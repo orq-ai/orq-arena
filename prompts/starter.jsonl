@@ -1,0 +1,30 @@
+{"prompt": "Write a Python function that finds the longest palindromic substring in a given string. Explain your approach.", "category": "code", "length_bucket": "medium"}
+{"prompt": "Implement a thread-safe LRU cache in Python using only the standard library. Walk me through the design.", "category": "code", "length_bucket": "medium"}
+{"prompt": "Given a list of integers, find the two numbers that sum to a target value. Optimize for time complexity and explain trade-offs.", "category": "code", "length_bucket": "short"}
+{"prompt": "Write a SQL query that finds the top 3 customers by total spend per month, breaking ties by most recent purchase.", "category": "code", "length_bucket": "medium"}
+{"prompt": "Refactor this function to be more Pythonic: def add(a, b): result = a + b; return result. Then explain three additional idioms.", "category": "code", "length_bucket": "short"}
+{"prompt": "Explain event loops in JavaScript vs Python asyncio in a way a backend engineer would find useful.", "category": "code", "length_bucket": "medium"}
+{"prompt": "A number is called 'practical' if every smaller positive integer can be represented as a sum of distinct divisors of it. Is 12 practical? Show your work.", "category": "math", "length_bucket": "short"}
+{"prompt": "Prove that the sum of the first n odd positive integers equals n squared. Offer a visual argument too.", "category": "math", "length_bucket": "short"}
+{"prompt": "A farmer has 100 meters of fencing and wants to enclose a rectangular field along a river (no fence on the river side). What's the maximum area?", "category": "math", "length_bucket": "short"}
+{"prompt": "Derive the formula for the volume of a sphere using integration from first principles, showing each step.", "category": "math", "length_bucket": "medium"}
+{"prompt": "Compute 2^100 mod 1000 without a calculator. Explain the technique you use.", "category": "math", "length_bucket": "short"}
+{"prompt": "Write a short story (under 300 words) about a lighthouse keeper who discovers that the lighthouse has been extinct for a century.", "category": "creative", "length_bucket": "medium"}
+{"prompt": "Compose a haiku sequence (three haikus) about an orc who secretly loves gardening.", "category": "creative", "length_bucket": "short"}
+{"prompt": "Write a product pitch for a fictional wearable called 'MoodRing' that detects when its owner is about to lie.", "category": "creative", "length_bucket": "medium"}
+{"prompt": "Describe a city where gravity shifts direction every sunrise, from the perspective of a postal worker.", "category": "creative", "length_bucket": "medium"}
+{"prompt": "Invent a new holiday and describe how it's celebrated across three imaginary cultures.", "category": "creative", "length_bucket": "medium"}
+{"prompt": "Explain the concept of 'technical debt' to a non-technical product manager, using a vivid analogy.", "category": "general", "length_bucket": "short"}
+{"prompt": "What are three common misconceptions about large language models? Explain why each is wrong.", "category": "general", "length_bucket": "medium"}
+{"prompt": "Plan a 3-day trip to Lisbon focused on food and history, with a daily budget of 80 euros.", "category": "general", "length_bucket": "medium"}
+{"prompt": "Summarize the French Revolution in under 200 words, then list its three most lasting global consequences.", "category": "general", "length_bucket": "medium"}
+{"prompt": "Give me a beginner-friendly workout routine for building general fitness in 20 minutes a day, three days a week.", "category": "general", "length_bucket": "medium"}
+{"prompt": "How would you explain public-key cryptography to a 12-year-old using only everyday objects?", "category": "general", "length_bucket": "short"}
+{"prompt": "What makes a good onboarding experience for a new software engineer? Suggest five concrete practices.", "category": "general", "length_bucket": "medium"}
+{"prompt": "Compare and contrast the philosophies of Stoicism and Epicureanism in a table, then recommend which suits a modern knowledge worker.", "category": "general", "length_bucket": "medium"}
+{"prompt": "Design a fair tie-breaker rule for a round-robin tournament where three teams have the same win-loss record.", "category": "general", "length_bucket": "short"}
+{"prompt": "Write a persuasive email to a busy CTO asking for 30 minutes to discuss LLM evaluation infrastructure.", "category": "general", "length_bucket": "short"}
+{"prompt": "Given the prompt 'improve my resume', what five clarifying questions would a great career coach ask first? Justify each.", "category": "general", "length_bucket": "medium"}
+{"prompt": "Write a Python script that reads a CSV of tournament match results and prints a Markdown leaderboard sorted by wins.", "category": "code", "length_bucket": "medium"}
+{"prompt": "What is the best data structure for a spell-checker that should suggest corrections? Compare at least two options.", "category": "code", "length_bucket": "medium"}
+{"prompt": "A light clock on a train moving at 80% of the speed of light — how much slower does it tick compared to a clock on the platform? Show the math.", "category": "math", "length_bucket": "short"}
