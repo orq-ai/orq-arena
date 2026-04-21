@@ -1,0 +1,239 @@
+[
+  {
+    "type": "bracket_updated",
+    "rounds": [
+      [["Grak the Thoughtful", "Ugluk Stormcaller"], ["Snot the Quick", "Azog Deepmind"], ["Morgoth Quadskull", "Gruk Flashfist"], ["Thrall Swiftclaw", "Bolg the Seeker"]],
+      [[null, null], [null, null]],
+      [[null, null]]
+    ],
+    "_delay": 0.1
+  },
+  {
+    "type": "match_started",
+    "match_id": "QF1",
+    "round_name": "quarterfinal",
+    "warrior_a": "Grak the Thoughtful",
+    "warrior_b": "Ugluk Stormcaller",
+    "_delay": 0.3
+  },
+  {
+    "type": "turn_prompt",
+    "match_id": "QF1",
+    "round_number": 1,
+    "prompt": "Explain event loops in JavaScript vs Python asyncio in a way a backend engineer would find useful.",
+    "_delay": 0.2
+  },
+  {
+    "type": "response_chunk",
+    "match_id": "QF1",
+    "side": "a",
+    "text": "Event loops ",
+    "_delay": 0.05
+  },
+  {
+    "type": "response_chunk",
+    "match_id": "QF1",
+    "side": "a",
+    "text": "schedule asynchronous work by polling for ready I/O and running queued callbacks between those polls.",
+    "_delay": 0.05
+  },
+  {
+    "type": "response_chunk",
+    "match_id": "QF1",
+    "side": "b",
+    "text": "An event loop is a single-threaded scheduler that yields to pending I/O and ",
+    "_delay": 0.05
+  },
+  {
+    "type": "response_chunk",
+    "match_id": "QF1",
+    "side": "b",
+    "text": "interleaves coroutines.",
+    "_delay": 0.05
+  },
+  {
+    "type": "judge_verdict",
+    "match_id": "QF1",
+    "judge_name": "Haiku",
+    "verdict": "A",
+    "reasoning": "Response A is more accurate about how event loops actually schedule I/O and describes the mechanism more clearly.",
+    "_delay": 0.3
+  },
+  {
+    "type": "judge_verdict",
+    "match_id": "QF1",
+    "judge_name": "Flash",
+    "verdict": "A",
+    "reasoning": "A covers polling and callback ordering. B is shorter but omits the scheduling detail.",
+    "_delay": 0.2
+  },
+  {
+    "type": "judge_verdict",
+    "match_id": "QF1",
+    "judge_name": "4o-mini",
+    "verdict": "A",
+    "reasoning": "Stronger technical depth with concrete terminology.",
+    "_delay": 0.2
+  },
+  {
+    "type": "turn_resolved",
+    "match_id": "QF1",
+    "round_number": 1,
+    "majority": "A",
+    "verdicts": [],
+    "damage_dealt": 30,
+    "loser_side": "b",
+    "hp_a": 100,
+    "hp_b": 70,
+    "_delay": 0.4
+  },
+  {
+    "type": "turn_prompt",
+    "match_id": "QF1",
+    "round_number": 2,
+    "prompt": "Write a Python function that finds the longest palindromic substring in a given string.",
+    "_delay": 0.8
+  },
+  {
+    "type": "response_chunk",
+    "match_id": "QF1",
+    "side": "a",
+    "text": "def longest_palindrome(s):\n    n = len(s)\n    ...",
+    "_delay": 0.05
+  },
+  {
+    "type": "response_chunk",
+    "match_id": "QF1",
+    "side": "b",
+    "text": "def find_palindrome(s): return s[::-1]  # incorrect",
+    "_delay": 0.05
+  },
+  {
+    "type": "judge_verdict",
+    "match_id": "QF1",
+    "judge_name": "Haiku",
+    "verdict": "A",
+    "reasoning": "A attempts an expand-around-center approach; B returns a reversed string which is wrong.",
+    "_delay": 0.3
+  },
+  {
+    "type": "judge_verdict",
+    "match_id": "QF1",
+    "judge_name": "Flash",
+    "verdict": "A",
+    "reasoning": "A is closer to a correct solution. B is plainly wrong.",
+    "_delay": 0.2
+  },
+  {
+    "type": "judge_verdict",
+    "match_id": "QF1",
+    "judge_name": "4o-mini",
+    "verdict": "A",
+    "reasoning": "A is correct in approach and B is incorrect.",
+    "_delay": 0.2
+  },
+  {
+    "type": "turn_resolved",
+    "match_id": "QF1",
+    "round_number": 2,
+    "majority": "A",
+    "verdicts": [],
+    "damage_dealt": 30,
+    "loser_side": "b",
+    "hp_a": 100,
+    "hp_b": 40,
+    "_delay": 0.4
+  },
+  {
+    "type": "turn_prompt",
+    "match_id": "QF1",
+    "round_number": 3,
+    "prompt": "Compose a haiku sequence (three haikus) about an orc who secretly loves gardening.",
+    "_delay": 0.6
+  },
+  {
+    "type": "response_chunk",
+    "match_id": "QF1",
+    "side": "a",
+    "text": "Axe leans on the fence /\nBetween the cabbage and thyme /\nGreen stains on his hands.",
+    "_delay": 0.05
+  },
+  {
+    "type": "response_chunk",
+    "match_id": "QF1",
+    "side": "b",
+    "text": "Orc tends garden small /\nBlade is sharp, but soil is soft /\nVictory — a rose.",
+    "_delay": 0.05
+  },
+  {
+    "type": "judge_verdict",
+    "match_id": "QF1",
+    "judge_name": "Haiku",
+    "verdict": "B",
+    "reasoning": "B has a cleaner contrast and imagery in all three lines.",
+    "_delay": 0.2
+  },
+  {
+    "type": "judge_verdict",
+    "match_id": "QF1",
+    "judge_name": "Flash",
+    "verdict": "A",
+    "reasoning": "A has more vivid sensory details.",
+    "_delay": 0.2
+  },
+  {
+    "type": "judge_verdict",
+    "match_id": "QF1",
+    "judge_name": "4o-mini",
+    "verdict": "B",
+    "reasoning": "B is more playful and on-theme.",
+    "_delay": 0.2
+  },
+  {
+    "type": "turn_resolved",
+    "match_id": "QF1",
+    "round_number": 3,
+    "majority": "B",
+    "verdicts": [],
+    "damage_dealt": 15,
+    "loser_side": "a",
+    "hp_a": 85,
+    "hp_b": 40,
+    "_delay": 0.4
+  },
+  {
+    "type": "match_resolved",
+    "match_id": "QF1",
+    "winner": "Grak the Thoughtful",
+    "loser": "Ugluk Stormcaller",
+    "by": "round_cap",
+    "final_hp_a": 85,
+    "final_hp_b": 40,
+    "_delay": 0.8
+  },
+  {
+    "type": "bracket_updated",
+    "rounds": [
+      [["Grak the Thoughtful", "Ugluk Stormcaller"], ["Snot the Quick", "Azog Deepmind"], ["Morgoth Quadskull", "Gruk Flashfist"], ["Thrall Swiftclaw", "Bolg the Seeker"]],
+      [["Grak the Thoughtful", null], [null, null]],
+      [[null, null]]
+    ],
+    "_delay": 0.3
+  },
+  {
+    "type": "tournament_ended",
+    "champion": "Grak the Thoughtful",
+    "elo": {
+      "Grak the Thoughtful": 1182,
+      "Thrall Swiftclaw": 1120,
+      "Azog Deepmind": 1080,
+      "Morgoth Quadskull": 1040,
+      "Gruk Flashfist": 990,
+      "Snot the Quick": 940,
+      "Bolg the Seeker": 880,
+      "Ugluk Stormcaller": 820
+    },
+    "battle_log_path": "battles.jsonl",
+    "_delay": 1.2
+  }
+]
