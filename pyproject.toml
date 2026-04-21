@@ -1,0 +1,46 @@
+[project]
+name = "orc-arena"
+version = "0.1.0"
+description = "Retro arcade tournament where LLMs fight as orcs — all calls via the orq.ai router gateway."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Arian Pasquali" }]
+dependencies = [
+    "textual>=0.83",
+    "click>=8.1",
+    "pydantic>=2.7",
+    "pyyaml>=6.0",
+    "openai>=1.50",
+    "instructor>=1.7",
+    "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.23",
+    "textual-dev>=1.6",
+]
+
+[project.scripts]
+orc-arena = "orc_arena.cli:cli"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/orc_arena"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+pythonpath = ["src"]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8",
+    "pytest-asyncio>=0.23",
+    "textual-dev>=1.6",
+]
