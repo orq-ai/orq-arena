@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>orc-arena — Architecture Complexity & Overengineering Report</title>
+<style>
+  :root {
+    --ivory: #f8f5ec;
+    --paper: #fffdf7;
+    --slate: #2a2d33;
+    --slate-soft: #4a4f57;
+    --oat: #ded6c3;
+    --oat-line: #e7e0d0;
+    --clay: #b45739;      /* primary accent */
+    --clay-soft: #c9765a;
+    --olive: #6f7748;     /* secondary */
+    --gold: #b8892b;
+    --green: #55713f;
+    --muted: #8a8578;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    --mono: "SF Mono", "JetBrains Mono", "Fira Code", ui-monospace, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--ivory);
+    color: var(--slate);
+    font-family: var(--sans);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 0 28px 96px; }
+
+  /* Header */
+  header.page {
+    border-bottom: 3px double var(--oat);
+    padding: 56px 0 30px;
+    margin-bottom: 8px;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--clay);
+    margin: 0 0 14px;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: 40px;
+    line-height: 1.12;
+    margin: 0 0 12px;
+    letter-spacing: -0.01em;
+  }
+  .dateline {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .dateline b { color: var(--slate-soft); font-weight: 600; }
+
+  h2 {
+    font-family: var(--serif);
+    font-size: 25px;
+    font-weight: 600;
+    margin: 52px 0 6px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--oat-line);
+  }
+  h2 .num {
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--clay);
+    margin-right: 12px;
+    vertical-align: 2px;
+  }
+  h3 { font-family: var(--serif); font-size: 18px; margin: 26px 0 4px; }
+  p { margin: 10px 0; }
+  .lede { font-size: 17px; color: var(--slate-soft); }
+  code, .mono { font-family: var(--mono); font-size: 0.86em; }
+  code {
+    background: #efe9db;
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: #7a3a26;
+  }
+  a { color: var(--clay); }
+
+  /* Verdict strip */
+  .verdict {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr 1fr 1fr;
+    gap: 14px;
+    margin: 30px 0 8px;
+  }
+  .vcard {
+    background: var(--paper);
+    border: 1px solid var(--oat-line);
+    border-radius: 10px;
+    padding: 18px 18px 16px;
+  }
+  .vcard .label {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 6px;
+  }
+  .vcard .big {
+    font-family: var(--serif);
+    font-size: 34px;
+    font-weight: 600;
+    line-height: 1;
+  }
+  .vcard .sub { font-size: 12.5px; color: var(--slate-soft); margin-top: 6px; }
+  .grade-strip { border-top: 3px solid var(--clay); }
+
+  /* Callout */
+  .callout {
+    background: var(--paper);
+    border-left: 4px solid var(--clay);
+    border-radius: 0 8px 8px 0;
+    padding: 16px 20px;
+    margin: 22px 0;
+  }
+  .callout.good { border-left-color: var(--green); }
+  .callout.warn { border-left-color: var(--gold); }
+
+  /* Tables */
+  table { border-collapse: collapse; width: 100%; margin: 18px 0; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--oat-line); vertical-align: top; }
+  th {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1.5px solid var(--oat);
+  }
+  tbody tr:hover { background: #fbf8f0; }
+  td.loc, td.n { font-family: var(--mono); white-space: nowrap; }
+
+  /* Pills */
+  .pill {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 1px 8px;
+    border-radius: 20px;
+    border: 1px solid var(--oat);
+    color: var(--slate-soft);
+    white-space: nowrap;
+  }
+  .pill.dead { background: #f6e2dc; border-color: #e2b7a8; color: #9c3f26; }
+  .pill.over { background: #f6ecd6; border-color: #e0c98d; color: #8a6510; }
+  .pill.keep { background: #e7efdd; border-color: #b8cf9e; color: #465e33; }
+  .pill.good { background: #e7efdd; border-color: #b8cf9e; color: #465e33; }
+
+  /* Finding blocks */
+  .finding {
+    background: var(--paper);
+    border: 1px solid var(--oat-line);
+    border-radius: 10px;
+    padding: 4px 22px 18px;
+    margin: 20px 0;
+  }
+  .finding .rank {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+  }
+  .finding h3 { margin-top: 12px; }
+  .finding .verdict-line {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--clay);
+    margin: 4px 0 10px;
+  }
+  .kv { display: grid; grid-template-columns: 96px 1fr; gap: 4px 14px; font-size: 14px; margin-top: 8px; }
+  .kv .k { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); padding-top: 2px; }
+
+  /* Grade scorecard */
+  .grades { margin: 20px 0; }
+  .grade-row {
+    display: grid;
+    grid-template-columns: 62px 1fr;
+    gap: 18px;
+    align-items: start;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--oat-line);
+  }
+  .grade-badge {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: 30px;
+    text-align: center;
+    line-height: 1.5;
+    border-radius: 10px;
+    border: 1.5px solid var(--oat);
+    background: var(--paper);
+  }
+  .g-a { color: #3f6b2f; border-color: #a9c78f; background: #eef4e6; }
+  .g-b { color: #6a7530; border-color: #cad39a; background: #f3f2e0; }
+  .g-c { color: #9a7414; border-color: #e0c98d; background: #f7efd8; }
+  .g-d { color: #a4502c; border-color: #e0ac93; background: #f7e7dd; }
+  .g-f { color: #93331d; border-color: #d99a86; background: #f6ded5; }
+  .grade-row .axis { font-family: var(--serif); font-size: 17px; font-weight: 600; }
+  .grade-row .why { font-size: 13.5px; color: var(--slate-soft); margin-top: 2px; }
+
+  /* Chart */
+  .chart { background: var(--paper); border: 1px solid var(--oat-line); border-radius: 10px; padding: 22px 24px; margin: 20px 0; }
+  .bar-row { display: grid; grid-template-columns: 190px 1fr 74px; gap: 12px; align-items: center; margin: 10px 0; font-size: 13px; }
+  .bar-track { background: #efe9db; border-radius: 6px; height: 22px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 6px; }
+  .bar-label { font-family: var(--mono); font-size: 12px; color: var(--slate-soft); }
+  .legend-note { font-size: 12px; color: var(--muted); margin-top: 12px; }
+
+  ul.tight { margin: 8px 0; padding-left: 20px; }
+  ul.tight li { margin: 5px 0; }
+  .footer { margin-top: 60px; padding-top: 18px; border-top: 3px double var(--oat); font-size: 12.5px; color: var(--muted); font-family: var(--mono); }
+  .toc { font-family: var(--mono); font-size: 12.5px; color: var(--slate-soft); margin: 4px 0 0; }
+  .toc a { color: var(--slate-soft); text-decoration: none; margin-right: 16px; }
+  .toc a:hover { color: var(--clay); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="page">
+    <p class="eyebrow">Architecture Review · Complexity &amp; Overengineering</p>
+    <h1>orc-arena — what to keep, what to cut</h1>
+    <p class="dateline"><b>2026-07-01</b> · branch <code>gnhf/i-want-you-to-analys-287d22</code> · ~1,909 LOC src · 25 modules · 5 test files</p>
+    <p class="toc">
+      <a href="#verdict">Verdict</a>
+      <a href="#good">What's good</a>
+      <a href="#map">Complexity map</a>
+      <a href="#over">Overengineering</a>
+      <a href="#dead">Dead code</a>
+      <a href="#grade">The grade</a>
+      <a href="#cut">Cut list</a>
+    </p>
+  </header>
+
+  <!-- ============ VERDICT ============ -->
+  <section id="verdict">
+    <p class="lede">The code is <b>clean, typed, documented, and tested</b>. That is not the problem.
+    The problem is that a 7-fight toy tournament is wearing the exoskeleton of a distributed
+    system — a typed event bus, a JSON replay format, and a maximum-likelihood rating estimator —
+    to serve a future (Unity/web renderers, router-training interop) that <b>the README itself files
+    under "not in MVP."</b> The overengineering is real but concentrated: it lives in ~15% of the
+    lines and can be excised with near-zero behavior change.</p>
+
+    <div class="verdict grade-strip">
+      <div class="vcard">
+        <p class="label">Complexity grade</p>
+        <div class="big" style="color:var(--olive)">B−</div>
+        <p class="sub">High-quality code, over-scoped architecture.</p>
+      </div>
+      <div class="vcard">
+        <p class="label">Deletable now</p>
+        <div class="big" style="color:var(--clay)">~65</div>
+        <p class="sub">LOC of pure dead code — zero behavior change.</p>
+      </div>
+      <div class="vcard">
+        <p class="label">Reducible</p>
+        <div class="big" style="color:var(--gold)">~180</div>
+        <p class="sub">LOC that work but out-scope the need.</p>
+      </div>
+      <div class="vcard">
+        <p class="label">Solid core</p>
+        <div class="big" style="color:var(--green)">~87%</div>
+        <p class="sub">Lines that earn their place.</p>
+      </div>
+    </div>
+    <p class="legend-note">Grades and line counts are one reviewer's estimate over a static read of the
+    branch; "deletable" was verified with <code>grep</code> for zero call-sites.</p>
+  </section>
+
+  <!-- ============ WHAT'S GOOD ============ -->
+  <section id="good">
+    <h2><span class="num">01</span>What's actually good (don't touch)</h2>
+    <p>Any honest overengineering review has to start by admitting where restraint <em>was</em> shown,
+    so the cuts below read as surgery and not vandalism.</p>
+    <div class="callout good">
+      <ul class="tight">
+        <li><b>The bracket is honestly narrow.</b> <code>Bracket.seed_eight</code> hardcodes 8 warriors and
+        the QF/SF/F structure and <em>raises</em> on anything else. That is textbook YAGNI — no generic
+        n-player tournament engine nobody asked for.</li>
+        <li><b>Judge eval technique is legit.</b> Per-judge 50/50 position-bias label swap + un-swap,
+        self-judge exclusion (a judge model can't score a match it's fighting in), and majority-with-DISCARD
+        are real evaluation hygiene, not gold-plating.</li>
+        <li><b>Dependencies are boring and correct.</b> <code>openai</code> (gateway is OpenAI-compatible),
+        <code>instructor</code> for structured verdicts, <code>textual</code>, <code>click</code>,
+        <code>pydantic</code>. Nothing exotic; no framework smuggled in for a few lines.</li>
+        <li><b>Tests target the pure logic</b> (damage map, ELO, bracket seeding/propagation, majority vote,
+        config) and skip the TUI/network — the correct things to test.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ============ COMPLEXITY MAP ============ -->
+  <section id="map">
+    <h2><span class="num">02</span>Complexity map</h2>
+    <p>Per-subsystem read. "Verdict" is complexity <em>relative to the value it delivers today</em>,
+    not code quality.</p>
+    <table>
+      <thead>
+        <tr><th>Subsystem</th><th>LOC</th><th>Complexity</th><th>Verdict</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>arena/battle.py</code></td><td class="loc">275</td><td>High (inherent)</td><td><span class="pill keep">Keep</span> Real turn/HP/KO state machine. Earns its size.</td></tr>
+        <tr><td><code>tui/*</code> (app+screens+widgets)</td><td class="loc">692</td><td>Medium</td><td><span class="pill keep">Keep</span> It's the product. One dead stub inside.</td></tr>
+        <tr><td><code>events.py</code> + queue/dispatch/replay</td><td class="loc">108+</td><td>Medium</td><td><span class="pill over">Over</span> Event bus for renderers that don't exist.</td></tr>
+        <tr><td><code>judges/panel.py</code></td><td class="loc">127</td><td>Medium</td><td><span class="pill keep">Keep</span> Bias-swap + majority is the actual IP.</td></tr>
+        <tr><td><code>tournament/elo.py</code></td><td class="loc">69</td><td>High (needless)</td><td><span class="pill over">Over</span> Bradley-Terry MLE over 7 sparse outcomes.</td></tr>
+        <tr><td><code>providers/orq_gateway.py</code></td><td class="loc">97</td><td>Low</td><td><span class="pill over">Over</span> Half the file (<code>generate</code>) is uncalled.</td></tr>
+        <tr><td><code>data/schemas.py</code></td><td class="loc">53</td><td>Low</td><td><span class="pill keep">Keep*</span> Battlebench-compat; several fields never filled.</td></tr>
+        <tr><td><code>config.py</code>, <code>cli.py</code>, <code>data/*</code></td><td class="loc">~180</td><td>Low</td><td><span class="pill keep">Keep</span> Thin and appropriate.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ============ OVERENGINEERING ============ -->
+  <section id="over">
+    <h2><span class="num">03</span>Overengineering, ranked</h2>
+
+    <div class="finding">
+      <p class="rank">FINDING 01 · biggest complexity-to-value gap</p>
+      <h3>The typed event bus exists for consumers that don't</h3>
+      <p class="verdict-line">10 pydantic event classes · asyncio.Queue · dispatcher task · JSON replay codec</p>
+      <p>The engine never calls the TUI; it pushes typed events into a queue that a dispatcher drains
+      (<code>events.py</code>, <code>tui/app.py</code>). The stated justification is a "future Unity/web renderer."
+      That renderer is in the README's <em>"Stretch work (not in MVP)"</em> section. For one consumer, a direct
+      call or a plain callback does the same job. Two of the ten event types —
+      <code>TournamentStarted</code> and <code>ResponseComplete</code> — are emitted but have
+      <b>no handler at all</b> (absent from both <code>_handle_event</code> and the replay <code>mapping</code>):
+      dead on arrival.</p>
+      <div class="kv">
+        <span class="k">Redeemed by</span><span>The <code>demo</code> command genuinely replays recorded events from a fixture — that reuse justifies roughly half the layer.</span>
+        <span class="k">Do</span><span>Keep the queue (replay needs it); delete the 2 zero-consumer events; stop marketing "future renderers" as architecture.</span>
+      </div>
+    </div>
+
+    <div class="finding">
+      <p class="rank">FINDING 02 · illusory precision</p>
+      <h3>Bradley-Terry MLE to rank 8 players from 7 games</h3>
+      <p class="verdict-line">69 LOC · 100 iterations · log-mean anchoring · convergence tol 1e-6</p>
+      <p>Single elimination produces <b>7 outcomes on a sparse 8-node graph</b> where most pairs never meet and
+      no pair meets twice. Fitting a maximum-likelihood paired-comparison model to that yields a number with
+      four-figure confidence and near-zero information — the champion's "ELO" is dominated by <em>who they
+      happened to be bracketed against</em>. The machinery (precomputed <code>n_matrix</code>, geometric-mean
+      normalization, iterate-to-tolerance) is genuinely nice code solving a problem the data can't support.</p>
+      <div class="kv">
+        <span class="k">Do</span><span>Rank by wins / rounds-survived (≈10 lines) and label it honestly, or keep BT-MLE only if you run a round-robin. Don't sell 7 games as a rating system.</span>
+      </div>
+    </div>
+
+    <div class="finding">
+      <p class="rank">FINDING 03 · speculative interop surface</p>
+      <h3>Battlebench-compat fields nothing writes</h3>
+      <p class="verdict-line"><code>prompt_category</code> · <code>prompt_length_bucket</code> · <code>generation_type</code> · <code>tokens_a_in</code> · <code>tokens_b_in</code></p>
+      <p><code>BattleRecord</code> is documented as "byte-identical" to orq-battlebench so the log is drop-in for
+      router training — a real, stated goal. But these fields are <b>never populated</b> (always default), and
+      streaming gives no input-token counts, so the "compatibility" is aspiration, not a tested contract. Fine to
+      keep for the schema shape; don't mistake unfilled fields for working interop.</p>
+    </div>
+
+    <div class="callout warn">
+      <b>Borderline, left alone:</b> <code>instructor</code> for a two-field verdict is slightly heavy vs a JSON
+      <code>response_format</code>, but it buys retries + validation for free — a fair trade. The double-KO / HP-tie
+      resolution in <code>battle.py</code> is arbitrary-but-documented; acceptable for a game.
+    </div>
+  </section>
+
+  <!-- ============ DEAD CODE ============ -->
+  <section id="dead">
+    <h2><span class="num">04</span>Dead code — delete today, nothing breaks</h2>
+    <p>Each verified with a zero-call-site <code>grep</code> across <code>src/</code> and <code>tests/</code>.</p>
+    <table>
+      <thead><tr><th>What</th><th>Where</th><th>LOC</th><th>Evidence</th></tr></thead>
+      <tbody>
+        <tr><td><code>OrqGateway.generate()</code> + <code>GenerationResult</code></td><td>providers/orq_gateway.py</td><td class="n">~35</td><td>No <code>.generate(</code> call anywhere; judges use <code>instructor.from_openai(client)</code>, warriors use <code>stream_completion</code>.</td></tr>
+        <tr><td><code>TournamentState</code> dataclass</td><td>tournament/driver.py</td><td class="n">~8</td><td>Never instantiated; <code>run_tournament</code> uses locals.</td></tr>
+        <tr><td>Bracket-screen stub</td><td>tui/screens/bracket.py</td><td class="n">5</td><td>Docstring says "kept as a stub for future work"; never imported.</td></tr>
+        <tr><td><code>TournamentStarted</code>, <code>ResponseComplete</code></td><td>events.py (consumers)</td><td class="n">~7</td><td>Emitted but absent from TUI dispatch &amp; replay mapping.</td></tr>
+        <tr><td><code>WarriorCard.set_elo()</code></td><td>tui/widgets/warrior_card.py</td><td class="n">4</td><td>No call site; ELO never updates mid-match.</td></tr>
+        <tr><td><code>ResponsePanel.set_text()</code></td><td>tui/widgets/response_panel.py</td><td class="n">4</td><td>No call site; only <code>append_chunk</code>/<code>reset</code> used.</td></tr>
+        <tr><td><code>WarriorSpec.starting_elo</code></td><td>orcs/roster.py</td><td class="n">1</td><td>Defined, never read.</td></tr>
+        <tr><td><code>GatewayConfig.concurrency</code></td><td>config.py + yaml</td><td class="n">1</td><td>Config knob wired to nothing — no semaphore exists.</td></tr>
+      </tbody>
+    </table>
+
+    <div class="chart">
+      <div class="bar-row">
+        <span class="bar-label">Solid core (keep)</span>
+        <div class="bar-track"><div class="bar-fill" style="width:87%;background:var(--green)"></div></div>
+        <span class="bar-label">~1,660</span>
+      </div>
+      <div class="bar-row">
+        <span class="bar-label">Reducible (over-scoped)</span>
+        <div class="bar-track"><div class="bar-fill" style="width:9.4%;background:var(--gold)"></div></div>
+        <span class="bar-label">~180</span>
+      </div>
+      <div class="bar-row">
+        <span class="bar-label">Pure dead (delete)</span>
+        <div class="bar-track"><div class="bar-fill" style="width:3.4%;background:var(--clay)"></div></div>
+        <span class="bar-label">~65</span>
+      </div>
+      <p class="legend-note">Src LOC by disposition (bar width ∝ share of ~1,909 src lines). "Reducible" counts
+      the event-bus trim + collapsing BT-MLE to a win-count ranking.</p>
+    </div>
+  </section>
+
+  <!-- ============ THE GRADE (hate mode) ============ -->
+  <section id="grade">
+    <h2><span class="num">05</span>The grade — harsh mode</h2>
+    <p>Graded like a hostile reviewer who assumes every line is guilty until it justifies itself.
+    Axis grades, then the aggregate.</p>
+    <div class="grades">
+      <div class="grade-row">
+        <div class="grade-badge g-a">A−</div>
+        <div><div class="axis">Code quality &amp; readability</div>
+        <div class="why">Consistent typing, purposeful docstrings, clean module seams. Genuinely pleasant to read. Hard to fault.</div></div>
+      </div>
+      <div class="grade-row">
+        <div class="grade-badge g-b">B</div>
+        <div><div class="axis">Reuse / no-reinvention</div>
+        <div class="why">Leans on the right libraries — but hand-rolls a Bradley-Terry solver ("no numpy") the data doesn't warrant.</div></div>
+      </div>
+      <div class="grade-row">
+        <div class="grade-badge g-c">C−</div>
+        <div><div class="axis">Dead-code hygiene</div>
+        <div class="why">~65 dead LOC, two zero-consumer events, four unreachable methods/fields, a self-described stub file shipped.</div></div>
+      </div>
+      <div class="grade-row">
+        <div class="grade-badge g-d">D+</div>
+        <div><div class="axis">YAGNI discipline / scope</div>
+        <div class="why">Event bus, replay codec, and renderer seams built for a future the README labels "not in MVP." Architecture ahead of need.</div></div>
+      </div>
+      <div class="grade-row">
+        <div class="grade-badge g-d">D</div>
+        <div><div class="axis">Statistical honesty (ELO)</div>
+        <div class="why">MLE ratings from 7 sparse games manufacture precision that isn't there. Right tool, wrong sample size.</div></div>
+      </div>
+      <div class="grade-row">
+        <div class="grade-badge g-b">B</div>
+        <div><div class="axis">Test coverage vs surface</div>
+        <div class="why">Pure logic well covered; TUI/gateway untested — the correct call for a toy, so no penalty there.</div></div>
+      </div>
+    </div>
+    <div class="callout">
+      <p style="margin:2px 0"><b>Aggregate: B−.</b> This is not a mess — it's a tidy codebase that mistook a
+      weekend game for a platform. The fix isn't a rewrite; it's <b>deletion</b>. Cut the dead ~65, collapse the
+      ELO to a win-count, and stop treating "future renderer" as a load-bearing requirement, and the same product
+      ships at ~1,650 lines with an <b>A−</b> on every axis above.</p>
+    </div>
+  </section>
+
+  <!-- ============ CUT LIST ============ -->
+  <section id="cut">
+    <h2><span class="num">06</span>Recommended cut list</h2>
+    <ol class="tight">
+      <li><b>Delete the 8 dead items</b> in §04 — mechanical, no behavior change, ~65 LOC and one file gone.</li>
+      <li><b>Collapse <code>elo.py</code></b> to wins/rounds-survived ranking (~57 LOC saved) <em>unless</em> a round-robin mode is on the roadmap — then keep MLE and add CIs back.</li>
+      <li><b>Trim the event layer</b>: drop the two zero-consumer events; keep the queue (replay uses it) but reframe it as "TUI + replay," not "future renderers."</li>
+      <li><b>Mark or fill</b> the unpopulated battlebench fields — either write them or annotate them as reserved, so "drop-in compatible" is a claim you can test.</li>
+      <li><b>Leave the bracket, judge panel, and battle engine alone.</b> They're right-sized.</li>
+    </ol>
+    <p style="margin-top:18px">Net: a leaner ~1,650-line codebase that does exactly what it does today, with the
+    scaffolding for an imagined future taken down until that future actually files a ticket.</p>
+  </section>
+
+  <div class="footer">
+    orc-arena architecture review · generated 2026-07-01 · static read of branch
+    gnhf/i-want-you-to-analys-287d22 · line counts approximate, dead-code claims grep-verified
+  </div>
+
+</div>
+</body>
+</html>
