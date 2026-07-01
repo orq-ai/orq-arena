@@ -235,7 +235,7 @@
   <header class="page">
     <p class="eyebrow">Architecture Review · Complexity &amp; Overengineering</p>
     <h1>orc-arena — what to keep, what to cut</h1>
-    <p class="dateline"><b>2026-07-01</b> · branch <code>gnhf/i-want-you-to-analys-287d22</code> · ~1,909 LOC src · 25 modules · 5 test files</p>
+    <p class="dateline"><b>2026-07-01</b> · <b>rev 2 — revised after an adversarial /hate pass</b> · branch <code>gnhf/i-want-you-to-analys-287d22</code> · ~1,909 LOC src · 25 modules · 5 test files</p>
     <p class="toc">
       <a href="#verdict">Verdict</a>
       <a href="#good">What's good</a>
@@ -362,13 +362,46 @@
     </div>
 
     <div class="finding">
-      <p class="rank">FINDING 03 · speculative interop surface</p>
-      <h3>Battlebench-compat fields nothing writes</h3>
-      <p class="verdict-line"><code>prompt_category</code> · <code>prompt_length_bucket</code> · <code>generation_type</code> · <code>tokens_a_in</code> · <code>tokens_b_in</code></p>
-      <p><code>BattleRecord</code> is documented as "byte-identical" to orq-battlebench so the log is drop-in for
-      router training — a real, stated goal. But these fields are <b>never populated</b> (always default), and
-      streaming gives no input-token counts, so the "compatibility" is aspiration, not a tested contract. Fine to
-      keep for the schema shape; don't mistake unfilled fields for working interop.</p>
+      <p class="rank">FINDING 03 · speculative interop surface — with a reuse root cause underneath it</p>
+      <h3>Battlebench-compat token fields nothing writes — because a fake tokenizer stands in for the real API</h3>
+      <p class="verdict-line"><code>tokens_a_in</code> · <code>tokens_b_in</code> · <code>tokens_*_out</code> ← <code>battle.py:75  max(1, len(full)//4)</code></p>
+      <p><code>BattleRecord</code> is documented "byte-identical" to orq-battlebench so the log is drop-in for
+      router training — a real, stated goal. The input-token fields are never populated, and the output-token
+      fields are filled by <code>tokens_out = max(1, len(full) // 4)</code> (<code>battle.py:75</code>, whose own
+      comment reads <i>"We don't have usage tokens from streaming; approximate by char/4"</i>) — a hand-rolled
+      fake tokenizer. <b>That premise is false.</b> The gateway is OpenAI-compatible: passing
+      <code>stream_options={"include_usage": True}</code> to the streaming <code>create()</code> call
+      (<code>orq_gateway.py:54</code>) makes the API emit a terminal chunk carrying exact
+      <code>prompt_tokens</code> / <code>completion_tokens</code> — and the code to read <code>resp.usage</code>
+      <b>already exists</b>, stranded in the <em>dead</em> <code>complete()</code> path (<code>orq_gateway.py:84</code>).
+      So the "compatibility" gap and the char/4 estimator are one bug, not two: real usage is a single API flag
+      away and the reader is already written.</p>
+      <div class="kv">
+        <span class="k">Do</span><span>Set <code>stream_options={"include_usage": True}</code>, read the terminal usage chunk, delete the char/4 line — then the battlebench token fields are measured, not aspirational.</span>
+      </div>
+    </div>
+
+    <div class="finding">
+      <p class="rank">FINDING 04 · reuse / reinvention — the axis the first draft under-graded</p>
+      <h3>A canonical type re-spelled by hand, and a solver the ecosystem already ships</h3>
+      <p class="verdict-line">4 copies of one <code>Verdict</code> union · hand-rolled Bradley-Terry vs <code>choix</code> · comment rot</p>
+      <ul class="tight">
+        <li><b><code>Verdict</code> is defined once, then ignored.</b> <code>judges/panel.py:20</code> declares the
+        canonical <code>Verdict = Literal["A", "B", "TIE", "DISCARD"]</code> — then <code>arena/damage.py:27</code>,
+        <code>events.py:72</code>, and <code>data/schemas.py:34</code> each re-spell the raw Literal inline instead
+        of importing it. Four hand-kept copies of one union; change the verdict set and three sites drift silently.</li>
+        <li><b>Bradley-Terry is a solved, packaged problem.</b> Finding 02's 69-LOC MLE reinvents
+        <code>choix.ilsr_pairwise</code> (or ~15 lines on <code>numpy</code>/<code>scipy</code>). The file's own
+        header — "<i>Pure Python, no numpy/scipy</i>" (<code>elo.py:3</code>) — sells the reinvention as a virtue.
+        If a paired-comparison MLE is warranted at all (Finding 02 argues it isn't, at 7 games), it's warranted
+        via the maintained solver, not a bespoke iterate-to-tolerance loop.</li>
+        <li><b>A docstring advertises code that isn't there.</b> <code>orcs/roster.py:1</code> promises
+        "<i>Warrior specification + default roster</i>", but the file defines only <code>WarriorSpec</code> — no
+        roster exists. Comment rot on line 1.</li>
+      </ul>
+      <div class="kv">
+        <span class="k">Do</span><span>Export and import the one <code>Verdict</code> alias; adopt <code>choix</code> only if a round-robin ever justifies MLE (else drop it per Finding 02); fix the line-1 docstring.</span>
+      </div>
     </div>
 
     <div class="callout warn">
@@ -429,9 +462,9 @@
         <div class="why">Consistent typing, purposeful docstrings, clean module seams. Genuinely pleasant to read. Hard to fault.</div></div>
       </div>
       <div class="grade-row">
-        <div class="grade-badge g-b">B</div>
+        <div class="grade-badge g-c">C+</div>
         <div><div class="axis">Reuse / no-reinvention</div>
-        <div class="why">Leans on the right libraries — but hand-rolls a Bradley-Terry solver ("no numpy") the data doesn't warrant.</div></div>
+        <div class="why">Downgraded from B after the /hate pass: right libraries at the seams, reinvention in the middle. A canonical <code>Verdict</code> type re-spelled in 3 more files, a Bradley-Terry solver hand-rolled where <code>choix</code> exists, and a char/4 fake tokenizer standing in for the <code>stream_options</code> usage the API already returns (§03–04).</div></div>
       </div>
       <div class="grade-row">
         <div class="grade-badge g-c">C−</div>
@@ -455,10 +488,12 @@
       </div>
     </div>
     <div class="callout">
-      <p style="margin:2px 0"><b>Aggregate: B−.</b> This is not a mess — it's a tidy codebase that mistook a
-      weekend game for a platform. The fix isn't a rewrite; it's <b>deletion</b>. Cut the dead ~65, collapse the
-      ELO to a win-count, and stop treating "future renderer" as a load-bearing requirement, and the same product
-      ships at ~1,650 lines with an <b>A−</b> on every axis above.</p>
+      <p style="margin:2px 0"><b>Aggregate: B− (held down by the reuse downgrade this revision).</b> This is not a
+      mess — it's a tidy codebase that mistook a weekend game for a platform. The fix isn't a rewrite; it's
+      <b>deletion and reuse</b>: cut the dead ~65, collapse the ELO to a win-count, import the one <code>Verdict</code>
+      type instead of four copies, swap the char/4 estimator for real <code>stream_options</code> usage, and stop
+      treating "future renderer" as a load-bearing requirement. The same product then ships at ~1,650 lines with an
+      <b>A−</b> on every axis above.</p>
     </div>
   </section>
 
@@ -469,7 +504,8 @@
       <li><b>Delete the 8 dead items</b> in §04 — mechanical, no behavior change, ~65 LOC and one file gone.</li>
       <li><b>Collapse <code>elo.py</code></b> to wins/rounds-survived ranking (~57 LOC saved) <em>unless</em> a round-robin mode is on the roadmap — then keep MLE and add CIs back.</li>
       <li><b>Trim the event layer</b>: drop the two zero-consumer events; keep the queue (replay uses it) but reframe it as "TUI + replay," not "future renderers."</li>
-      <li><b>Mark or fill</b> the unpopulated battlebench fields — either write them or annotate them as reserved, so "drop-in compatible" is a claim you can test.</li>
+      <li><b>Fill the battlebench token fields for real</b>: add <code>stream_options={"include_usage": True}</code>, read the terminal usage chunk (the reader already exists in the dead <code>complete()</code> path), and delete the char/4 estimator — one change closes both §03 and half of §04.</li>
+      <li><b>Consolidate the <code>Verdict</code> union</b>: export the alias from <code>judges/panel.py</code> and import it in <code>damage.py</code>, <code>events.py</code>, and <code>schemas.py</code> instead of re-spelling the Literal four times. Fix the <code>roster.py</code> line-1 docstring while you're there.</li>
       <li><b>Leave the bracket, judge panel, and battle engine alone.</b> They're right-sized.</li>
     </ol>
     <p style="margin-top:18px">Net: a leaner ~1,650-line codebase that does exactly what it does today, with the
