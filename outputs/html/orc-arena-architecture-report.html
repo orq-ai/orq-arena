@@ -235,7 +235,7 @@
   <header class="page">
     <p class="eyebrow">Architecture Review · Complexity &amp; Overengineering</p>
     <h1>orc-arena — what to keep, what to cut</h1>
-    <p class="dateline"><b>2026-07-01</b> · <b>rev 5 — complexity-map fix: the "config+cli+data" row double-counted schemas.py and its ~180 collided with the unrelated "Reducible ~180"; corrected to ~160 (schemas.py counted once)</b> · branch <code>gnhf/i-want-you-to-analys-287d22</code> · ~1,909 LOC src · 25 modules · 5 test files</p>
+    <p class="dateline"><b>2026-07-01</b> · <b>rev 6 — lede-consistency fix: the headline said overengineering is "~15% of the lines" but the report's own chart (reducible 9.4% + dead 3.4% = 12.8%) and the 87% solid-core card both say ~13%; corrected the lede to ~13% and cited the breakdown inline</b> · branch <code>gnhf/i-want-you-to-analys-287d22</code> · ~1,909 LOC src · 25 modules · 5 test files</p>
     <p class="toc">
       <a href="#verdict">Verdict</a>
       <a href="#good">What's good</a>
@@ -253,8 +253,8 @@
     The problem is that a 7-fight toy tournament is wearing the exoskeleton of a distributed
     system — a typed event bus, a JSON replay format, and a maximum-likelihood rating estimator —
     to serve a future (Unity/web renderers, router-training interop) that <b>the README itself files
-    under "not in MVP."</b> The overengineering is real but concentrated: it lives in ~15% of the
-    lines and can be excised with near-zero behavior change.</p>
+    under "not in MVP."</b> The overengineering is real but concentrated: it lives in ~13% of the
+    lines (the ~180 reducible + ~65 dead below, of ~1,909) and can be excised with near-zero behavior change.</p>
 
     <div class="verdict grade-strip">
       <div class="vcard">
