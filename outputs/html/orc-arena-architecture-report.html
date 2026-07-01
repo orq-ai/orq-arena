@@ -235,7 +235,7 @@
   <header class="page">
     <p class="eyebrow">Architecture Review · Complexity &amp; Overengineering</p>
     <h1>orc-arena — what to keep, what to cut</h1>
-    <p class="dateline"><b>2026-07-01</b> · <b>rev 2 — revised after an adversarial /hate pass</b> · branch <code>gnhf/i-want-you-to-analys-287d22</code> · ~1,909 LOC src · 25 modules · 5 test files</p>
+    <p class="dateline"><b>2026-07-01</b> · <b>rev 3 — reuse finding sharpened: two distinct verdict Literals, not one</b> · branch <code>gnhf/i-want-you-to-analys-287d22</code> · ~1,909 LOC src · 25 modules · 5 test files</p>
     <p class="toc">
       <a href="#verdict">Verdict</a>
       <a href="#good">What's good</a>
@@ -384,12 +384,17 @@
     <div class="finding">
       <p class="rank">FINDING 04 · reuse / reinvention — the axis the first draft under-graded</p>
       <h3>A canonical type re-spelled by hand, and a solver the ecosystem already ships</h3>
-      <p class="verdict-line">4 copies of one <code>Verdict</code> union · hand-rolled Bradley-Terry vs <code>choix</code> · comment rot</p>
+      <p class="verdict-line">Two un-aliased verdict Literals (7 sites) · hand-rolled Bradley-Terry vs <code>choix</code> · comment rot</p>
       <ul class="tight">
-        <li><b><code>Verdict</code> is defined once, then ignored.</b> <code>judges/panel.py:20</code> declares the
-        canonical <code>Verdict = Literal["A", "B", "TIE", "DISCARD"]</code> — then <code>arena/damage.py:27</code>,
-        <code>events.py:72</code>, and <code>data/schemas.py:34</code> each re-spell the raw Literal inline instead
-        of importing it. Four hand-kept copies of one union; change the verdict set and three sites drift silently.</li>
+        <li><b>Two parallel verdict unions, only one aliased — and it's still re-spelled.</b> The panel outcome
+        <code>Literal["A", "B", "TIE", "DISCARD"]</code> is aliased once as <code>Verdict</code>
+        (<code>judges/panel.py:20</code>) yet re-spelled by hand at <code>arena/damage.py:27</code>,
+        <code>events.py:72</code>, and <code>data/schemas.py:34</code> instead of imported. Meanwhile the
+        <em>judge</em> choice <code>Literal["A", "B", "TIE"]</code> — a distinct 3-value type, since one judge
+        cannot <code>DISCARD</code> — has no alias at all and is spelled out 4× (<code>judges/schemas.py:34/44/47</code>,
+        <code>events.py:64</code>). Change either verdict set and up to 6 sites drift silently. The fix is
+        <em>two</em> exported aliases, not one: collapsing both into <code>Verdict</code> would let a judge emit
+        <code>DISCARD</code> and break the invariant the split protects.</li>
         <li><b>Bradley-Terry is a solved, packaged problem.</b> Finding 02's 69-LOC MLE reinvents
         <code>choix.ilsr_pairwise</code> (or ~15 lines on <code>numpy</code>/<code>scipy</code>). The file's own
         header — "<i>Pure Python, no numpy/scipy</i>" (<code>elo.py:3</code>) — sells the reinvention as a virtue.
@@ -505,7 +510,7 @@
       <li><b>Collapse <code>elo.py</code></b> to wins/rounds-survived ranking (~57 LOC saved) <em>unless</em> a round-robin mode is on the roadmap — then keep MLE and add CIs back.</li>
       <li><b>Trim the event layer</b>: drop the two zero-consumer events; keep the queue (replay uses it) but reframe it as "TUI + replay," not "future renderers."</li>
       <li><b>Fill the battlebench token fields for real</b>: add <code>stream_options={"include_usage": True}</code>, read the terminal usage chunk (the reader already exists in the dead <code>complete()</code> path), and delete the char/4 estimator — one change closes both §03 and half of §04.</li>
-      <li><b>Consolidate the <code>Verdict</code> union</b>: export the alias from <code>judges/panel.py</code> and import it in <code>damage.py</code>, <code>events.py</code>, and <code>schemas.py</code> instead of re-spelling the Literal four times. Fix the <code>roster.py</code> line-1 docstring while you're there.</li>
+      <li><b>Alias the two verdict unions</b>: export <code>Verdict</code> from <code>judges/panel.py</code> and import it at the 3 re-spelled panel sites (<code>damage.py</code>, <code>events.py</code>, <code>data/schemas.py</code>); add a separate <code>JudgeChoice</code> alias for the 3-value judge Literal spelled 4× in <code>judges/schemas.py</code>/<code>events.py</code>. Keep them distinct — a judge can't <code>DISCARD</code>. Fix the <code>roster.py</code> line-1 docstring while you're there.</li>
       <li><b>Leave the bracket, judge panel, and battle engine alone.</b> They're right-sized.</li>
     </ol>
     <p style="margin-top:18px">Net: a leaner ~1,650-line codebase that does exactly what it does today, with the
