@@ -235,7 +235,7 @@
   <header class="page">
     <p class="eyebrow">Architecture Review · Complexity &amp; Overengineering</p>
     <h1>orc-arena — what to keep, what to cut</h1>
-    <p class="dateline"><b>2026-07-01</b> · <b>rev 3 — reuse finding sharpened: two distinct verdict Literals, not one</b> · branch <code>gnhf/i-want-you-to-analys-287d22</code> · ~1,909 LOC src · 25 modules · 5 test files</p>
+    <p class="dateline"><b>2026-07-01</b> · <b>rev 4 — Finding 01 sharpened: the replay codec is a partial 8-of-10 subset whose unknown-kind guard is unreachable</b> · branch <code>gnhf/i-want-you-to-analys-287d22</code> · ~1,909 LOC src · 25 modules · 5 test files</p>
     <p class="toc">
       <a href="#verdict">Verdict</a>
       <a href="#good">What's good</a>
@@ -338,11 +338,16 @@
       (<code>events.py</code>, <code>tui/app.py</code>). The stated justification is a "future Unity/web renderer."
       That renderer is in the README's <em>"Stretch work (not in MVP)"</em> section. For one consumer, a direct
       call or a plain callback does the same job. Two of the ten event types —
-      <code>TournamentStarted</code> and <code>ResponseComplete</code> — are emitted but have
-      <b>no handler at all</b> (absent from both <code>_handle_event</code> and the replay <code>mapping</code>):
-      dead on arrival.</p>
+      <code>TournamentStarted</code> and <code>ResponseComplete</code> — are emitted
+      (<code>driver.py:50</code>, <code>battle.py:77</code>) but consumed nowhere: absent from the live
+      <code>_handle_event</code> dispatch <em>and</em> from the replay codec's 8-of-10 <code>mapping</code>
+      (<code>app.py:176</code>). The deserializer even <code>raise</code>s <code>ValueError</code> on any
+      unmapped kind (<code>app.py:188</code>) — but that guard is <b>itself dead code</b>: its only caller wraps
+      it in <code>except Exception: continue</code> (<code>app.py:111</code>). So the "replay format" credited
+      below silently can't round-trip 2 of the 10 events its own producers emit, and the check meant to catch
+      that can never fire — dead on arrival, twice over.</p>
       <div class="kv">
-        <span class="k">Redeemed by</span><span>The <code>demo</code> command genuinely replays recorded events from a fixture — that reuse justifies roughly half the layer.</span>
+        <span class="k">Redeemed by</span><span>The <code>demo</code> command genuinely replays recorded events from a fixture — that reuse justifies roughly half the layer. But the shipped <code>demo_tournament.json</code> only decodes because it was hand-trimmed to the 8 mappable kinds (zero <code>tournament_started</code>/<code>response_complete</code> rows); the codec is a partial subset, not a general one.</span>
         <span class="k">Do</span><span>Keep the queue (replay needs it); delete the 2 zero-consumer events; stop marketing "future renderers" as architecture.</span>
       </div>
     </div>
