@@ -235,7 +235,7 @@
   <header class="page">
     <p class="eyebrow">Architecture Review · Complexity &amp; Overengineering</p>
     <h1>orc-arena — what to keep, what to cut</h1>
-    <p class="dateline"><b>2026-07-01</b> · <b>rev 4 — Finding 01 sharpened: the replay codec is a partial 8-of-10 subset whose unknown-kind guard is unreachable</b> · branch <code>gnhf/i-want-you-to-analys-287d22</code> · ~1,909 LOC src · 25 modules · 5 test files</p>
+    <p class="dateline"><b>2026-07-01</b> · <b>rev 5 — complexity-map fix: the "config+cli+data" row double-counted schemas.py and its ~180 collided with the unrelated "Reducible ~180"; corrected to ~160 (schemas.py counted once)</b> · branch <code>gnhf/i-want-you-to-analys-287d22</code> · ~1,909 LOC src · 25 modules · 5 test files</p>
     <p class="toc">
       <a href="#verdict">Verdict</a>
       <a href="#good">What's good</a>
@@ -321,7 +321,7 @@
         <tr><td><code>tournament/elo.py</code></td><td class="loc">69</td><td>High (needless)</td><td><span class="pill over">Over</span> Bradley-Terry MLE over 7 sparse outcomes.</td></tr>
         <tr><td><code>providers/orq_gateway.py</code></td><td class="loc">97</td><td>Low</td><td><span class="pill over">Over</span> Half the file (<code>generate</code>) is uncalled.</td></tr>
         <tr><td><code>data/schemas.py</code></td><td class="loc">53</td><td>Low</td><td><span class="pill keep">Keep*</span> Battlebench-compat; several fields never filled.</td></tr>
-        <tr><td><code>config.py</code>, <code>cli.py</code>, <code>data/*</code></td><td class="loc">~180</td><td>Low</td><td><span class="pill keep">Keep</span> Thin and appropriate.</td></tr>
+        <tr><td><code>config.py</code>, <code>cli.py</code>, <code>data/log+prompts</code></td><td class="loc">~160</td><td>Low</td><td><span class="pill keep">Keep</span> Thin and appropriate (<code>data/schemas.py</code> counted above).</td></tr>
       </tbody>
     </table>
   </section>
