@@ -65,3 +65,46 @@ def list_warriors(config_path: str) -> None:
 
 if __name__ == "__main__":
     cli()
+
+
+@cli.command()
+@click.argument("log_path", default=DEFAULT_OUTPUT)
+@click.option("--judge", "judges", multiple=True, required=True,
+              help="Router model id; repeat for a panel.")
+@click.option("--criteria", default=None, help="Override judging criteria.")
+@click.option("--config", "config_path", default=DEFAULT_CONFIG, show_default=True)
+@click.option("--output", "output_path", default=None,
+              help="Write re-judged rounds to this JSONL.")
+@click.option("--report-json", default=None, help="Write the summary as JSON.")
+@click.option("--concurrency", default=4, show_default=True)
+def rejudge(log_path: str, judges: tuple[str, ...], criteria: str | None,
+            config_path: str, output_path: str | None, report_json: str | None,
+            concurrency: int) -> None:
+    """Re-judge a recorded run with a different panel — zero regeneration.
+
+    The evaluatorq demo inside the demo: the responses are already on disk,
+    so swapping the jury costs judge tokens only. Prints the new jury's
+    behaviour and the Spearman correlation against the recorded ranking.
+    """
+    import asyncio
+
+    from .rejudge import (load_records, rejudge_run, render_result,
+                          save_report_json, write_rejudged)
+
+    _quiet_logs()
+    cfg = load_config(config_path)
+    records = load_records(log_path)
+    if not records:
+        raise click.ClickException(f"no judgeable rounds in {log_path}")
+    click.echo(f"re-judging {len(records)} rounds with panel: {', '.join(judges)}")
+    result = asyncio.run(rejudge_run(
+        cfg=cfg, records=records, judges=list(judges),
+        criteria=criteria, concurrency=concurrency,
+    ))
+    render_result(result)
+    if output_path:
+        write_rejudged(output_path, records, result["comparisons"])
+        click.echo(f"re-judged rounds -> {output_path}")
+    if report_json:
+        save_report_json(report_json, result)
+        click.echo(f"summary -> {report_json}")
