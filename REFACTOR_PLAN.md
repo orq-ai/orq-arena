@@ -192,6 +192,11 @@ new `judge_tokens_in` / `judge_tokens_out` fields (warrior token fields are fixe
 - The seed-advantage HP tiebreak in `battle.py` (lines ~250–251): an HP tie at the round cap is
   now a drawn match. `MatchResult.by` gains `"draw"` (winner/loser fields become the two
   participants in config order; the TUI banner shows "DRAW" instead of a champion).
+- **KO no longer truncates sampling.** The turn loop runs all `max_rounds` prompts regardless of
+  HP; reaching 0 HP is a rendering event (the KO banner fires, remaining rounds still get judged
+  and logged). Rationale: with KO-as-termination, rounds-per-pair is outcome-dependent — lopsided
+  pairs contribute fewer comparisons and the game mechanics contaminate the sampling design. HP
+  keeps clamping at 0 for display; `MatchResult.by` = `"ko"` whenever HP hit 0 at any point.
 
 ### 2.2 Scheduler (`tournament/driver.py`, rewritten, ~70 LOC)
 
@@ -232,6 +237,25 @@ Accumulate every `PairwiseComparison` across the run; at the end call
 `evaluatorq.build_report(comparisons)` and render a jury table on the leaderboard screen:
 per-judge A/B lean, flip rate (position bias), tie rate, plus mean inter-judge agreement.
 ~30 LOC of widget, all data free from evaluatorq.
+
+### 2.5 Statistical honesty on the leaderboard (~60 LOC)
+
+- **Bootstrap CIs.** Port the bootstrap confidence intervals `elo.py`'s header says it dropped
+  from orq-battlebench's `ranking.py` (resample outcomes with replacement, ~200 iterations,
+  report the 2.5/97.5 percentiles). Leaderboard renders `1234 ±45`; models whose CIs overlap the
+  next rank render as a shared rank band, not a fake strict order.
+- **Verbosity column.** Mean output tokens per model beside its ELO — makes the best-documented
+  LLM-judge confound (verbosity bias) visible instead of hidden.
+- **Confidence banner.** If `build_report().mean_agreement` falls below a threshold (default
+  0.6, config knob), the leaderboard headlines "low-confidence ranking — judges disagree" and the
+  run manifest records it. The instrument says so when its own reading is noise.
+
+### 2.6 Run manifest (`run.json`)
+
+Written next to `battles.jsonl` at start, finalized at end: config hash, prompt-set path + hash,
+judge panel + replacements, warrior/judge max-tokens and temperatures, evaluatorq version/SHA,
+seed, match count, mean agreement, inconclusive rate. Without this, two runs aren't comparable
+and "benchmark data" is a marketing claim. ~20 LOC.
 
 ### 2.5 Tests
 
@@ -298,6 +322,42 @@ single-response replay column. If it doesn't fit cleanly, ship the local rejudge
 Plus: README rewrite around the two-product story (gateway routes every token, evaluatorq issues
 every verdict, `battles.jsonl` + ELO are the reusable benchmark output).
 
+**Rank-stability check (~15 LOC on top):** after a rejudge, print the Spearman rank correlation
+between the recorded run's ELO order and the re-judged order. High correlation = the ranking is
+judge-robust; low = it's panel preference. This is the strongest available answer to "your
+leaderboard is just what three cheap models like."
+
+---
+
+## PR 5 — Utility unlock: per-category rankings + run ergonomics (~+90 LOC, after PR 4)
+
+The upgrades that turn one vibes-number into router-decision evidence. Nothing here adds a
+subsystem — knobs and slices only.
+
+1. **Categorized prompts → per-category ELO.** Prompt JSONL rows gain an optional
+   `category` field (untagged rows fall into `"general"`). `BattleRecord` carries it through;
+   the ELO step runs BT once overall and once per category with ≥ a minimum comparison count
+   (skip slices below ~20 comparisons rather than print noise). Leaderboard gets a category
+   picker; `run.json` records per-slice counts. This is the router pitch made concrete:
+   "sonnet leads reasoning, 4o leads coding — route accordingly." Ship 2–3 curated starter sets
+   (`prompts/reasoning.jsonl`, `prompts/coding.jsonl`, …) instead of one generic file.
+2. **Cost preflight.** Before the first API call, print: matches × rounds × judge calls
+   (panel × 2 orderings), plus a rough token estimate from config max-tokens — then proceed.
+   Good UX, and it demos gateway token accounting. `--yes` skips the pause.
+3. **Panel presets in config comments.** Document a `demo` panel (current cheap trio — fast,
+   pennies, fine for the show) vs a `strong` panel (frontier judges — for numbers you intend to
+   defend). No code, just an honest config file.
+4. **`--headless`.** Same run, no TUI: a null renderer drains the event queue and Rich-prints
+   match results + final table. For CI/cron benchmark generation. (~30 LOC — and the event queue
+   Finding 01 mocked finally gets its second consumer, legitimately this time.)
+5. *(Stretch)* Post-run static HTML export of leaderboard + CIs + jury table — a shareable
+   artifact per run. Only if PR 1–4 land clean; do not start here.
+
+## Explicitly rejected (the cut list stays cut)
+
+Swiss or bracket modes, human-vote web UI, a database, multi-run aggregation services, custom
+judge-prompt DSLs, parallel match execution. Any of these returns only with a ticket and an owner.
+
 ---
 
 ## Sequencing, risk, rollback
@@ -323,3 +383,6 @@ every verdict, `battles.jsonl` + ELO are the reusable benchmark output).
 4. `min_successful_judges=2` + one neutral replacement judge as shipped defaults.
 5. Sequential matches only; `concurrency` knob deleted rather than implemented.
 6. Fixture regenerated (not migrated) in PR 3.
+7. KO is presentation, not termination — every match judges all `max_rounds` prompts (§2.1).
+8. Leaderboard always shows CIs and mean output tokens; low judge agreement is announced, not
+   buried (§2.5). A benchmark that can't say "insufficient data" is a toy.
