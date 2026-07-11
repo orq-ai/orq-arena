@@ -381,10 +381,10 @@ warriors:
 
 - Config validation: `thinking.budget_tokens < max_tokens` (per-warrior `max_tokens` override
   added, defaulting to `gateway.warrior_max_tokens`).
-- Router base URL: docs use `api.orq.ai/v3/router` for raw OpenAI clients, while orq-ai-sdk
-  4.11.7 pins `my.orq.ai` + `/v2/router` — both are live. Confirm the canonical raw-client URL
-  with the platform team; until then keep the current default. Do not hand-roll a v3 migration on
-  doc examples alone.
+- Router base URL: `https://api.orq.ai/v3/router` (PR 1). `api.orq.ai` is the public-facing
+  host and the one this repo always shows; `my.orq.ai` is an alias to the same server and fine
+  where the orq-ai-sdk uses it internally. `/v3` is the docs-canonical path for raw OpenAI
+  clients.
 - Judges stay non-reasoning by default; if ever wanted, `llm_jury_pairwise(extra_kwargs=...)`
   carries `reasoning_effort` panel-wide — note in config comments, don't build anything.
 
@@ -457,5 +457,6 @@ judge-prompt DSLs, parallel match execution. Any of these returns only with a ti
 10. Visible chain-of-thought is rendered best-effort only ("thinking…" indicator is the
     guaranteed path) — the router's stable contract excludes CoT text.
 11. Warrior + judge traffic stays on `AsyncOpenAI`; orq-ai-sdk (typed reasoning controls,
-    platform APIs) enters via PR 4 / README examples. Base-URL version (v2 on my.orq.ai per SDK
-    vs v3 on api.orq.ai per docs) to be confirmed with the platform team before any change.
+    platform APIs) enters via PR 4 / README examples. All user-facing URLs in this repo use
+    `api.orq.ai` (`my.orq.ai` is the same server, SDK-internal use is fine); base URL becomes
+    `https://api.orq.ai/v3/router` in PR 1.
