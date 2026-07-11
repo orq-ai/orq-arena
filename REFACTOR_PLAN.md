@@ -1,0 +1,325 @@
+# orc-arena → evaluatorq refactor plan
+
+**Goal.** Refocus this repo on the arena only: a benchmark that produces a Bradley-Terry ELO
+ranking over a configurable pool of models, rendered by the existing Textual TUI. All judging
+moves to `evaluatorq` (pairwise jury), all model traffic stays on the orq.ai router gateway.
+Tournament modes (single-elimination bracket) are removed. End state: ~1,600 src LOC where every
+line renders the show, routes the tokens, or demonstrates the eval.
+
+**Companion analysis:** `outputs/html/orc-arena-architecture-report.html` (Findings 01–05, target
+architecture §09, artifact: https://claude.ai/code/artifact/cb006f76-6fec-4586-a550-a18bfc91617a).
+
+**Non-goals.** No Unity/web renderer seams, no parallel-match execution (the TUI shows one fight
+at a time), no generic n-format tournament engine, no byte-compat with orq-battlebench records
+(schema v2 below supersedes it).
+
+---
+
+## Vocabulary decision (applies to every PR)
+
+Adopt evaluatorq's verdict vocabulary end-to-end and delete the arena's two hand-spelled Literals
+(report Finding 04):
+
+| concept | today | after |
+|---|---|---|
+| per-judge vote | `"A" \| "B" \| "TIE"` (`JudgeVerdict`) | `PairwiseVote.vote`: `'A' \| 'B' \| 'tie' \| None` (None = abstained/flipped) |
+| panel outcome | `"A" \| "B" \| "TIE" \| "DISCARD"` (`majority_vote`) | `PairwiseComparison.winner`: `'A' \| 'B' \| 'tie' \| 'inconclusive'` |
+| record winner | short model / `"tie"` / `"discard"` | short model / `"tie"` / `"inconclusive"` |
+
+`damage.py`, `events.py`, `data/schemas.py`, and the TUI widgets all switch to the new strings.
+The `demo` fixture is regenerated in PR 3 (it embeds the old vocabulary).
+
+---
+
+## PR 1 — Swap the bench: `judges/` → `llm_jury_pairwise` (~−180 LOC)
+
+### 1.1 Dependencies (`pyproject.toml`)
+
+- Remove `instructor>=1.7` (evaluatorq does its own structured output).
+- Add `evaluatorq` pinned to the RES-760 pairwise branch (1.3.0 is unreleased):
+
+```toml
+[project]
+dependencies = [
+  # ...
+  "evaluatorq @ git+https://github.com/orq-ai/evaluatorq.git@<exact-sha-on-res-760>",
+]
+
+# local development against the sibling checkout:
+[tool.uv.sources]
+evaluatorq = { path = "../evaluatorq", editable = true }
+```
+
+Pin an exact SHA, not the branch name — the branch is active. Note 1.3.0 makes `openai` and
+`loguru` core deps of evaluatorq; `openai` is already here, `loguru` is new transitive baggage we
+accept.
+
+### 1.2 Config (`config.py`, `orc_arena.yaml`)
+
+`JudgeSpec` and `judge_system_prompt` die. New shape:
+
+```yaml
+judges:
+  - anthropic/claude-haiku-4-5
+  - google/gemini-2.5-flash
+  - openai/gpt-4o-mini
+replacement_judges:
+  - mistral/mistral-small        # neutral stand-in; cures judge-erosion (Finding 05)
+criteria: >-
+  Accuracy and correctness, helpfulness and completeness, clarity, and
+  relevance to the prompt.
+```
+
+```python
+class ArenaConfig(BaseModel):
+    match: MatchRules = Field(default_factory=MatchRules)
+    gateway: GatewayConfig = Field(default_factory=GatewayConfig)
+    warriors: list[WarriorSpec]
+    judges: list[str]
+    replacement_judges: list[str] = []
+    criteria: str = "Accuracy, helpfulness, clarity, relevance to the prompt."
+    min_successful_judges: int = 2   # jury-of-one -> 'inconclusive', never a verdict
+```
+
+Judge display names: derive from the model id tail (`model_id.split("/")[-1]`) at the event/TUI
+boundary. No name map unless someone asks for one.
+
+`GatewayConfig.judge_max_tokens` survives and feeds `llm_jury_pairwise(max_tokens=...)`.
+
+### 1.3 Battle wiring (`arena/battle.py`)
+
+Replace the `run_panel` / `filter_self_judges` / `majority_vote` block (battle.py:163–188) with a
+comparator built once per match and called once per round:
+
+```python
+from evaluatorq import llm_jury_pairwise
+
+# in Battle.__init__ (panel is fixed for the whole match):
+panel = [m for m in cfg.judges if m not in {warrior_a.model_id, warrior_b.model_id}]
+self.jury = llm_jury_pairwise(
+    judges=panel,
+    criteria=cfg.criteria,
+    replacement_judges=cfg.replacement_judges,
+    min_successful_judges=cfg.min_successful_judges,
+    max_tokens=cfg.gateway.judge_max_tokens,
+    client=gateway.client,          # judges ride the same orq router client
+)
+
+# per round:
+comparison = await self.jury.compare(
+    question=prompt, response_a=resp_a, response_b=resp_b
+)
+```
+
+The one-line panel filter *is* the self-judge exclusion. With 3 judges and at most 2 contestants
+excluded, the primary panel can drop to 1; the configured replacement judge plus
+`min_successful_judges=2` keeps a real fight from ever being decided by a jury of one
+(closes Finding 05). Keep `replacement_judges` non-empty in the default config — it also keeps
+`PairwiseComparator` off its single-judge `propagate_errors` path.
+
+### 1.4 Verdict → damage adapter (`arena/damage.py`, rewritten in place, ~40 LOC)
+
+```python
+Side = Literal["a", "b", "none"]
+
+def compute_damage(comparison: PairwiseComparison, rules: MatchRules) -> DamageResult:
+    winner = comparison.winner                     # 'A' | 'B' | 'tie' | 'inconclusive'
+    if winner in ("tie", "inconclusive"):
+        return DamageResult(damage=rules.damage_tie, loser_side="none", counts_toward_cap=False)
+    decisive = [v for v in comparison.votes if v.vote in ("A", "B", "tie")]
+    unanimous = len(decisive) >= 2 and all(v.vote == winner for v in decisive)
+    damage = rules.damage_unanimous if unanimous else rules.damage_majority
+    return DamageResult(damage=damage, loser_side="b" if winner == "A" else "a",
+                        counts_toward_cap=True)
+```
+
+Semantics preserved: tie/inconclusive deal no damage and don't consume a round (today's
+TIE/DISCARD behavior). Semantics fixed: "unanimous" now requires at least two decisive votes —
+a degraded panel can no longer land the 30-damage hit (Finding 05). Update the YAML comment
+(`# 3-0 verdict` → `# all decisive votes agree, minimum 2`).
+
+### 1.5 Events (`events.py`) and TUI
+
+`JudgeVerdictEvent` gains the drama fields, keeps its name:
+
+```python
+class JudgeVerdictEvent(BaseModel):
+    kind: Literal["judge_verdict"] = "judge_verdict"
+    match_id: str
+    judge_name: str                  # model id tail
+    verdict: str                     # 'A' | 'B' | 'tie' | 'abstain'
+    reasoning: str                   # PairwiseVote.explanation
+    flipped: bool = False            # judge contradicted itself across orderings
+    replacement: bool = False        # stand-in for a failed judge
+```
+
+Emit one per `comparison.votes` entry (vote `None` → `"abstain"`). `tui/widgets/judge_card.py`
+renders a flip badge when `flipped` (copy suggestion: "flipped under cross-examination — vote
+thrown out"). `TurnResolved.majority` becomes `str` with the new vocabulary.
+
+### 1.6 Records (`data/schemas.py`) — schema v2
+
+`judge_verdicts: list[JudgeResult]` → `judge_votes: list[dict]` holding
+`PairwiseVote.model_dump()` (model, vote, flipped, completed, replacement, explanation). Add
+`schema_version: int = 2`. `majority_verdict` stores `comparison.winner`; `winner` maps
+`inconclusive` per the vocabulary table. Judge token usage from `comparison.token_usage` lands in
+new `judge_tokens_in` / `judge_tokens_out` fields (warrior token fields are fixed in PR 3).
+
+### 1.7 Deletions and tests
+
+- Delete `src/orc_arena/judges/` entirely (panel.py, schemas.py, prompts.py — 196 LOC).
+- Delete `tests/test_panel_tally.py`.
+- Add `tests/test_damage_adapter.py`: winner mapping ×4, unanimity requires ≥2 decisive votes,
+  jury-of-one → inconclusive → no damage, tie doesn't tick the round cap, panel filter excludes
+  both contestants.
+
+### Acceptance
+
+- `uv run pytest` green; `uv pip list | grep instructor` empty.
+- Live smoke: 2-warrior mini config (add `fixtures/smoke.yaml`), `ORQ_API_KEY` set,
+  `orc-arena run --config fixtures/smoke.yaml` completes a match with visible per-judge verdicts
+  and at least one flip/abstain rendering correctly.
+
+---
+
+## PR 2 — Bracket out, round-robin in (~−90 LOC)
+
+### 2.1 Deletions
+
+- `tournament/bracket.py` (95), `tui/screens/bracket.py` (5, dead stub), `tests/test_bracket.py`.
+- `BracketUpdated` event and its TUI handler.
+- The `len(cfg.warriors) != 8` gate in `driver.py`; new validation: `len(warriors) >= 2`.
+- The seed-advantage HP tiebreak in `battle.py` (lines ~250–251): an HP tie at the round cap is
+  now a drawn match. `MatchResult.by` gains `"draw"` (winner/loser fields become the two
+  participants in config order; the TUI banner shows "DRAW" instead of a champion).
+
+### 2.2 Scheduler (`tournament/driver.py`, rewritten, ~70 LOC)
+
+```python
+schedule = list(itertools.combinations(cfg.warriors, 2))   # C(n,2); 28 at n=8
+rng.shuffle(schedule)                                       # match order variety, seeded
+```
+
+Per match, unchanged: shuffled prompt slice of `max_rounds`, one `Battle`, append records to the
+JSONL log.
+
+### 2.3 ELO feed — per round, not per match
+
+After each match, extend outcomes from its `BattleRecord`s:
+
+```python
+for rec in result.battles:
+    if rec.majority_verdict == "A":
+        outcomes.append((name_a, name_b, "winner"))
+    elif rec.majority_verdict == "B":
+        outcomes.append((name_b, name_a, "winner"))
+    elif rec.majority_verdict == "tie":
+        outcomes.append((name_a, name_b, "tie"))     # 0.5/0.5 — finally exercises elo.py's tie path
+    # 'inconclusive' rounds carry no rating information; skip
+```
+
+`elo.py` is untouched. Up to `C(n,2) × max_rounds` comparisons (~140 at the default 8×5) replace
+today's 7 match outcomes — this is what makes BT-MLE defensible (resolves report Finding 02).
+
+Recompute ELO after every match (pure Python, 8 models, effectively free) and emit a new
+`StandingsUpdated(elo: dict[str, float], matches_done: int, matches_total: int)` event; the
+leaderboard screen updates live instead of only at `TournamentEnded`. `TournamentEnded.champion`
+= ELO leader.
+
+### 2.4 Jury stats on the leaderboard
+
+Accumulate every `PairwiseComparison` across the run; at the end call
+`evaluatorq.build_report(comparisons)` and render a jury table on the leaderboard screen:
+per-judge A/B lean, flip rate (position bias), tie rate, plus mean inter-judge agreement.
+~30 LOC of widget, all data free from evaluatorq.
+
+### 2.5 Tests
+
+- `tests/test_scheduler.py`: C(n,2) count, no self-pairs, seeded order stable.
+- Extend `tests/test_elo.py`: tie outcomes shift ratings symmetrically.
+
+### Acceptance
+
+- `orc-arena run` on the smoke config (2 warriors → 1 match) and on a 4-warrior config
+  (6 matches) completes; leaderboard shows live standings and the jury table.
+- Cost sanity check on 8×5 default before merging: ~28 matches × ≤5 rounds × 3 judges × 2
+  orderings ≈ 840 judge calls (~8× today) — confirm acceptable or trim default `max_rounds`.
+
+---
+
+## PR 3 — Part-1 hygiene (~−55 LOC)
+
+Everything here is from the report's §04/§03 audit, minus items already deleted with their module.
+
+1. **Real token usage.** `OrqGateway.stream_completion` passes
+   `stream_options={"include_usage": True}` and fills a caller-supplied `usage_out: dict` from the
+   terminal chunk (per-call dict — safe under concurrent A/B streams). `_generate_side` writes
+   `tokens_in`/`tokens_out` into `BattleRecord`; delete the `max(1, len(full) // 4)` estimator
+   (Finding 03).
+2. **Dead code:** `OrqGateway.generate()` + `GenerationResult` (~35 LOC — judges no longer need a
+   non-streaming path at all), `TournamentState` (if not already gone in PR 2's driver rewrite),
+   `WarriorCard.set_elo()`, `ResponsePanel.set_text()`, `WarriorSpec.starting_elo`,
+   `GatewayConfig.concurrency` (knob wired to nothing; parallel matches are a non-goal).
+3. **Zero-consumer events:** delete `TournamentStarted` and `ResponseComplete` (emitters and
+   classes) or wire them; the report's call is delete.
+4. **Replay codec + fixture:** update `tui/app.py`'s decode mapping for the new/changed events,
+   then regenerate `fixtures/demo_tournament.json` from one real smoke run (the old fixture
+   embeds the retired vocabulary and bracket events). `orc-arena demo` must work offline again.
+5. `orcs/roster.py` line-1 docstring ("default roster" that doesn't exist).
+
+### Acceptance
+
+- `orc-arena demo` replays the new fixture with judge flip badges visible, no API key needed.
+- `grep -rn "len(full) // 4\|generate(\|TournamentStarted\|ResponseComplete" src/` returns nothing.
+
+---
+
+## PR 4 — `orc-arena rejudge`: the evaluatorq demo inside the demo (~+60 LOC, optional but it's the point)
+
+New CLI command that re-scores a recorded run with a different panel, zero regeneration:
+
+```
+orc-arena rejudge battles.jsonl \
+  --judge anthropic/claude-haiku-4-5 --judge openai/gpt-4o-mini \
+  [--criteria "..."] [--output rejudged.jsonl]
+```
+
+Implementation (verified API surface): read the JSONL; for each record build one
+`PairwiseComparator` (panel minus that record's two contestants) and
+`await jury.compare(question=rec.prompt_text, response_a=rec.response_a,
+response_b=rec.response_b)`; collect comparisons; print `build_report()` as a Rich table
+(win rates, agreement, per-judge flip/lean) plus the re-fed BT-ELO delta vs the recorded run.
+
+Stretch (verify at impl time, not promised): push results to the Orq platform via
+`evaluatorq(inference=False, data=..., evaluators=[llm_jury(...)])` — requires shaping rows as
+`DataPoint(inputs={"messages": ...})`; the pairwise two-response shape may not fit the
+single-response replay column. If it doesn't fit cleanly, ship the local rejudge only.
+
+Plus: README rewrite around the two-product story (gateway routes every token, evaluatorq issues
+every verdict, `battles.jsonl` + ELO are the reusable benchmark output).
+
+---
+
+## Sequencing, risk, rollback
+
+- **Order:** PR 1 → PR 2 → PR 3 → PR 4. PR 2 depends on PR 1's vocabulary; PR 3's fixture
+  regeneration depends on PR 2's events; PR 4 reads PR 1's schema v2.
+- **Each PR:** tests green + smoke run (live for PR 1/2, offline demo for PR 3). PRs revert
+  independently.
+- **Pinned-branch risk:** RES-760 is unmerged in evaluatorq; pin an exact SHA and re-pin on
+  release of 1.3.0. If the branch is force-rebased, the `[tool.uv.sources]` path dep keeps local
+  dev working.
+- **Latency:** both-orderings judging doubles judge calls but runs them concurrently — wall-clock
+  per round ≈ one judge call, unchanged. Volume knobs if cost bites: `swap=False` (halves),
+  smaller `max_rounds`, smaller pool.
+- **LOC ledger:** −196 (judges/) −100 (bracket + stub) −65 (dead, ~10 overlap) +~40 (adapter,
+  scheduler, jury widget) ⇒ ~1,600 src LOC.
+
+## Decisions taken (flag if you disagree)
+
+1. evaluatorq vocabulary end-to-end; record schema v2; battlebench byte-compat dropped.
+2. Judge display names derived from model id tail; no name map.
+3. HP tie at round cap = draw (seed advantage deleted with the seeds).
+4. `min_successful_judges=2` + one neutral replacement judge as shipped defaults.
+5. Sequential matches only; `concurrency` knob deleted rather than implemented.
+6. Fixture regenerated (not migrated) in PR 3.
