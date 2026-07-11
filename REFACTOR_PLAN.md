@@ -442,9 +442,33 @@ column; thinking-enabled warriors get a 🧠 badge; mixed pools are **allowed** 
 "is +40 ELO worth 6× the tokens and 10× the latency?" is a legitimate benchmark and precisely
 the router's pitch) with a footnote naming the mix. No hard error, no confirmation prompt.
 
+**Timeouts & incomplete responses (into PR 1).** State today: the router imposes no timeout
+unless `timeout.call_timeout` is sent (we never send it); the openai SDK's *default*
+`httpx.Timeout(600, connect=5)` is the only cutoff — an inherited, unconfigured 10-minute
+read-gap guard. The real defect is failure handling: `_generate_side` swallows any stream
+exception and the round is judged on the partial/empty text, so a timeout or disconnect becomes
+a forfeit scored as merit. Policy:
+
+- **Wait for the model, always.** `AsyncOpenAI(timeout=httpx.Timeout(connect=10, read=cfg.gateway.stream_read_timeout_s, write=60, pool=60))`
+  with `stream_read_timeout_s: 1200` default (20 min of inter-chunk silence tolerated — covers
+  thinking; fires only on true silence, never on a slow-but-alive stream). No total cap; never
+  send router `call_timeout`. Not infinite: a dead connection must eventually fail or one network
+  blip hangs the tournament.
+- **Never judge an incomplete response.** On stream error: retry that side once (same prompt);
+  still failing → the round is **voided** — no judging, no damage, no round-cap tick, no ELO
+  datapoint. Logged in the JSONL as an `error` round with the exception, surfaced in the TUI
+  ("connection died — round void") and counted in `run.json` (`error_rounds`). A model must lose
+  on its words, never on its network.
+- **Truncation is visible, not voided.** Record `finish_reason` per side in `BattleRecord`;
+  `length` means the model spent its budget — judged as-is, but auditable. (Thinking budgets
+  can't eat the answer: `budget_tokens < max_tokens` validation above.)
+- Judge calls keep evaluatorq's `timeout_ms` (default 90s) — non-thinking judges; exposed as
+  `judge_timeout_ms` in config for anyone running a thinking panel.
+
 **Acceptance (PR 1 smoke config):** include one thinking-enabled warrior
 (`anthropic/claude-*, budget 2048, max_tokens 4096`); verify the thinking indicator renders, the
-match completes, and reasoning tokens land in the record.
+match completes, and reasoning tokens land in the record. Timeout path: unit-test the
+void-round flow (fake stream raising mid-iteration → retry → void, zero damage, zero ELO rows).
 
 ## Explicitly rejected (the cut list stays cut)
 
@@ -487,6 +511,9 @@ judge-prompt DSLs, parallel match execution. Any of these returns only with a ti
     models (no o-series). Mixed pools allowed, badged 🧠, footnoted — never refused.
 9b. Rosters are refreshed to current-gen models at PR 1, verified against the router registry;
     selection stays manual YAML curation, no discovery code.
+12. Streams are waited out, not raced: 1200s read-gap guard (config), no total cap, no router
+    `call_timeout`. A round with an incomplete response is retried once, then voided — partial
+    output is never judged, so slow thinking is never penalized.
 10. Visible chain-of-thought is rendered best-effort only ("thinking…" indicator is the
     guaranteed path) — the router's stable contract excludes CoT text.
 11. Warrior + judge traffic stays on `AsyncOpenAI`; orq-ai-sdk (typed reasoning controls,
