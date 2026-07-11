@@ -27,7 +27,9 @@ def test_warrior_short_model_strips_provider_prefix() -> None:
 def test_reasoning_config_loads_uniform_on() -> None:
     cfg = load_config(ROOT / "configs" / "reasoning_arena.yaml")
     assert len(cfg.warriors) == 8
-    assert sum(w.thinking_enabled for w in cfg.warriors) >= 6
+    # always-thinking models (deepseek-reasoner, kimi-k2*) carry no config
+    # block, so the flag undercounts them by design.
+    assert sum(w.thinking_enabled for w in cfg.warriors) >= 5
 
 
 def test_default_pool_is_uniform_thinking_off() -> None:

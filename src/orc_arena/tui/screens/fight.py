@@ -92,6 +92,7 @@ class FightScreen(Screen):
         self._status = Static("", id="status")
         self._orc_a = ""
         self._orc_b = ""
+        self._ko_announced: set[str] = set()
 
     def compose(self) -> ComposeResult:
         yield self._ticker
@@ -113,6 +114,14 @@ class FightScreen(Screen):
     def set_ticker(self, text: str) -> None:
         self._ticker.update(text)
 
+    def set_standings(self, elo: dict[str, float], done: int, total: int) -> None:
+        top = sorted(elo.items(), key=lambda kv: kv[1], reverse=True)[:5]
+        strip = "   ".join(f"{i}. {n[:14]} {v:.0f}" for i, (n, v) in enumerate(top, 1))
+        self._ticker.update(f"[b]MATCH {done}/{total}[/b]   {strip}")
+        for card, orc in ((self._card_a, self._orc_a), (self._card_b, self._orc_b)):
+            if orc in elo:
+                card.set_elo(elo[orc])
+
     def start_match(
         self,
         orc_a: str, model_a: str, emblem_a: str, thinking_a: bool,
@@ -133,6 +142,7 @@ class FightScreen(Screen):
         for card in self._judges.values():
             card.reset()
         self._prompt.clear_prompt()
+        self._ko_announced.clear()
         self._status.update(f"[b green]{orc_a}[/b green] vs [b yellow]{orc_b}[/b yellow]")
 
     def set_prompt(self, round_number: int, text: str) -> None:
@@ -179,14 +189,23 @@ class FightScreen(Screen):
             self._status.update(f"verdict [b]{majority}[/b] — [b red]{damage} damage[/b red] to {hit}")
         else:
             self._status.update(f"verdict [b]{majority}[/b] — no damage")
+        # KO moment — the show ends here, the judging doesn't.
+        for hp, card, orc in ((hp_a, self._card_a, self._orc_a), (hp_b, self._card_b, self._orc_b)):
+            if hp == 0 and orc and orc not in self._ko_announced:
+                self._ko_announced.add(orc)
+                card.knock_out()
+                self.app.bell()
+                self._status.update(
+                    f"[b red]💀 K.O.![/b red] [b]{orc}[/b] is down — remaining rounds judged for the rating"
+                )
 
     def round_voided(self, reason: str) -> None:
         self._status.update(f"[yellow]⚠ round void — {reason}[/yellow]")
 
     def match_resolved(self, winner: str, by: str) -> None:
-        if by == "ko":
-            loser_card = self._card_b if winner == self._orc_a else self._card_a
-            loser_card.knock_out()
+        if by == "draw":
+            self._status.update("[b]🤝 DRAW[/b] — even on HP; the rating heard every round anyway")
+        elif by == "ko":
             self.app.bell()
             self._status.update(f"[b red]💀 K.O.![/b red]  [b]{winner}[/b] wins!")
         else:

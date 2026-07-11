@@ -42,7 +42,7 @@ warriors:
     model_id: openai/gpt-5.4-mini
     emblem: "🏹"
   - orc_name: Azog Deepmind
-    model_id: google/gemini-3-pro-preview
+    model_id: google/gemini-3.1-pro-preview
     emblem: "🛡"
     # think-by-default model: explicitly disabled for the uniform-OFF pool
     # (router coerces disable to its minimum on thinking-enforced models)
@@ -52,11 +52,14 @@ warriors:
     emblem: "🔥"
     reasoning: { thinking: { type: disabled } }
   - orc_name: Bolg the Seeker
-    model_id: deepseek/deepseek-v4-pro
+    model_id: deepseek/deepseek-chat
     emblem: "🪓"
   - orc_name: Ugluk Stormcaller
-    model_id: moonshotai/kimi-k2.6
+    model_id: mistral/mistral-medium-2604
     emblem: "⚡"
+# Excluded from the default pool (thinking can't be disabled via the router,
+# verified 2026-07-11): moonshotai/kimi-k2.6, deepseek/deepseek-v4-pro,
+# alibaba/qwen3.5-flash. They belong in configs/reasoning_arena.yaml.
 
 # Judge panel — router model ids, judged via evaluatorq's pairwise jury
 # (both orderings per judge; a judge that flips abstains and is recorded).

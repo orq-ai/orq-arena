@@ -12,3 +12,7 @@ build/
 battles.jsonl
 .env
 uv.lock
+outputs/smoke/
+battles.jsonl
+battles.run.json
+*_orc_arena_*.svg

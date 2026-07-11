@@ -139,3 +139,44 @@ async def test_all_judges_contestants_raises(monkeypatch):
             prompts=["p"], match_id="M1", round_name="round",
             tournament_id="t", events=asyncio.Queue(),
         )
+
+
+async def test_ko_does_not_stop_the_judging(monkeypatch):
+    # 30 HP, 30-damage unanimous verdicts: Beta is KO'd in round 1, but both
+    # remaining prompts are still judged — KO is rendering, not sampling.
+    comparison = PairwiseComparison(
+        winner="A",
+        votes=[PairwiseVote(model="x/j1", vote="A"), PairwiseVote(model="x/j2", vote="A")],
+    )
+    jury = FakeJury(comparison)
+    monkeypatch.setattr(battle_mod, "llm_jury_pairwise", lambda **kw: jury)
+    cfg = _cfg()
+    cfg.match.starting_hp = 30
+    cfg.match.max_rounds = 3
+    events: asyncio.Queue = asyncio.Queue()
+    b = Battle(
+        cfg=cfg, gateway=FakeGateway(),
+        warrior_a=cfg.warriors[0], warrior_b=cfg.warriors[1],
+        prompts=["p1", "p2", "p3"], match_id="M1", round_name="round",
+        tournament_id="t", events=events,
+    )
+    result = await b.run()
+    assert len(result.battles) == 3          # all prompts judged
+    assert result.by == "ko"
+    assert result.final_hp_b == 0
+    assert jury.calls == 3
+
+
+async def test_equal_hp_is_a_draw(monkeypatch):
+    comparison = PairwiseComparison(
+        winner="tie",
+        votes=[PairwiseVote(model="x/j1", vote="tie"), PairwiseVote(model="x/j2", vote="tie")],
+    )
+    jury = FakeJury(comparison)
+    b, events = _build_battle(monkeypatch, FakeGateway(), jury)
+    result = await b.run()
+    assert result.by == "draw"
+    evs = _drain(events)
+    from orc_arena.events import MatchResolved
+    resolved = [e for e in evs if isinstance(e, MatchResolved)]
+    assert resolved and resolved[0].by == "draw" and resolved[0].winner == ""

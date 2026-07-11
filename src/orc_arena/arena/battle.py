@@ -213,8 +213,10 @@ class Battle:
             )
         )
 
+        # KO is presentation, not termination: every prompt is judged so the
+        # rating never depends on when the HP bar happened to empty.
         prompt_iter = iter(self.prompts)
-        while hp_a > 0 and hp_b > 0 and rounds_counted < rules.max_rounds:
+        while rounds_counted < rules.max_rounds:
             try:
                 prompt = next(prompt_iter)
             except StopIteration:
@@ -332,23 +334,20 @@ class Battle:
                 )
             )
 
-        # Resolve winner (single-elim semantics; PR 2 replaces with per-round ELO feed)
-        if hp_a <= 0 and hp_b <= 0:
-            winner, loser, by = self.b, self.a, "ko"
-        elif hp_a <= 0:
-            winner, loser, by = self.b, self.a, "ko"
-        elif hp_b <= 0:
-            winner, loser, by = self.a, self.b, "ko"
-        elif hp_a >= hp_b:
-            winner, loser, by = self.a, self.b, "round_cap"  # seed advantage on tie
+        # Resolve the match for the show. The rating ignores this entirely —
+        # ELO is fed per-round verdicts — so an HP tie is simply a draw.
+        if hp_a == hp_b:
+            winner, loser, by = self.a, self.b, "draw"
+        elif hp_a > hp_b:
+            winner, loser, by = self.a, self.b, "ko" if hp_b <= 0 else "round_cap"
         else:
-            winner, loser, by = self.b, self.a, "round_cap"
+            winner, loser, by = self.b, self.a, "ko" if hp_a <= 0 else "round_cap"
 
         await self.events.put(
             MatchResolved(
                 match_id=self.match_id,
-                winner=winner.orc_name,
-                loser=loser.orc_name,
+                winner="" if by == "draw" else winner.orc_name,
+                loser="" if by == "draw" else loser.orc_name,
                 by=by,
                 final_hp_a=hp_a,
                 final_hp_b=hp_b,

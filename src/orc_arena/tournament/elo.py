@@ -67,3 +67,35 @@ def bradley_terry_mle(
             break
 
     return {m: 400 * math.log10(max(r, 1e-10)) + 1000 for m, r in ratings.items()}
+
+
+def bootstrap_ci(
+    matches: list[tuple[str, str, str]],
+    models: list[str],
+    iterations: int = 200,
+    seed: int = 42,
+) -> dict[str, tuple[float, float]]:
+    """Percentile bootstrap 95% CI on the BT-MLE ratings.
+
+    Resamples the outcome list with replacement ``iterations`` times and
+    refits. Small pools + few comparisons => wide intervals, which is the
+    honest output.
+    """
+    import random
+
+    if not matches:
+        return {m: (1000.0, 1000.0) for m in models}
+    rng = random.Random(seed)
+    samples: dict[str, list[float]] = {m: [] for m in models}
+    for _ in range(iterations):
+        resampled = [matches[rng.randrange(len(matches))] for _ in matches]
+        ratings = bradley_terry_mle(build_wins_matrix(resampled), models, iterations=50)
+        for m in models:
+            samples[m].append(ratings.get(m, 1000.0))
+    out: dict[str, tuple[float, float]] = {}
+    for m, vals in samples.items():
+        vals.sort()
+        lo = vals[max(0, int(0.025 * len(vals)) - 1)]
+        hi = vals[min(len(vals) - 1, int(0.975 * len(vals)))]
+        out[m] = (lo, hi)
+    return out

@@ -36,13 +36,13 @@ warriors:
     emblem: "🏹"
     reasoning: { reasoning_effort: medium }
   - orc_name: Azog Deepmind
-    model_id: google/gemini-3-pro-preview
+    model_id: google/gemini-3.1-pro-preview
     emblem: "🛡"
     reasoning: { thinking: { thinking_level: high } }
   - orc_name: Gruk Flashfist
-    model_id: google/gemini-3-flash-preview
+    model_id: moonshotai/kimi-k2.6      # always-thinking by model design
     emblem: "🔥"
-    reasoning: { thinking: { thinking_level: high } }
+
   - orc_name: Bolg the Seeker
     model_id: deepseek/deepseek-reasoner   # always-thinking model
     emblem: "🪓"

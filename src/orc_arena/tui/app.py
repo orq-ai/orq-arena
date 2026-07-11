@@ -24,13 +24,13 @@ from textual.app import App
 from ..config import ArenaConfig
 from ..events import (
     ArenaEvent,
-    BracketUpdated,
     JudgeVerdictEvent,
     MatchResolved,
     MatchStarted,
     ResponseChunk,
     ResponseComplete,
     RoundVoided,
+    StandingsUpdated,
     ThinkingChunk,
     TournamentEnded,
     TurnPrompt,
@@ -50,7 +50,11 @@ class ArenaApp(App):
     """Main Textual app."""
 
     TITLE = "orc-arena"
-    BINDINGS = [("q", "quit", "Quit")]
+    BINDINGS = [("q", "quit", "Quit"), ("s", "shot", "Screenshot")]
+
+    def action_shot(self) -> None:
+        path = self.save_screenshot()
+        self.notify(f"saved {path}")
 
     def __init__(
         self,
@@ -125,6 +129,7 @@ class ArenaApp(App):
                         elo=ev.elo,
                         champion=ev.champion,
                         log_path=ev.battle_log_path,
+                        report=ev.report,
                     )
                 )
                 return
@@ -135,8 +140,8 @@ class ArenaApp(App):
         fs = self._fight_screen
         if fs is None:
             return
-        if isinstance(ev, BracketUpdated):
-            fs.set_ticker(_compact_bracket(ev.rounds))
+        if isinstance(ev, StandingsUpdated):
+            fs.set_standings(ev.elo, ev.matches_done, ev.matches_total)
         elif isinstance(ev, MatchStarted):
             w_a = self._by_name.get(ev.warrior_a)
             w_b = self._by_name.get(ev.warrior_b)
@@ -173,26 +178,10 @@ class ArenaApp(App):
             fs.match_resolved(ev.winner, ev.by)
 
 
-def _compact_bracket(rounds: list[list[list[str | None]]]) -> str:
-    if not rounds:
-        return "[dim]bracket[/dim]"
-    headers = ["QF", "SF", "F"]
-    parts: list[str] = []
-    for idx, rnd in enumerate(rounds):
-        names = []
-        for pair in rnd:
-            a = (pair[0] if len(pair) > 0 else None) or "?"
-            b = (pair[1] if len(pair) > 1 else None) or "?"
-            names.append(f"{a[:10]} vs {b[:10]}")
-        hdr = headers[idx] if idx < len(headers) else f"R{idx+1}"
-        parts.append(f"[b]{hdr}[/b] " + "  ".join(names))
-    return "   ".join(parts)
-
-
 def _event_from_dict(raw: dict[str, Any]) -> ArenaEvent:
     kind = raw["type"]
     mapping = {
-        "bracket_updated": BracketUpdated,
+        "standings_updated": StandingsUpdated,
         "match_started": MatchStarted,
         "turn_prompt": TurnPrompt,
         "response_chunk": ResponseChunk,
