@@ -1,14 +1,5 @@
 [
  {
-  "type": "tournament_started",
-  "warrior_names": [
-   "Snot the Quick",
-   "Gruk Flashfist",
-   "Ugluk Stormcaller"
-  ],
-  "_delay": 0.35
- },
- {
   "type": "match_started",
   "match_id": "M1",
   "round_name": "match 1/3",

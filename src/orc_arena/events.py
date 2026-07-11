@@ -16,11 +16,6 @@ from typing import Any, Literal, Union
 from pydantic import BaseModel
 
 
-class TournamentStarted(BaseModel):
-    type: Literal["tournament_started"] = "tournament_started"
-    warrior_names: list[str]
-
-
 class StandingsUpdated(BaseModel):
     """Live Bradley-Terry standings, recomputed after every match."""
 
@@ -124,7 +119,6 @@ class TournamentEnded(BaseModel):
 
 
 ArenaEvent = Union[
-    TournamentStarted,
     StandingsUpdated,
     MatchStarted,
     TurnPrompt,

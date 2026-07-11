@@ -21,7 +21,7 @@ from ..arena.battle import Battle
 from ..config import ArenaConfig
 from ..data.log import BattleLog
 from ..data.schemas import BattleRecord
-from ..events import ArenaEvent, StandingsUpdated, TournamentEnded, TournamentStarted
+from ..events import ArenaEvent, StandingsUpdated, TournamentEnded
 from ..orcs.roster import WarriorSpec
 from ..providers.orq_gateway import OrqGateway
 from .elo import bootstrap_ci, bradley_terry_mle, build_wins_matrix
@@ -162,8 +162,6 @@ async def run_tournament(
     _write_manifest(
         manifest_path, cfg=cfg, prompts=prompts, seed=seed, tournament_id=tournament_id
     )
-
-    await events.put(TournamentStarted(warrior_names=names))
 
     rng = random.Random(seed)
     outcomes: list[Outcome] = []
