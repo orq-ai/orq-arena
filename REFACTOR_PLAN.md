@@ -367,20 +367,43 @@ models is coerced to a minimum budget of 128; setting `reasoning_effort` auto-dr
 `usage.completion_tokens_details.reasoning_tokens`. Visible chain-of-thought in responses is
 explicitly **not** part of the router's stable contract — optional provider fields only.
 
-**Into PR 1 (config + wiring):**
-- `WarriorSpec.reasoning: dict | None = None` — passed verbatim as `extra_body` on the warrior's
-  `create()` call. The arena stays a dumb pipe; the router normalizes per provider. Example:
+**Interface ruling (owner, 2026-07-11): config file only.** No CLI flags for thinking or effort
+— one interface, not two. `WarriorSpec.reasoning: dict | None = None` is the whole mechanism:
+raw router fields passed verbatim as `extra_body` on the warrior's `create()` call. No shorthand
+syntax (`reasoning: off` sugar would need per-provider expansion tables). Any custom or future
+router control passes through with zero arena code. YAML comments carry the three provider
+recipes:
 
 ```yaml
 warriors:
   - orc_name: Azog Deepmind
     model_id: google/gemini-2.5-pro
-    reasoning: { thinking: { type: enabled, budget_tokens: 2048 } }
-    max_tokens: 8000            # per-warrior override; must exceed the thinking budget
+    # think-by-default model: explicitly disabled for the uniform-OFF default pool
+    # (router coerces disable to its minimum budget of 128 on thinking-enforced models)
+    reasoning: { thinking: { type: disabled } }
+  - orc_name: Grak the Thoughtful
+    model_id: anthropic/claude-opus-4-7   # no reasoning block = provider default (off)
+# recipes: OpenAI  -> reasoning: { reasoning_effort: low|medium|high }
+#          Claude  -> reasoning: { thinking: { type: enabled, budget_tokens: 4096 } }
+#          Gemini3 -> reasoning: { thinking: { thinking_level: low|high } }
 ```
 
+- **Default policy: uniform OFF.** The default config carries explicit
+  `thinking: {type: disabled}` blocks on think-by-default warriors (today: the two gemini-2.5
+  entries) and nothing on the rest — explicit beats a blanket-send, and the dumb-pipe rule holds
+  (no per-provider logic in arena code, just per-warrior config lines).
 - Config validation: `thinking.budget_tokens < max_tokens` (per-warrior `max_tokens` override
   added, defaulting to `gateway.warrior_max_tokens`).
+- **Roster refresh (both configs).** The current 8-warrior list was hand-picked at repo creation
+  and is stale (gpt-4o, deepseek-v3, mistral-large). At PR 1, refresh against the router's live
+  registry (verify `GET {base_url}/models` at impl time) with current-gen picks documented on the
+  router: gpt-5.x family, claude-sonnet-4-6 / opus-4-x, gemini-3-preview family, plus whatever
+  current deepseek/mistral the registry lists. Roster selection stays manual curation in YAML —
+  no discovery mechanism in code.
+- **Second config: `configs/reasoning_arena.yaml`** — the "does thinking help" benchmark.
+  Modern reasoning models only (no o-series — dated): gpt-5.x with `reasoning_effort`,
+  claude-4.x with thinking budgets (budget 4096 / max_tokens 16000 per docs pairing),
+  gemini-3-preview with `thinking_level`. Same prompts, thinking ON uniformly.
 - Router base URL: `https://api.orq.ai/v3/router` (PR 1). `api.orq.ai` is the public-facing
   host and the one this repo always shows; `my.orq.ai` is an alias to the same server and fine
   where the orq-ai-sdk uses it internally. `/v3` is the docs-canonical path for raw OpenAI
@@ -401,10 +424,11 @@ orq-ai-sdk enters where it belongs: PR 4's platform upload already pulls it via
 "official SDK" example. If we later want typed reasoning controls in arena code, swapping the
 warrior call to orq-ai-sdk is a contained change to `providers/orq_gateway.py` only.
 
-**Into PR 1 (TUI):** response panel gets a "thinking…" state between `TurnPrompt` and its first
-`ResponseChunk` (widget-local timer, no new events). Best-effort: if a streamed delta carries an
-optional reasoning field (`getattr(delta, "reasoning_content", None)` / `model_extra`), render it
-dimmed — never depend on it (router contract above).
+**Into PR 1 (TUI):** response panel gets an animated "thinking…" timer between `TurnPrompt` and
+its first `ResponseChunk` (widget-local, no new events). Best-effort CoT: if a streamed delta
+carries an optional reasoning field (`getattr(delta, "reasoning_content", None)` /
+`model_extra`), render it dimmed as a rolling last-~3-lines window — never depend on it (router
+contract above); the timer is the guaranteed path.
 
 **Into PR 3 (usage):** the `usage_out` capture also reads
 `completion_tokens_details.reasoning_tokens`; `BattleRecord` gains `tokens_a_reasoning` /
@@ -412,8 +436,9 @@ dimmed — never depend on it (router contract above).
 effective reasoning setting (explicit config or `"vendor-default"`).
 
 **Into PR 2 (leaderboard, extends §2.5):** mean reasoning tokens rendered beside the verbosity
-column, and a footnote whenever the pool mixes reasoning-enabled and disabled warriors — the
-"is +40 ELO worth 6× the tokens and 10× the latency?" readout is precisely the router's pitch.
+column; thinking-enabled warriors get a 🧠 badge; mixed pools are **allowed** (deliberately —
+"is +40 ELO worth 6× the tokens and 10× the latency?" is a legitimate benchmark and precisely
+the router's pitch) with a footnote naming the mix. No hard error, no confirmation prompt.
 
 **Acceptance (PR 1 smoke config):** include one thinking-enabled warrior
 (`anthropic/claude-*, budget 2048, max_tokens 4096`); verify the thinking indicator renders, the
@@ -453,7 +478,13 @@ judge-prompt DSLs, parallel match execution. Any of these returns only with a ti
 8. Leaderboard always shows CIs and mean output tokens; low judge agreement is announced, not
    buried (§2.5). A benchmark that can't say "insufficient data" is a toy.
 9. Reasoning controls are raw router fields passed through verbatim (`WarriorSpec.reasoning` →
-   `extra_body`), never modeled per-provider in arena code; the router normalizes.
+   `extra_body`), never modeled per-provider in arena code; the router normalizes. Config file
+   is the only interface — no CLI flags for thinking/effort, no shorthand syntax.
+9a. Default pool is uniform thinking-OFF (explicit disable blocks on think-by-default warriors);
+    `configs/reasoning_arena.yaml` is the uniform thinking-ON counterpart with modern reasoning
+    models (no o-series). Mixed pools allowed, badged 🧠, footnoted — never refused.
+9b. Rosters are refreshed to current-gen models at PR 1, verified against the router registry;
+    selection stays manual YAML curation, no discovery code.
 10. Visible chain-of-thought is rendered best-effort only ("thinking…" indicator is the
     guaranteed path) — the router's stable contract excludes CoT text.
 11. Warrior + judge traffic stays on `AsyncOpenAI`; orq-ai-sdk (typed reasoning controls,
