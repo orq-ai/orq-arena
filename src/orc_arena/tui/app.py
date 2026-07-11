@@ -4,7 +4,6 @@ Flow:
   Title screen
     ↓ (ENTER)
   Fight screen + background tournament task
-    (bracket strip + warrior cards re-render for each match)
     ↓ TournamentEnded
   Leaderboard screen.
 
@@ -30,6 +29,9 @@ from ..events import (
     MatchResolved,
     MatchStarted,
     ResponseChunk,
+    ResponseComplete,
+    RoundVoided,
+    ThinkingChunk,
     TournamentEnded,
     TurnPrompt,
     TurnResolved,
@@ -38,6 +40,10 @@ from ..tournament.driver import run_tournament
 from .screens.fight import FightScreen
 from .screens.leaderboard import LeaderboardScreen
 from .screens.title import TitleScreen
+
+
+def _judge_display(model_id: str) -> str:
+    return model_id.split("/")[-1]
 
 
 class ArenaApp(App):
@@ -73,13 +79,10 @@ class ArenaApp(App):
         self.push_screen(TitleScreen())
 
     def begin(self) -> None:
-        """Called from TitleScreen when the user presses ENTER.
-
-        Pushes the Fight screen and kicks off tournament + event dispatcher.
-        """
+        """Called from TitleScreen when the user presses ENTER."""
         if self._engine_task is not None:
             return  # already running
-        self._fight_screen = FightScreen([j.name for j in self.cfg.judges])
+        self._fight_screen = FightScreen([_judge_display(m) for m in self.cfg.judges])
         self.push_screen(self._fight_screen)
         self._dispatcher_task = asyncio.create_task(self._dispatch_events())
         if self._live:
@@ -133,24 +136,39 @@ class ArenaApp(App):
         if fs is None:
             return
         if isinstance(ev, BracketUpdated):
-            fs.set_bracket_strip(_compact_bracket(ev.rounds))
+            fs.set_ticker(_compact_bracket(ev.rounds))
         elif isinstance(ev, MatchStarted):
             w_a = self._by_name.get(ev.warrior_a)
             w_b = self._by_name.get(ev.warrior_b)
             if w_a and w_b:
                 fs.start_match(
-                    w_a.orc_name, w_a.model_id, w_a.emblem,
-                    w_b.orc_name, w_b.model_id, w_b.emblem,
+                    w_a.orc_name, w_a.model_id, w_a.emblem, w_a.thinking_enabled,
+                    w_b.orc_name, w_b.model_id, w_b.emblem, w_b.thinking_enabled,
                     self.cfg.match.starting_hp,
                 )
         elif isinstance(ev, TurnPrompt):
             fs.set_prompt(ev.round_number, ev.prompt)
         elif isinstance(ev, ResponseChunk):
             fs.append_response(ev.side, ev.text)
+        elif isinstance(ev, ThinkingChunk):
+            fs.append_thinking(ev.side, ev.text)
+        elif isinstance(ev, ResponseComplete):
+            fs.response_complete(
+                ev.side,
+                tokens_out=ev.tokens_out,
+                reasoning_tokens=ev.reasoning_tokens,
+                finish_reason=ev.finish_reason,
+                error=ev.error,
+            )
         elif isinstance(ev, JudgeVerdictEvent):
-            fs.set_judge_verdict(ev.judge_name, ev.verdict, ev.reasoning)
+            fs.set_judge_verdict(
+                ev.judge_name, ev.verdict, ev.reasoning,
+                flipped=ev.flipped, replacement=ev.replacement,
+            )
+        elif isinstance(ev, RoundVoided):
+            fs.round_voided(ev.reason)
         elif isinstance(ev, TurnResolved):
-            fs.apply_damage(ev.hp_a, ev.hp_b, ev.majority, ev.damage_dealt)
+            fs.apply_damage(ev.hp_a, ev.hp_b, ev.majority, ev.damage_dealt, ev.loser_side)
         elif isinstance(ev, MatchResolved):
             fs.match_resolved(ev.winner, ev.by)
 
@@ -178,7 +196,10 @@ def _event_from_dict(raw: dict[str, Any]) -> ArenaEvent:
         "match_started": MatchStarted,
         "turn_prompt": TurnPrompt,
         "response_chunk": ResponseChunk,
+        "thinking_chunk": ThinkingChunk,
+        "response_complete": ResponseComplete,
         "judge_verdict": JudgeVerdictEvent,
+        "round_voided": RoundVoided,
         "turn_resolved": TurnResolved,
         "match_resolved": MatchResolved,
         "tournament_ended": TournamentEnded,

@@ -1,17 +1,19 @@
-"""Typed events emitted by the engine and consumed by the TUI / future renderers.
+"""Typed events emitted by the engine and consumed by the TUI + fixture replay.
 
-All events are ``pydantic.BaseModel`` so a future Unity/web renderer can consume
-the same stream via JSON. The engine never calls into the TUI directly — it
-pushes events into an ``asyncio.Queue``.
+All events are ``pydantic.BaseModel`` so the ``demo`` fixture can round-trip
+them as JSON. The engine never calls into the TUI directly — it pushes events
+into an ``asyncio.Queue``.
+
+Verdict vocabulary follows evaluatorq's pairwise contract:
+per-judge votes are ``'A' | 'B' | 'tie' | 'abstain'`` and a round's consensus
+is ``'A' | 'B' | 'tie' | 'inconclusive'``.
 """
 
 from __future__ import annotations
 
 from typing import Literal, Union
 
-from pydantic import BaseModel, Field
-
-from .judges.schemas import JudgeResult
+from pydantic import BaseModel
 
 
 class TournamentStarted(BaseModel):
@@ -22,14 +24,13 @@ class TournamentStarted(BaseModel):
 class BracketUpdated(BaseModel):
     type: Literal["bracket_updated"] = "bracket_updated"
     # round → list of [a, b] matchups; 'a'/'b' may be None for TBD.
-    # List (not tuple) so JSON round-trip works cleanly for the fixture replay.
     rounds: list[list[list[str | None]]]
 
 
 class MatchStarted(BaseModel):
     type: Literal["match_started"] = "match_started"
     match_id: str
-    round_name: str  # 'quarterfinal', 'semifinal', 'final'
+    round_name: str
     warrior_a: str
     warrior_b: str
 
@@ -48,12 +49,24 @@ class ResponseChunk(BaseModel):
     text: str
 
 
+class ThinkingChunk(BaseModel):
+    """Best-effort visible reasoning delta — optional per router contract."""
+
+    type: Literal["thinking_chunk"] = "thinking_chunk"
+    match_id: str
+    side: Literal["a", "b"]
+    text: str
+
+
 class ResponseComplete(BaseModel):
     type: Literal["response_complete"] = "response_complete"
     match_id: str
     side: Literal["a", "b"]
     full_text: str
+    tokens_in: int = 0
     tokens_out: int = 0
+    reasoning_tokens: int = 0
+    finish_reason: str = ""
     error: str | None = None
 
 
@@ -61,16 +74,26 @@ class JudgeVerdictEvent(BaseModel):
     type: Literal["judge_verdict"] = "judge_verdict"
     match_id: str
     judge_name: str
-    verdict: Literal["A", "B", "TIE"]
+    verdict: str  # 'A' | 'B' | 'tie' | 'abstain'
     reasoning: str
+    flipped: bool = False      # judge contradicted itself across orderings
+    replacement: bool = False  # stand-in for a failed judge
+
+
+class RoundVoided(BaseModel):
+    """A side's stream failed after retry — round never judged, never scored."""
+
+    type: Literal["round_voided"] = "round_voided"
+    match_id: str
+    round_number: int
+    reason: str
 
 
 class TurnResolved(BaseModel):
     type: Literal["turn_resolved"] = "turn_resolved"
     match_id: str
     round_number: int
-    majority: Literal["A", "B", "TIE", "DISCARD"]
-    verdicts: list[JudgeResult]
+    majority: str  # 'A' | 'B' | 'tie' | 'inconclusive'
     damage_dealt: int
     loser_side: Literal["a", "b", "none"]
     hp_a: int
@@ -100,8 +123,10 @@ ArenaEvent = Union[
     MatchStarted,
     TurnPrompt,
     ResponseChunk,
+    ThinkingChunk,
     ResponseComplete,
     JudgeVerdictEvent,
+    RoundVoided,
     TurnResolved,
     MatchResolved,
     TournamentEnded,

@@ -1,28 +1,18 @@
-"""orq.ai router gateway client — single provider for all warrior + judge calls.
+"""orq.ai router gateway client — single provider for all warrior calls.
 
-Adapted from orq-battlebench/providers/orq_gateway.py. Uses ``AsyncOpenAI``
-pointed at ``api.orq.ai/v2/router``; the gateway is OpenAI-compatible.
+Uses ``AsyncOpenAI`` pointed at ``api.orq.ai/v3/router``; the gateway is
+OpenAI-compatible. Judge calls share ``.client`` via evaluatorq.
 """
 
 from __future__ import annotations
 
 import os
-import time
-from dataclasses import dataclass
-from typing import AsyncIterator
+from typing import Any, AsyncIterator
 
+import httpx
 from openai import AsyncOpenAI
 
 from ..config import GatewayConfig
-
-
-@dataclass
-class GenerationResult:
-    text: str
-    tokens_in: int = 0
-    tokens_out: int = 0
-    latency_ms: int = 0
-    error: str | None = None
 
 
 class OrqGateway:
@@ -35,11 +25,17 @@ class OrqGateway:
                 f"{cfg.api_key_env} is not set. Export it before running orc-arena."
             )
         self._cfg = cfg
-        self._client = AsyncOpenAI(api_key=api_key, base_url=cfg.base_url)
+        # read = max silence between stream chunks; generous so thinking models
+        # can pause for minutes before the first token. No total-duration cap —
+        # a model loses on its words, never on its network.
+        timeout = httpx.Timeout(
+            connect=10.0, read=float(cfg.stream_read_timeout_s), write=60.0, pool=60.0
+        )
+        self._client = AsyncOpenAI(api_key=api_key, base_url=cfg.base_url, timeout=timeout)
 
     @property
     def client(self) -> AsyncOpenAI:
-        """Exposed for ``instructor.from_openai`` usage in the judge panel."""
+        """Exposed so evaluatorq's jury rides the same router client."""
         return self._client
 
     async def stream_completion(
@@ -48,50 +44,45 @@ class OrqGateway:
         model: str,
         prompt: str,
         max_tokens: int | None = None,
-    ) -> AsyncIterator[str]:
-        """Yield response text chunks as they arrive from the gateway."""
-        max_tokens = max_tokens or self._cfg.warrior_max_tokens
+        extra_body: dict[str, Any] | None = None,
+        usage_out: dict[str, Any] | None = None,
+    ) -> AsyncIterator[tuple[str, str]]:
+        """Yield ``(kind, text)`` chunks: kind is ``"text"`` or ``"think"``.
+
+        ``extra_body`` carries raw router controls (``thinking`` /
+        ``reasoning_effort``) verbatim. ``"think"`` chunks are best-effort —
+        visible reasoning deltas are optional per the router contract. Exact
+        token usage and finish_reason land in ``usage_out``.
+        """
         stream = await self._client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=max_tokens,
+            max_tokens=max_tokens or self._cfg.warrior_max_tokens,
             stream=True,
+            stream_options={"include_usage": True},
+            extra_body=extra_body or None,
         )
         async for chunk in stream:
+            usage = getattr(chunk, "usage", None)
+            if usage is not None and usage_out is not None:
+                usage_out["input_tokens"] = usage.prompt_tokens or 0
+                usage_out["output_tokens"] = usage.completion_tokens or 0
+                details = getattr(usage, "completion_tokens_details", None)
+                usage_out["reasoning_tokens"] = getattr(details, "reasoning_tokens", 0) or 0
             if not chunk.choices:
                 continue
-            delta = chunk.choices[0].delta
-            if delta and delta.content:
-                yield delta.content
-
-    async def generate(
-        self,
-        *,
-        model: str,
-        prompt: str,
-        max_tokens: int | None = None,
-    ) -> GenerationResult:
-        """Non-streaming single call — used for judge invocations."""
-        max_tokens = max_tokens or self._cfg.warrior_max_tokens
-        t0 = time.time()
-        try:
-            resp = await self._client.chat.completions.create(
-                model=model,
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=max_tokens,
-            )
-            text = resp.choices[0].message.content or "" if resp.choices else ""
-            tin = resp.usage.prompt_tokens if resp.usage else 0
-            tout = resp.usage.completion_tokens if resp.usage else 0
-            return GenerationResult(
-                text=text,
-                tokens_in=tin,
-                tokens_out=tout,
-                latency_ms=int((time.time() - t0) * 1000),
-            )
-        except Exception as exc:
-            return GenerationResult(
-                text="",
-                latency_ms=int((time.time() - t0) * 1000),
-                error=str(exc),
-            )
+            choice = chunk.choices[0]
+            if choice.finish_reason and usage_out is not None:
+                usage_out["finish_reason"] = choice.finish_reason
+            delta = choice.delta
+            if delta is None:
+                continue
+            # The router surfaces visible CoT as `reasoning` on the delta
+            # (observed for Anthropic/Gemini thinking); `reasoning_content` is
+            # the DeepSeek-style spelling. Both optional per the contract.
+            extra = delta.model_extra or {}
+            reasoning_piece = extra.get("reasoning") or getattr(delta, "reasoning_content", None)
+            if reasoning_piece:
+                yield ("think", str(reasoning_piece))
+            if delta.content:
+                yield ("text", delta.content)

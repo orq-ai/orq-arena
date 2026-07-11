@@ -6,9 +6,8 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
-from .judges.schemas import JudgeSpec
 from .orcs.roster import WarriorSpec
 
 
@@ -21,11 +20,15 @@ class MatchRules(BaseModel):
 
 
 class GatewayConfig(BaseModel):
-    base_url: str = "https://api.orq.ai/v2/router"
+    base_url: str = "https://api.orq.ai/v3/router"
     api_key_env: str = "ORQ_API_KEY"
-    concurrency: int = 4
     warrior_max_tokens: int = 1024
     judge_max_tokens: int = 512
+    # Max silence between stream chunks before we declare the connection dead.
+    # Generous on purpose: thinking models may pause for minutes before the
+    # first token. Fires only on true silence, never on a slow-but-alive stream.
+    stream_read_timeout_s: int = 1200
+    judge_timeout_ms: int = 90000
 
 
 class ArenaConfig(BaseModel):
@@ -34,11 +37,31 @@ class ArenaConfig(BaseModel):
     match: MatchRules = Field(default_factory=MatchRules)
     gateway: GatewayConfig = Field(default_factory=GatewayConfig)
     warriors: list[WarriorSpec]
-    judges: list[JudgeSpec]
-    judge_system_prompt: str = (
-        "You are an expert judge evaluating AI assistant responses. "
-        "Be impartial and focus on accuracy, helpfulness, clarity, and relevance."
+    judges: list[str] = Field(description="Judge panel — router model ids")
+    replacement_judges: list[str] = Field(default_factory=list)
+    criteria: str = (
+        "Accuracy and correctness, helpfulness and completeness, "
+        "clarity, and relevance to the prompt."
     )
+    # Fewer decisive reconciled votes than this -> round is 'inconclusive',
+    # never a verdict. Guards against jury-of-one "unanimous" hits.
+    min_successful_judges: int = 2
+
+    @model_validator(mode="after")
+    def _validate(self) -> "ArenaConfig":
+        if len(self.warriors) < 2:
+            raise ValueError(f"Need at least 2 warriors, got {len(self.warriors)}")
+        if not self.judges:
+            raise ValueError("Judge panel is empty")
+        for w in self.warriors:
+            budget = ((w.reasoning or {}).get("thinking") or {}).get("budget_tokens")
+            cap = w.max_tokens or self.gateway.warrior_max_tokens
+            if isinstance(budget, int) and budget >= cap:
+                raise ValueError(
+                    f"{w.orc_name}: thinking budget_tokens ({budget}) must be < "
+                    f"max_tokens ({cap})"
+                )
+        return self
 
 
 def load_config(path: str | Path) -> ArenaConfig:

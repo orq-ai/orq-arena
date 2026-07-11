@@ -2,7 +2,7 @@
 
 Layout:
   ┌─────────────────────────────────────────────┐
-  │ Bracket strip (compact)                     │
+  │ Ticker strip (match progress)               │
   ├──────────────────────┬──────────────────────┤
   │ WarriorCard A        │ WarriorCard B        │
   ├──────────────────────┴──────────────────────┤
@@ -12,6 +12,9 @@ Layout:
   ├──────────────────────┴──────────────────────┤
   │ Judge cards (3 across)                      │
   └─────────────────────────────────────────────┘
+
+Side identity: A is green, B is orange — on the warrior cards, the response
+panels, and the judge verdict cues.
 """
 
 from __future__ import annotations
@@ -34,7 +37,7 @@ class FightScreen(Screen):
     FightScreen {
         background: $surface;
     }
-    FightScreen #bracket-strip {
+    FightScreen #ticker-strip {
         height: 3;
         padding: 0 1;
         color: $text-muted;
@@ -77,19 +80,21 @@ class FightScreen(Screen):
     def __init__(self, judge_names: list[str], **kwargs) -> None:
         super().__init__(**kwargs)
         self._judge_names = judge_names
-        self._card_a = WarriorCard()
-        self._card_b = WarriorCard()
+        self._card_a = WarriorCard(side="a")
+        self._card_b = WarriorCard(side="b")
         self._prompt = PromptPanel("[dim]waiting for next round...[/dim]")
-        self._resp_a = ResponsePanel()
-        self._resp_b = ResponsePanel()
+        self._resp_a = ResponsePanel(side="a")
+        self._resp_b = ResponsePanel(side="b")
         self._judges: dict[str, JudgeCard] = {
             name: JudgeCard(name) for name in judge_names
         }
-        self._bracket_strip = Static("[dim]bracket loading...[/dim]", id="bracket-strip")
+        self._ticker = Static("[dim]arena loading...[/dim]", id="ticker-strip")
         self._status = Static("", id="status")
+        self._orc_a = ""
+        self._orc_b = ""
 
     def compose(self) -> ComposeResult:
-        yield self._bracket_strip
+        yield self._ticker
         with Horizontal(id="warriors"):
             yield self._card_a
             yield self._card_b
@@ -105,21 +110,30 @@ class FightScreen(Screen):
 
     # --- called by the App from the event loop ---
 
-    def set_bracket_strip(self, text: str) -> None:
-        self._bracket_strip.update(text)
+    def set_ticker(self, text: str) -> None:
+        self._ticker.update(text)
 
-    def start_match(self,
-                    orc_a: str, model_a: str, emblem_a: str,
-                    orc_b: str, model_b: str, emblem_b: str,
-                    starting_hp: int) -> None:
-        self._card_a.set_warrior(orc_name=orc_a, model_id=model_a, emblem=emblem_a, max_hp=starting_hp)
-        self._card_b.set_warrior(orc_name=orc_b, model_id=model_b, emblem=emblem_b, max_hp=starting_hp)
+    def start_match(
+        self,
+        orc_a: str, model_a: str, emblem_a: str, thinking_a: bool,
+        orc_b: str, model_b: str, emblem_b: str, thinking_b: bool,
+        starting_hp: int,
+    ) -> None:
+        self._orc_a, self._orc_b = orc_a, orc_b
+        self._card_a.set_warrior(
+            orc_name=orc_a, model_id=model_a, emblem=emblem_a,
+            max_hp=starting_hp, thinking=thinking_a,
+        )
+        self._card_b.set_warrior(
+            orc_name=orc_b, model_id=model_b, emblem=emblem_b,
+            max_hp=starting_hp, thinking=thinking_b,
+        )
         self._resp_a.reset()
         self._resp_b.reset()
         for card in self._judges.values():
             card.reset()
         self._prompt.clear_prompt()
-        self._status.update(f"[b]{orc_a}[/b] vs [b]{orc_b}[/b]")
+        self._status.update(f"[b green]{orc_a}[/b green] vs [b yellow]{orc_b}[/b yellow]")
 
     def set_prompt(self, round_number: int, text: str) -> None:
         self._prompt.set_prompt(round_number, text)
@@ -131,21 +145,52 @@ class FightScreen(Screen):
     def append_response(self, side: str, text: str) -> None:
         (self._resp_a if side == "a" else self._resp_b).append_chunk(text)
 
-    def set_judge_verdict(self, judge_name: str, verdict: str, reasoning: str) -> None:
+    def append_thinking(self, side: str, text: str) -> None:
+        (self._resp_a if side == "a" else self._resp_b).append_thinking(text)
+
+    def response_complete(
+        self, side: str, *, tokens_out: int, reasoning_tokens: int,
+        finish_reason: str, error: str | None,
+    ) -> None:
+        panel = self._resp_a if side == "a" else self._resp_b
+        panel.complete(
+            tokens_out=tokens_out, reasoning_tokens=reasoning_tokens,
+            finish_reason=finish_reason, error=error,
+        )
+
+    def set_judge_verdict(
+        self, judge_name: str, verdict: str, reasoning: str,
+        *, flipped: bool = False, replacement: bool = False,
+    ) -> None:
         card = self._judges.get(judge_name)
         if card is not None:
-            card.set_verdict(verdict, reasoning)
+            card.set_verdict(verdict, reasoning, flipped=flipped, replacement=replacement)
+            return
+        # A stand-in judge has no pre-built card — surface it on the status line.
+        self._status.update(f"[dim]stand-in[/dim] [b]{judge_name}[/b] votes {verdict}")
 
-    def apply_damage(self, hp_a: int, hp_b: int, majority: str, damage: int) -> None:
+    def apply_damage(
+        self, hp_a: int, hp_b: int, majority: str, damage: int, loser_side: str
+    ) -> None:
         self._card_a.set_hp(hp_a)
         self._card_b.set_hp(hp_b)
         if majority in ("A", "B"):
-            self._status.update(f"verdict {majority} — {damage} damage")
+            hit = self._orc_a if loser_side == "a" else self._orc_b
+            self._status.update(f"verdict [b]{majority}[/b] — [b red]{damage} damage[/b red] to {hit}")
         else:
-            self._status.update(f"verdict {majority} — no damage")
+            self._status.update(f"verdict [b]{majority}[/b] — no damage")
+
+    def round_voided(self, reason: str) -> None:
+        self._status.update(f"[yellow]⚠ round void — {reason}[/yellow]")
 
     def match_resolved(self, winner: str, by: str) -> None:
-        self._status.update(f"[b]{winner}[/b] wins by [b]{by}[/b]")
+        if by == "ko":
+            loser_card = self._card_b if winner == self._orc_a else self._card_a
+            loser_card.knock_out()
+            self.app.bell()
+            self._status.update(f"[b red]💀 K.O.![/b red]  [b]{winner}[/b] wins!")
+        else:
+            self._status.update(f"[b]🏁 {winner}[/b] wins on points ({by})")
 
     def action_quit(self) -> None:
         self.app.exit()
