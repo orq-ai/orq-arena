@@ -1,0 +1,356 @@
+<title>orc-arena — Refactor Executed: evaluatorq In, Bracket Out</title>
+<style>
+  :root {
+    --ivory: #f8f5ec;
+    --paper: #fffdf7;
+    --slate: #2a2d33;
+    --slate-soft: #4a4f57;
+    --oat: #ded6c3;
+    --oat-line: #e7e0d0;
+    --clay: #b45739;
+    --olive: #6f7748;
+    --gold: #b8892b;
+    --green: #55713f;
+    --muted: #8a8578;
+    --evq: #44607f;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    --mono: "SF Mono", "JetBrains Mono", "Fira Code", ui-monospace, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--ivory); color: var(--slate); font-family: var(--sans); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 0 28px 96px; }
+  header.page { border-bottom: 3px double var(--oat); padding: 56px 0 30px; margin-bottom: 8px; }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--clay); margin: 0 0 14px; }
+  h1 { font-family: var(--serif); font-weight: 600; font-size: 40px; line-height: 1.12; margin: 0 0 12px; letter-spacing: -0.01em; text-wrap: balance; }
+  .dateline { font-family: var(--mono); font-size: 13px; color: var(--muted); }
+  .dateline b { color: var(--slate-soft); font-weight: 600; }
+  h2 { font-family: var(--serif); font-size: 25px; font-weight: 600; margin: 52px 0 6px; padding-bottom: 8px; border-bottom: 1px solid var(--oat-line); }
+  h2 .num { font-family: var(--mono); font-size: 14px; color: var(--clay); margin-right: 12px; vertical-align: 2px; }
+  h3 { font-family: var(--serif); font-size: 18px; margin: 26px 0 4px; }
+  p { margin: 10px 0; }
+  .lede { font-size: 17px; color: var(--slate-soft); }
+  code, .mono { font-family: var(--mono); font-size: 0.86em; }
+  code { background: #efe9db; padding: 1px 5px; border-radius: 3px; color: #7a3a26; }
+  a { color: var(--clay); }
+  .verdict { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 14px; margin: 30px 0 8px; }
+  .vcard { background: var(--paper); border: 1px solid var(--oat-line); border-radius: 10px; padding: 18px 18px 16px; }
+  .vcard .label { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; }
+  .vcard .big { font-family: var(--serif); font-size: 34px; font-weight: 600; line-height: 1; }
+  .vcard .sub { font-size: 12.5px; color: var(--slate-soft); margin-top: 6px; }
+  .grade-strip { border-top: 3px solid var(--clay); }
+  .callout { background: var(--paper); border-left: 4px solid var(--clay); border-radius: 0 8px 8px 0; padding: 16px 20px; margin: 22px 0; }
+  .callout.good { border-left-color: var(--green); }
+  .callout.warn { border-left-color: var(--gold); }
+  .callout.evq { border-left-color: var(--evq); }
+  table { border-collapse: collapse; width: 100%; margin: 18px 0; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--oat-line); vertical-align: top; }
+  th { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); border-bottom: 1.5px solid var(--oat); }
+  tbody tr:hover { background: #fbf8f0; }
+  td.n { font-family: var(--mono); white-space: nowrap; }
+  .tablewrap { overflow-x: auto; }
+  .pill { display: inline-block; font-family: var(--mono); font-size: 11px; padding: 1px 8px; border-radius: 20px; border: 1px solid var(--oat); color: var(--slate-soft); white-space: nowrap; }
+  .pill.done { background: #e7efdd; border-color: #b8cf9e; color: #465e33; }
+  .pill.live { background: #e6ebf1; border-color: #a9b8ca; color: #33475e; }
+  .finding { background: var(--paper); border: 1px solid var(--oat-line); border-radius: 10px; padding: 4px 22px 18px; margin: 20px 0; }
+  .finding .rank { font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: 0.1em; }
+  .finding h3 { margin-top: 12px; }
+  .kv { display: grid; grid-template-columns: 96px 1fr; gap: 4px 14px; font-size: 14px; margin-top: 8px; }
+  .kv .k { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); padding-top: 2px; }
+  .grades { margin: 20px 0; }
+  .grade-row { display: grid; grid-template-columns: 62px 62px 1fr; gap: 14px; align-items: start; padding: 14px 0; border-bottom: 1px solid var(--oat-line); }
+  .grade-badge { font-family: var(--serif); font-weight: 600; font-size: 26px; text-align: center; line-height: 1.7; border-radius: 10px; border: 1.5px solid var(--oat); background: var(--paper); }
+  .grade-badge.old { opacity: 0.45; text-decoration: line-through; text-decoration-thickness: 2px; }
+  .g-a { color: #3f6b2f; border-color: #a9c78f; background: #eef4e6; }
+  .g-b { color: #6a7530; border-color: #cad39a; background: #f3f2e0; }
+  .g-c { color: #9a7414; border-color: #e0c98d; background: #f7efd8; }
+  .g-d { color: #a4502c; border-color: #e0ac93; background: #f7e7dd; }
+  .grade-row .axis { font-family: var(--serif); font-size: 17px; font-weight: 600; }
+  .grade-row .why { font-size: 13.5px; color: var(--slate-soft); margin-top: 2px; }
+  pre.snippet { background: #2e3138; color: #e8e4d8; border-radius: 10px; padding: 16px 18px; overflow-x: auto; font-family: var(--mono); font-size: 12.5px; line-height: 1.6; margin: 14px 0; }
+  pre.snippet .c { color: #9a958a; }
+  ul.tight { margin: 8px 0; padding-left: 20px; }
+  ul.tight li { margin: 5px 0; }
+  .footer { margin-top: 60px; padding-top: 18px; border-top: 3px double var(--oat); font-size: 12.5px; color: var(--muted); font-family: var(--mono); }
+  .toc { font-family: var(--mono); font-size: 12.5px; color: var(--slate-soft); margin: 4px 0 0; }
+  .toc a { color: var(--slate-soft); text-decoration: none; margin-right: 16px; }
+  .toc a:hover { color: var(--clay); }
+  @media (max-width: 720px) {
+    .verdict { grid-template-columns: 1fr 1fr; }
+    .kv { grid-template-columns: 80px 1fr; }
+    .grade-row { grid-template-columns: 50px 50px 1fr; }
+  }
+</style>
+<div class="wrap">
+
+  <header class="page">
+    <p class="eyebrow">Refactor Report · Executed</p>
+    <h1>orc-arena — evaluatorq in, bracket out, the number now defensible</h1>
+    <p class="dateline"><b>2026-07-11</b> · branch <code>gnhf/i-want-you-to-analys-287d22</code> ·
+    5 feature commits (<code>62ffbaa</code>→<code>fd8288b</code>) · 26 tests · 4 live smokes against
+    <code>api.orq.ai/v3/router</code> · companion analysis:
+    <a href="https://claude.ai/code/artifact/cb006f76-6fec-4586-a550-a18bfc91617a">architecture &amp; migration report</a></p>
+    <p class="toc">
+      <a href="#done">What was done</a>
+      <a href="#live">Live-fire findings</a>
+      <a href="#run">How to run</a>
+      <a href="#improved">What improved</a>
+      <a href="#loc">The line-count truth</a>
+      <a href="#grade">The new grade</a>
+    </p>
+  </header>
+
+  <section id="verdict">
+    <p class="lede">The plan was executed end to end: the hand-rolled judge panel is deleted and every
+    verdict now comes from <b>evaluatorq's pairwise jury</b>; the single-elimination bracket is deleted
+    and the ELO now comes from a <b>round-robin of per-round Bradley-Terry comparisons with bootstrap
+    CIs</b>; reasoning models are supported deliberately (verified uniform-OFF default pool, a
+    thinking-ON counterpart config, live CoT in the TUI); and a stream failure now <b>voids a round
+    instead of scoring it</b>. Everything was smoke-tested against the real router — which is where the
+    best findings came from.</p>
+    <div class="verdict grade-strip">
+      <div class="vcard">
+        <p class="label">New aggregate grade</p>
+        <div class="big" style="color:var(--green)">A−</div>
+        <p class="sub">was B− — held down then by reuse, dead code, and statistical honesty.</p>
+      </div>
+      <div class="vcard">
+        <p class="label">Hand-rolled judging</p>
+        <div class="big" style="color:var(--clay)">0</div>
+        <p class="sub">lines left. judges/ (196 LOC) + bracket (100) + dead (~65) deleted.</p>
+      </div>
+      <div class="vcard">
+        <p class="label">Rating input</p>
+        <div class="big" style="color:var(--olive)">≤140</div>
+        <p class="sub">judged rounds per default run (was 7 knockout outcomes).</p>
+      </div>
+      <div class="vcard">
+        <p class="label">Tests</p>
+        <div class="big" style="color:var(--evq)">26</div>
+        <p class="sub">was 20 — incl. void/KO/draw semantics + headless TUI render.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ WHAT WAS DONE ============ -->
+  <section id="done">
+    <h2><span class="num">01</span>What was done — five commits, four PRs' worth</h2>
+    <div class="tablewrap">
+    <table>
+      <thead><tr><th>Commit</th><th>Scope</th><th>The point</th></tr></thead>
+      <tbody>
+        <tr><td class="n">62ffbaa</td><td><b>PR 1 — swap the bench</b><br><span class="pill done">judges/ deleted</span></td>
+          <td>Every round judged by <code>llm_jury_pairwise</code>: both seat orders per judge, flip ⇒ abstain
+          (recorded), replacement judges, <code>min_successful_judges=2</code>. Damage adapter requires ≥2 decisive
+          votes for "unanimous" (closes Finding 05). Verdict→damage, records v2 with exact token usage incl.
+          reasoning tokens, TTFT, finish reasons. Reasoning controls forwarded verbatim per warrior; 1200s
+          read-gap timeout; stream failure → one retry → <b>round voided, never judged on partial text</b>.
+          Roster refreshed to current-gen registry models. <code>instructor</code> out, <code>evaluatorq</code>
+          pinned (pairwise verified merged to its main). TUI: side colors, HP color states + floating damage,
+          thinking timer + dimmed CoT window, tokens/sec footers, flip/abstain judge badges.</td></tr>
+        <tr><td class="n">61f40a5</td><td><b>PR 2 — round-robin ELO</b><br><span class="pill done">bracket deleted</span></td>
+          <td>Every pair fights once (any pool ≥2); every judged round feeds BT-MLE, <b>ties included at
+          0.5</b> — the tie path finally has input. KO is pure rendering: all rounds judged, even-HP = draw
+          (seed advantage deleted). Live standings ticker + live card ELO. Leaderboard: <b>bootstrap 95%
+          CIs</b>, 🧠 badges, verbosity + reasoning-token columns, per-judge jury table, win grid,
+          low-agreement and mixed-pool banners. Run manifest (<code>*.run.json</code>). Screenshot key.</td></tr>
+        <tr><td class="n">775f46b</td><td><b>PR 3 — hygiene close-out</b></td>
+          <td>Finding 01's two dead events resolved: <code>ResponseComplete</code> gained a consumer
+          (tokens/sec footer), <code>TournamentStarted</code> deleted. Every remaining event kind has a live
+          consumer. (The rest of the audit's dead code — <code>generate()</code>, <code>concurrency</code>,
+          <code>starting_elo</code>, <code>set_text</code>, char/4, stub screen — died inside PRs 1–2.)</td></tr>
+        <tr><td class="n">9e96390 + fd8288b</td><td><b>PR 4 — rejudge + README</b><br><span class="pill live">live-verified</span></td>
+          <td><code>orc-arena rejudge battles.jsonl --judge …</code>: re-scores a recorded run with a new
+          panel — zero regeneration — and prints per-judge lean/flip/tie rates plus the <b>Spearman
+          correlation</b> between recorded and re-judged rankings. README rewritten around the two-product
+          story with the statistical-honesty list.</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <!-- ============ LIVE FIRE ============ -->
+  <section id="live">
+    <h2><span class="num">02</span>Live-fire findings — what the real router taught us</h2>
+    <p>Four smoke runs against <code>api.orq.ai/v3/router</code> did more than verify wiring; they produced
+    the report's best material.</p>
+
+    <div class="finding">
+      <p class="rank">LIVE 01 · the predicted confound, observed, then eliminated</p>
+      <h3>kimi-k2.6 finished at ELO −3000 — because of a vendor default, not quality</h3>
+      <p>In the first round-robin smoke, kimi-k2.6 thought by default, burned <b>358–399 of its 400-token
+      budget on reasoning</b> every single round (<code>finish_reason=length</code>), answered in stumps, and
+      lost every round. Exactly the "ranking conflates model quality with vendor defaults" failure the plan
+      predicted — measured in production. A live audit of the whole roster followed:
+      <b>gemini-3-pro-preview is broken upstream</b> (router 500), and kimi-k2.6, deepseek-v4-pro and
+      qwen3.5-flash <b>cannot have thinking disabled via the router</b>. The default pool now contains only
+      models verified thinking-OFF (gemini-3.1-pro-preview + disable = 0 reasoning tokens; deepseek-chat;
+      mistral-medium-2604); the un-disableable thinkers moved to <code>configs/reasoning_arena.yaml</code>
+      where always-on is the uniform policy.</p>
+    </div>
+
+    <div class="finding">
+      <p class="rank">LIVE 02 · the methodology paying rent</p>
+      <h3>Cheap judges flip 67–83% under seat-swapping — and the ranking survives anyway</h3>
+      <p>On easy prompts the panel's coin flips became visible: in the very first smoke, two of three judges
+      contradicted themselves when A and B swapped seats, abstained, and the round resolved
+      <code>inconclusive</code> instead of minting a fake verdict — the old code would have scored it as a
+      "unanimous" 30-damage hit. The <code>rejudge</code> live test then closed the loop: a completely
+      different panel changed 2 of 6 verdicts, flipped 67–83% of pairs individually… and produced the
+      <b>same ranking, Spearman 1.00</b>. That is the pitch in one line: <i>individual LLM judges are
+      position-biased; the gated panel plus per-round BT is judge-robust, and the tool can prove it about
+      its own output.</i></p>
+    </div>
+
+    <div class="finding">
+      <p class="rank">LIVE 03 · router gaps found, reported upstream</p>
+      <h3>Two undocumented behaviors, one filed to the docs team</h3>
+      <ul class="tight">
+        <li><b>Anthropic reasoning tokens aren't counted.</b> Claude with thinking enabled returns visible
+        CoT + <code>reasoning_signature</code>, but <code>completion_tokens_details.reasoning_tokens = 0</code>
+        — while Gemini reports it correctly (e.g. 511). Feedback submitted via the docs channel.</li>
+        <li><b>Streamed CoT arrives as <code>delta.reasoning</code></b> (not the DeepSeek-style
+        <code>reasoning_content</code>). The gateway now reads both — best-effort by contract, with the
+        "thinking…" timer as the guaranteed path.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ============ HOW TO RUN ============ -->
+  <section id="run">
+    <h2><span class="num">03</span>How to run it</h2>
+<pre class="snippet">uv sync
+
+<span class="c"># no API key — replay a recorded tournament (regenerated from a real run):</span>
+uv run orc-arena demo
+
+<span class="c"># the real thing: 8 warriors, 28 matches, ≤140 judged rounds</span>
+export ORQ_API_KEY=...
+uv run orc-arena run
+uv run orc-arena run --config configs/reasoning_arena.yaml   <span class="c"># the thinking-ON pool</span>
+
+<span class="c"># swap the jury over yesterday's log — zero regeneration:</span>
+uv run orc-arena rejudge battles.jsonl \
+  --judge mistral/mistral-small-2603 --judge anthropic/claude-haiku-4-5-20251001
+
+uv run pytest        <span class="c"># 26 tests, no network</span></pre>
+    <p>In the TUI: <code>s</code> saves an SVG screenshot, <code>q</code> quits. Watch for the flip badge —
+    <i>"flipped when sides swapped — vote thrown out"</i> — and the KO banner that admits the judging
+    continues for the rating. Each run writes <code>battles.jsonl</code> (schema v2) +
+    <code>battles.run.json</code> (manifest: config/prompt hashes, panel, seed, evaluatorq version,
+    agreement).</p>
+  </section>
+
+  <!-- ============ WHAT IMPROVED ============ -->
+  <section id="improved">
+    <h2><span class="num">04</span>What improved — before → after</h2>
+    <div class="tablewrap">
+    <table>
+      <thead><tr><th>Dimension</th><th>Before</th><th>After</th></tr></thead>
+      <tbody>
+        <tr><td>Position bias</td><td>50/50 random single ordering — diluted, invisible</td><td>Both orders per judge; flip ⇒ abstain + measured per judge</td></tr>
+        <tr><td>Degraded panel</td><td>Jury-of-one issued "unanimous" 30-damage hits</td><td><code>min_successful_judges=2</code> ⇒ inconclusive; replacements refill</td></tr>
+        <tr><td>Rating input</td><td>7 match outcomes; ties impossible (seed advantage)</td><td>≤140 per-round comparisons; ties count 0.5; any pool size</td></tr>
+        <tr><td>Uncertainty</td><td>Four-digit ELO, no error bars</td><td>Bootstrap 95% CIs + low-agreement banner</td></tr>
+        <tr><td>Sampling</td><td>KO truncated data collection</td><td>KO is rendering; every round judged</td></tr>
+        <tr><td>Token accounting</td><td><code>len(text)//4</code>, input tokens never filled</td><td>Exact usage incl. reasoning tokens, TTFT, finish reasons; judge tokens too</td></tr>
+        <tr><td>Reasoning models</td><td>Nothing forwarded; pool silently mixed</td><td>Verbatim router controls; verified uniform-OFF default + thinking-ON config; 🧠 badges; live CoT</td></tr>
+        <tr><td>Failure handling</td><td>Timeouts judged as losses on partial text</td><td>Retry once → round voided; 1200s read-gap only; "a model loses on its words, never on its network"</td></tr>
+        <tr><td>Reproducibility</td><td>None</td><td>Seeded schedule + run manifest with hashes</td></tr>
+        <tr><td>Auditability</td><td>—</td><td><code>rejudge</code>: jury swap + Spearman rank-stability on any log</td></tr>
+        <tr><td>Dependencies</td><td><code>instructor</code> + hand-rolled everything</td><td><code>evaluatorq</code> (the second product, demonstrated)</td></tr>
+        <tr><td>TUI</td><td>Flat: dim status line, fake static ELO 1000</td><td>Side colors, damage that lands, KO banner + bell, thinking timer, tokens/sec, live ELO, jury table, win grid, screenshots</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <!-- ============ LOC TRUTH ============ -->
+  <section id="loc">
+    <h2><span class="num">05</span>The line-count truth</h2>
+    <p>The plan projected ~1,600 src LOC for a like-for-like feature set. The repo landed at
+    <b>2,426 src LOC (was 1,912)</b> — and the delta deserves an honest itemization, because both plan
+    numbers were achieved: everything slated for deletion died (<code>judges/</code> 196, bracket + stub
+    100, audit dead code ~65 — <b>zero hand-rolled judging or tournament code remains</b>), and then
+    ~870 lines of <em>owner-approved new capability</em> — none of which existed in the 1,912 — took its
+    place:</p>
+    <ul class="tight">
+      <li><code>rejudge.py</code> + CLI command (~230) — the evaluatorq demo inside the demo;</li>
+      <li>statistics: bootstrap CIs, run manifest, final report, jury/win-grid leaderboard (~280);</li>
+      <li>reasoning support + timeout/void policy in gateway/battle/config (~180);</li>
+      <li>TUI upgrades: thinking states, tokens/sec, standings ticker, drama (~180).</li>
+    </ul>
+    <p><b>Smaller where it duplicated, bigger where it differentiates.</b> The complexity the audit
+    condemned — speculative seams, reinvented libraries, dead surface — is gone; every added line traces
+    to a plan decision with an owner sign-off. Tests grew 20 → 26 and now cover the semantics that carry
+    money: void rounds, KO-continues-judging, draws, unanimity floors, and a headless render of the
+    leaderboard.</p>
+  </section>
+
+  <!-- ============ NEW GRADE ============ -->
+  <section id="grade">
+    <h2><span class="num">06</span>The new grade — same hostile reviewer, re-run</h2>
+    <div class="grades">
+      <div class="grade-row">
+        <div class="grade-badge old g-a">A−</div><div class="grade-badge g-a">A−</div>
+        <div><div class="axis">Code quality &amp; readability</div>
+        <div class="why">Still typed, documented, cleanly seamed. The new modules match the old bar.</div></div>
+      </div>
+      <div class="grade-row">
+        <div class="grade-badge old g-c">C+</div><div class="grade-badge g-a">A</div>
+        <div><div class="axis">Reuse / no-reinvention</div>
+        <div class="why">The jury is evaluatorq's, structured output is evaluatorq's, <code>instructor</code> is gone.
+        BT-MLE stays hand-rolled <em>deliberately</em> (69→101 LOC incl. CIs beats a numpy dep for one solver) — a
+        reasoned exception, not an oversight.</div></div>
+      </div>
+      <div class="grade-row">
+        <div class="grade-badge old g-c">C−</div><div class="grade-badge g-a">A</div>
+        <div><div class="axis">Dead-code hygiene</div>
+        <div class="why">Every event kind has a consumer; every config knob is wired; the audit's ~65 dead lines and
+        the stub file are gone. Grep-verified.</div></div>
+      </div>
+      <div class="grade-row">
+        <div class="grade-badge old g-d">D+</div><div class="grade-badge g-a">A−</div>
+        <div><div class="axis">YAGNI discipline / scope</div>
+        <div class="why">Bracket, renderer seams, and battlebench aspiration deleted. The event queue stayed and now
+        earns its keep twice (demo replay + fixture generation). Minus: the reasoning config ships before anyone asked
+        to run it — a marketing artifact, accepted knowingly.</div></div>
+      </div>
+      <div class="grade-row">
+        <div class="grade-badge old g-d">D</div><div class="grade-badge g-a">A−</div>
+        <div><div class="axis">Statistical honesty</div>
+        <div class="why">Per-round BT over a round-robin, ties counted, CIs rendered, agreement disclosed, void rounds
+        excluded, verbosity confound visible, rank-stability checkable. Minus: tiny runs still swing the MLE hard —
+        the CIs say so, but a regularizing prior would be gentler.</div></div>
+      </div>
+      <div class="grade-row">
+        <div class="grade-badge old g-b">B</div><div class="grade-badge g-b">B+</div>
+        <div><div class="axis">Test coverage vs surface</div>
+        <div class="why">26 tests: the money semantics are covered, the leaderboard renders headlessly. The fight
+        screen still relies on the live smokes — defensible, not perfect.</div></div>
+      </div>
+    </div>
+    <div class="callout good">
+      <p style="margin:2px 0"><b>Aggregate: A− (from B−).</b> The B− codebase was a tidy toy wearing a
+      distributed system's exoskeleton. What ships now is smaller where it was derivative, larger where it
+      is differentiated, measured about its own uncertainty, and demonstrably judge-robust. The two products
+      it exists to promote are no longer mentioned by the README — they are load-bearing: the router carries
+      every token (and its registry audit reshaped the roster), and evaluatorq issues every verdict on
+      screen. What keeps it off A: no per-category ELO yet (the router-evidence feature, PR 5), no cost
+      preflight, and the MLE's small-sample manners.</p>
+    </div>
+    <div class="callout evq">
+      <b>Left on the plan, deliberately (PR 5):</b> per-category ELO from the already-tagged prompts, cost
+      preflight, panel presets, <code>--headless</code> CI mode. All scoped in
+      <code>REFACTOR_PLAN.md</code>; none blocks a Show-HN post.
+    </div>
+  </section>
+
+  <div class="footer">
+    orc-arena refactor report · executed &amp; live-smoked 2026-07-11 · commits 62ffbaa · 61f40a5 · 775f46b ·
+    9e96390 · fd8288b (+ tests) · companion analysis: <a href="https://claude.ai/code/artifact/cb006f76-6fec-4586-a550-a18bfc91617a">what to keep, what to cut</a> ·
+    plan: REFACTOR_PLAN.md
+  </div>
+
+</div>

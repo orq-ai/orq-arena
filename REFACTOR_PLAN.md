@@ -1,5 +1,17 @@
 # orc-arena → evaluatorq refactor plan
 
+> **Status (2026-07-11): EXECUTED through PR 4** — commits `62ffbaa` (PR 1), `61f40a5` (PR 2),
+> `775f46b` (PR 3), `9e96390`+`fd8288b` (PR 4). PR 5 (per-category ELO, cost preflight, panel
+> presets, `--headless`) remains open. Execution report:
+> `outputs/html/orc-arena-refactor-report.html`
+> (https://claude.ai/code/artifact/f02388ad-5f11-4f0a-b152-0dd414f18996). Notable deviations from
+> plan, discovered live: roster re-audited against the router (gemini-3-pro-preview broken
+> upstream; kimi-k2.6 / deepseek-v4-pro / qwen3.5-flash cannot disable thinking → excluded from
+> the uniform-OFF pool); streamed CoT arrives as `delta.reasoning`; Anthropic path reports
+> `reasoning_tokens=0` (filed to docs team); final src LOC is 2,426, not ~1,600 — all planned
+> deletions landed, and ~870 lines of owner-approved new capability (rejudge, CIs+manifest,
+> reasoning support, TUI upgrades) were added on top.
+
 **Goal.** Refocus this repo on the arena only: a benchmark that produces a Bradley-Terry ELO
 ranking over a configurable pool of models, rendered by the existing Textual TUI. All judging
 moves to `evaluatorq` (pairwise jury), all model traffic stays on the orq.ai router gateway.
