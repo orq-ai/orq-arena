@@ -353,6 +353,72 @@ subsystem — knobs and slices only.
 5. *(Stretch)* Post-run static HTML export of leaderboard + CIs + jury table — a shareable
    artifact per run. Only if PR 1–4 land clean; do not start here.
 
+## Reasoning-model support (folded across PRs 1–3)
+
+Today the arena sends no reasoning controls, reads only `delta.content`, and counts tokens by
+`len(text)//4` — while the shipped roster already mixes thinking and non-thinking defaults
+(`gemini-2.5-pro` is thinking-*enforced* on the router, `gemini-2.5-flash` thinks by default,
+the other six don't). The ranking silently conflates model quality with vendor default settings.
+Router facts (docs.orq.ai, AI Gateway → Reasoning models): `reasoning_effort`
+(`none…xhigh`, OpenAI) and `thinking: {type: enabled|disabled, budget_tokens}` (Claude/Gemini)
+are accepted on `/chat/completions` and normalized per model; disabling on thinking-enforced
+models is coerced to a minimum budget of 128; setting `reasoning_effort` auto-drops
+`temperature`/`top_p`; reasoning usage returns under
+`usage.completion_tokens_details.reasoning_tokens`. Visible chain-of-thought in responses is
+explicitly **not** part of the router's stable contract — optional provider fields only.
+
+**Into PR 1 (config + wiring):**
+- `WarriorSpec.reasoning: dict | None = None` — passed verbatim as `extra_body` on the warrior's
+  `create()` call. The arena stays a dumb pipe; the router normalizes per provider. Example:
+
+```yaml
+warriors:
+  - orc_name: Azog Deepmind
+    model_id: google/gemini-2.5-pro
+    reasoning: { thinking: { type: enabled, budget_tokens: 2048 } }
+    max_tokens: 8000            # per-warrior override; must exceed the thinking budget
+```
+
+- Config validation: `thinking.budget_tokens < max_tokens` (per-warrior `max_tokens` override
+  added, defaulting to `gateway.warrior_max_tokens`).
+- Router base URL: docs use `api.orq.ai/v3/router` for raw OpenAI clients, while orq-ai-sdk
+  4.11.7 pins `my.orq.ai` + `/v2/router` — both are live. Confirm the canonical raw-client URL
+  with the platform team; until then keep the current default. Do not hand-roll a v3 migration on
+  doc examples alone.
+- Judges stay non-reasoning by default; if ever wanted, `llm_jury_pairwise(extra_kwargs=...)`
+  carries `reasoning_effort` panel-wide — note in config comments, don't build anything.
+
+**orq-ai-sdk check (4.11.7, /Users/arian/…/orq-python).** The official SDK's
+`router.chat.completions.create()` exposes everything above *typed*: `reasoning_effort`
+(`none…xhigh`), `thinking` (enabled / disabled / adaptive schemas), `max_completion_tokens`,
+`stream` + `stream_options`, and `usage.completion_tokens_details.reasoning_tokens` — our
+`extra_body` pass-through serializes to exactly the fields the typed SDK sends, so the two paths
+are wire-identical. Warriors stay on `AsyncOpenAI` anyway, for three reasons: evaluatorq's
+judge client is `AsyncOpenAI` (shared `client=`, one HTTP stack), the openai SDK's async
+streaming iterator is the cleaner fit for the TUI loop, and the router docs' own examples use it.
+orq-ai-sdk enters where it belongs: PR 4's platform upload already pulls it via
+`evaluatorq[orq]`, and the README can show the typed-SDK variant of a warrior call as the
+"official SDK" example. If we later want typed reasoning controls in arena code, swapping the
+warrior call to orq-ai-sdk is a contained change to `providers/orq_gateway.py` only.
+
+**Into PR 1 (TUI):** response panel gets a "thinking…" state between `TurnPrompt` and its first
+`ResponseChunk` (widget-local timer, no new events). Best-effort: if a streamed delta carries an
+optional reasoning field (`getattr(delta, "reasoning_content", None)` / `model_extra`), render it
+dimmed — never depend on it (router contract above).
+
+**Into PR 3 (usage):** the `usage_out` capture also reads
+`completion_tokens_details.reasoning_tokens`; `BattleRecord` gains `tokens_a_reasoning` /
+`tokens_b_reasoning` and per-side time-to-first-token. `run.json` records each warrior's
+effective reasoning setting (explicit config or `"vendor-default"`).
+
+**Into PR 2 (leaderboard, extends §2.5):** mean reasoning tokens rendered beside the verbosity
+column, and a footnote whenever the pool mixes reasoning-enabled and disabled warriors — the
+"is +40 ELO worth 6× the tokens and 10× the latency?" readout is precisely the router's pitch.
+
+**Acceptance (PR 1 smoke config):** include one thinking-enabled warrior
+(`anthropic/claude-*, budget 2048, max_tokens 4096`); verify the thinking indicator renders, the
+match completes, and reasoning tokens land in the record.
+
 ## Explicitly rejected (the cut list stays cut)
 
 Swiss or bracket modes, human-vote web UI, a database, multi-run aggregation services, custom
@@ -386,3 +452,10 @@ judge-prompt DSLs, parallel match execution. Any of these returns only with a ti
 7. KO is presentation, not termination — every match judges all `max_rounds` prompts (§2.1).
 8. Leaderboard always shows CIs and mean output tokens; low judge agreement is announced, not
    buried (§2.5). A benchmark that can't say "insufficient data" is a toy.
+9. Reasoning controls are raw router fields passed through verbatim (`WarriorSpec.reasoning` →
+   `extra_body`), never modeled per-provider in arena code; the router normalizes.
+10. Visible chain-of-thought is rendered best-effort only ("thinking…" indicator is the
+    guaranteed path) — the router's stable contract excludes CoT text.
+11. Warrior + judge traffic stays on `AsyncOpenAI`; orq-ai-sdk (typed reasoning controls,
+    platform APIs) enters via PR 4 / README examples. Base-URL version (v2 on my.orq.ai per SDK
+    vs v3 on api.orq.ai per docs) to be confirmed with the platform team before any change.
