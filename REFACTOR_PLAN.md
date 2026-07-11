@@ -36,13 +36,15 @@ The `demo` fixture is regenerated in PR 3 (it embeds the old vocabulary).
 ### 1.1 Dependencies (`pyproject.toml`)
 
 - Remove `instructor>=1.7` (evaluatorq does its own structured output).
-- Add `evaluatorq` pinned to the RES-760 pairwise branch (1.3.0 is unreleased):
+- Add `evaluatorq` pinned to a main SHA — RES-760 (pairwise) is **already merged to
+  evaluatorq main** (verified 2026-07-11, `pairwise.py` present on `origin/main` @ `8e56a56`);
+  1.3.0 is still unreleased on PyPI:
 
 ```toml
 [project]
 dependencies = [
   # ...
-  "evaluatorq @ git+https://github.com/orq-ai/evaluatorq.git@<exact-sha-on-res-760>",
+  "evaluatorq @ git+https://github.com/orq-ai/evaluatorq.git@<main-sha>",
 ]
 
 # local development against the sibling checkout:
@@ -50,9 +52,9 @@ dependencies = [
 evaluatorq = { path = "../evaluatorq", editable = true }
 ```
 
-Pin an exact SHA, not the branch name — the branch is active. Note 1.3.0 makes `openai` and
-`loguru` core deps of evaluatorq; `openai` is already here, `loguru` is new transitive baggage we
-accept.
+Switch the local `../evaluatorq` checkout from the stale feature branch to `main` first. Re-pin
+to the PyPI release when 1.3.0 ships. Note 1.3.0 makes `openai` and `loguru` core deps of
+evaluatorq; `openai` is already here, `loguru` is new transitive baggage we accept.
 
 ### 1.2 Config (`config.py`, `orc_arena.yaml`)
 

@@ -627,9 +627,9 @@ report = build_report(all_comparisons)  <span class="c"># A/B win rates · mean 
     ids — <code>JudgeSpec</code>, the judge prompt builder, and the instructor dependency all evaporate.</p>
 
     <div class="callout warn">
-      <b>Pin note:</b> pairwise lives on the RES-760 branch and 1.3.0 is unreleased — depend on a git ref
-      (or a local path dep) until it lands on PyPI. Also 1.3.0 makes <code>openai</code> and
-      <code>loguru</code> core dependencies; the arena already ships <code>openai</code>.
+      <b>Pin note:</b> pairwise (RES-760) is merged to evaluatorq <code>main</code>; 1.3.0 is still
+      unreleased on PyPI — pin a main git SHA (or a local path dep) until it ships. Also 1.3.0 makes
+      <code>openai</code> and <code>loguru</code> core dependencies; the arena already ships <code>openai</code>.
     </div>
 
     <h3><span class="evq-tint">llm_jury + the core loop</span> — the offline half</h3>
