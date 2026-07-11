@@ -470,6 +470,41 @@ a forfeit scored as merit. Policy:
 match completes, and reasoning tokens land in the record. Timeout path: unit-test the
 void-round flow (fake stream raising mid-iteration → retry → void, zero damage, zero ELO rows).
 
+## TUI upgrades (the show is the product — ~200 LOC across PRs 1/2/5)
+
+Grounded in a read of `tui/`: the event wiring is clean, but the drama is flat — the KO climax
+is one dim status line, `WarriorCard` renders a hardcoded `ELO 1000` forever (dead `set_elo`),
+verdict "A" is never visually tied to the left card, and the leaderboard is a bare table.
+
+**PR 1 (with the judge/thinking work):**
+- **Side identity colors** — side A green / side B orange on warrior-card borders, response-panel
+  borders, and judge verdict cues. One CSS class per side; ends the mental "which one is A" hop.
+- **Damage that lands** — floating `−30!` on the hit card, HP bar color states
+  (green → yellow → red), KO as a centered banner + `App.bell()` instead of a status-line note.
+- **Tokens/sec ticker** in each response panel footer (live chars/4 estimate; stamped with real
+  usage on `ResponseComplete`… of its PR-3 successor). Model speed differences are gateway drama.
+- Already specified elsewhere: thinking timer, dimmed CoT window, flip/abstain judge badges,
+  void-round banner, truncation marker.
+
+**PR 2 (with the round-robin work):**
+- Bracket strip's replacement: **match ticker + live top-5 ELO strip**
+  (`MATCH 12/28 · Grak vs Snot`), reshuffling on each `StandingsUpdated`.
+- **Wire warrior-card ELO live** — `set_elo` resurrects with real data: `ELO 1187 ▲+23`
+  between matches. The number the repo exists to compute finally appears during the show.
+- Leaderboard: ±CI column, 🧠 badges, mean-tokens column, jury table, low-confidence banner
+  (§2.5) **plus an N×N win-grid heatmap** (colored `DataTable` cells — non-transitivity visible
+  at a glance).
+- **`s` binding → `App.save_screenshot()`** (Textual-native SVG export), bound on all screens.
+  README/Show-HN screenshots generate themselves.
+
+**PR 5 (ergonomics):**
+- Replay controls in demo mode: `space` pause, `+`/`-` speed multiplier (fixture currently plays
+  at a hardcoded 0.02s/event — judge reasoning is unreadable).
+- Round intro shows the prompt's `category` tag once per-category ELO exists.
+
+**Rejected for the TUI:** markdown rendering of streams (heavy mid-stream), chart libraries,
+mouse navigation, theming. Plain streaming text reads fine.
+
 ## Explicitly rejected (the cut list stays cut)
 
 Swiss or bracket modes, human-vote web UI, a database, multi-run aggregation services, custom
