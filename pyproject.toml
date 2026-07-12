@@ -1,11 +1,19 @@
 [project]
-name = "orc-arena"
+name = "orq-arena"
 version = "0.1.0"
-description = "Retro arcade tournament where LLMs fight as orcs — all calls via the orq.ai router gateway."
+description = "LLM arena benchmark: models battle in a terminal arena, an evaluatorq pairwise jury judges, Bradley-Terry ELO comes out — every token via the orq.ai router gateway."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "Arian Pasquali" }]
+keywords = ["llm", "benchmark", "evaluation", "elo", "llm-as-judge", "orq"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
     "textual>=0.83",
     "click>=8.1",
@@ -17,34 +25,29 @@ dependencies = [
     "evaluatorq>=1.8.0",
 ]
 
-[project.optional-dependencies]
-dev = [
-    "pytest>=8",
-    "pytest-asyncio>=0.23",
-    "textual-dev>=1.6",
-]
+[project.urls]
+Homepage = "https://github.com/orq-ai/orq-arena"
+Repository = "https://github.com/orq-ai/orq-arena"
+"Orq Router Docs" = "https://docs.orq.ai/docs/ai-gateway"
+"evaluatorq" = "https://github.com/orq-ai/evaluatorq"
 
 [project.scripts]
-orc-arena = "orc_arena.cli:cli"
+orq-arena = "orq_arena.cli:cli"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/orc_arena"]
-
-[tool.hatch.metadata]
-# the evaluatorq git pin is a direct reference
-allow-direct-references = true
+packages = ["src/orq_arena"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 pythonpath = ["src"]
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "pytest>=8",
     "pytest-asyncio>=0.23",
     "textual-dev>=1.6",
