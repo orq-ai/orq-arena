@@ -1,6 +1,9 @@
 # orc-arena → evaluatorq refactor plan
 
-> **Status (2026-07-11): EXECUTED through PR 4** — commits `62ffbaa` (PR 1), `61f40a5` (PR 2),
+> **Status (2026-07-12): EXECUTED through PR 8** — harvest PRs on `feat/chennai-harvest`:
+> `09b7d47` (PR 5 ergonomics), `b29afd8` (PR 6 roster picker), `c234e5f` (PR 7 browser+κ+
+> post-mortems), `f4eaa25` (PR 8 theme+CTA+Swiss). 41 tests. Prior status:
+> **(2026-07-11): EXECUTED through PR 4** — commits `62ffbaa` (PR 1), `61f40a5` (PR 2),
 > `775f46b` (PR 3), `9e96390`+`fd8288b` (PR 4). PR 5 (per-category ELO, cost preflight, panel
 > presets, `--headless`) remains open. Execution report:
 > `outputs/html/orc-arena-refactor-report.html`
