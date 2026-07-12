@@ -17,6 +17,8 @@ class LeaderboardScreen(Screen):
     BINDINGS = [
         ("enter,space,q", "quit", "Quit"),
         ("s", "shot", "Screenshot"),
+        ("b", "browse", "Battle browser"),
+        ("m", "postmortem", "Post-mortems"),
     ]
 
     DEFAULT_CSS = """
@@ -38,6 +40,7 @@ class LeaderboardScreen(Screen):
         champion: str,
         log_path: str,
         report: dict[str, Any] | None = None,
+        cfg: Any | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -45,6 +48,7 @@ class LeaderboardScreen(Screen):
         self._champion = champion
         self._log_path = log_path
         self._report = report or {}
+        self._cfg = cfg
 
     def compose(self) -> ComposeResult:
         r = self._report
@@ -74,15 +78,45 @@ class LeaderboardScreen(Screen):
 
             yield DataTable(id="table")
 
+            tok = r.get("tokens") or {}
+            if tok:
+                total_in = tok["warriors_in"] + tok["judges_in"]
+                total_out = tok["warriors_out"] + tok["judges_out"]
+                jury_share = (
+                    (tok["judges_in"] + tok["judges_out"]) / max(1, total_in + total_out)
+                )
+                yield Static(
+                    f"tokens — warriors {tok['warriors_in']:,} in / {tok['warriors_out']:,} out"
+                    f"   ·   jury {tok['judges_in']:,} in / {tok['judges_out']:,} out"
+                    f"   ({jury_share:.0%} of all tokens went to judging)",
+                    classes="section",
+                )
+
+            if r.get("elo_by_category"):
+                yield Static("BY CATEGORY — Bradley-Terry per prompt slice", classes="section")
+                yield DataTable(id="cats")
+
             if r.get("jury"):
                 yield Static("THE JURY ROOM — per-judge behaviour", classes="section")
                 yield DataTable(id="jury")
+                fleiss = r.get("fleiss") or {}
+                if fleiss.get("kappa") is not None:
+                    cohen = r.get("cohen") or {}
+                    pair_txt = "   ".join(
+                        f"{k}: {v['kappa']}" for k, v in cohen.items() if v.get("kappa") is not None
+                    )
+                    yield Static(
+                        f"Fleiss' κ [b]{fleiss['kappa']}[/b] ({fleiss['label']}) over "
+                        f"{fleiss['rounds_used']}/{fleiss['rounds_total']} full-panel rounds"
+                        + (f"   ·   pairwise: {pair_txt}" if pair_txt else ""),
+                        classes="section",
+                    )
             if r.get("win_grid"):
                 yield Static("WIN GRID — row beats column (ties = ½)", classes="section")
                 yield DataTable(id="grid")
 
             yield Static(f"battle log → {self._log_path}   ·   manifest → *.run.json", id="log-path")
-            yield Static("ENTER exit · s screenshot", id="hint")
+            yield Static("ENTER exit · B battle browser · M post-mortems · s screenshot", id="hint")
 
     def on_mount(self) -> None:
         r = self._report
@@ -115,6 +149,19 @@ class LeaderboardScreen(Screen):
                 row.append(f"{reasoning.get(m, 0):.0f}")
             table.add_row(*row)
 
+        by_cat = r.get("elo_by_category") or {}
+        if by_cat:
+            counts = r.get("category_counts") or {}
+            ct = self.query_one("#cats", DataTable)
+            cats = list(by_cat.keys())
+            ct.add_columns("Orc", "overall", *(f"{c} (n={counts.get(c, '?')})" for c in cats))
+            for name, elo in ranked:
+                ct.add_row(
+                    name,
+                    f"{elo:.0f}",
+                    *(f"{by_cat[c].get(name, 0):.0f}" for c in cats),
+                )
+
         jury = r.get("jury")
         if jury:
             jt = self.query_one("#jury", DataTable)
@@ -141,6 +188,24 @@ class LeaderboardScreen(Screen):
                         for m in names
                     ),
                 )
+
+    def action_browse(self) -> None:
+        from ...analysis.postmortem import load_records
+        from .battle_browser import BattleBrowserScreen
+
+        records = load_records(self._log_path)
+        if not records:
+            self.notify("no battle log to browse", severity="warning")
+            return
+        self.app.push_screen(BattleBrowserScreen(records))
+
+    def action_postmortem(self) -> None:
+        if self._cfg is None:
+            self.notify("post-mortems need a live run", severity="warning")
+            return
+        from .postmortem import PostmortemScreen
+
+        self.app.push_screen(PostmortemScreen(self._cfg, self._log_path))
 
     def action_shot(self) -> None:
         path = self.app.save_screenshot()

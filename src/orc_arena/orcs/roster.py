@@ -4,21 +4,30 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class WarriorSpec(BaseModel):
-    """A single orc warrior — a model routed via the orq.ai gateway."""
+    """A single warrior — a model routed via the orq.ai gateway.
 
-    orc_name: str = Field(description="Flavor display name, e.g. 'Grak the Thoughtful'")
+    Display name defaults to the model's short name (owner decision 22:
+    model names only on the leaderboard). A custom ``orc_name`` is still
+    allowed but never generated.
+    """
+
     model_id: str = Field(description="orq.ai gateway model slug, e.g. 'anthropic/claude-opus-4-8'")
-    emblem: str = Field(default="⚔", description="Single-glyph emblem rendered on the warrior card")
-    # Raw router reasoning controls, forwarded verbatim as extra_body — e.g.
-    # {"thinking": {"type": "enabled", "budget_tokens": 4096}} or
-    # {"reasoning_effort": "medium"}. None = provider default.
+    orc_name: str = ""
+    emblem: str = Field(default="", description="Optional glyph shown before the name")
+    # Raw router reasoning controls, forwarded verbatim as extra_body.
     reasoning: dict[str, Any] | None = None
     # Per-warrior output cap; None = gateway.warrior_max_tokens.
     max_tokens: int | None = None
+
+    @model_validator(mode="after")
+    def _default_name(self) -> "WarriorSpec":
+        if not self.orc_name:
+            self.orc_name = self.short_model
+        return self
 
     @property
     def short_model(self) -> str:
@@ -34,3 +43,13 @@ class WarriorSpec(BaseModel):
             return True
         effort = r.get("reasoning_effort")
         return bool(effort and effort != "none")
+
+
+def assign_warriors(model_ids: list[str], existing: list[WarriorSpec]) -> list[WarriorSpec]:
+    """Build WarriorSpecs for picked models.
+
+    Models already configured keep their spec (incl. reasoning blocks);
+    new models display as their model name (decision 22).
+    """
+    by_model = {w.model_id: w for w in existing}
+    return [by_model.get(mid) or WarriorSpec(model_id=mid) for mid in model_ids]

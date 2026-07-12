@@ -90,7 +90,9 @@ async def rejudge_run(
                 replacement_judges=[
                     m for m in cfg.replacement_judges if m.split("/")[-1] not in key
                 ] or None,
-                min_successful_judges=cfg.min_successful_judges,
+                # A 1-judge rejudge panel is legitimate; don't let the run
+                # config's quorum (sized for its own panel) reject it.
+                min_successful_judges=min(cfg.min_successful_judges, len(panel)),
                 max_tokens=cfg.gateway.judge_max_tokens,
                 timeout_ms=cfg.gateway.judge_timeout_ms,
                 client=gateway.client,

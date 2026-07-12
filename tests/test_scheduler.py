@@ -27,10 +27,10 @@ def test_schedule_is_seed_stable():
     ]
 
 
-def _rec(majority: str, error: str | None = None) -> BattleRecord:
+def _rec(majority: str, error: str | None = None, category: str = "code") -> BattleRecord:
     return BattleRecord(
         prompt_hash="h", prompt_text="p", model_a="ma", model_b="mb",
-        majority_verdict=majority, error=error,
+        majority_verdict=majority, error=error, prompt_category=category,
     )
 
 
@@ -39,7 +39,17 @@ def test_outcomes_include_wins_and_ties_skip_rest():
                _rec("inconclusive", error="void")]
     out = outcomes_from_records(records, "Alpha", "Beta")
     assert out == [
-        ("Alpha", "Beta", "winner"),
-        ("Beta", "Alpha", "winner"),
-        ("Alpha", "Beta", "tie"),
+        ("Alpha", "Beta", "winner", "code"),
+        ("Beta", "Alpha", "winner", "code"),
+        ("Alpha", "Beta", "tie", "code"),
     ]
+
+
+def test_elo_by_category_respects_floor():
+    from orc_arena.tournament.driver import elo_by_category
+
+    # 25 code outcomes (passes the 20 floor), 3 math (skipped)
+    outcomes = [("a", "b", "winner", "code")] * 25 + [("b", "a", "winner", "math")] * 3
+    sliced = elo_by_category(outcomes, ["a", "b"])
+    assert "code" in sliced and "math" not in sliced
+    assert sliced["code"]["a"] > sliced["code"]["b"]

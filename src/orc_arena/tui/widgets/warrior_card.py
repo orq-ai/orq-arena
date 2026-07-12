@@ -22,11 +22,11 @@ class WarriorCard(Static):
         border: round $accent;
         background: $panel;
     }
-    WarriorCard.side-a { border: round $success; }
-    WarriorCard.side-b { border: round $warning; }
-    WarriorCard .name { text-style: bold; color: $accent; }
-    WarriorCard.side-a .name { color: $success; }
-    WarriorCard.side-b .name { color: $warning; }
+    WarriorCard.side-a { border: round $accent; }
+    WarriorCard.side-b { border: round $primary; }
+    WarriorCard .name { text-style: bold; }
+    WarriorCard.side-a .name { color: $accent; }
+    WarriorCard.side-b .name { color: $primary; }
     WarriorCard .model { color: $text-muted; }
     WarriorCard .hp-line { color: $text; }
     WarriorCard .elo { color: $text-muted; }
@@ -39,7 +39,7 @@ class WarriorCard(Static):
         self.add_class(f"side-{side}")
         self._orc_name = ""
         self._model_id = ""
-        self._emblem = "⚔"
+        self._emblem = ""
         self._thinking = False
         self._max_hp = 100
         self._hp = 100
@@ -69,7 +69,8 @@ class WarriorCard(Static):
     def _refresh_all(self) -> None:
         if self._name_w:
             badge = "  🧠" if self._thinking else ""
-            self._name_w.update(f"{self._emblem}  {self._orc_name}{badge}")
+            prefix = f"{self._emblem}  " if self._emblem else ""
+            self._name_w.update(f"{prefix}{self._orc_name}{badge}")
         if self._model_w:
             self._model_w.update(self._model_id)
         if self._hp_bar:
