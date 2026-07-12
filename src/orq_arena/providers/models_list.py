@@ -153,6 +153,45 @@ def _filter_by_type(entries: list[ModelEntry], type_map: dict[str, str]) -> list
     return [m for m in entries if not type_map.get(m.id) or type_map[m.id] == "chat"]
 
 
+async def fetch_price_map(cfg: GatewayConfig) -> dict[str, tuple[float, float]]:
+    """``{router_id: ($/M input, $/M output)}`` from the Model Garden.
+
+    Garden rows key as ``provider/model_id``, which is exactly the router
+    slug (verified 12/12 against the shipped config). Empty dict on any
+    failure; pricing is advisory, never blocks a run.
+    """
+    api_key = os.environ.get(cfg.api_key_env, "")
+    if not api_key:
+        return {}
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(
+                f"{_host(cfg)}/v2/models", headers={"Authorization": f"Bearer {api_key}"}
+            )
+            resp.raise_for_status()
+            payload = resp.json()
+    except (httpx.HTTPError, ValueError):
+        return {}
+    rows = payload if isinstance(payload, list) else (
+        payload.get("data") or payload.get("models") or []
+    )
+    prices: dict[str, tuple[float, float]] = {}
+    for row in rows:
+        if not isinstance(row, dict) or not row.get("model_id"):
+            continue
+        rid = f"{row.get('provider')}/{row['model_id']}"
+        md = row.get("metadata") or {}
+        cin = md.get("million_tokens_input_cost")
+        cout = md.get("million_tokens_output_cost")
+        if cin is None:
+            cin = (row.get("input_cost") or 0.0) * 1000  # input_cost is $/1k tok
+        if cout is None:
+            cout = (row.get("output_cost") or 0.0) * 1000
+        if isinstance(cin, (int, float)) and isinstance(cout, (int, float)):
+            prices[rid] = (float(cin), float(cout))
+    return prices
+
+
 async def fetch_chat_models(
     cfg: GatewayConfig,
     *,
