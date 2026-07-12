@@ -26,7 +26,7 @@ class GatewayConfig(BaseModel):
     base_url: str = "https://api.orq.ai/v3/router"
     api_key_env: str = "ORQ_API_KEY"
     warrior_max_tokens: int = 2048
-    # A cap, not a target — free headroom for judges that think by default
+    # A cap, not a target, free headroom for judges that think by default
     # (G1 finding: 512 starved gemini-2.5-flash's reasoning and killed every
     # one of its votes with LengthFinishReasonError).
     judge_max_tokens: int = 2048
@@ -54,7 +54,7 @@ class ArenaConfig(BaseModel):
     swiss_rounds: int = 6
     gateway: GatewayConfig = Field(default_factory=GatewayConfig)
     warriors: list[WarriorSpec]
-    judges: list[str] = Field(description="Judge panel — router model ids")
+    judges: list[str] = Field(description="Judge panel, router model ids")
     replacement_judges: list[str] = Field(default_factory=list)
     criteria: str = (
         "Accuracy and correctness, helpfulness and completeness, "

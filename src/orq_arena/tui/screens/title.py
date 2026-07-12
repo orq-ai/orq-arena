@@ -1,4 +1,4 @@
-"""Title screen — ASCII banner. ENTER triggers the tournament."""
+"""Title screen, ASCII banner. ENTER triggers the tournament."""
 
 from __future__ import annotations
 
@@ -41,7 +41,7 @@ class TitleScreen(Screen):
             with Center():
                 yield Static(BANNER, id="banner")
             with Center():
-                yield Static("press ENTER to begin — q to quit", id="hint")
+                yield Static("press ENTER to begin · q to quit", id="hint")
 
     def action_start(self) -> None:
         self.app.begin()

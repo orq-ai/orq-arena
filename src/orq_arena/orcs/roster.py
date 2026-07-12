@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field, model_validator
 
 
 class WarriorSpec(BaseModel):
-    """A single warrior — a model routed via the orq.ai gateway.
+    """A single warrior, a model routed via the orq.ai gateway.
 
     Display name defaults to the model's short name (owner decision 22:
     model names only on the leaderboard). A custom ``orc_name`` is still

@@ -1,4 +1,4 @@
-<!-- Thanks for contributing! Keep this short — delete sections that don't apply. -->
+<!-- Thanks for contributing! Keep this short, delete sections that don't apply. -->
 
 ## What
 
@@ -12,4 +12,4 @@
 
 - [ ] `uv run pytest` passes (no network needed)
 - [ ] Docs/README updated if user-facing behaviour changed
-- [ ] No secrets committed — API keys live in `.env` (gitignored)
+- [ ] No secrets committed, API keys live in `.env` (gitignored)

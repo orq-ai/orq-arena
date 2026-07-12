@@ -1,4 +1,4 @@
-"""Post-demo call-to-action — the one moment a delighted viewer becomes a user."""
+"""Post-demo call-to-action, the one moment a delighted viewer becomes a user."""
 
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ class CTAModalScreen(ModalScreen):
             with Vertical(id="cta-box"):
                 yield Static("THAT WAS A RECORDING.", classes="cta-title")
                 yield Static(
-                    "Run it live with your own pool — every model on the orq.ai "
+                    "Run it live with your own pool, every model on the orq.ai "
                     "router, judged by evaluatorq's pairwise jury:\n\n"
                     "  export ORQ_API_KEY=…   # get one at orq.ai\n"
                     "  uv run orq-arena run   # picker opens, choose any 2+ models",

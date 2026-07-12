@@ -1,4 +1,4 @@
-"""orq.ai router gateway client — single provider for all warrior calls.
+"""orq.ai router gateway client, single provider for all warrior calls.
 
 Uses ``AsyncOpenAI`` pointed at ``api.orq.ai/v3/router``; the gateway is
 OpenAI-compatible. Judge calls share ``.client`` via evaluatorq.
@@ -26,7 +26,7 @@ class OrqGateway:
             )
         self._cfg = cfg
         # read = max silence between stream chunks; generous so thinking models
-        # can pause for minutes before the first token. No total-duration cap —
+        # can pause for minutes before the first token. No total-duration cap,
         # a model loses on its words, never on its network.
         timeout = httpx.Timeout(
             connect=10.0, read=float(cfg.stream_read_timeout_s), write=60.0, pool=60.0
@@ -50,7 +50,7 @@ class OrqGateway:
         """Yield ``(kind, text)`` chunks: kind is ``"text"`` or ``"think"``.
 
         ``extra_body`` carries raw router controls (``thinking`` /
-        ``reasoning_effort``) verbatim. ``"think"`` chunks are best-effort —
+        ``reasoning_effort``) verbatim. ``"think"`` chunks are best-effort,
         visible reasoning deltas are optional per the router contract. Exact
         token usage and finish_reason land in ``usage_out``.
         """

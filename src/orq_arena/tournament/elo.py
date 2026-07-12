@@ -1,4 +1,4 @@
-"""Bradley-Terry MLE ELO — adapted from orq-battlebench/ranking.py.
+"""Bradley-Terry MLE ELO, adapted from orq-battlebench/ranking.py.
 
 Pure Python, no numpy/scipy. Simplified for orq-arena: no bootstrap CIs.
 Ties split 0.5 / 0.5 (standard Bradley-Terry treatment).
@@ -23,7 +23,7 @@ def build_wins_matrix(
         if outcome == "tie":
             wins[a][b] += 0.5
             wins[b][a] += 0.5
-        else:  # 'winner' — a beat b
+        else:  # 'winner', a beat b
             wins[a][b] += 1.0
     return wins
 

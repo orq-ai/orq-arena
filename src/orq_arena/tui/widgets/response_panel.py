@@ -1,4 +1,4 @@
-"""Streaming response panel — live output, thinking state, tokens/sec footer."""
+"""Streaming response panel, live output, thinking state, tokens/sec footer."""
 
 from __future__ import annotations
 
@@ -116,7 +116,7 @@ class ResponsePanel(Vertical):
             self._timer.pause()
         self.remove_class("thinking")
         if error:
-            self._footer.update("[red]✕ stream failed — round void[/red]")
+            self._footer.update("[red]✕ stream failed, round void[/red]")
             return
         total = time.monotonic() - self._started_at
         parts = [f"{tokens_out or len(''.join(self._buffer)) // 4} tok", f"{total:.1f}s"]

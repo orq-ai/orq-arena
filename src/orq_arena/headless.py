@@ -1,4 +1,4 @@
-"""Headless runner — the same tournament, no TUI, matches in parallel.
+"""Headless runner, the same tournament, no TUI, matches in parallel.
 
 For CI/cron benchmark generation. Consumes the event queue with a Rich
 printer: match results and live standings as one-liners, the full
@@ -58,7 +58,7 @@ async def run_headless(
                 else:
                     console.print(f"[dim]{ev.match_id}[/dim] {ev.winner} beats {ev.loser} ({ev.by})")
             elif isinstance(ev, RoundVoided):
-                console.print(f"[yellow]{ev.match_id} round void — {ev.reason}[/yellow]")
+                console.print(f"[yellow]{ev.match_id} round void, {ev.reason}[/yellow]")
             elif isinstance(ev, StandingsUpdated):
                 console.print(f"[dim]match {ev.matches_done}/{ev.matches_total} done[/dim]")
             elif isinstance(ev, TournamentEnded):
@@ -69,7 +69,7 @@ async def run_headless(
                 tok = r.get("tokens") or {}
                 if tok:
                     console.print(
-                        f"tokens — warriors {tok['warriors_in']:,} in / {tok['warriors_out']:,} out"
+                        f"tokens, warriors {tok['warriors_in']:,} in / {tok['warriors_out']:,} out"
                         f" · jury {tok['judges_in']:,} in / {tok['judges_out']:,} out"
                     )
                 console.print(f"battle log → {ev.battle_log_path}")

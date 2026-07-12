@@ -4,7 +4,7 @@ One ``Battle`` owns a single fight: it drives the turn loop, tracks HP,
 invokes the evaluatorq pairwise jury, and pushes typed events onto an
 ``asyncio.Queue`` that the TUI subscribes to.
 
-Judging: each round's A/B pair goes through ``llm_jury_pairwise`` — every
+Judging: each round's A/B pair goes through ``llm_jury_pairwise``, every
 judge sees both orderings, a judge that flips abstains (and is recorded), and
 fewer than ``min_successful_judges`` decisive votes yields ``inconclusive``.
 A round whose generation fails after one retry is **voided**: never judged,
@@ -104,7 +104,7 @@ async def _generate_side(
             if attempt == 1:
                 await events.put(
                     ResponseChunk(  # type: ignore[arg-type]
-                        match_id=match_id, side=side, text="\n⟲ stream failed — retrying…\n"
+                        match_id=match_id, side=side, text="\n⟲ stream failed, retrying…\n"
                     )
                 )
                 continue
@@ -163,7 +163,7 @@ class Battle:
         if not panel:
             raise ValueError(
                 f"Every judge is a contestant in {warrior_a.orc_name} vs "
-                f"{warrior_b.orc_name} — add a neutral judge to the config."
+                f"{warrior_b.orc_name}, add a neutral judge to the config."
             )
         replacements = [m for m in cfg.replacement_judges if m not in contestants]
         self._jury = llm_jury_pairwise(
@@ -245,7 +245,7 @@ class Battle:
 
             if res_a.error or res_b.error:
                 failed = self.a.orc_name if res_a.error else self.b.orc_name
-                reason = f"{failed}: stream failed after retry — {res_a.error or res_b.error}"
+                reason = f"{failed}: stream failed after retry, {res_a.error or res_b.error}"
                 battles.append(await self._void_round(
                     round_number=round_number, item=item, reason=reason,
                     res_a=res_a, res_b=res_b, hp_a=hp_a, hp_b=hp_b,
@@ -341,8 +341,8 @@ class Battle:
             if rules.verdict_hold_s > 0:
                 await asyncio.sleep(rules.verdict_hold_s)
 
-        # Resolve the match for the show. The rating ignores this entirely —
-        # ELO is fed per-round verdicts — so an HP tie is simply a draw.
+        # Resolve the match for the show. The rating ignores this entirely,
+        # ELO is fed per-round verdicts, so an HP tie is simply a draw.
         if hp_a == hp_b:
             winner, loser, by = self.a, self.b, "draw"
         elif hp_a > hp_b:

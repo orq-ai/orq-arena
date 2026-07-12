@@ -2,10 +2,10 @@
 
 Endpoint strategy (ported from the chennai research):
 
-* ``GET /v2/router/models`` — the **workspace-enabled subset**: models
+* ``GET /v2/router/models``, the **workspace-enabled subset**: models
   disabled in the Model Garden simply don't appear. Primary source.
-* ``GET /v3/router/models`` — full routable catalog; fallback.
-* ``GET /v2/models`` — full Model Garden with an authoritative ``type``
+* ``GET /v3/router/models``, full routable catalog; fallback.
+* ``GET /v2/models``, full Model Garden with an authoritative ``type``
   field; used to narrow to ``type == "chat"``. Regex patterns stay as a
   safety net when it's unreachable.
 

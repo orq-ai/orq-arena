@@ -40,7 +40,7 @@ def _load_dotenv() -> None:
 
 @click.group()
 def cli() -> None:
-    """orq-arena — LLM arena benchmark: orq.ai router + evaluatorq jury."""
+    """orq-arena, LLM arena benchmark: orq.ai router + evaluatorq jury."""
     _load_dotenv()
 
 
@@ -95,11 +95,11 @@ def run(config_path: str | None, prompts_path: str, output_path: str,
         preflight_data["thinking_probe"] = probe
         for name, r in probe.items():
             if r["error"]:
-                click.echo(f"  ⚠ {name} ({r['model']}): probe failed — {r['error']}")
+                click.echo(f"  ⚠ {name} ({r['model']}): probe failed, {r['error']}")
             elif r["thinks"] and not r["configured"]:
                 click.echo(
                     f"  🧠 {name} ({r['model']}): thinks despite config "
-                    f"({r['reasoning_tokens']} reasoning tok) — ranking will be footnoted"
+                    f"({r['reasoning_tokens']} reasoning tok), ranking will be footnoted"
                 )
         odd = surprises(probe)
         if not odd:
@@ -163,7 +163,7 @@ if __name__ == "__main__":
 def rejudge(log_path: str, judges: tuple[str, ...], criteria: str | None,
             config_path: str, output_path: str | None, report_json: str | None,
             concurrency: int) -> None:
-    """Re-judge a recorded run with a different panel — zero regeneration.
+    """Re-judge a recorded run with a different panel, zero regeneration.
 
     The evaluatorq demo inside the demo: the responses are already on disk,
     so swapping the jury costs judge tokens only. Prints the new jury's

@@ -1,7 +1,7 @@
-"""Tournament driver — full round-robin, per-round Bradley-Terry ELO.
+"""Tournament driver, full round-robin, per-round Bradley-Terry ELO.
 
 Every pair fights once; every judged round (win or tie) feeds the rating.
-The HP show is presentation — the leaderboard comes from ~C(n,2)·max_rounds
+The HP show is presentation, the leaderboard comes from ~C(n,2)·max_rounds
 reconciled panel verdicts, not from 7 knockout outcomes.
 """
 
@@ -215,7 +215,7 @@ async def run_tournament(
 ) -> dict[str, float]:
     """Run the full round-robin; return final ELO ratings by orc name.
 
-    ``concurrency`` > 1 runs matches in parallel under a semaphore — headless
+    ``concurrency`` > 1 runs matches in parallel under a semaphore, headless
     runs only; the TUI passes 1 so the show stays one fight at a time.
     """
     if len(cfg.warriors) < 2:
@@ -299,7 +299,7 @@ async def run_tournament(
                 for i, (w_a, w_b) in enumerate(schedule, 1)
             ))
     else:
-        # Pools >8: Swiss — pair by score group between rounds (decision 15:
+        # Pools >8: Swiss, pair by score group between rounds (decision 15:
         # pairing consumes match winners; the rating stays per-round).
         from .swiss import SwissScheduler
 

@@ -1,4 +1,4 @@
-"""Post-run battle browser — step through every judged round.
+"""Post-run battle browser, step through every judged round.
 
 Pushed from the leaderboard via ``B``. One round per page: prompt, both
 responses, every judge's reconciled vote with flip/abstain badges and
@@ -77,7 +77,7 @@ class BattleBrowserScreen(Screen):
         r = self._records[self._idx]
         self._header.update(
             f"[b]ROUND {self._idx + 1}/{len(self._records)}[/b]   "
-            f"[dim]{r.match_id} · round {r.round_number} · category {r.prompt_category or '—'}[/dim]"
+            f"[dim]{r.match_id} · round {r.round_number} · category {r.prompt_category or '-'}[/dim]"
         )
         self._prompt.update(f"[b]PROMPT[/b]\n{escape(r.prompt_text[:600])}")
         self._resp_a.update(f"A · {r.model_a}\n\n{r.response_a[:1500]}")
@@ -90,7 +90,7 @@ class BattleBrowserScreen(Screen):
             color = _VOTE_COLOR.get(str(vote), "red")
             badge = ""
             if v.get("flipped"):
-                badge = " [red]⚖ flipped — vote thrown out[/red]"
+                badge = " [red]⚖ flipped, vote thrown out[/red]"
             if v.get("replacement"):
                 badge += " [dim](stand-in)[/dim]"
             reason = str(v.get("explanation") or "")[:220]
@@ -101,7 +101,7 @@ class BattleBrowserScreen(Screen):
         self._judges.update("\n".join(lines))
 
         if r.error:
-            outcome = f"[yellow]⚠ round void — {escape(r.error[:160])}[/yellow]"
+            outcome = f"[yellow]⚠ round void, {escape(r.error[:160])}[/yellow]"
         else:
             outcome = (
                 f"verdict [b]{r.majority_verdict}[/b] → winner [b]{escape(r.winner)}[/b]"

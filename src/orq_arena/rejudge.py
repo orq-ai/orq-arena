@@ -1,4 +1,4 @@
-"""Re-judge a recorded run with a different panel — zero regeneration.
+"""Re-judge a recorded run with a different panel, zero regeneration.
 
 Reads ``battles.jsonl`` (schema v2), runs every recorded A/B pair through a
 fresh evaluatorq pairwise jury, and compares the resulting Bradley-Terry
@@ -155,13 +155,13 @@ def render_result(result: dict) -> None:
     console = Console()
     report = result["report"]
     console.print(
-        f"\n[bold]re-judged {result['total']} rounds[/bold] — "
+        f"\n[bold]re-judged {result['total']} rounds[/bold], "
         f"{result['changed_verdicts']} verdicts changed"
     )
     console.print(
         f"rank correlation (Spearman) old→new: [bold]{result['spearman']:.2f}[/bold]"
-        + ("  — judge-robust ranking" if result["spearman"] >= 0.8 else
-           "  — ranking is panel-sensitive; treat with care")
+        + (" , judge-robust ranking" if result["spearman"] >= 0.8 else
+           " , ranking is panel-sensitive; treat with care")
     )
     console.print(f"old ranking: {' > '.join(result['old_ranking'])}")
     console.print(f"new ranking: {' > '.join(result['new_ranking'])}")

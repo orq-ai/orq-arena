@@ -1,4 +1,4 @@
-"""Swiss/Monrad pairing for large pools — same benchmark, scaled.
+"""Swiss/Monrad pairing for large pools, same benchmark, scaled.
 
 Ported from the chennai fork. Bradley-Terry estimates converge faster when
 strong models play strong models; random pairing needs roughly 3× the matches
@@ -7,7 +7,7 @@ active-learning schedule cheaply.
 
 Pairing consumes **match winners** (the HP show, decision 15); the rating
 itself never stops being per-round. Auto-switched by the driver for pools
-larger than 8 — never a user-facing mode.
+larger than 8, never a user-facing mode.
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ class SwissScheduler:
             head = unpicked.pop(0)
             partner = self._pick_partner(head, unpicked)
             if partner is None:
-                continue  # odd float — head sits this round out
+                continue  # odd float, head sits this round out
             unpicked.remove(partner)
             pairs.append((head, partner))
         return pairs
@@ -56,5 +56,5 @@ class SwissScheduler:
         for cand in candidates:
             if frozenset({head, cand}) not in self._state.played:
                 return cand
-        # Everyone remaining already played head — repeat beats skipping.
+        # Everyone remaining already played head, repeat beats skipping.
         return candidates[0] if candidates else None

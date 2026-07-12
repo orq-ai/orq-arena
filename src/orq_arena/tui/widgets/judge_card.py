@@ -1,4 +1,4 @@
-"""Judge card — compact verdict display with flip/abstain/stand-in badges."""
+"""Judge card, compact verdict display with flip/abstain/stand-in badges."""
 
 from __future__ import annotations
 
@@ -44,7 +44,7 @@ class JudgeCard(Static):
         cue = _CUES.get(self._verdict.lower(), self._verdict)
         lines = [f"[b]{name}[/b]  {cue}"]
         if self._flipped:
-            lines.append("[red]⚖ flipped when sides swapped — vote thrown out[/red]")
+            lines.append("[red]⚖ flipped when sides swapped, vote thrown out[/red]")
         reason = self._reasoning[:110] + ("…" if len(self._reasoning) > 110 else "")
         lines.append(f"[dim]{reason}[/dim]")
         return "\n".join(lines)

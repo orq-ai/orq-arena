@@ -1,7 +1,7 @@
 """Headless render test: the fight screen survives a full match lifecycle.
 
 Exists because JudgeCard once shadowed Textual's internal Widget._render and
-only exploded at render time — which no logic test could catch.
+only exploded at render time, which no logic test could catch.
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ async def test_fight_screen_full_match_lifecycle():
 
         # KO path + void + draw banner
         screen.apply_damage(100, 0, "A", 30, "b")
-        screen.round_voided("Snot: stream failed after retry — boom")
+        screen.round_voided("Snot: stream failed after retry, boom")
         screen.match_resolved("Grak", "ko")
         screen.match_resolved("", "draw")
         await pilot.pause()
