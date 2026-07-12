@@ -61,7 +61,11 @@ warriors:
 #     - anthropic/claude-opus-4-8
 #     - openai/gpt-5.4
 #     - google/gemini-3.1-pro-preview
-#   (expect ~10× judge cost; agreement stats will tell you if it mattered)
+#   (expect ~10× judge cost; agreement stats will tell you if it mattered.
+#    measured 2026-07-12 over a 140-round log: same champion, Spearman 0.81
+#    vs the cheap trio's ranking, still 22-30% flips. If you do this, raise
+#    judge_max_tokens to ~8000 and judge_timeout_ms to ~180000: thinking
+#    judges burn ~2k reasoning tokens and opus can exceed 90s per verdict.)
 judges:
   - anthropic/claude-haiku-4-5-20251001
   - google/gemini-2.5-flash-lite

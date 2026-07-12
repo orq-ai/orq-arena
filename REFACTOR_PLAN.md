@@ -94,9 +94,24 @@ Remaining: demo GIF; post draft led by the flip-badge story ("individual judges 
 position-biased; the gated panel is judge-robust, the tool proves it about itself") and
 linking a real G2.5 report page.
 
-### G4: Judge-quality experiment and the jury-selection recipe
-`rejudge` one real log with a strong panel (opus / gpt-5.4 / gemini-pro); publish κ + Spearman
-vs the cheap trio. One command; pre-empts the strongest objection.
+### G4: Judge-quality experiment and the jury-selection recipe. **RAN 2026-07-12**
+Strong panel (opus / gpt-5.4 / gemini-3.1-pro, both orders, 140 rounds, ~10x judge cost) over
+the G1 log. Verdict: **the money bought nothing the gated cheap trio hadn't already found.**
+
+| jury | Spearman vs run | inconclusive | agreement | flips |
+|---|---|---|---|---|
+| cheap trio (the run itself) | 1.00 by definition | 49% | 93% | 30-45% |
+| gpt-5.1 solo | 0.50 | 25% | n/a | 25% |
+| cheap candidate panel | 0.83 | 53% | 93% | 30-45% (+74% replacement) |
+| strong panel | **0.81** | 45% | 85% | **22-30%** |
+
+Claude-opus-4-8 stays champion under every jury. Frontier judges still flip 22-30% under seat
+swap and tie more (16% vs the cheap trio's 1-10%): close pairs are close, not cheaply
+misjudged. The self-preference caveat applies (all three strong judges are also contestants;
+per-match self-exclusion held, family overlap warned). Two operational catches: opus hit the
+90s judge timeout and gemini-3.1-pro burned ~1960 reasoning tokens into the 2048 cap, so some
+votes fell to the 60%-flip replacement; a strong-panel config wants `judge_max_tokens: 8000`
+and `judge_timeout_ms: 180000` (noted in the yaml presets).
 
 **Jury selection is a first-class use-case (decision 26), and the loop shipped 2026-07-12:**
 record once, then per candidate panel `rejudge <log> --judge ... --report-json c.json` (judge
