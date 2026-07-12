@@ -14,7 +14,7 @@ BANNER = r"""
  | |__| |  _ <| |___  / ___ \|  _ <| |___| |\  |/ ___ \
   \____/|_| \_\\\____|/_/   \_\_| \_\_____|_| \_/_/   \_\
 
-         ~ 8 warriors. 7 fights. 1 champion. ~
+         ~ every model fights every model. the jury sees both sides. ~
 """
 
 

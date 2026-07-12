@@ -1,4 +1,4 @@
-"""Warrior card — name, model, HP bar, ELO.
+"""Warrior card — name, model, HP bar with damage flashes, ELO.
 
 Child widget references are stored directly on the card instance so we never
 query by ID — two WarriorCards can be mounted on the same screen without
@@ -22,56 +22,66 @@ class WarriorCard(Static):
         border: round $accent;
         background: $panel;
     }
-    WarriorCard .name {
-        text-style: bold;
-        color: $accent;
-    }
-    WarriorCard .model {
-        color: $text-muted;
-    }
-    WarriorCard .elo {
-        color: $text-muted;
-    }
-    WarriorCard.hit {
-        background: $error-darken-1;
-    }
+    WarriorCard.side-a { border: round $success; }
+    WarriorCard.side-b { border: round $warning; }
+    WarriorCard .name { text-style: bold; color: $accent; }
+    WarriorCard.side-a .name { color: $success; }
+    WarriorCard.side-b .name { color: $warning; }
+    WarriorCard .model { color: $text-muted; }
+    WarriorCard .hp-line { color: $text; }
+    WarriorCard .elo { color: $text-muted; }
+    WarriorCard.hit { background: $error-darken-1; }
+    WarriorCard.ko { opacity: 0.5; border: round $error; }
     """
 
-    def __init__(
-        self,
-        orc_name: str = "",
-        model_id: str = "",
-        emblem: str = "⚔",
-        max_hp: int = 100,
-        elo: float = 1000.0,
-        **kwargs,
-    ) -> None:
+    def __init__(self, side: str = "a", **kwargs) -> None:
         super().__init__(**kwargs)
-        self._orc_name = orc_name
-        self._model_id = model_id
-        self._emblem = emblem
-        self._max_hp = max_hp
-        self._hp = max_hp
-        self._elo = elo
+        self.add_class(f"side-{side}")
+        self._orc_name = ""
+        self._model_id = ""
+        self._emblem = "⚔"
+        self._thinking = False
+        self._max_hp = 100
+        self._hp = 100
+        self._elo = 1000.0
         self._name_w: Static | None = None
         self._model_w: Static | None = None
-        self._hp_w: ProgressBar | None = None
+        self._hp_bar: ProgressBar | None = None
+        self._hp_line: Static | None = None
         self._elo_w: Static | None = None
 
     def compose(self) -> ComposeResult:
-        self._name_w = Static(f"{self._emblem}  {self._orc_name}", classes="name")
-        self._model_w = Static(self._model_id, classes="model")
-        self._hp_w = ProgressBar(total=self._max_hp, show_eta=False)
+        self._name_w = Static("", classes="name")
+        self._model_w = Static("", classes="model")
+        self._hp_bar = ProgressBar(total=self._max_hp, show_eta=False)
+        self._hp_line = Static("", classes="hp-line")
         self._elo_w = Static(f"ELO {self._elo:.0f}", classes="elo")
         with Vertical():
             yield self._name_w
             yield self._model_w
-            yield self._hp_w
+            yield self._hp_bar
+            yield self._hp_line
             yield self._elo_w
 
     def on_mount(self) -> None:
-        if self._hp_w is not None:
-            self._hp_w.update(progress=self._hp)
+        self._refresh_all()
+
+    def _refresh_all(self) -> None:
+        if self._name_w:
+            badge = "  🧠" if self._thinking else ""
+            self._name_w.update(f"{self._emblem}  {self._orc_name}{badge}")
+        if self._model_w:
+            self._model_w.update(self._model_id)
+        if self._hp_bar:
+            self._hp_bar.update(total=self._max_hp, progress=self._hp)
+        self._update_hp_line()
+
+    def _update_hp_line(self, flash: str = "") -> None:
+        if self._hp_line is None:
+            return
+        share = self._hp / self._max_hp if self._max_hp else 0
+        color = "green" if share > 0.5 else "yellow" if share > 0.25 else "red"
+        self._hp_line.update(f"[{color}]HP {self._hp}/{self._max_hp}[/{color}]{flash}")
 
     def set_warrior(
         self,
@@ -80,27 +90,32 @@ class WarriorCard(Static):
         model_id: str,
         emblem: str,
         max_hp: int,
+        thinking: bool = False,
     ) -> None:
         self._orc_name = orc_name
         self._model_id = model_id
         self._emblem = emblem
+        self._thinking = thinking
         self._max_hp = max_hp
         self._hp = max_hp
-        if self._name_w:
-            self._name_w.update(f"{emblem}  {orc_name}")
-        if self._model_w:
-            self._model_w.update(model_id)
-        if self._hp_w:
-            self._hp_w.update(total=max_hp, progress=max_hp)
+        self.remove_class("ko")
+        self._refresh_all()
 
     def set_hp(self, new_hp: int) -> None:
         old = self._hp
         self._hp = max(0, new_hp)
-        if self._hp_w:
-            self._hp_w.update(progress=self._hp)
+        if self._hp_bar:
+            self._hp_bar.update(progress=self._hp)
         if self._hp < old:
+            self._update_hp_line(f"  [b red]−{old - self._hp}![/b red]")
             self.add_class("hit")
             self.set_timer(0.3, lambda: self.remove_class("hit"))
+            self.set_timer(1.2, self._update_hp_line)
+        else:
+            self._update_hp_line()
+
+    def knock_out(self) -> None:
+        self.add_class("ko")
 
     def set_elo(self, elo: float) -> None:
         self._elo = elo

@@ -1,0 +1,864 @@
+<title>orc-arena × evaluatorq — Architecture & Migration Report</title>
+<style>
+  :root {
+    --ivory: #f8f5ec;
+    --paper: #fffdf7;
+    --slate: #2a2d33;
+    --slate-soft: #4a4f57;
+    --oat: #ded6c3;
+    --oat-line: #e7e0d0;
+    --clay: #b45739;      /* primary accent */
+    --clay-soft: #c9765a;
+    --olive: #6f7748;     /* secondary */
+    --gold: #b8892b;
+    --green: #55713f;
+    --muted: #8a8578;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    --mono: "SF Mono", "JetBrains Mono", "Fira Code", ui-monospace, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--ivory);
+    color: var(--slate);
+    font-family: var(--sans);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 0 28px 96px; }
+
+  /* Header */
+  header.page {
+    border-bottom: 3px double var(--oat);
+    padding: 56px 0 30px;
+    margin-bottom: 8px;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--clay);
+    margin: 0 0 14px;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: 40px;
+    line-height: 1.12;
+    margin: 0 0 12px;
+    letter-spacing: -0.01em;
+  }
+  .dateline {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .dateline b { color: var(--slate-soft); font-weight: 600; }
+
+  h2 {
+    font-family: var(--serif);
+    font-size: 25px;
+    font-weight: 600;
+    margin: 52px 0 6px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--oat-line);
+  }
+  h2 .num {
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--clay);
+    margin-right: 12px;
+    vertical-align: 2px;
+  }
+  h3 { font-family: var(--serif); font-size: 18px; margin: 26px 0 4px; }
+  p { margin: 10px 0; }
+  .lede { font-size: 17px; color: var(--slate-soft); }
+  code, .mono { font-family: var(--mono); font-size: 0.86em; }
+  code {
+    background: #efe9db;
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: #7a3a26;
+  }
+  a { color: var(--clay); }
+
+  /* Verdict strip */
+  .verdict {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr 1fr 1fr;
+    gap: 14px;
+    margin: 30px 0 8px;
+  }
+  .vcard {
+    background: var(--paper);
+    border: 1px solid var(--oat-line);
+    border-radius: 10px;
+    padding: 18px 18px 16px;
+  }
+  .vcard .label {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 6px;
+  }
+  .vcard .big {
+    font-family: var(--serif);
+    font-size: 34px;
+    font-weight: 600;
+    line-height: 1;
+  }
+  .vcard .sub { font-size: 12.5px; color: var(--slate-soft); margin-top: 6px; }
+  .grade-strip { border-top: 3px solid var(--clay); }
+
+  /* Callout */
+  .callout {
+    background: var(--paper);
+    border-left: 4px solid var(--clay);
+    border-radius: 0 8px 8px 0;
+    padding: 16px 20px;
+    margin: 22px 0;
+  }
+  .callout.good { border-left-color: var(--green); }
+  .callout.warn { border-left-color: var(--gold); }
+
+  /* Tables */
+  table { border-collapse: collapse; width: 100%; margin: 18px 0; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--oat-line); vertical-align: top; }
+  th {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1.5px solid var(--oat);
+  }
+  tbody tr:hover { background: #fbf8f0; }
+  td.loc, td.n { font-family: var(--mono); white-space: nowrap; }
+
+  /* Pills */
+  .pill {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 1px 8px;
+    border-radius: 20px;
+    border: 1px solid var(--oat);
+    color: var(--slate-soft);
+    white-space: nowrap;
+  }
+  .pill.dead { background: #f6e2dc; border-color: #e2b7a8; color: #9c3f26; }
+  .pill.over { background: #f6ecd6; border-color: #e0c98d; color: #8a6510; }
+  .pill.keep { background: #e7efdd; border-color: #b8cf9e; color: #465e33; }
+  .pill.good { background: #e7efdd; border-color: #b8cf9e; color: #465e33; }
+
+  /* Finding blocks */
+  .finding {
+    background: var(--paper);
+    border: 1px solid var(--oat-line);
+    border-radius: 10px;
+    padding: 4px 22px 18px;
+    margin: 20px 0;
+  }
+  .finding .rank {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+  }
+  .finding h3 { margin-top: 12px; }
+  .finding .verdict-line {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--clay);
+    margin: 4px 0 10px;
+  }
+  .kv { display: grid; grid-template-columns: 96px 1fr; gap: 4px 14px; font-size: 14px; margin-top: 8px; }
+  .kv .k { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); padding-top: 2px; }
+
+  /* Grade scorecard */
+  .grades { margin: 20px 0; }
+  .grade-row {
+    display: grid;
+    grid-template-columns: 62px 1fr;
+    gap: 18px;
+    align-items: start;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--oat-line);
+  }
+  .grade-badge {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: 30px;
+    text-align: center;
+    line-height: 1.5;
+    border-radius: 10px;
+    border: 1.5px solid var(--oat);
+    background: var(--paper);
+  }
+  .g-a { color: #3f6b2f; border-color: #a9c78f; background: #eef4e6; }
+  .g-b { color: #6a7530; border-color: #cad39a; background: #f3f2e0; }
+  .g-c { color: #9a7414; border-color: #e0c98d; background: #f7efd8; }
+  .g-d { color: #a4502c; border-color: #e0ac93; background: #f7e7dd; }
+  .g-f { color: #93331d; border-color: #d99a86; background: #f6ded5; }
+  .grade-row .axis { font-family: var(--serif); font-size: 17px; font-weight: 600; }
+  .grade-row .why { font-size: 13.5px; color: var(--slate-soft); margin-top: 2px; }
+
+  /* Chart */
+  .chart { background: var(--paper); border: 1px solid var(--oat-line); border-radius: 10px; padding: 22px 24px; margin: 20px 0; }
+  .bar-row { display: grid; grid-template-columns: 190px 1fr 74px; gap: 12px; align-items: center; margin: 10px 0; font-size: 13px; }
+  .bar-track { background: #efe9db; border-radius: 6px; height: 22px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 6px; }
+  .bar-label { font-family: var(--mono); font-size: 12px; color: var(--slate-soft); }
+  .legend-note { font-size: 12px; color: var(--muted); margin-top: 12px; }
+
+  ul.tight { margin: 8px 0; padding-left: 20px; }
+  ul.tight li { margin: 5px 0; }
+  .footer { margin-top: 60px; padding-top: 18px; border-top: 3px double var(--oat); font-size: 12.5px; color: var(--muted); font-family: var(--mono); }
+  .toc { font-family: var(--mono); font-size: 12.5px; color: var(--slate-soft); margin: 4px 0 0; }
+  .toc a { color: var(--slate-soft); text-decoration: none; margin-right: 16px; }
+  .toc a:hover { color: var(--clay); }
+  .toc .part-tag { color: var(--muted); margin-right: 10px; }
+
+  /* rev 7 — Part 2 components */
+  .part-mark {
+    font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.24em;
+    text-transform: uppercase; color: var(--paper);
+    background: var(--slate); border-radius: 6px;
+    padding: 7px 16px; margin: 68px 0 0; display: inline-block;
+  }
+  .pill.part2 { background: #e6ebf1; border-color: #a9b8ca; color: #33475e; margin-left: 6px; }
+  .pill.gone { background: #f6e2dc; border-color: #e2b7a8; color: #9c3f26; margin-left: 6px; }
+  pre.snippet {
+    background: #2e3138; color: #e8e4d8; border-radius: 10px;
+    padding: 16px 18px; overflow-x: auto; font-family: var(--mono);
+    font-size: 12.5px; line-height: 1.6; margin: 14px 0;
+  }
+  pre.snippet .c { color: #9a958a; }
+  pre.snippet .s { color: #a3b97a; }
+  pre.snippet .k { color: #d9a05b; }
+  .flow { background: var(--paper); border: 1px solid var(--oat-line); border-radius: 10px; padding: 18px 22px 14px; margin: 20px 0; overflow-x: auto; }
+  .flow-lane { display: flex; align-items: stretch; gap: 8px; margin: 10px 0; min-width: 660px; }
+  .flow-box { border: 1.5px solid var(--oat); background: var(--ivory); border-radius: 8px; padding: 8px 12px; font-family: var(--mono); font-size: 11.5px; line-height: 1.5; flex: 1; }
+  .flow-box b { font-size: 12px; letter-spacing: 0.02em; }
+  .flow-box.hot { border-color: var(--clay); background: #f9ece5; }
+  .flow-box.evq { border-color: #5c7a99; background: #edf1f6; }
+  .flow-arrow { align-self: center; color: var(--muted); font-family: var(--mono); font-size: 15px; flex: 0 0 auto; }
+  .flow-note { font-size: 12px; color: var(--muted); font-family: var(--mono); margin-top: 10px; }
+  .evq-tint { color: #44607f; }
+  .tablewrap { overflow-x: auto; }
+  @media (max-width: 720px) {
+    .verdict { grid-template-columns: 1fr 1fr; }
+    .bar-row { grid-template-columns: 110px 1fr 58px; }
+    .kv { grid-template-columns: 80px 1fr; }
+  }
+</style>
+<div class="wrap">
+
+  <header class="page">
+    <p class="eyebrow">Architecture Review · Complexity, Overengineering &amp; the evaluatorq Refactor</p>
+    <h1>orc-arena — what to keep, what to cut, and what evaluatorq replaces</h1>
+    <p class="dateline"><b>2026-07-11</b> · <b>rev 7 — Part 2 added: evaluatorq 1.3 (pairwise jury) migration plan, tournament-mode removal, round-robin ELO, and the two-product story; three Part-1 verdicts superseded and marked inline</b> · branch <code>gnhf/i-want-you-to-analys-287d22</code> · ~1,909 LOC src · 25 modules · 5 test files · vs <code>evaluatorq</code> @ RES-760 (1.3.0-unreleased)</p>
+    <p class="toc">
+      <span class="part-tag">Part 1 ·</span>
+      <a href="#verdict">Verdict</a>
+      <a href="#good">What's good</a>
+      <a href="#map">Complexity map</a>
+      <a href="#over">Overengineering</a>
+      <a href="#dead">Dead code</a>
+      <a href="#grade">The grade</a>
+      <a href="#cut">Cut list</a><br>
+      <span class="part-tag">Part 2 ·</span>
+      <a href="#evq">evaluatorq 1.3</a>
+      <a href="#f05">Finding 05</a>
+      <a href="#target">Target architecture</a>
+      <a href="#migrate">Migration plan</a>
+      <a href="#story">Two-product story</a>
+    </p>
+  </header>
+
+  <!-- ============ VERDICT ============ -->
+  <section id="verdict">
+    <p class="lede">The code is <b>clean, typed, documented, and tested</b>. That is not the problem.
+    The problem is that a 7-fight toy tournament is wearing the exoskeleton of a distributed
+    system — a typed event bus, a JSON replay format, and a maximum-likelihood rating estimator —
+    to serve a future (Unity/web renderers, router-training interop) that <b>the README itself files
+    under "not in MVP."</b> The overengineering is real but concentrated: it lives in ~13% of the
+    lines (the ~180 reducible + ~65 dead below, of ~1,909) and can be excised with near-zero behavior change.
+    That was Part 1's verdict, and it stands. <b>Part 2 (§07–§11) goes further:</b> evaluatorq 1.3 now ships
+    the exact machinery <code>judges/</code> hand-rolls — a position-bias-corrected pairwise jury — but stronger.
+    So the measurement layer moves into the library, the single-elim bracket gives way to a round-robin that makes
+    the ELO honest, and this repo keeps only what nothing else provides: the show, the gateway routing, and the
+    Bradley-Terry leaderboard. Target: <b>~1,600 lines that render, route, or measure — nothing else.</b></p>
+
+    <div class="verdict grade-strip">
+      <div class="vcard">
+        <p class="label">Complexity grade</p>
+        <div class="big" style="color:var(--olive)">B−</div>
+        <p class="sub">High-quality code, over-scoped architecture.</p>
+      </div>
+      <div class="vcard">
+        <p class="label">Deletable now</p>
+        <div class="big" style="color:var(--clay)">~65</div>
+        <p class="sub">LOC of pure dead code — zero behavior change.</p>
+      </div>
+      <div class="vcard">
+        <p class="label">Reducible</p>
+        <div class="big" style="color:var(--gold)">~180</div>
+        <p class="sub">LOC that work but out-scope the need.</p>
+      </div>
+      <div class="vcard">
+        <p class="label">Solid core</p>
+        <div class="big" style="color:var(--green)">~87%</div>
+        <p class="sub">Lines that earn their place.</p>
+      </div>
+    </div>
+    <p class="legend-note">Grades and line counts are one reviewer's estimate over a static read of the
+    branch; "deletable" was verified with <code>grep</code> for zero call-sites. Part 2 (added rev 7)
+    supersedes three Part-1 verdicts — each is marked <span class="pill part2">Part 2</span> inline where it happens.</p>
+  </section>
+
+  <!-- ============ WHAT'S GOOD ============ -->
+  <section id="good">
+    <h2><span class="num">01</span>What's actually good (don't touch)</h2>
+    <p>Any honest overengineering review has to start by admitting where restraint <em>was</em> shown,
+    so the cuts below read as surgery and not vandalism.</p>
+    <div class="callout good">
+      <ul class="tight">
+        <li><b>The bracket is honestly narrow.</b> <code>Bracket.seed_eight</code> hardcodes 8 warriors and
+        the QF/SF/F structure and <em>raises</em> on anything else. That is textbook YAGNI — no generic
+        n-player tournament engine nobody asked for.</li>
+        <li><b>Judge eval technique is legit.</b> Per-judge 50/50 position-bias label swap + un-swap,
+        self-judge exclusion (a judge model can't score a match it's fighting in), and majority-with-DISCARD
+        are real evaluation hygiene, not gold-plating.</li>
+        <li><b>Dependencies are boring and correct.</b> <code>openai</code> (gateway is OpenAI-compatible),
+        <code>instructor</code> for structured verdicts, <code>textual</code>, <code>click</code>,
+        <code>pydantic</code>. Nothing exotic; no framework smuggled in for a few lines.</li>
+        <li><b>Tests target the pure logic</b> (damage map, ELO, bracket seeding/propagation, majority vote,
+        config) and skip the TUI/network — the correct things to test.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ============ COMPLEXITY MAP ============ -->
+  <section id="map">
+    <h2><span class="num">02</span>Complexity map</h2>
+    <p>Per-subsystem read. "Verdict" is complexity <em>relative to the value it delivers today</em>,
+    not code quality.</p>
+    <table>
+      <thead>
+        <tr><th>Subsystem</th><th>LOC</th><th>Complexity</th><th>Verdict</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>arena/battle.py</code></td><td class="loc">275</td><td>High (inherent)</td><td><span class="pill keep">Keep</span> Real turn/HP/KO state machine. Earns its size.</td></tr>
+        <tr><td><code>tui/*</code> (app+screens+widgets)</td><td class="loc">692</td><td>Medium</td><td><span class="pill keep">Keep</span> It's the product. One dead stub inside.</td></tr>
+        <tr><td><code>events.py</code> + queue/dispatch/replay</td><td class="loc">108+</td><td>Medium</td><td><span class="pill over">Over</span> Event bus for renderers that don't exist.</td></tr>
+        <tr><td><code>judges/panel.py</code></td><td class="loc">127</td><td>Medium</td><td><span class="pill keep">Keep</span><span class="pill part2">Part 2: replace</span> Bias-swap + majority <em>was</em> the IP — evaluatorq 1.3 ships a strictly stronger version (§07–§08).</td></tr>
+        <tr><td><code>tournament/bracket.py</code> + <code>driver.py</code></td><td class="loc">195</td><td>Medium</td><td><span class="pill keep">Keep</span><span class="pill gone">Part 2: bracket dies</span> Single-elim is tournament theater; a round-robin scheduler is ~15 lines and feeds the ELO properly (§09).</td></tr>
+        <tr><td><code>tournament/elo.py</code></td><td class="loc">69</td><td>High (needless)</td><td><span class="pill over">Over</span><span class="pill part2">Part 2: keep</span> BT-MLE over 7 sparse outcomes — round-robin fixes the sample, not the solver (§09).</td></tr>
+        <tr><td><code>providers/orq_gateway.py</code></td><td class="loc">97</td><td>Low</td><td><span class="pill over">Over</span> Half the file (<code>generate</code>) is uncalled.</td></tr>
+        <tr><td><code>data/schemas.py</code></td><td class="loc">53</td><td>Low</td><td><span class="pill keep">Keep*</span> Battlebench-compat; several fields never filled.</td></tr>
+        <tr><td><code>config.py</code>, <code>cli.py</code>, <code>data/log+prompts</code></td><td class="loc">~160</td><td>Low</td><td><span class="pill keep">Keep</span> Thin and appropriate (<code>data/schemas.py</code> counted above).</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ============ OVERENGINEERING ============ -->
+  <section id="over">
+    <h2><span class="num">03</span>Overengineering, ranked</h2>
+
+    <div class="finding">
+      <p class="rank">FINDING 01 · biggest complexity-to-value gap</p>
+      <h3>The typed event bus exists for consumers that don't</h3>
+      <p class="verdict-line">10 pydantic event classes · asyncio.Queue · dispatcher task · JSON replay codec</p>
+      <p>The engine never calls the TUI; it pushes typed events into a queue that a dispatcher drains
+      (<code>events.py</code>, <code>tui/app.py</code>). The stated justification is a "future Unity/web renderer."
+      That renderer is in the README's <em>"Stretch work (not in MVP)"</em> section. For one consumer, a direct
+      call or a plain callback does the same job. Two of the ten event types —
+      <code>TournamentStarted</code> and <code>ResponseComplete</code> — are emitted
+      (<code>driver.py:50</code>, <code>battle.py:77</code>) but consumed nowhere: absent from the live
+      <code>_handle_event</code> dispatch <em>and</em> from the replay codec's 8-of-10 <code>mapping</code>
+      (<code>app.py:176</code>). The deserializer even <code>raise</code>s <code>ValueError</code> on any
+      unmapped kind (<code>app.py:188</code>) — but that guard is <b>itself dead code</b>: its only caller wraps
+      it in <code>except Exception: continue</code> (<code>app.py:111</code>). So the "replay format" credited
+      below silently can't round-trip 2 of the 10 events its own producers emit, and the check meant to catch
+      that can never fire — dead on arrival, twice over.</p>
+      <div class="kv">
+        <span class="k">Redeemed by</span><span>The <code>demo</code> command genuinely replays recorded events from a fixture — that reuse justifies roughly half the layer. But the shipped <code>demo_tournament.json</code> only decodes because it was hand-trimmed to the 8 mappable kinds (zero <code>tournament_started</code>/<code>response_complete</code> rows); the codec is a partial subset, not a general one.</span>
+        <span class="k">Do</span><span>Keep the queue (replay needs it); delete the 2 zero-consumer events; stop marketing "future renderers" as architecture.</span>
+      </div>
+    </div>
+
+    <div class="finding">
+      <p class="rank">FINDING 02 · illusory precision</p>
+      <h3>Bradley-Terry MLE to rank 8 players from 7 games</h3>
+      <p class="verdict-line">69 LOC · 100 iterations · log-mean anchoring · convergence tol 1e-6</p>
+      <p>Single elimination produces <b>7 outcomes on a sparse 8-node graph</b> where most pairs never meet and
+      no pair meets twice. Fitting a maximum-likelihood paired-comparison model to that yields a number with
+      four-figure confidence and near-zero information — the champion's "ELO" is dominated by <em>who they
+      happened to be bracketed against</em>. The machinery (precomputed <code>n_matrix</code>, geometric-mean
+      normalization, iterate-to-tolerance) is genuinely nice code solving a problem the data can't support.</p>
+      <div class="kv">
+        <span class="k">Do</span><span>Rank by wins / rounds-survived (≈10 lines) and label it honestly, or keep BT-MLE only if you run a round-robin. Don't sell 7 games as a rating system.</span>
+        <span class="k">Part 2</span><span><span class="pill part2">resolved by more data, not less code</span> The round-robin (§09) is now the plan: 28 matches and up to ~140 judged rounds feed the solver, ties finally flow in as 0.5/0.5 — BT-MLE becomes defensible and stays. The win-count fallback above is superseded.</span>
+      </div>
+    </div>
+
+    <div class="finding">
+      <p class="rank">FINDING 03 · speculative interop surface — with a reuse root cause underneath it</p>
+      <h3>Battlebench-compat token fields nothing writes — because a fake tokenizer stands in for the real API</h3>
+      <p class="verdict-line"><code>tokens_a_in</code> · <code>tokens_b_in</code> · <code>tokens_*_out</code> ← <code>battle.py:75  max(1, len(full)//4)</code></p>
+      <p><code>BattleRecord</code> is documented "byte-identical" to orq-battlebench so the log is drop-in for
+      router training — a real, stated goal. The input-token fields are never populated, and the output-token
+      fields are filled by <code>tokens_out = max(1, len(full) // 4)</code> (<code>battle.py:75</code>, whose own
+      comment reads <i>"We don't have usage tokens from streaming; approximate by char/4"</i>) — a hand-rolled
+      fake tokenizer. <b>That premise is false.</b> The gateway is OpenAI-compatible: passing
+      <code>stream_options={"include_usage": True}</code> to the streaming <code>create()</code> call
+      (<code>orq_gateway.py:54</code>) makes the API emit a terminal chunk carrying exact
+      <code>prompt_tokens</code> / <code>completion_tokens</code> — and the code to read <code>resp.usage</code>
+      <b>already exists</b>, stranded in the <em>dead</em> <code>complete()</code> path (<code>orq_gateway.py:84</code>).
+      So the "compatibility" gap and the char/4 estimator are one bug, not two: real usage is a single API flag
+      away and the reader is already written.</p>
+      <div class="kv">
+        <span class="k">Do</span><span>Set <code>stream_options={"include_usage": True}</code>, read the terminal usage chunk, delete the char/4 line — then the battlebench token fields are measured, not aspirational.</span>
+      </div>
+    </div>
+
+    <div class="finding">
+      <p class="rank">FINDING 04 · reuse / reinvention — the axis the first draft under-graded</p>
+      <h3>A canonical type re-spelled by hand, and a solver the ecosystem already ships</h3>
+      <p class="verdict-line">Two un-aliased verdict Literals (7 sites) · hand-rolled Bradley-Terry vs <code>choix</code> · comment rot</p>
+      <ul class="tight">
+        <li><b>Two parallel verdict unions, only one aliased — and it's still re-spelled.</b> The panel outcome
+        <code>Literal["A", "B", "TIE", "DISCARD"]</code> is aliased once as <code>Verdict</code>
+        (<code>judges/panel.py:20</code>) yet re-spelled by hand at <code>arena/damage.py:27</code>,
+        <code>events.py:72</code>, and <code>data/schemas.py:34</code> instead of imported. Meanwhile the
+        <em>judge</em> choice <code>Literal["A", "B", "TIE"]</code> — a distinct 3-value type, since one judge
+        cannot <code>DISCARD</code> — has no alias at all and is spelled out 4× (<code>judges/schemas.py:34/44/47</code>,
+        <code>events.py:64</code>). Change either verdict set and up to 6 sites drift silently. The fix is
+        <em>two</em> exported aliases, not one: collapsing both into <code>Verdict</code> would let a judge emit
+        <code>DISCARD</code> and break the invariant the split protects.</li>
+        <li><b>Bradley-Terry is a solved, packaged problem.</b> Finding 02's 69-LOC MLE reinvents
+        <code>choix.ilsr_pairwise</code> (or ~15 lines on <code>numpy</code>/<code>scipy</code>). The file's own
+        header — "<i>Pure Python, no numpy/scipy</i>" (<code>elo.py:3</code>) — sells the reinvention as a virtue.
+        If a paired-comparison MLE is warranted at all (Finding 02 argues it isn't, at 7 games), it's warranted
+        via the maintained solver, not a bespoke iterate-to-tolerance loop.</li>
+        <li><b>A docstring advertises code that isn't there.</b> <code>orcs/roster.py:1</code> promises
+        "<i>Warrior specification + default roster</i>", but the file defines only <code>WarriorSpec</code> — no
+        roster exists. Comment rot on line 1.</li>
+      </ul>
+      <div class="kv">
+        <span class="k">Do</span><span>Export and import the one <code>Verdict</code> alias; adopt <code>choix</code> only if a round-robin ever justifies MLE (else drop it per Finding 02); fix the line-1 docstring.</span>
+        <span class="k">Part 2</span><span><span class="pill part2">mostly moot</span> <code>judges/</code> is deleted wholesale (§09), taking both hand-spelled Literals with it — evaluatorq's <code>PairwiseComparison</code>/<code>PairwiseVote</code> become the canonical verdict types. Only the arena-side damage map keeps a small Literal, and the BT solver stays hand-rolled-but-tested rather than importing <code>choix</code> (one fewer dep beats 69 borrowed lines). The docstring fix stands.</span>
+      </div>
+    </div>
+
+    <div class="callout warn">
+      <b>Borderline, left alone:</b> <code>instructor</code> for a two-field verdict is slightly heavy vs a JSON
+      <code>response_format</code>, but it buys retries + validation for free — a fair trade. The double-KO / HP-tie
+      resolution in <code>battle.py</code> is arbitrary-but-documented; acceptable for a game.
+    </div>
+  </section>
+
+  <!-- ============ DEAD CODE ============ -->
+  <section id="dead">
+    <h2><span class="num">04</span>Dead code — delete today, nothing breaks</h2>
+    <p>Each verified with a zero-call-site <code>grep</code> across <code>src/</code> and <code>tests/</code>.</p>
+    <table>
+      <thead><tr><th>What</th><th>Where</th><th>LOC</th><th>Evidence</th></tr></thead>
+      <tbody>
+        <tr><td><code>OrqGateway.generate()</code> + <code>GenerationResult</code></td><td>providers/orq_gateway.py</td><td class="n">~35</td><td>No <code>.generate(</code> call anywhere; judges use <code>instructor.from_openai(client)</code>, warriors use <code>stream_completion</code>.</td></tr>
+        <tr><td><code>TournamentState</code> dataclass</td><td>tournament/driver.py</td><td class="n">~8</td><td>Never instantiated; <code>run_tournament</code> uses locals.</td></tr>
+        <tr><td>Bracket-screen stub</td><td>tui/screens/bracket.py</td><td class="n">5</td><td>Docstring says "kept as a stub for future work"; never imported.</td></tr>
+        <tr><td><code>TournamentStarted</code>, <code>ResponseComplete</code></td><td>events.py (consumers)</td><td class="n">~7</td><td>Emitted but absent from TUI dispatch &amp; replay mapping.</td></tr>
+        <tr><td><code>WarriorCard.set_elo()</code></td><td>tui/widgets/warrior_card.py</td><td class="n">4</td><td>No call site; ELO never updates mid-match.</td></tr>
+        <tr><td><code>ResponsePanel.set_text()</code></td><td>tui/widgets/response_panel.py</td><td class="n">4</td><td>No call site; only <code>append_chunk</code>/<code>reset</code> used.</td></tr>
+        <tr><td><code>WarriorSpec.starting_elo</code></td><td>orcs/roster.py</td><td class="n">1</td><td>Defined, never read.</td></tr>
+        <tr><td><code>GatewayConfig.concurrency</code></td><td>config.py + yaml</td><td class="n">1</td><td>Config knob wired to nothing — no semaphore exists.</td></tr>
+      </tbody>
+    </table>
+
+    <div class="chart">
+      <div class="bar-row">
+        <span class="bar-label">Solid core (keep)</span>
+        <div class="bar-track"><div class="bar-fill" style="width:87%;background:var(--green)"></div></div>
+        <span class="bar-label">~1,660</span>
+      </div>
+      <div class="bar-row">
+        <span class="bar-label">Reducible (over-scoped)</span>
+        <div class="bar-track"><div class="bar-fill" style="width:9.4%;background:var(--gold)"></div></div>
+        <span class="bar-label">~180</span>
+      </div>
+      <div class="bar-row">
+        <span class="bar-label">Pure dead (delete)</span>
+        <div class="bar-track"><div class="bar-fill" style="width:3.4%;background:var(--clay)"></div></div>
+        <span class="bar-label">~65</span>
+      </div>
+      <p class="legend-note">Src LOC by disposition (bar width ∝ share of ~1,909 src lines). "Reducible" counts
+      the event-bus trim + collapsing BT-MLE to a win-count ranking.</p>
+    </div>
+  </section>
+
+  <!-- ============ THE GRADE (hate mode) ============ -->
+  <section id="grade">
+    <h2><span class="num">05</span>The grade — harsh mode</h2>
+    <p>Graded like a hostile reviewer who assumes every line is guilty until it justifies itself.
+    Axis grades, then the aggregate.</p>
+    <div class="grades">
+      <div class="grade-row">
+        <div class="grade-badge g-a">A−</div>
+        <div><div class="axis">Code quality &amp; readability</div>
+        <div class="why">Consistent typing, purposeful docstrings, clean module seams. Genuinely pleasant to read. Hard to fault.</div></div>
+      </div>
+      <div class="grade-row">
+        <div class="grade-badge g-c">C+</div>
+        <div><div class="axis">Reuse / no-reinvention</div>
+        <div class="why">Downgraded from B after the /hate pass: right libraries at the seams, reinvention in the middle. A canonical <code>Verdict</code> type re-spelled in 3 more files, a Bradley-Terry solver hand-rolled where <code>choix</code> exists, and a char/4 fake tokenizer standing in for the <code>stream_options</code> usage the API already returns (§03–04).</div></div>
+      </div>
+      <div class="grade-row">
+        <div class="grade-badge g-c">C−</div>
+        <div><div class="axis">Dead-code hygiene</div>
+        <div class="why">~65 dead LOC, two zero-consumer events, four unreachable methods/fields, a self-described stub file shipped.</div></div>
+      </div>
+      <div class="grade-row">
+        <div class="grade-badge g-d">D+</div>
+        <div><div class="axis">YAGNI discipline / scope</div>
+        <div class="why">Event bus, replay codec, and renderer seams built for a future the README labels "not in MVP." Architecture ahead of need.</div></div>
+      </div>
+      <div class="grade-row">
+        <div class="grade-badge g-d">D</div>
+        <div><div class="axis">Statistical honesty (ELO)</div>
+        <div class="why">MLE ratings from 7 sparse games manufacture precision that isn't there. Right tool, wrong sample size.</div></div>
+      </div>
+      <div class="grade-row">
+        <div class="grade-badge g-b">B</div>
+        <div><div class="axis">Test coverage vs surface</div>
+        <div class="why">Pure logic well covered; TUI/gateway untested — the correct call for a toy, so no penalty there.</div></div>
+      </div>
+    </div>
+    <div class="callout">
+      <p style="margin:2px 0"><b>Aggregate: B− (held down by the reuse downgrade this revision).</b> This is not a
+      mess — it's a tidy codebase that mistook a weekend game for a platform. The fix isn't a rewrite; it's
+      <b>deletion and reuse</b>: cut the dead ~65, collapse the ELO to a win-count, import the one <code>Verdict</code>
+      type instead of four copies, swap the char/4 estimator for real <code>stream_options</code> usage, and stop
+      treating "future renderer" as a load-bearing requirement. The same product then ships at ~1,650 lines with an
+      <b>A−</b> on every axis above.</p>
+      <p style="margin:10px 0 2px; font-size:13.5px; color:var(--slate-soft)">These grades score the code <em>as it
+      stands</em>; Part 2 doesn't regrade it — it moves the destination. Notably, the C+ reuse grade's biggest item
+      (a hand-rolled jury where a library now exists) is fixed by deletion, not refactoring.</p>
+    </div>
+  </section>
+
+  <!-- ============ CUT LIST ============ -->
+  <section id="cut">
+    <h2><span class="num">06</span>Recommended cut list</h2>
+    <ol class="tight">
+      <li><b>Delete the 8 dead items</b> in §04 — mechanical, no behavior change, ~65 LOC and one file gone.</li>
+      <li><b>Collapse <code>elo.py</code></b> to wins/rounds-survived ranking (~57 LOC saved) <em>unless</em> a round-robin mode is on the roadmap — then keep MLE and add CIs back. <span class="pill part2">superseded</span> The round-robin <em>is</em> the roadmap (§09): keep MLE.</li>
+      <li><b>Trim the event layer</b>: drop the two zero-consumer events; keep the queue (replay uses it) but reframe it as "TUI + replay," not "future renderers."</li>
+      <li><b>Fill the battlebench token fields for real</b>: add <code>stream_options={"include_usage": True}</code>, read the terminal usage chunk (the reader already exists in the dead <code>complete()</code> path), and delete the char/4 estimator — one change closes both §03 and half of §04.</li>
+      <li><b>Alias the two verdict unions</b>: export <code>Verdict</code> from <code>judges/panel.py</code> and import it at the 3 re-spelled panel sites (<code>damage.py</code>, <code>events.py</code>, <code>data/schemas.py</code>); add a separate <code>JudgeChoice</code> alias for the 3-value judge Literal spelled 4× in <code>judges/schemas.py</code>/<code>events.py</code>. Keep them distinct — a judge can't <code>DISCARD</code>. Fix the <code>roster.py</code> line-1 docstring while you're there.</li>
+      <li><b>Leave the bracket, judge panel, and battle engine alone.</b> They're right-sized.
+      <span class="pill part2">superseded ×2</span> Part 2 deletes the bracket (§09) and replaces the panel with
+      evaluatorq (§08) — only the battle engine's keep survives, and it does, slimmer.</li>
+    </ol>
+    <p style="margin-top:18px">Net (Part 1 alone): a leaner ~1,650-line codebase that does exactly what it does today.
+    Part 2's deeper cut lands at <b>~1,600 lines with the judging upgraded</b>, not merely trimmed (§09).</p>
+  </section>
+
+  <!-- ================= PART 2 ================= -->
+  <div class="part-mark">Part 2 · The evaluatorq refactor</div>
+
+  <!-- ============ THE BRIEF + EVALUATORQ ============ -->
+  <section id="evq">
+    <h2><span class="num">07</span>The brief, and what evaluatorq 1.3 actually ships</h2>
+    <p>The repo's end state, per the owner: <b>an arena benchmark that produces an ELO ranking over a pool
+    of models</b>, wearing a TUI good enough to front a Show-HN post, and existing to promote two products —
+    the <b>orq.ai router/gateway</b> (every token flows through it) and <b>evaluatorq</b> (every verdict
+    comes from it). Tournament theatrics beyond that are scope creep. That hands Part 2 a one-line test for
+    every module: <i>render the show, route the tokens, or demonstrate the eval — or go.</i></p>
+
+    <p><code>evaluatorq</code> (~52k LOC, <b>1.3.0-unreleased</b>) is Orq's evaluation framework: an
+    async <span class="mono">data × jobs × evaluators</span> loop with parallelism, Rich progress tables,
+    optional Orq-platform result upload, and OpenTelemetry tracing. Two recent additions are what make this
+    migration possible at all:</p>
+
+    <h3><span class="evq-tint">llm_jury_pairwise</span> — the arena's judging layer, done properly</h3>
+    <p>RES-760 / ADR-24 added preference judging on top of the shared jury core. The methodology is strictly
+    stronger than <code>judges/panel.py</code>:</p>
+    <ul class="tight">
+      <li><b>Both-orderings position-bias control.</b> Every judge sees (A,B) <em>and</em> (B,A), run
+      concurrently. A judge that answers the same in both frames casts that vote; a judge that flips
+      <b>abstains and is recorded as a flip</b> (<code>PairwiseVote.flipped</code>). The arena's 50/50
+      single-ordering coin toss merely <em>dilutes</em> position bias across rounds — it can never
+      detect a biased judge, let alone discount one.</li>
+      <li><b>Panel resilience as parameters.</b> <code>replacement_judges</code> promotes stand-ins (run in
+      <em>both</em> orderings) when a primary errors; <code>min_successful_judges</code> turns a too-degraded
+      panel into <code>inconclusive</code> instead of a fake verdict; <code>repetitions</code> for stochastic
+      judges.</li>
+      <li><b>A real cross-comparison report.</b> <code>build_report(comparisons)</code> rolls up A/B win
+      rates, tie and inconclusive rates, mean inter-judge agreement, and per-judge lean / flip-rate /
+      tie-rate. The arena computes none of this today.</li>
+      <li><b>Judge token accounting</b> (<code>TokenUsage</code> summed across orderings and replacements) —
+      the very thing Finding 03 caught the arena faking with <code>len(text)//4</code>.</li>
+    </ul>
+
+<pre class="snippet">from evaluatorq import llm_jury_pairwise, build_report
+
+jury = llm_jury_pairwise(
+    judges=["anthropic/claude-haiku-4-5", "google/gemini-2.5-flash", "openai/gpt-4o-mini"],
+    criteria="Accuracy, helpfulness, clarity, relevance to the prompt.",
+    replacement_judges=["mistral/mistral-small"],  <span class="c"># refills an eroded panel</span>
+    min_successful_judges=2,                       <span class="c"># jury-of-one → 'inconclusive', never a verdict</span>
+    client=gateway.client,                         <span class="c"># the arena's existing orq-router AsyncOpenAI</span>
+)
+comparison = await jury.compare(question=prompt, response_a=resp_a, response_b=resp_b)
+<span class="c"># comparison.winner: 'A' | 'B' | 'tie' | 'inconclusive' · per-judge votes[].flipped · token_usage</span>
+
+report = build_report(all_comparisons)  <span class="c"># A/B win rates · mean agreement · per-judge flip rate</span></pre>
+
+    <p>Judge traffic routes through Orq by default: evaluatorq's client resolver honors
+    <code>ORQ_API_KEY</code> / <code>ORQ_BASE_URL</code>, and <code>client=</code> accepts the arena's
+    existing gateway <code>AsyncOpenAI</code> as-is. A panel is just <code>list[str]</code> of router model
+    ids — <code>JudgeSpec</code>, the judge prompt builder, and the instructor dependency all evaporate.</p>
+
+    <div class="callout warn">
+      <b>Pin note:</b> pairwise (RES-760) is merged to evaluatorq <code>main</code>; 1.3.0 is still
+      unreleased on PyPI — pin a main git SHA (or a local path dep) until it ships. Also 1.3.0 makes
+      <code>openai</code> and <code>loguru</code> core dependencies; the arena already ships <code>openai</code>.
+    </div>
+
+    <h3><span class="evq-tint">llm_jury + the core loop</span> — the offline half</h3>
+    <p><code>llm_jury(...)</code> builds a panel <em>evaluator</em> (categorical / numeric / boolean verdicts,
+    aggregators, tie-breaks, pass/fail) for <code>evaluatorq(evaluators=[...])</code>, and the core loop's
+    <code>inference=False</code> mode scores <b>pre-recorded responses</b> without regenerating them. That is
+    exactly what <code>battles.jsonl</code> is — which makes <i>"re-judge last night's tournament with a
+    different panel, offline, zero generation cost"</i> a two-line demo of the second product (§10, PR 4).</p>
+  </section>
+
+  <!-- ============ FINDING 05 ============ -->
+  <section id="f05">
+    <h2><span class="num">08</span>Finding 05 — the shipped panel is subtly miscalibrated</h2>
+    <p>Part 1 graded <code>judges/panel.py</code> "the actual IP" on methodology. A harder look at the
+    <em>shipped configuration</em> turns up the reason "replace" beats "keep" — beyond mere deduplication.</p>
+
+    <div class="finding">
+      <p class="rank">FINDING 05 · new in part 2 · config × code interaction</p>
+      <h3>Two of the three judges moonlight as warriors — and the damage math can't count</h3>
+      <p class="verdict-line">panel of 3 · self-judge exclusion · damage.py:35–37 — n_agree == n_total, where n_total = len(verdicts) or 1</p>
+      <p>Self-judge exclusion (<code>battle.py:186</code>) is correct hygiene — but the default
+      <code>orc_arena.yaml</code> makes it bite: judges <b>Flash</b> (gemini-2.5-flash) and <b>4o-mini</b>
+      (gpt-4o-mini) are also seeded warriors. In the default bracket, quarterfinal
+      <b>Snot&nbsp;the&nbsp;Quick (gpt-4o-mini) vs Azog&nbsp;Deepmind</b> excludes judge 4o-mini, and
+      <b>Morgoth&nbsp;Quadskull vs Gruk&nbsp;Flashfist (gemini-2.5-flash)</b> excludes judge Flash — both
+      fights are decided by a panel of two. <code>compute_damage</code> defines unanimity as "everyone left
+      agrees" (<code>n_agree == n_total</code>), so every 2-0 round deals the <b>30-damage "unanimous"</b> hit
+      that the YAML explicitly reserves for 3-0 (<code>damage_unanimous: 30&nbsp;&nbsp;# 3-0 verdict</code>) —
+      and a two-judge panel can <em>never</em> deal the 15-damage majority hit at all: 2-0 reads as unanimous,
+      1-1 is DISCARD. Should Snot and Gruk both reach the final, the title fight is judged by <b>Haiku
+      alone</b> — and <code>n_total = len(verdicts) or 1</code> makes every decisive round of it an automatic
+      "unanimous" 30. A judge that errors is silently dropped on top
+      (<code>panel.py:62 — except Exception: return None</code>), eroding panels further with no floor.</p>
+      <div class="kv">
+        <span class="k">In evaluatorq</span><span>These are parameters, not patches: <code>min_successful_judges=2</code>
+        turns a jury-of-one into <code>inconclusive</code>; <code>replacement_judges</code> refills an eroded
+        panel (a neutral fourth model also cures the moonlighting); flips are measured per judge instead of
+        averaged away. Unanimity for the damage map is then derived from <code>comparison.votes</code>, guarded
+        by actual panel size.</span>
+        <span class="k">Do</span><span>Don't fix <code>panel.py</code> — delete it (§09–§10), set the two parameters,
+        and add one neutral replacement judge to the config so a real fight never falls below two reconciled votes.</span>
+      </div>
+    </div>
+
+    <div class="tablewrap">
+    <table>
+      <thead><tr><th>Concern</th><th>judges/ today (196 LOC)</th><th>evaluatorq llm_jury_pairwise</th></tr></thead>
+      <tbody>
+        <tr><td>Position bias</td><td>50/50 random single ordering — diluted, invisible</td><td>Both orderings per judge; a flip ⇒ abstain + recorded (<code>flipped</code>)</td></tr>
+        <tr><td>Judge failure</td><td>Silently dropped; panel shrinks unbounded</td><td>Replacements promoted into <em>both</em> orderings</td></tr>
+        <tr><td>Degraded panel</td><td>Jury-of-one still issues "unanimous" verdicts (F05)</td><td><code>min_successful_judges</code> ⇒ <code>inconclusive</code></td></tr>
+        <tr><td>Diagnostics</td><td>None</td><td><code>build_report</code>: per-judge lean, flip rate, tie rate, agreement</td></tr>
+        <tr><td>Judge token usage</td><td>None (F03's char/4 estimator)</td><td><code>TokenUsage</code> summed, replacements included</td></tr>
+        <tr><td>Structured output</td><td>Via <code>instructor</code> dependency</td><td>Built in — <code>instructor</code> leaves <code>pyproject.toml</code></td></tr>
+        <tr><td>Verdict types</td><td>Two hand-spelled Literals across 7 sites (F04)</td><td><code>PairwiseComparison</code> / <code>PairwiseVote</code> pydantic models</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <!-- ============ TARGET ARCHITECTURE ============ -->
+  <section id="target">
+    <h2><span class="num">09</span>Target architecture — arena-only, evaluatorq-judged</h2>
+
+    <div class="flow">
+      <div class="flow-lane">
+        <div class="flow-box"><b>prompts/*.jsonl</b><br>round questions</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box hot"><b>orq router gateway</b><br>streams warrior A + B concurrently · one key, every vendor</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box evq"><b>evaluatorq jury</b><br>llm_jury_pairwise · both orderings × 3 judges · consistency-gated</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box"><b>damage adapter</b><br>winner/votes → HP hit · KO / round cap</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box"><b>TUI fight screen</b><br>streams · HP bars · flip badges</div>
+      </div>
+      <div class="flow-lane">
+        <div class="flow-box"><b>per-round verdicts</b><br>win / tie (ties count, at last)</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box"><b>Bradley-Terry MLE</b><br>elo.py, unchanged</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box"><b>TUI leaderboard</b><br>ELO table + per-judge jury stats (build_report)</div>
+      </div>
+      <div class="flow-lane">
+        <div class="flow-box"><b>battles.jsonl</b><br>benchmark artifact</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box evq"><b>evaluatorq rejudge</b><br>inference=False · new panel, zero regeneration</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box"><b>Orq platform / CI</b><br>result upload · OTel spans</div>
+      </div>
+      <p class="flow-note">clay = orq router/gateway surface · blue = evaluatorq surface · plain = this repo (~1,600 LOC)</p>
+    </div>
+
+    <div class="tablewrap">
+    <table>
+      <thead><tr><th>Module</th><th>LOC</th><th>Fate</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td><code>arena/battle.py</code></td><td class="loc">275</td><td><span class="pill keep">keep, −~25</span></td><td>Turn/HP/KO loop + event emission. The judge block collapses to one <code>compare()</code> call + adapter.</td></tr>
+        <tr><td><code>tui/*</code></td><td class="loc">692</td><td><span class="pill keep">keep, + jury widgets</span></td><td>The product — the Show-HN surface (§11).</td></tr>
+        <tr><td><code>providers/orq_gateway.py</code></td><td class="loc">97</td><td><span class="pill keep">keep, −35 dead</span></td><td>Streaming <em>is</em> the fight; the router pitch. Judges reuse <code>.client</code>.</td></tr>
+        <tr><td><code>tournament/elo.py</code></td><td class="loc">69</td><td><span class="pill keep">keep</span></td><td>The deliverable. Round-robin data finally justifies MLE; tie support (already coded) finally gets input.</td></tr>
+        <tr><td><code>events.py</code> · <code>data/*</code> · <code>config.py</code> · <code>cli.py</code></td><td class="loc">~320</td><td><span class="pill keep">keep, trimmed</span></td><td>TUI/replay contract; <code>battles.jsonl</code>; config sheds <code>JudgeSpec</code> + judge prompt; CLI drops the 8-warrior gate.</td></tr>
+        <tr><td><code>judges/</code> (panel · schemas · prompts)</td><td class="loc">196</td><td><span class="pill part2">replaced</span></td><td>→ <code>llm_jury_pairwise</code> + a ~15-line verdict→damage adapter. Self-judge exclusion becomes a 1-line panel filter.</td></tr>
+        <tr><td><code>tournament/bracket.py</code> + TUI stub</td><td class="loc">100</td><td><span class="pill dead">deleted</span></td><td>Single-elim theater. <code>itertools.combinations</code> is the scheduler.</td></tr>
+        <tr><td>Part-1 dead code (§04)</td><td class="loc">~65</td><td><span class="pill dead">deleted</span></td><td>Unchanged advice; ~10 LOC overlap with the rows above.</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h3>Why the ELO gets honest, not just cheaper</h3>
+    <p>Today the solver sees <b>7 match outcomes</b>, and a drawn match is impossible — an HP tie is awarded
+    to the higher seed (<code>battle.py:250</code>, comment: <i>"seed advantage"</i>), so the tie handling in
+    <code>build_wins_matrix</code> is dead-in-practice code. The refocused arena feeds the solver
+    <b>per-round panel verdicts from a full round-robin</b>: C(8,2) = 28 matches × up to 5 rounds ≈
+    <b>140 reconciled comparisons</b>, ties entering as the 0.5/0.5 the code always supported. Finding 02's
+    "illusory precision" dissolves — same solver, defensible sample. The 8-warrior constraint dies with the
+    bracket: any pool size works, which is what "benchmark a pool of models" requires. HP, KO, and the
+    round cap stay <em>exactly</em> as they are — as the show — but the ranking no longer depends on them.</p>
+
+    <div class="callout warn">
+      <b>Cost, stated plainly:</b> full round-robin (28 vs 7 matches) with both-orderings judging
+      (6 vs 3 judge calls per round) is roughly <b>8× today's judge volume</b> (~840 calls vs ~105) and 4× the
+      warrior-generation volume. The judges are deliberately cheap models, and every knob exists:
+      <code>swap=False</code> halves judging, fewer prompts per match, smaller pools. Ship the honest default;
+      expose the knobs in <code>orc_arena.yaml</code>.
+    </div>
+
+    <p><b>Line math:</b> −196 (judges/) − 100 (bracket + stub) − 65 (dead, ~10 overlap) + ~40 (scheduler +
+    adapter + config glue) ⇒ <b>≈ −310 net, landing at ~1,600 src LOC</b> — a 16% smaller repo whose judging
+    got strictly stronger. Tests: <code>test_panel_tally.py</code> and <code>test_bracket.py</code> retire with their
+    subjects; one small adapter test takes their place.</p>
+  </section>
+
+  <!-- ============ MIGRATION PLAN ============ -->
+  <section id="migrate">
+    <h2><span class="num">10</span>Migration plan — four PR-sized steps</h2>
+
+    <div class="finding">
+      <p class="rank">PR 1 · swap the bench · ~−180 LOC</p>
+      <h3>judges/ → llm_jury_pairwise</h3>
+      <ul class="tight">
+        <li><code>pyproject.toml</code>: add <code>evaluatorq @ git+…@&lt;res-760 ref&gt;</code> (path dep while
+        developing), <b>remove <code>instructor</code></b>.</li>
+        <li><code>battle.py</code>: build one comparator per match (panel = configured judges minus both
+        contestants — the self-judge filter becomes this one line), call
+        <code>compare(question=prompt, response_a=…, response_b=…)</code> per round.</li>
+        <li>New ~15-line adapter: <code>winner</code> → loser side + damage; unanimity = all decisive votes agree
+        <em>and</em> ≥2 decisive votes (closes Finding 05); <code>tie</code>/<code>inconclusive</code> → no damage,
+        no round-cap tick (today's TIE/DISCARD semantics, unchanged).</li>
+        <li><code>events.py</code>: <code>JudgeVerdictEvent</code> gains <code>flipped</code> / <code>replacement</code>
+        fields for the TUI. Delete <code>judges/</code>, delete <code>test_panel_tally.py</code>, add the adapter test.</li>
+      </ul>
+<pre class="snippet">panel = [m for m in cfg.judges if m not in {self.a.model_id, self.b.model_id}]
+jury = llm_jury_pairwise(judges=panel, criteria=cfg.criteria,
+                         replacement_judges=cfg.replacement_judges,
+                         min_successful_judges=2, client=self.gateway.client)
+comparison = await jury.compare(question=prompt, response_a=resp_a, response_b=resp_b)</pre>
+    </div>
+
+    <div class="finding">
+      <p class="rank">PR 2 · round-robin ELO · ~−90 LOC</p>
+      <h3>Bracket out, pool in</h3>
+      <ul class="tight">
+        <li>Delete <code>tournament/bracket.py</code> and the TUI bracket stub;
+        <code>for a, b in itertools.combinations(cfg.warriors, 2)</code> is the whole scheduler.</li>
+        <li>Feed <code>elo.py</code> per-<em>round</em> outcomes including <code>'tie'</code>; drop the
+        seed-advantage tiebreak — the match "winner" (HP edge) remains for the show, the ranking ignores it.</li>
+        <li>Remove the <code>len(warriors) != 8</code> gate; leaderboard screen adds the
+        <code>build_report</code> jury table. Delete <code>test_bracket.py</code>.</li>
+      </ul>
+<pre class="snippet">judges: [anthropic/claude-haiku-4-5, google/gemini-2.5-flash, openai/gpt-4o-mini]
+replacement_judges: [mistral/mistral-small]
+criteria: Accuracy, helpfulness, clarity, relevance to the prompt.
+<span class="c"># JudgeSpec, judge_system_prompt, judge names — all gone; warriors: any length</span></pre>
+    </div>
+
+    <div class="finding">
+      <p class="rank">PR 3 · part-1 hygiene · ~−55 LOC</p>
+      <h3>The audit's surviving cuts</h3>
+      <ul class="tight">
+        <li>Delete the §04 dead code not already gone with its module.</li>
+        <li><code>stream_options={"include_usage": true}</code> on the warrior stream; real token counts into
+        <code>BattleRecord</code>; delete the char/4 estimator (Finding 03).</li>
+        <li>Trim the two zero-consumer events; fix the <code>roster.py</code> docstring.</li>
+      </ul>
+    </div>
+
+    <div class="finding">
+      <p class="rank">PR 4 · ship the story · ~+60 LOC · optional but it is the point</p>
+      <h3><code>orc-arena rejudge</code> — the evaluatorq demo inside the demo</h3>
+      <p>A CLI command that replays <code>battles.jsonl</code> through
+      <code>evaluatorq(inference=False, evaluators=[llm_jury(…)])</code>: swap the panel, re-score every recorded
+      round offline, upload results to the Orq platform, emit OTel spans. One command that says the quiet part
+      out loud: <i>the arena is just a very theatrical evaluatorq run.</i></p>
+    </div>
+  </section>
+
+  <!-- ============ TWO-PRODUCT STORY ============ -->
+  <section id="story">
+    <h2><span class="num">11</span>The two-product story — and what the TUI keeps</h2>
+    <p>After the four PRs, every part of the demo maps to a product pitch:</p>
+    <ul class="tight">
+      <li><b>orq router/gateway</b> — eight models from six vendors fight through <em>one</em>
+      OpenAI-compatible client and <em>one</em> API key (<code>api.orq.ai/v2/router</code>). The streaming
+      fight screen is literally gateway throughput as spectacle.</li>
+      <li><b>evaluatorq</b> — every verdict on screen is a consistency-gated, position-bias-corrected panel
+      decision; the leaderboard's per-judge stats and the <code>rejudge</code> command are the library's
+      pairwise + jury + replay features, demonstrated on data the audience just watched being made.</li>
+      <li><b>The benchmark</b> — <code>battles.jsonl</code> accumulates real cross-vendor comparison data
+      with honest token counts; the ELO table is the reusable output.</li>
+    </ul>
+    <p><b>The TUI loses nothing and gains drama.</b> Streaming panes, HP bars, and the KO banner stay
+    untouched. The bracket screen was already a dead stub, so removing tournament modes deletes zero pixels;
+    "champion" becomes "leaderboard king." And because evaluatorq computes them anyway, three cheap new
+    moments become possible: a <b>flip badge</b> when a judge contradicts itself across orderings
+    (<i>"Flash flipped under cross-examination — vote thrown out"</i>), a per-round <b>agreement meter</b>,
+    and a <b>jury-room table</b> on the leaderboard (per-judge lean, flip rate, tie rate). That's the
+    Show-HN hook: a game that is transparently a rigorous eval.</p>
+    <div class="callout good">
+      <b>End state:</b> ~1,600 lines. The gateway routes every token, evaluatorq issues every verdict,
+      Bradley-Terry turns 140 judged rounds into an ELO you can defend in the comments section — and the
+      orcs are still cool.
+    </div>
+  </section>
+
+  <div class="footer">
+    orc-arena architecture review &amp; evaluatorq migration plan · rev 7 · generated 2026-07-11 · static read of
+    branch gnhf/i-want-you-to-analys-287d22 + evaluatorq @ RES-760 · line counts approximate, dead-code and
+    config claims grep-verified
+  </div>
+
+</div>
