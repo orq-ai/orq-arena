@@ -195,6 +195,9 @@ def build_report_html(
     grid = report.get("win_grid") or {}
     order = [n for n, _ in ranked]
     head = "".join(f"<th class='n'>{i}</th>" for i in range(1, len(order) + 1))
+    vmax = max(
+        (v for row in grid.values() for v in (row or {}).values()), default=0.0
+    )
     grid_rows = []
     for i, a in enumerate(order, 1):
         cells = []
@@ -203,7 +206,10 @@ def build_report_html(
                 cells.append("<td>&middot;</td>")
             else:
                 v = (grid.get(a) or {}).get(b, 0.0)
-                cells.append(f"<td>{v:g}</td>")
+                # Heat: single-hue intensity so the dominance triangle reads at a glance.
+                alpha = 0.0 if not v or not vmax else 0.10 + 0.45 * (v / vmax)
+                style = f" style='background:rgba(10,123,99,{alpha:.2f})'" if alpha else ""
+                cells.append(f"<td{style}>{v:g}</td>")
         grid_rows.append(f"<tr><td class='rowname'>{i}. {_e(a)}</td>{''.join(cells)}</tr>")
 
     # Jury room.
