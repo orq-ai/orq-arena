@@ -1,0 +1,179 @@
+<title>orc-arena — Final Grade & Next Steps</title>
+<style>
+  :root {
+    --ivory: #f8f5ec; --paper: #fffdf7; --slate: #2a2d33; --slate-soft: #4a4f57;
+    --oat: #ded6c3; --oat-line: #e7e0d0; --clay: #b45739; --olive: #6f7748;
+    --gold: #b8892b; --green: #55713f; --muted: #8a8578; --evq: #44607f;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    --mono: "SF Mono", "JetBrains Mono", "Fira Code", ui-monospace, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--ivory); color: var(--slate); font-family: var(--sans); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 0 28px 96px; }
+  header.page { border-bottom: 3px double var(--oat); padding: 56px 0 30px; margin-bottom: 8px; }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--clay); margin: 0 0 14px; }
+  h1 { font-family: var(--serif); font-weight: 600; font-size: 40px; line-height: 1.12; margin: 0 0 12px; text-wrap: balance; }
+  .dateline { font-family: var(--mono); font-size: 13px; color: var(--muted); }
+  .dateline b { color: var(--slate-soft); font-weight: 600; }
+  h2 { font-family: var(--serif); font-size: 25px; font-weight: 600; margin: 52px 0 6px; padding-bottom: 8px; border-bottom: 1px solid var(--oat-line); }
+  h2 .num { font-family: var(--mono); font-size: 14px; color: var(--clay); margin-right: 12px; vertical-align: 2px; }
+  p { margin: 10px 0; }
+  .lede { font-size: 17px; color: var(--slate-soft); }
+  code { font-family: var(--mono); font-size: 0.86em; background: #efe9db; padding: 1px 5px; border-radius: 3px; color: #7a3a26; }
+  a { color: var(--clay); }
+  .verdict { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 14px; margin: 30px 0 8px; }
+  .vcard { background: var(--paper); border: 1px solid var(--oat-line); border-radius: 10px; padding: 18px 18px 16px; }
+  .vcard .label { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; }
+  .vcard .big { font-family: var(--serif); font-size: 34px; font-weight: 600; line-height: 1; }
+  .vcard .sub { font-size: 12.5px; color: var(--slate-soft); margin-top: 6px; }
+  .grade-strip { border-top: 3px solid var(--clay); }
+  .callout { background: var(--paper); border-left: 4px solid var(--clay); border-radius: 0 8px 8px 0; padding: 16px 20px; margin: 22px 0; }
+  .callout.good { border-left-color: var(--green); }
+  .callout.warn { border-left-color: var(--gold); }
+  table { border-collapse: collapse; width: 100%; margin: 18px 0; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--oat-line); vertical-align: top; }
+  th { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); border-bottom: 1.5px solid var(--oat); }
+  td.n { font-family: var(--mono); white-space: nowrap; }
+  .tablewrap { overflow-x: auto; }
+  .grades { margin: 20px 0; }
+  .grade-row { display: grid; grid-template-columns: 62px 62px 1fr; gap: 14px; align-items: start; padding: 14px 0; border-bottom: 1px solid var(--oat-line); }
+  .grade-badge { font-family: var(--serif); font-weight: 600; font-size: 26px; text-align: center; line-height: 1.7; border-radius: 10px; border: 1.5px solid var(--oat); background: var(--paper); }
+  .grade-badge.old { opacity: 0.45; }
+  .g-a { color: #3f6b2f; border-color: #a9c78f; background: #eef4e6; }
+  .g-b { color: #6a7530; border-color: #cad39a; background: #f3f2e0; }
+  .grade-row .axis { font-family: var(--serif); font-size: 17px; font-weight: 600; }
+  .grade-row .why { font-size: 13.5px; color: var(--slate-soft); margin-top: 2px; }
+  .pill { display: inline-block; font-family: var(--mono); font-size: 11px; padding: 1px 8px; border-radius: 20px; border: 1px solid var(--oat); color: var(--slate-soft); white-space: nowrap; }
+  .pill.p1 { background: #f6e2dc; border-color: #e2b7a8; color: #9c3f26; }
+  .pill.p2 { background: #f6ecd6; border-color: #e0c98d; color: #8a6510; }
+  .pill.p3 { background: #e7efdd; border-color: #b8cf9e; color: #465e33; }
+  ul.tight { margin: 8px 0; padding-left: 20px; }
+  ul.tight li { margin: 5px 0; }
+  .footer { margin-top: 60px; padding-top: 18px; border-top: 3px double var(--oat); font-size: 12.5px; color: var(--muted); font-family: var(--mono); }
+  @media (max-width: 720px) { .verdict { grid-template-columns: 1fr 1fr; } .grade-row { grid-template-columns: 50px 50px 1fr; } }
+</style>
+<div class="wrap">
+
+  <header class="page">
+    <p class="eyebrow">Project Report · Final Grade &amp; Roadmap</p>
+    <h1>orc-arena at rest: what it is now, and what it still owes</h1>
+    <p class="dateline"><b>2026-07-12</b> · branch <code>feat/chennai-harvest</code> · 34 commits ahead of master ·
+    4,185 src LOC · 41 tests · 12 test files · reports:
+    <a href="https://claude.ai/code/artifact/cb006f76-6fec-4586-a550-a18bfc91617a">analysis</a> ·
+    <a href="https://claude.ai/code/artifact/f02388ad-5f11-4f0a-b152-0dd414f18996">refactor</a> ·
+    <a href="https://claude.ai/code/artifact/c66af501-60ae-430c-a32e-8ec5093dd451">harvest</a></p>
+  </header>
+
+  <section>
+    <p class="lede">Three days ago this was a 1,912-line toy graded <b>B−</b>: a hand-rolled judge panel with a
+    jury-of-one bug, an ELO fit to 7 knockout games, dead code, and a bracket nobody needed. It is now a
+    <b>single-mode arena benchmark</b>: evaluatorq's position-bias-gated pairwise jury issues every verdict,
+    a round-robin (Swiss above 8) feeds per-round Bradley-Terry with bootstrap CIs and Fleiss' κ, rounds
+    void instead of scoring network failures, reasoning models are handled deliberately with a preflight
+    probe, and the TUI — CRT-neon, roster picker, battle browser, post-mortems — is the demo shell for the
+    orq router and evaluatorq. Grade now: <b>A−</b>, capped by one honest gap: <b>the full 8-model,
+    28-match experience has never been run end to end.</b></p>
+    <div class="verdict grade-strip">
+      <div class="vcard"><p class="label">Grade</p><div class="big" style="color:var(--green)">A−</div>
+        <p class="sub">B− → A− (refactor) → A− held (harvest); A gated on a dress rehearsal.</p></div>
+      <div class="vcard"><p class="label">Journey</p><div class="big" style="color:var(--olive)">1.9k→4.2k</div>
+        <p class="sub">−360 duplicated/dead, +2.6k owner-approved capability. Still 40% of the v1 brainstorm.</p></div>
+      <div class="vcard"><p class="label">Verified live</p><div class="big" style="color:var(--clay)">7</div>
+        <p class="sub">smoke runs against the real router; every finding fed back into the code.</p></div>
+      <div class="vcard"><p class="label">Modes</p><div class="big" style="color:var(--evq)">1</div>
+        <p class="sub">One benchmark. Pickers choose <i>what</i> to test, never <i>how</i>.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">01</span>The scorecard — original → now</h2>
+    <div class="grades">
+      <div class="grade-row"><div class="grade-badge old g-b">A−</div><div class="grade-badge g-a">A−</div>
+        <div><div class="axis">Code quality</div><div class="why">Still typed, documented, seam-clean at
+        2.2× the size. The harvest ports match the house style.</div></div></div>
+      <div class="grade-row"><div class="grade-badge old g-b">C+</div><div class="grade-badge g-a">A</div>
+        <div><div class="axis">Reuse</div><div class="why">evaluatorq is the jury; chennai's best 8 features
+        ported rather than reinvented; instructor gone. The one kept hand-roll (BT-MLE + CIs) is a reasoned
+        exception.</div></div></div>
+      <div class="grade-row"><div class="grade-badge old g-b">C−</div><div class="grade-badge g-a">A</div>
+        <div><div class="axis">Dead code &amp; scope</div><div class="why">Every event consumed, every knob wired.
+        Cuts stayed cut under pressure: $-cost deferred, recorder surface dropped, demo untouched, one mode.</div></div></div>
+      <div class="grade-row"><div class="grade-badge old g-b">D</div><div class="grade-badge g-a">A</div>
+        <div><div class="axis">Statistical honesty</div><div class="why">Per-round BT with ties, bootstrap CIs,
+        Fleiss/Cohen κ with coverage, void rounds, thinking probe, verbosity + reasoning-token columns,
+        judge-vs-warrior token split, low-agreement banner, seeded manifests, <code>rejudge</code>
+        rank-stability. The instrument reports its own uncertainty everywhere.</div></div></div>
+      <div class="grade-row"><div class="grade-badge old g-b">B</div><div class="grade-badge g-a">B+</div>
+        <div><div class="axis">Tests</div><div class="why">41, incl. headless render tests for three screens —
+        which caught the second <code>_render</code>-shadowing bug before a user did. Gap: picker interaction
+        flows and Swiss are unit-tested only.</div></div></div>
+      <div class="grade-row"><div class="grade-badge old g-b">—</div><div class="grade-badge g-b">B+</div>
+        <div><div class="axis">Show-readiness (new axis)</div><div class="why">Theme, damage drama, thinking
+        timer, flip badges, live ELO, CTA — but two UX bugs were found by the owner's own eyes this morning
+        (unwrapped text, vanishing verdicts). That's what the dress rehearsal below is for.</div></div></div>
+    </div>
+    <div class="callout good"><b>What the grade rewards most:</b> the feedback loop. Seven live smokes turned
+    into code: kimi's vendor-default thinking collapse → the probe; 67–83% judge flips → the consistency
+    gate's public badges; the 8× jury token bill → the token split; two router gaps → one docs report filed
+    upstream. The tool keeps auditing itself — <code>rejudge</code> answered "is the ranking judge-robust?"
+    with Spearman 1.00 on its own output.</div>
+  </section>
+
+  <section>
+    <h2><span class="num">02</span>Next steps, in order</h2>
+    <div class="tablewrap">
+    <table>
+      <thead><tr><th>#</th><th>Step</th><th>Why now</th><th>Size</th></tr></thead>
+      <tbody>
+        <tr><td class="n">1 <span class="pill p1">gate to A</span></td>
+          <td><b>Dress rehearsal:</b> one full default run — 8 warriors, 28 matches, ~140 rounds, live TUI
+          start to finish, then <code>B</code>/<code>M</code>/leaderboard on the real volume.</td>
+          <td>Nothing beyond 3 models has ever run. Wall-clock, rate limits, leaderboard density, verdict
+          pacing at scale — all unproven. Both of today's UX bugs were this class of finding.</td>
+          <td class="n">~1h + a few $</td></tr>
+        <tr><td class="n">2 <span class="pill p1">ship</span></td>
+          <td><b>Merge train:</b> PR <code>gnhf/…</code> → master, then <code>feat/chennai-harvest</code> → master;
+          regenerate the demo fixture from a themed run (<code>scripts/record_fixture.py</code>).</td>
+          <td>34 commits of value sitting on stacked branches; master is still the pre-refactor toy.</td>
+          <td class="n">small</td></tr>
+        <tr><td class="n">3 <span class="pill p2">launch</span></td>
+          <td><b>Show-HN kit:</b> SVG screenshots (<code>s</code> key) into the README, a 90-second demo GIF,
+          the post draft leading with the flip-badge story ("individual judges are position-biased; the
+          gated panel is judge-robust — the tool proves it about itself").</td>
+          <td>The repo exists to promote the router + evaluatorq; unposted, it promotes nothing.</td>
+          <td class="n">~half day</td></tr>
+        <tr><td class="n">4 <span class="pill p2">credibility</span></td>
+          <td><b>The judge-quality experiment:</b> same log, <code>rejudge</code> with the strong panel
+          (opus/gpt-5.4/gemini-pro), publish κ + Spearman vs the cheap trio.</td>
+          <td>Pre-empts the strongest HN objection, and it's one command — the feature already exists.</td>
+          <td class="n">1 cmd + writeup</td></tr>
+        <tr><td class="n">5 <span class="pill p2">data</span></td>
+          <td><b>Prompt curation:</b> grow the tagged set (30 → ~80, balanced across the 4 categories) so
+          per-category ELO clears its 20-comparison floor with real margin.</td>
+          <td>Per-category rankings are the router-evidence feature; thin slices under-power it.</td>
+          <td class="n">editorial</td></tr>
+        <tr><td class="n">6 <span class="pill p3">later</span></td>
+          <td>Deferred by decision, in waiting: $-cost overlay (needs a reliable price source, decision 18);
+          evaluatorq re-pin when 1.3.0 hits PyPI; a live Swiss run &gt;8 models; committee-discussion idea
+          upstreamed to evaluatorq; post-run HTML export.</td>
+          <td>All have owners-in-waiting and none block launch.</td>
+          <td class="n">—</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <div class="callout warn"><b>Standing risks:</b> evaluatorq is pinned to a git SHA of an unreleased 1.3.0
+    (re-pin on release); the model registry drifts (one preview model broke mid-refactor — the picker +
+    probe mitigate but don't eliminate); Anthropic reasoning-token accounting is still wrong upstream
+    (reported, watch for the fix).</div>
+    <div class="callout good"><b>One-line verdict:</b> the instrument is honest, the show is dressed, the
+    story is written in its own run logs. What stands between A− and A is not code — it's one full
+    tournament watched end to end, and a merge button.</div>
+  </section>
+
+  <div class="footer">
+    orc-arena final grade · 2026-07-12 · grades follow the same hostile-reviewer rubric as the original
+    B− audit · counts from the working tree (4,185 src LOC · 41 tests · 34 commits ahead of master)
+  </div>
+
+</div>
