@@ -1,12 +1,14 @@
 # orc-arena plan
 
 > **Status (2026-07-12):** PRs 1–8 executed and live-verified; dependency is the official
-> `evaluatorq>=1.8.0` from PyPI; leaderboard shows model names only. Working branch
-> `feat/chennai-harvest` (stacked on `gnhf/…`); master is still pre-refactor.
+> `evaluatorq>=1.8.0` from PyPI; leaderboard shows model names only. Working branch: `master`
+> (post-merge); `gnhf/…` and `feat/chennai-harvest` kept as the granular history.
 > **G1 ran 2026-07-12** (28 matches / 140 rounds / 10.7 min, `outputs/g1/`): pipeline clean,
 > renders clean, three real bugs caught and fixed; the <25% inconclusive gate number itself
 > proved miscalibrated — see G1 for the measured story and the proposed replacement gate.
-> **Next up: G2 (merge train), G3, G4, then PR 9.**
+> **G2 merged the same day**: master now carries the refactor
+> ([#1](https://github.com/orq-ai/orq-arena/pull/1), [#2](https://github.com/orq-ai/orq-arena/pull/2)).
+> **Next up: G2.5 (run report page), G3, G4, then PR 9.**
 > Full historical specs for PRs 1–8 live in git history (`git log --follow REFACTOR_PLAN.md`)
 > and in the reports below — this document keeps only what's ahead, the executed summary, and
 > the decision log.
@@ -63,11 +65,13 @@ raised to 2048 (a cap, costs nothing on frugal judges).
 raw −3000 BT clamp for a cratered model; replacement-judge quality is invisible in the TUI (the
 74%-flip stand-in surfaced only in rejudge stats).
 
-### G2 — Merge train
-PR `gnhf/…` → master, then `feat/chennai-harvest` → master. ~~Regenerate the demo fixture~~ —
-done 2026-07-12 (`fbe8b9d`): the stale pre-rename fixture blanked the warrior cards in `demo`;
-regenerated with model-name specs, and the app now falls back to a bare spec instead of
-silently skipping `MatchStarted` for names the roster doesn't know.
+### G2 — Merge train — **DONE 2026-07-12**
+[#1](https://github.com/orq-ai/orq-arena/pull/1) (refactor, PRs 1–4) and
+[#2](https://github.com/orq-ai/orq-arena/pull/2) (harvest + G1, PRs 5–8) squash-merged to
+master; suite green on the result. Squash because the repo ruleset requires signed commits and
+six early commits weren't — the granular history lives on the kept branches. Fixture regen
+also done (`demo` blanked names off the stale pre-rename fixture; regenerated, plus unknown
+names now render instead of silently skipping `MatchStarted`).
 
 ### G2.5 — Run report page *(pulled forward from PR 12, decision 23)*
 One-file self-contained HTML report rendered from `battles.jsonl` + `*.run.json` (the G1
