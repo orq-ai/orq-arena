@@ -393,6 +393,8 @@ orq-arena annotate BATTLE_LOG [--out PATH] [--sample N] [--seed N]
 | `--sample N` | all rounds | Annotate a seeded random subset instead of every round. |
 | `--seed N` | `42` | Drives round order and per-round side flips; keep it if you want two raters on identical pages. |
 | `--exclude PATH` | none | votes.json file(s), repeatable: rounds already voted there are dropped, producing a resume page with only the remaining rounds (or a top-up page when growing a study). |
+| `--serve` | off | Prodigy-style local mode: serve the page at `http://127.0.0.1:<port>` instead of writing a file. Every vote saves automatically as `votes-<annotator>.json` next to the log (no download step); Ctrl-C stops the server and prints the anchor table for whatever was voted. Localhost-only by construction; for remote raters use the default file mode. |
+| `--port N` | `8765` | Port for `--serve`; `0` picks a free one. |
 
 The page is one self-contained HTML file (inline CSS/JS, no external assets, works from
 `file://`), so "deployment" is sending someone the file. It is **blind by construction**:
@@ -417,6 +419,8 @@ uv run orq-arena annotate outputs/g1/battles.jsonl --sample 60
 uv run orq-arena annotate battles.jsonl --out rater2.html --seed 42
 # resume: only the rounds dana hasn't voted yet
 uv run orq-arena annotate battles.jsonl --exclude votes-dana.json --out dana-round2.html
+# annotate your own run locally, votes save as you click, Ctrl-C prints the numbers
+uv run orq-arena annotate outputs/g1/battles.jsonl --serve --sample 60
 ```
 
 ## `anchor`

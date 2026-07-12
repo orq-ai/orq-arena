@@ -13,7 +13,9 @@ from __future__ import annotations
 import hashlib
 import json
 import random
+import re
 from dataclasses import dataclass
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Collection
 
@@ -116,8 +118,19 @@ try {
   for (const k of c.s || []) seen.add(k);
 } catch (e) {}
 let downloaded = false;
+// Served over http (orq-arena annotate --serve): votes also POST to /save
+// after every decision, so closing the tab loses nothing.
+const SERVED = location.protocol.indexOf('http') === 0;
+let savedToServer = false;
 function cache(){
   try{localStorage.setItem(cacheKey,JSON.stringify({v:votes,s:[...seen]}));}catch(e){}
+}
+function persist(){
+  if(!SERVED)return;
+  const name=document.getElementById('annotator').value||'anonymous';
+  fetch('/save',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({schema:1,seed:D.seed,source:D.source,annotator:name,votes:votes})})
+    .then(r=>{savedToServer=r.ok;}).catch(()=>{savedToServer=false;});
 }
 
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
@@ -207,7 +220,11 @@ function renderDone(){
   document.getElementById('prog').textContent=progText('done');
   document.getElementById('done-stats').textContent=
     c.voted+' of '+total+' rounds voted'+(c.voted<total?' ('+(total-c.voted)+' skipped or unseen; click any dot above to finish them)':'');
-  document.getElementById('done-hint').textContent=downloaded
+  document.getElementById('done-hint').textContent=SERVED
+    ? (savedToServer||Object.keys(votes).length===0
+       ? 'Votes are saved on this machine automatically; you can close this tab.'
+       : 'Saving to the local server failed; use the download button instead.')
+    : downloaded
     ? 'votes.json downloaded. Send it back to whoever sent you this file.'
     : 'One step left: download your votes and send the file back.';
   updateNav();
@@ -227,7 +244,7 @@ function start(){
 }
 function vote(side){const it=D.items[idx];
   if(side==='skip'){delete votes[it.k];}else{votes[it.k]=canon(side,it);}
-  cache();
+  cache(); persist();
   if(idx<D.items.length-1){idx++;render();}
   else{show('done');}
 }
@@ -257,7 +274,7 @@ document.addEventListener('keydown',e=>{
   else if(e.key==='ArrowLeft'&&idx>0){idx--;render();}
 });
 window.addEventListener('beforeunload',e=>{
-  if(Object.keys(votes).length&&!downloaded)e.preventDefault();});
+  if(Object.keys(votes).length&&!downloaded&&!(SERVED&&savedToServer))e.preventDefault();});
 document.getElementById('n-items').textContent=D.items.length;
 document.getElementById('n-mins').textContent=Math.max(1,Math.round(D.items.length*45/60));
 document.getElementById('criteria').textContent=D.criteria;
@@ -422,7 +439,8 @@ def anchor_result(records, votesets: list[VoteSet]) -> dict:
             "n_kappa": pair["rounds"],
             "kappa": pair["kappa"],
             "kappa_label": pair["label"],
-            "spearman": spearman(panel_rank, human_rank),
+            # no co-voted rounds -> no ranking claim, not an alphabetical one
+            "spearman": spearman(panel_rank, human_rank) if co else float("nan"),
         })
 
     inter = []
@@ -449,3 +467,93 @@ def anchor_result(records, votesets: list[VoteSet]) -> dict:
         "panel_ranking": panel_rank,
         "unknown_keys": unknown,
     }
+
+
+_VOTE_KEYS = ("schema", "seed", "source", "annotator", "votes")
+
+
+def make_annotation_server(
+    page: str, votes_dir: Path, *, host: str = "127.0.0.1", port: int = 8765
+) -> ThreadingHTTPServer:
+    """Localhost-only serve mode (decision 30): the same blinded page, but
+    every vote POSTs to /save and lands as votes-<annotator>.json next to
+    the log. No auth surface: binds 127.0.0.1, two fixed routes, capped
+    body, sanitized filename, whitelisted payload keys.
+    """
+    written: set[Path] = set()
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *_args) -> None:
+            pass  # keep the terminal quiet; votes are the signal
+
+        def do_GET(self) -> None:
+            if self.path in ("", "/"):
+                body = page.encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            else:
+                self.send_error(404)
+
+        def do_POST(self) -> None:
+            if self.path != "/save":
+                self.send_error(404)
+                return
+            size = int(self.headers.get("Content-Length") or 0)
+            if not 0 < size <= 5_000_000:
+                self.send_error(413)
+                return
+            try:
+                data = json.loads(self.rfile.read(size))
+                votes = {
+                    str(k): v for k, v in (data.get("votes") or {}).items()
+                    if v in _DECISIVE
+                }
+                slug = re.sub(
+                    r"[^a-z0-9-]+", "-", str(data.get("annotator") or "").lower()
+                ).strip("-") or "anonymous"
+            except (ValueError, AttributeError):
+                self.send_error(400)
+                return
+            payload = {k: data.get(k) for k in _VOTE_KEYS}
+            payload["votes"] = votes
+            path = votes_dir / f"votes-{slug}.json"
+            tmp = path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(payload, indent=1))
+            tmp.replace(path)
+            written.add(path)
+            self.send_response(204)
+            self.end_headers()
+
+    server = ThreadingHTTPServer((host, port), Handler)
+    server.votes_written = written  # type: ignore[attr-defined]
+    return server
+
+
+def render_anchor_result(result: dict) -> None:
+    """Rich table for `anchor` and for --serve's exit summary."""
+    from rich.console import Console
+    from rich.table import Table
+
+    t = Table(title="human anchor vs panel")
+    for col in ("annotator", "voted", "κ rounds", "κ vs panel", "label", "rank ρ"):
+        t.add_column(col)
+    for row in result["per_annotator"]:
+        t.add_row(
+            row["annotator"], str(row["n_voted"]), str(row["n_kappa"]),
+            "n/a" if row["kappa"] is None else f"{row['kappa']:.2f}",
+            row["kappa_label"],
+            "n/a" if row["spearman"] != row["spearman"] else f"{row['spearman']:.2f}",
+        )
+    console = Console()
+    console.print(t)
+    for pair in result["inter_annotator"]:
+        console.print(
+            f"inter-annotator {pair['pair']}: "
+            + ("κ=n/a" if pair["kappa"] is None else f"κ={pair['kappa']:.2f}")
+            + f" ({pair['kappa_label']}, {pair['rounds']} rounds)"
+        )
+    if result["unknown_keys"]:
+        console.print(f"⚠ {result['unknown_keys']} votes matched no round in this log")

@@ -306,3 +306,8 @@ tokens ≈ 8× warrior tokens under both-orders judging; cheap judges flip 67–
 29. Blinding contract for annotation: the generated page ships no model names, no jury votes,
     no verdicts; round keys are one-way hashes; side order flips per round by seeded RNG; human
     votes are stored in the canonical A/B frame so merges never depend on presentation order.
+30. Two transports, one page: `annotate --serve` adds a Prodigy-style localhost mode (stdlib
+    `http.server`, binds 127.0.0.1 only, votes POST to /save and land next to the log, Ctrl-C
+    prints the anchor table) for the operator annotating their own run; the static-file mode
+    stays the transport for remote raters. Same page, same votes.json schema either way.
+    FastAPI/hosted serving stays rejected until multi-rater assignment logic exists.
