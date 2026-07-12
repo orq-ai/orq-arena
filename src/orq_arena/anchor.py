@@ -15,6 +15,7 @@ import json
 import random
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Collection
 
 from .analysis.kappa import cohen_kappa_pairs
 from .data.schemas import BattleRecord
@@ -29,12 +30,21 @@ def record_key(rec: BattleRecord) -> str:
 
 
 def annotation_items(
-    records: list[BattleRecord], *, seed: int = 42, sample: int | None = None
+    records: list[BattleRecord], *, seed: int = 42, sample: int | None = None,
+    exclude: Collection[str] = (),
 ) -> list[dict]:
-    """Blinded page payload: canonical responses + per-round display flip."""
+    """Blinded page payload: canonical responses + per-round display flip.
+
+    ``exclude`` drops rounds by record key (Prodigy's --exclude move): pass
+    a rater's existing votes.json keys to build a resume page with only
+    their unvoted rounds.
+    """
     items = []
+    excluded = set(exclude)
     for rec in records:
         key = record_key(rec)
+        if key in excluded:
+            continue
         items.append({
             "k": key,
             "q": rec.prompt_text,

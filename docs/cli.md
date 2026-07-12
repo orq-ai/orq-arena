@@ -392,6 +392,7 @@ orq-arena annotate BATTLE_LOG [--out PATH] [--sample N] [--seed N]
 | `--out PATH` | `annotate.html` | Destination HTML file. |
 | `--sample N` | all rounds | Annotate a seeded random subset instead of every round. |
 | `--seed N` | `42` | Drives round order and per-round side flips; keep it if you want two raters on identical pages. |
+| `--exclude PATH` | none | votes.json file(s), repeatable: rounds already voted there are dropped, producing a resume page with only the remaining rounds (or a top-up page when growing a study). |
 
 The page is one self-contained HTML file (inline CSS/JS, no external assets, works from
 `file://`), so "deployment" is sending someone the file. It is **blind by construction**:
@@ -414,6 +415,8 @@ order.
 ```bash
 uv run orq-arena annotate outputs/g1/battles.jsonl --sample 60
 uv run orq-arena annotate battles.jsonl --out rater2.html --seed 42
+# resume: only the rounds dana hasn't voted yet
+uv run orq-arena annotate battles.jsonl --exclude votes-dana.json --out dana-round2.html
 ```
 
 ## `anchor`
