@@ -9,7 +9,8 @@
 > **G2 merged the same day**: master now carries the refactor
 > ([#1](https://github.com/orq-ai/orq-arena/pull/1), [#2](https://github.com/orq-ai/orq-arena/pull/2)).
 > **G2.5 shipped 2026-07-12** (report page + length-controlled ELO + BYOK + demo GIF).
-> **Next up: G3 remainder (HN post draft), G4, then PR 9.**
+> **Next up: G3 remainder (HN post draft), G4, G5 (human anchor, plan ready), then PR 9.**
+> **2026-07-12 also shipped:** preflight spend ceiling (decision 27).
 > Full historical specs for PRs 1–8 live in git history (`git log --follow REFACTOR_PLAN.md`)
 > and in the reports below, this document keeps only what's ahead, the executed summary, and
 > the decision log.
@@ -103,6 +104,17 @@ tokens only), then `orq-arena jury-compare c1.json c2.json ...` tabulates the ca
 Spearman vs the recorded ranking, inconclusive rate, agreement, worst per-judge flip, tie
 rate, changed verdicts. Everything it measures is reliability; the accuracy axis (which jury
 is *right*, not just consistent) arrives with PR 11's gold-pair sanity suite and human anchor.
+
+### G5: Human anchor *(PR 11.4 pulled forward, decisions 28-29)*
+Blind web annotation of a recorded run, merged back into panel↔human κ and rank correlation;
+the launch-worthy accuracy number ("panel agrees with humans at κ=X"). Two commands, no server:
+`orq-arena annotate <log>` renders one self-contained blinded page (no model names, no jury
+votes, seeded side order; votes export as `votes.json`); `orq-arena anchor <log> votes.json …`
+prints per-annotator Cohen's κ vs the panel majority, Spearman of BT(human) vs BT(panel), and
+inter-annotator κ. Explicitly a web artifact, not a TUI screen: annotation is a reading task,
+raters may not live in terminals, and blinding is only real when names never enter the page.
+Full task-level plan: `.planning/plans/2026-07-12-human-anchor.md`. Target: 50–100 rounds,
+2–3 raters, results into methodology docs (PR 12.2 consumes them).
 
 ---
 
@@ -263,3 +275,14 @@ tokens ≈ 8× warrior tokens under both-orders judging; cheap judges flip 67–
     responses are recorded and juries are swappable at judge-token cost (`rejudge` +
     `jury-compare`). Reliability signals ship now; accuracy claims wait for PR 11's gold
     pairs and human anchor.
+27. Spend ceiling in preflight (shipped 2026-07-12): prices fetched live from the router's
+    Model Garden catalog at run time (`provider/model_id` = router slug), never client-side
+    price tables, so decision 18's staleness objection is void. It is a *ceiling* (exact
+    counts × output caps × catalog prices), display only; decision 20 stands, no spend guard.
+28. Human anchor is a web artifact, not a TUI screen (G5): annotation is post-run reading
+    work, the best raters are non-terminal people who are not the benchmark's author, and the
+    static-page + votes.json round-trip keeps the no-server property. No `[web]` extra needed;
+    `[tui]` still rides PR 9 (decision 21).
+29. Blinding contract for annotation: the generated page ships no model names, no jury votes,
+    no verdicts; round keys are one-way hashes; side order flips per round by seeded RNG; human
+    votes are stored in the canonical A/B frame so merges never depend on presentation order.
