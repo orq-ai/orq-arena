@@ -82,8 +82,11 @@ Pattern proven by Model-Router-Auto-Evaluation's `dashboard.py`: single file, in
 orq lockup, regenerable without re-running. Static per-run page — no server, no live dashboard.
 Pulled ahead of G3 because the HN post wants a linkable result, not a terminal screenshot.
 
-### G3 — Show-HN kit
-README SVGs + demo GIF; post draft led by the flip-badge story ("individual judges are
+### G3 — Show-HN kit — **README/OSS half done 2026-07-12**
+Done (`8fcc993`, `e2cebe6`): project renamed **orq-arena** (decision 25); README rebuilt on the
+house pattern (splash, badges, G1 screenshots, zero-key demo first); LICENSE, CONTRIBUTING,
+PR template, `.env.example` (+ stdlib loader), CI workflow, `media/`, pyproject metadata.
+Remaining: demo GIF; post draft led by the flip-badge story ("individual judges are
 position-biased; the gated panel is judge-robust — the tool proves it about itself") and
 linking a real G2.5 report page.
 
@@ -148,8 +151,10 @@ extra `evaluatorq[arena]`, CLI `evaluatorq arena bench`; the themed TUI rides al
    default post-run output; the zero-key demo path also ends in this report.
 2. **`METHODS.md`**: how the number is made (pairwise both-orders, gating, BT, CIs, κ, void
    policy, thinking policy) + the PR 11 human-anchor results.
-3. **OSS packaging kit**: `.env.example`, QUICKSTART, CONTRIBUTING, badges, CI workflow,
-   media/ screenshots, real `--help` text.
+3. ~~OSS packaging kit~~ → shipped with G3's README pass (`e2cebe6`): `.env.example`,
+   CONTRIBUTING, PR template, badges, CI workflow, media/. Left here: QUICKSTART.md if the
+   README's quick-start outgrows itself, and `--help` text polish alongside PR 9's CLI
+   inversion.
 
 **Sequencing:** G1–G2 → **G2.5** → G3–G4 → PR 9 → 10 → 11 → 12. Engineering lives in 9–10; the
 A+ lives in 11–12.
@@ -240,3 +245,7 @@ tokens ≈ 8× warrior tokens under both-orders judging; cheap judges flip 67–
 24. Two-layer vocabulary: the core/library and config speak models (`models:`, `ModelSpec`,
     `name`); only the TUI speaks arena (warriors, HP, damage). Rename rides PR 9's package
     split — every import is already moving; no standalone rename churn.
+25. Project renamed **orq-arena** (was orc-arena): "orc" was playful but muddied the goal of
+    promoting orq.ai, and the GitHub repo was already `orq-ai/orq-arena`. Package
+    `orq_arena`, CLI `orq-arena`, config `orq_arena.yaml`. Internal fantasy identifiers still
+    exit at PR 9 (decision 24).
