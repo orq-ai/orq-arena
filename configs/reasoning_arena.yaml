@@ -14,7 +14,7 @@ gateway:
   api_key_env: ORQ_API_KEY
   # Thinking eats output budget on some providers; give answers headroom.
   warrior_max_tokens: 16000
-  judge_max_tokens: 512
+  judge_max_tokens: 2048
   stream_read_timeout_s: 1200
   judge_timeout_ms: 90000
 

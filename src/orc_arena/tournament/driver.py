@@ -163,7 +163,8 @@ def _final_report(
 
 def _write_manifest(
     path: Path, *, cfg: ArenaConfig, prompts: list[PromptItem], seed: int,
-    tournament_id: str, report: dict | None = None, preflight: dict | None = None,
+    tournament_id: str, started_at: float, finished_at: float | None = None,
+    report: dict | None = None, preflight: dict | None = None,
 ) -> None:
     try:
         from importlib.metadata import version
@@ -173,7 +174,7 @@ def _write_manifest(
         evq_version = "unknown"
     manifest = {
         "tournament_id": tournament_id,
-        "started_at": time.time(),
+        "started_at": started_at,
         "seed": seed,
         "config_sha256": hashlib.sha256(
             cfg.model_dump_json().encode("utf-8")
@@ -188,6 +189,8 @@ def _write_manifest(
         "min_successful_judges": cfg.min_successful_judges,
         "evaluatorq_version": evq_version,
     }
+    if finished_at is not None:
+        manifest["finished_at"] = finished_at
     if preflight is not None:
         manifest["preflight"] = preflight
     if report is not None:
@@ -231,10 +234,11 @@ async def run_tournament(
     matches_total = (
         cfg.swiss_rounds * (len(names) // 2) if use_swiss else len(schedule)
     )
-    tournament_id = f"tour-{int(time.time())}"
+    started_at = time.time()
+    tournament_id = f"tour-{int(started_at)}"
     _write_manifest(
         manifest_path, cfg=cfg, prompts=prompts, seed=seed,
-        tournament_id=tournament_id, preflight=preflight,
+        tournament_id=tournament_id, started_at=started_at, preflight=preflight,
     )
 
     rng = random.Random(seed)
@@ -321,7 +325,8 @@ async def run_tournament(
     report = _final_report(cfg, all_records, outcomes, names, preflight=preflight)
     _write_manifest(
         manifest_path, cfg=cfg, prompts=prompts, seed=seed,
-        tournament_id=tournament_id, report=report, preflight=preflight,
+        tournament_id=tournament_id, started_at=started_at,
+        finished_at=time.time(), report=report, preflight=preflight,
     )
 
     champion = max(elo, key=lambda n: elo[n]) if elo else ""

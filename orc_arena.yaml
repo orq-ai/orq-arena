@@ -17,7 +17,10 @@ gateway:
   # response shows as ✂ truncated and judges punish it. Per-warrior
   # max_tokens overrides this.
   warrior_max_tokens: 2048
-  judge_max_tokens: 512
+  # Cap, not target — costs nothing on frugal judges, and thinking-by-default
+  # judges (e.g. gemini-2.5-flash) burn ~500 reasoning tokens before the
+  # verdict; 512 starves them into failed votes.
+  judge_max_tokens: 2048
   # Max silence between stream chunks (seconds). Generous: thinking models may
   # pause for minutes before the first token. Never a total-duration cap.
   stream_read_timeout_s: 1200

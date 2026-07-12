@@ -26,7 +26,10 @@ class GatewayConfig(BaseModel):
     base_url: str = "https://api.orq.ai/v3/router"
     api_key_env: str = "ORQ_API_KEY"
     warrior_max_tokens: int = 2048
-    judge_max_tokens: int = 512
+    # A cap, not a target — free headroom for judges that think by default
+    # (G1 finding: 512 starved gemini-2.5-flash's reasoning and killed every
+    # one of its votes with LengthFinishReasonError).
+    judge_max_tokens: int = 2048
     # Max silence between stream chunks before we declare the connection dead.
     # Generous on purpose: thinking models may pause for minutes before the
     # first token. Fires only on true silence, never on a slow-but-alive stream.
