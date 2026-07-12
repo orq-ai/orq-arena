@@ -140,7 +140,7 @@ def demo(fixture_path: str, config_path: str) -> None:
 def list_warriors(config_path: str) -> None:
     """Print the warrior roster."""
     cfg = load_config(config_path)
-    click.echo(f"{'Seed':<5} {'Orc name':<26} Model ID")
+    click.echo(f"{'Seed':<5} {'Name':<26} Model ID")
     click.echo("-" * 70)
     for i, w in enumerate(cfg.warriors, 1):
         click.echo(f"{i:<5} {w.orc_name:<26} {w.model_id}")

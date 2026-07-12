@@ -24,7 +24,7 @@ def _final_table(ended: TournamentEnded) -> Table:
     ci = r.get("elo_ci") or {}
     thinking = r.get("thinking") or {}
     table = Table(title="FINAL STANDINGS")
-    cols = ["#", "Orc", "ELO"] + (["95% CI"] if ci else [])
+    cols = ["#", "Model", "ELO"] + (["95% CI"] if ci else [])
     for c in cols:
         table.add_column(c)
     ranked = sorted(ended.elo.items(), key=lambda kv: kv[1], reverse=True)
