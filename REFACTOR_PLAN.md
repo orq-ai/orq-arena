@@ -64,8 +64,10 @@ raw −3000 BT clamp for a cratered model; replacement-judge quality is invisibl
 74%-flip stand-in surfaced only in rejudge stats).
 
 ### G2 — Merge train
-PR `gnhf/…` → master, then `feat/chennai-harvest` → master. Regenerate the demo fixture from a
-themed run (`scripts/record_fixture.py`) — it still carries old orc names and pre-theme events.
+PR `gnhf/…` → master, then `feat/chennai-harvest` → master. ~~Regenerate the demo fixture~~ —
+done 2026-07-12 (`fbe8b9d`): the stale pre-rename fixture blanked the warrior cards in `demo`;
+regenerated with model-name specs, and the app now falls back to a bare spec instead of
+silently skipping `MatchStarted` for names the roster doesn't know.
 
 ### G3 — Show-HN kit
 README SVGs + demo GIF; post draft led by the flip-badge story ("individual judges are
