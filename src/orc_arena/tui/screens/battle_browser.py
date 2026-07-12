@@ -17,7 +17,7 @@ from textual.widgets import Static
 
 from ...data.schemas import BattleRecord
 
-_VOTE_COLOR = {"A": "green", "B": "yellow", "tie": "cyan"}
+_VOTE_COLOR = {"A": "#ff3bd4", "B": "#00e5ff", "tie": "#ffd54d"}
 
 
 class BattleBrowserScreen(Screen):
@@ -40,8 +40,8 @@ class BattleBrowserScreen(Screen):
     BattleBrowserScreen .block { margin-top: 1; }
     BattleBrowserScreen #responses { layout: grid; grid-size: 2; grid-gutter: 1; height: auto; }
     BattleBrowserScreen .resp { border: round $primary; padding: 0 1; height: auto; max-height: 18; }
-    BattleBrowserScreen #resp-a { border: round $success; }
-    BattleBrowserScreen #resp-b { border: round $warning; }
+    BattleBrowserScreen #resp-a { border: round $accent; }
+    BattleBrowserScreen #resp-b { border: round $primary; }
     BattleBrowserScreen #hint { height: 1; padding: 0 2; color: $text-muted; }
     """
 

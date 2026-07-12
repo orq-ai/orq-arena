@@ -22,11 +22,11 @@ class WarriorCard(Static):
         border: round $accent;
         background: $panel;
     }
-    WarriorCard.side-a { border: round $success; }
-    WarriorCard.side-b { border: round $warning; }
-    WarriorCard .name { text-style: bold; color: $accent; }
-    WarriorCard.side-a .name { color: $success; }
-    WarriorCard.side-b .name { color: $warning; }
+    WarriorCard.side-a { border: round $accent; }
+    WarriorCard.side-b { border: round $primary; }
+    WarriorCard .name { text-style: bold; }
+    WarriorCard.side-a .name { color: $accent; }
+    WarriorCard.side-b .name { color: $primary; }
     WarriorCard .model { color: $text-muted; }
     WarriorCard .hp-line { color: $text; }
     WarriorCard .elo { color: $text-muted; }

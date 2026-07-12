@@ -38,6 +38,7 @@ from ..events import (
 )
 from ..orcs.roster import assign_warriors
 from ..tournament.driver import run_tournament
+from .screens.cta_modal import CTAModalScreen
 from .screens.fight import FightScreen
 from .screens.leaderboard import LeaderboardScreen
 from .screens.roster_select import RosterSelectScreen
@@ -86,6 +87,10 @@ class ArenaApp(App):
     # ----- lifecycle -----
 
     def on_mount(self) -> None:
+        from .theme import CRT_THEME
+
+        self.register_theme(CRT_THEME)
+        self.theme = "crt-neon"
         if self._pick_roster:
             self.push_screen(RosterSelectScreen(self.cfg, prompt_count=len(self._prompts)))
         else:
@@ -177,6 +182,8 @@ class ArenaApp(App):
                         cfg=self.cfg,
                     )
                 )
+                if not self._live:
+                    self.push_screen(CTAModalScreen())
                 return
 
     # ----- event handling -----

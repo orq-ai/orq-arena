@@ -44,6 +44,8 @@ class ArenaConfig(BaseModel):
     preflight: PreflightConfig = Field(default_factory=PreflightConfig)
     # Parallel matches for --headless runs only; the TUI is always sequential.
     headless_concurrency: int = 4
+    # Pools >8 auto-switch from full round-robin to Swiss with this many rounds.
+    swiss_rounds: int = 6
     gateway: GatewayConfig = Field(default_factory=GatewayConfig)
     warriors: list[WarriorSpec]
     judges: list[str] = Field(description="Judge panel — router model ids")

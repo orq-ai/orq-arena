@@ -13,8 +13,8 @@ Layout:
   │ Judge cards (3 across)                      │
   └─────────────────────────────────────────────┘
 
-Side identity: A is green, B is orange — on the warrior cards, the response
-panels, and the judge verdict cues.
+Side identity: A is magenta, B is cyan (CRT theme) — on the warrior cards,
+the response panels, and the judge verdict cues.
 """
 
 from __future__ import annotations
@@ -143,7 +143,7 @@ class FightScreen(Screen):
             card.reset()
         self._prompt.clear_prompt()
         self._ko_announced.clear()
-        self._status.update(f"[b green]{orc_a}[/b green] vs [b yellow]{orc_b}[/b yellow]")
+        self._status.update(f"[b #ff3bd4]{orc_a}[/b #ff3bd4] vs [b #00e5ff]{orc_b}[/b #00e5ff]")
 
     def set_prompt(self, round_number: int, text: str) -> None:
         self._prompt.set_prompt(round_number, text)

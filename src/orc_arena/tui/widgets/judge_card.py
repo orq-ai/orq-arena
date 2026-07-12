@@ -20,9 +20,9 @@ class JudgeCard(Static):
         background: $panel-darken-1;
     }
     JudgeCard.waiting { opacity: 0.4; }
-    JudgeCard.verdict-a { border: round $success; }
-    JudgeCard.verdict-b { border: round $warning; }
-    JudgeCard.verdict-tie { border: round $accent; }
+    JudgeCard.verdict-a { border: round $accent; }
+    JudgeCard.verdict-b { border: round $primary; }
+    JudgeCard.verdict-tie { border: round #ffd54d; }
     JudgeCard.verdict-abstain { border: round $error; }
     """
 
