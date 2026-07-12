@@ -102,7 +102,10 @@ and **no macro pool-ranking layer** — this is that layer.
 1. **Package split.** Core (`config`, `preflight`, `arena/`, `tournament/`, `analysis/`,
    `providers/`, `data/`, `headless`) imports zero Textual. `textual` → 
    `[project.optional-dependencies] tui`; `orc_arena.tui` imports lazily with a friendly
-   "pip install orc-arena[tui]" error.
+   "pip install orc-arena[tui]" error. Same commit: core vocabulary goes model-neutral
+   (`warriors:` → `models:`, `WarriorSpec` → `ModelSpec`, `orc_name` → `name`, `orcs/roster.py`
+   → `roster.py`) — an `evaluatorq.arena` candidate can't ship fantasy nouns; the TUI keeps the
+   warrior/HP/damage theatre as pure presentation (decision 24).
 2. **CLI inversion.** `orc-arena bench` = primary, headless by default: writes `battles.jsonl`
    + `run.json` + machine-readable `report.json` (ELO, CIs, κ, categories, tokens); exit-code
    asserts (`--assert-agreement 0.5`, `--assert-min-rated N`) so CI can fail a run.
@@ -234,3 +237,6 @@ tokens ≈ 8× warrior tokens under both-orders judging; cheap judges flip 67–
 23. Per-run HTML report pulled forward to G2.5 (before the HN post): static single file in the
     Model-Router-Auto-Evaluation dashboard mold, rendered from the log + manifest alone.
     Explicitly not a live dashboard — no server, no state.
+24. Two-layer vocabulary: the core/library and config speak models (`models:`, `ModelSpec`,
+    `name`); only the TUI speaks arena (warriors, HP, damage). Rename rides PR 9's package
+    split — every import is already moving; no standalone rename churn.

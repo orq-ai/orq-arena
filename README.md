@@ -28,18 +28,27 @@ uv sync
 # no API key needed — replay a recorded tournament:
 uv run orc-arena demo
 
-# the real thing (any pool size >= 2, default: 8 warriors, 28 matches):
+# the real thing: a roster picker opens over your workspace-enabled model
+# catalog — choose any pool >= 2 (round-robin; Swiss above 8):
 export ORQ_API_KEY=...
 uv run orc-arena run
 
-# see the roster:
+# skip the picker and use the YAML roster as-is (default: 8 models, 28 matches):
+uv run orc-arena run --config orc_arena.yaml
+
+# CI / cron: no TUI, matches in parallel, same battles.jsonl out the end:
+uv run orc-arena run --headless --yes --config orc_arena.yaml --output outputs/run.jsonl
+
+# see the roster / refresh the cached model catalog:
 uv run orc-arena list-warriors
+uv run orc-arena refresh-models
 ```
 
-In the TUI: `s` saves an SVG screenshot, `q` quits. A 🧠 badge marks
-thinking-enabled warriors; a judge card that announces *"flipped when sides
-swapped — vote thrown out"* is evaluatorq's position-bias gate doing its job
-in public.
+In the TUI: `s` saves an SVG screenshot, `q` quits. On the final leaderboard
+`B` opens the battle browser (page through every judged round) and `M` the
+per-model post-mortem coach. A 🧠 badge marks thinking-enabled models; a
+judge card that announces *"flipped when sides swapped — vote thrown out"*
+is evaluatorq's position-bias gate doing its job in public.
 
 ## Re-judge yesterday's tournament (no regeneration)
 
@@ -61,11 +70,9 @@ the direct answer to *"is this leaderboard just judge preference?"*
 Everything lives in `orc_arena.yaml` — no flags to remember:
 
 ```yaml
-warriors:
-  - orc_name: Grak the Thoughtful
-    model_id: anthropic/claude-opus-4-8
-  - orc_name: Azog Deepmind
-    model_id: google/gemini-3.1-pro-preview
+warriors:            # the pool — leaderboard names default to the model name
+  - model_id: anthropic/claude-opus-4-8
+  - model_id: google/gemini-3.1-pro-preview
     reasoning: { thinking: { type: disabled } }   # raw router fields, verbatim
 
 judges:            # evaluatorq pairwise panel — plain router model ids
@@ -104,10 +111,10 @@ footnoted on the leaderboard.
   is retried once, then the round is *voided* — logged, shown, and excluded
   from the rating. Timeouts are read-gap only (default 20 min of silence)
   so slow thinkers are never penalized.
-- **Self-aware jury.** Mean inter-judge agreement is printed with the
-  standings; a low-agreement run headlines itself as low-confidence.
-  Verbosity and reasoning-token columns keep the classic LLM-judge
-  confounds visible.
+- **Self-aware jury.** Mean inter-judge agreement, Fleiss' and pairwise
+  Cohen's κ, and per-judge flip rates ship with the standings; a
+  low-agreement run headlines itself as low-confidence. Verbosity and
+  reasoning-token columns keep the classic LLM-judge confounds visible.
 - **Reproducible.** Seeded schedule and prompt slices; every run writes a
   `*.run.json` manifest (config + prompt hashes, panel, evaluatorq version,
   agreement stats) next to the `battles.jsonl` it describes.
@@ -123,11 +130,11 @@ footnoted on the leaderboard.
 ## Development
 
 ```bash
-uv run pytest          # 24 tests, no network
+uv run pytest          # 41 tests, no network (incl. headless TUI render pilots)
 ```
 
-evaluatorq is pinned to a git SHA and, for local development, resolved from
-the sibling checkout via `[tool.uv.sources]` (`../evaluatorq`, editable).
+evaluatorq is the official PyPI release (`evaluatorq>=1.8.0`) — no pin, no
+path override.
 
 Prefer the typed client? The official SDK exposes the same router surface,
 reasoning controls included:
