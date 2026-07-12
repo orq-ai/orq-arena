@@ -320,8 +320,11 @@ def refresh_models(config_path: str, show: bool) -> None:
 @click.option("--seed", type=int, default=42, show_default=True)
 @click.option("--criteria", default=None,
               help="Judging guidelines shown to the rater; default matches the jury's default.")
+@click.option("--exclude", "exclude_files", multiple=True, type=click.Path(exists=True),
+              help="votes.json to exclude already-voted rounds; repeat per file. "
+                   "Builds a resume page with only the remaining rounds.")
 def annotate(battle_log: str, out_path: str, sample: int | None, seed: int,
-             criteria: str | None) -> None:
+             criteria: str | None, exclude_files: tuple[str, ...]) -> None:
     """Render a blinded human-annotation page from a recorded run.
 
     The page is one self-contained HTML file: open it locally or send it
@@ -330,18 +333,27 @@ def annotate(battle_log: str, out_path: str, sample: int | None, seed: int,
     """
     from pathlib import Path
 
-    from .anchor import DEFAULT_CRITERIA, annotation_items, render_annotate_page
+    from .anchor import (DEFAULT_CRITERIA, annotation_items, load_votes,
+                         render_annotate_page)
     from .rejudge import load_records
 
     records = load_records(battle_log)
     if not records:
         raise click.ClickException(f"no judgeable rounds in {battle_log}")
-    items = annotation_items(records, seed=seed, sample=sample)
+    excluded: set[str] = set()
+    for vs in load_votes(list(exclude_files)):
+        excluded.update(vs.votes)
+    items = annotation_items(records, seed=seed, sample=sample, exclude=excluded)
+    if not items:
+        raise click.ClickException("every round is already voted in the --exclude files")
     Path(out_path).write_text(
         render_annotate_page(items, seed=seed, source=Path(battle_log).name,
                              criteria=criteria or DEFAULT_CRITERIA)
     )
-    click.echo(f"{len(items)} rounds -> {out_path} (blind; votes export as votes.json)")
+    click.echo(
+        f"{len(items)} rounds -> {out_path} (blind; votes export as votes.json)"
+        + (f", {len(excluded)} already-voted excluded" if excluded else "")
+    )
 
 
 @cli.command()

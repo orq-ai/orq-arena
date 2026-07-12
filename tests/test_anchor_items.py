@@ -41,3 +41,11 @@ def test_flip_is_seeded_per_key_and_mixed():
 
 def test_sample_truncates_after_shuffle():
     assert len(annotation_items(RECORDS, seed=7, sample=3)) == 3
+
+
+def test_exclude_drops_already_voted_keys():
+    keys = {record_key(r) for r in RECORDS[:2]}
+    items = annotation_items(RECORDS, seed=7, exclude=keys)
+    assert {i["k"] for i in items} == {record_key(r) for r in RECORDS[2:]}
+    # exclusion composes with sample (filter first, then truncate)
+    assert len(annotation_items(RECORDS, seed=7, exclude=keys, sample=2)) == 2
