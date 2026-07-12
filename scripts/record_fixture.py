@@ -19,12 +19,12 @@ from orc_arena.tournament.driver import run_tournament
 CFG = ArenaConfig.model_validate(
     {
         "match": {"starting_hp": 100, "max_rounds": 2},
-        "gateway": {"warrior_max_tokens": 400, "judge_max_tokens": 512},
+        "gateway": {"warrior_max_tokens": 400},
         "warriors": [
-            {"orc_name": "Snot the Quick", "model_id": "openai/gpt-5.4-mini", "emblem": "🏹"},
-            {"orc_name": "Gruk Flashfist", "model_id": "google/gemini-2.5-flash", "emblem": "🔥",
+            {"model_id": "openai/gpt-5.4-mini"},
+            {"model_id": "google/gemini-2.5-flash",
              "reasoning": {"thinking": {"type": "disabled"}}},
-            {"orc_name": "Ugluk Stormcaller", "model_id": "mistral/mistral-medium-2604", "emblem": "⚡"},
+            {"model_id": "mistral/mistral-medium-2604"},
         ],
         "judges": [
             "anthropic/claude-haiku-4-5-20251001",

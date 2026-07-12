@@ -36,7 +36,7 @@ from ..events import (
     TurnPrompt,
     TurnResolved,
 )
-from ..orcs.roster import assign_warriors
+from ..orcs.roster import WarriorSpec, assign_warriors
 from ..tournament.driver import run_tournament
 from .screens.cta_modal import CTAModalScreen
 from .screens.fight import FightScreen
@@ -195,14 +195,16 @@ class ArenaApp(App):
         if isinstance(ev, StandingsUpdated):
             fs.set_standings(ev.elo, ev.matches_done, ev.matches_total)
         elif isinstance(ev, MatchStarted):
-            w_a = self._by_name.get(ev.warrior_a)
-            w_b = self._by_name.get(ev.warrior_b)
-            if w_a and w_b:
-                fs.start_match(
-                    w_a.orc_name, w_a.model_id, w_a.emblem, w_a.thinking_enabled,
-                    w_b.orc_name, w_b.model_id, w_b.emblem, w_b.thinking_enabled,
-                    self.cfg.match.starting_hp,
-                )
+            # Fall back to a bare spec so a name the roster doesn't know
+            # (e.g. a fixture recorded with another pool) still renders
+            # instead of silently blanking the cards.
+            w_a = self._by_name.get(ev.warrior_a) or WarriorSpec(model_id=ev.warrior_a)
+            w_b = self._by_name.get(ev.warrior_b) or WarriorSpec(model_id=ev.warrior_b)
+            fs.start_match(
+                w_a.orc_name, w_a.model_id, w_a.emblem, w_a.thinking_enabled,
+                w_b.orc_name, w_b.model_id, w_b.emblem, w_b.thinking_enabled,
+                self.cfg.match.starting_hp,
+            )
         elif isinstance(ev, TurnPrompt):
             fs.set_prompt(ev.round_number, ev.prompt)
         elif isinstance(ev, ResponseChunk):
