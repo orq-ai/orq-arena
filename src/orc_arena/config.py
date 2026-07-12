@@ -31,10 +31,19 @@ class GatewayConfig(BaseModel):
     judge_timeout_ms: int = 90000
 
 
+class PreflightConfig(BaseModel):
+    # One tiny call per warrior before the run: flags models that think
+    # despite their config (vendor defaults the router can't disable).
+    thinking_probe: bool = True
+
+
 class ArenaConfig(BaseModel):
     """Top-level orc-arena config."""
 
     match: MatchRules = Field(default_factory=MatchRules)
+    preflight: PreflightConfig = Field(default_factory=PreflightConfig)
+    # Parallel matches for --headless runs only; the TUI is always sequential.
+    headless_concurrency: int = 4
     gateway: GatewayConfig = Field(default_factory=GatewayConfig)
     warriors: list[WarriorSpec]
     judges: list[str] = Field(description="Judge panel — router model ids")

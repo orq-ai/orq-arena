@@ -32,12 +32,61 @@ def cli() -> None:
 @click.option("--config", "config_path", default=DEFAULT_CONFIG, show_default=True)
 @click.option("--prompts", "prompts_path", default=DEFAULT_PROMPTS, show_default=True)
 @click.option("--output", "output_path", default=DEFAULT_OUTPUT, show_default=True)
-def run(config_path: str, prompts_path: str, output_path: str) -> None:
+@click.option("--headless", is_flag=True, default=False,
+              help="No TUI; matches run in parallel (headless_concurrency). For CI.")
+@click.option("--yes", "-y", "assume_yes", is_flag=True, default=False,
+              help="Skip the preflight confirmation pause.")
+def run(config_path: str, prompts_path: str, output_path: str,
+        headless: bool, assume_yes: bool) -> None:
     """Run the full round-robin arena live (hits orq.ai)."""
+    import asyncio
+
+    from .preflight import call_counts, surprises, thinking_probe
+
     _quiet_logs()
     cfg = load_config(config_path)
     prompts = load_prompts(prompts_path)
-    app = ArenaApp(cfg=cfg, prompts=prompts, battle_log_path=output_path, live=True)
+
+    counts = call_counts(cfg, prompts)
+    click.echo(
+        f"preflight: {counts.matches} matches × {counts.rounds_per_match} rounds → "
+        f"{counts.warrior_streams} warrior streams + {counts.judge_calls} judge calls"
+        + (f" + {counts.probe_calls} probe calls" if counts.probe_calls else "")
+    )
+
+    preflight_data: dict = {"counts": counts.__dict__}
+    if cfg.preflight.thinking_probe:
+        click.echo("thinking probe…")
+        probe = asyncio.run(thinking_probe(cfg))
+        preflight_data["thinking_probe"] = probe
+        for name, r in probe.items():
+            if r["error"]:
+                click.echo(f"  ⚠ {name} ({r['model']}): probe failed — {r['error']}")
+            elif r["thinks"] and not r["configured"]:
+                click.echo(
+                    f"  🧠 {name} ({r['model']}): thinks despite config "
+                    f"({r['reasoning_tokens']} reasoning tok) — ranking will be footnoted"
+                )
+        odd = surprises(probe)
+        if not odd:
+            click.echo("  pool is thinking-clean ✓")
+
+    if not assume_yes:
+        click.confirm("Proceed?", abort=True)
+
+    if headless:
+        from .headless import run_headless
+
+        asyncio.run(run_headless(
+            cfg=cfg, prompts=prompts, battle_log_path=output_path,
+            preflight=preflight_data,
+        ))
+        return
+
+    app = ArenaApp(
+        cfg=cfg, prompts=prompts, battle_log_path=output_path, live=True,
+        preflight=preflight_data,
+    )
     app.run()
 
 

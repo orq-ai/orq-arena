@@ -11,6 +11,7 @@ from evaluatorq.pairwise import PairwiseVote
 import orc_arena.arena.battle as battle_mod
 from orc_arena.arena.battle import Battle
 from orc_arena.config import ArenaConfig
+from orc_arena.data.prompts import PromptItem
 from orc_arena.events import JudgeVerdictEvent, RoundVoided, TurnResolved
 
 
@@ -64,7 +65,7 @@ def _build_battle(monkeypatch, gateway, jury) -> tuple[Battle, asyncio.Queue]:
     b = Battle(
         cfg=cfg, gateway=gateway,
         warrior_a=cfg.warriors[0], warrior_b=cfg.warriors[1],
-        prompts=["What is 2+2?"], match_id="M1", round_name="round",
+        prompts=[PromptItem("What is 2+2?")], match_id="M1", round_name="round",
         tournament_id="t", events=events,
     )
     return b, events
@@ -136,7 +137,7 @@ async def test_all_judges_contestants_raises(monkeypatch):
         Battle(
             cfg=cfg, gateway=FakeGateway(),
             warrior_a=cfg.warriors[0], warrior_b=cfg.warriors[1],
-            prompts=["p"], match_id="M1", round_name="round",
+            prompts=[PromptItem("p")], match_id="M1", round_name="round",
             tournament_id="t", events=asyncio.Queue(),
         )
 
@@ -157,7 +158,7 @@ async def test_ko_does_not_stop_the_judging(monkeypatch):
     b = Battle(
         cfg=cfg, gateway=FakeGateway(),
         warrior_a=cfg.warriors[0], warrior_b=cfg.warriors[1],
-        prompts=["p1", "p2", "p3"], match_id="M1", round_name="round",
+        prompts=[PromptItem("p1"), PromptItem("p2"), PromptItem("p3")], match_id="M1", round_name="round",
         tournament_id="t", events=events,
     )
     result = await b.run()

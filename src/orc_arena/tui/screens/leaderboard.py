@@ -74,6 +74,24 @@ class LeaderboardScreen(Screen):
 
             yield DataTable(id="table")
 
+            tok = r.get("tokens") or {}
+            if tok:
+                total_in = tok["warriors_in"] + tok["judges_in"]
+                total_out = tok["warriors_out"] + tok["judges_out"]
+                jury_share = (
+                    (tok["judges_in"] + tok["judges_out"]) / max(1, total_in + total_out)
+                )
+                yield Static(
+                    f"tokens — warriors {tok['warriors_in']:,} in / {tok['warriors_out']:,} out"
+                    f"   ·   jury {tok['judges_in']:,} in / {tok['judges_out']:,} out"
+                    f"   ({jury_share:.0%} of all tokens went to judging)",
+                    classes="section",
+                )
+
+            if r.get("elo_by_category"):
+                yield Static("BY CATEGORY — Bradley-Terry per prompt slice", classes="section")
+                yield DataTable(id="cats")
+
             if r.get("jury"):
                 yield Static("THE JURY ROOM — per-judge behaviour", classes="section")
                 yield DataTable(id="jury")
@@ -114,6 +132,19 @@ class LeaderboardScreen(Screen):
                 row.append(f"{verbosity.get(m, 0):.0f}")
                 row.append(f"{reasoning.get(m, 0):.0f}")
             table.add_row(*row)
+
+        by_cat = r.get("elo_by_category") or {}
+        if by_cat:
+            counts = r.get("category_counts") or {}
+            ct = self.query_one("#cats", DataTable)
+            cats = list(by_cat.keys())
+            ct.add_columns("Orc", "overall", *(f"{c} (n={counts.get(c, '?')})" for c in cats))
+            for name, elo in ranked:
+                ct.add_row(
+                    name,
+                    f"{elo:.0f}",
+                    *(f"{by_cat[c].get(name, 0):.0f}" for c in cats),
+                )
 
         jury = r.get("jury")
         if jury:

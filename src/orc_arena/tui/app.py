@@ -64,9 +64,11 @@ class ArenaApp(App):
         battle_log_path: str,
         live: bool = True,
         fixture: str | None = None,
+        preflight: dict | None = None,
     ) -> None:
         super().__init__()
         self.cfg = cfg
+        self._preflight = preflight
         self._prompts = prompts
         self._battle_log_path = battle_log_path
         self._live = live
@@ -101,6 +103,7 @@ class ArenaApp(App):
                 prompts=self._prompts,
                 battle_log_path=self._battle_log_path,
                 events=self._events,
+                preflight=self._preflight,
             )
         except Exception as exc:
             await self._events.put(
