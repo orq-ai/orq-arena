@@ -34,9 +34,9 @@ class JudgeCard(Static):
         self._flipped = False
         self._replacement = False
         self.add_class("waiting")
-        self.update(self._render())
+        self.update(self._markup())
 
-    def _render(self) -> str:
+    def _markup(self) -> str:
         name = self.judge_name + (" [dim](stand-in)[/dim]" if self._replacement else "")
         if not self._verdict:
             return f"[b]{name}[/b]\n[dim]deliberating…[/dim]"
@@ -61,7 +61,7 @@ class JudgeCard(Static):
         cls = f"verdict-{verdict.lower()}"
         if cls in _VERDICT_CLASSES:
             self.add_class(cls)
-        self.update(self._render())
+        self.update(self._markup())
 
     def reset(self) -> None:
         self._verdict = ""
@@ -71,4 +71,4 @@ class JudgeCard(Static):
         self.add_class("waiting")
         for c in _VERDICT_CLASSES:
             self.remove_class(c)
-        self.update(self._render())
+        self.update(self._markup())
