@@ -91,3 +91,21 @@ def surprises(probe: dict[str, dict[str, Any]]) -> list[str]:
         name for name, r in probe.items()
         if r["error"] is None and r["thinks"] and not r["configured"]
     ]
+
+
+def judge_family_overlaps(judges: list[str], warriors: list[WarriorSpec]) -> list[str]:
+    """Judges sharing a provider family with a contestant.
+
+    Self-preference bias rides on stylistic self-recognition (Panickssery et
+    al., NeurIPS 2024): a judge favors its own family's prose, and neither
+    blinding nor seat-swapping corrects it. Exact self-judging is already
+    excluded per match; this flags the family-level residue so the ranking
+    ships with a warning instead of a hidden thumb on the scale.
+    """
+    # ponytail: provider prefix as family proxy; per-provider lineage tables
+    # if one provider ever hosts unrelated model families
+    def fam(model_id: str) -> str:
+        return model_id.split("/", 1)[0].lower()
+
+    warrior_fams = {fam(w.model_id) for w in warriors}
+    return [j for j in judges if fam(j) in warrior_fams]

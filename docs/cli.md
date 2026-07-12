@@ -31,6 +31,7 @@ full `orq_arena.yaml` key reference, see [configuration.md](configuration.md).
 | [`demo`](#demo) | Replay a recorded tournament fixture, zero API calls, zero key. |
 | [`list-warriors`](#list-warriors) | Print the configured roster (seed, orc name, model id). |
 | [`rejudge`](#rejudge) | Re-score a recorded `battles.jsonl` with a different judge panel, zero regeneration. |
+| [`report`](#report) | Render the single-file HTML report page from a recorded run; no API calls. |
 | [`refresh-models`](#refresh-models) | Force re-fetch of the 24h workspace model-catalog cache. |
 
 ---
@@ -308,6 +309,32 @@ uv run orq-arena rejudge my_battles.jsonl --judge openai/gpt-5.4-nano --concurre
 ```
 
 ---
+
+## `report`
+
+Render the single-file HTML report page from a recorded run. Reads `battles.jsonl` and its
+`*.run.json` manifest; makes no API calls. The same page is written automatically at the end
+of every run (`<log>.report.html` next to the log).
+
+```text
+orq-arena report [LOG_PATH] [--config PATH] [--output PATH]
+```
+
+| Flag / arg | Default | Effect |
+|---|---|---|
+| `LOG_PATH` (positional) | `battles.jsonl` | The recorded run to render. |
+| `--config PATH` | `orq_arena.yaml` | Supplies judges and rules for the report's statistics rebuild. |
+| `--output PATH` | `<log>.report.html` | Destination HTML file. |
+
+The page is self-contained (inline CSS, no external assets, works from `file://`): verdict
+headline with a CI-overlap caveat, the ELO ladder with confidence-interval bars and the
+len-ctrl column, the win grid, per-judge behaviour, category and token accounting, and the
+manifest hashes for reproducibility.
+
+```bash
+uv run orq-arena report outputs/g1/battles.jsonl
+uv run orq-arena report battles.jsonl --output /tmp/run.html
+```
 
 ## `refresh-models`
 

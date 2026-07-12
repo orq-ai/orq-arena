@@ -78,6 +78,15 @@ class LeaderboardScreen(Screen):
 
             yield DataTable(id="table")
 
+            lc = r.get("length_coef")
+            if lc is not None:
+                lean = "longer" if lc > 0 else "shorter"
+                yield Static(
+                    f"style control: jury length coefficient {lc:+.2f} "
+                    f"(leaned {lean}); len-ctrl ELO prices that preference out",
+                    classes="section",
+                )
+
             tok = r.get("tokens") or {}
             if tok:
                 total_in = tok["warriors_in"] + tok["judges_in"]
@@ -127,9 +136,12 @@ class LeaderboardScreen(Screen):
         names_by_model = r.get("by_model_names") or {}
 
         table = self.query_one("#table", DataTable)
+        sc = r.get("elo_style_controlled") or {}
         cols = ["Rank", "Model", "ELO"]
         if ci:
             cols.append("95% CI")
+        if sc:
+            cols.append("len-ctrl")
         if verbosity:
             cols += ["avg tok", "🧠 tok"]
         table.add_columns(*cols)
@@ -143,6 +155,8 @@ class LeaderboardScreen(Screen):
             if ci:
                 lo, hi = ci.get(name, (elo, elo))
                 row.append(f"{lo:.0f}–{hi:.0f}")
+            if sc:
+                row.append(f"{sc.get(name, elo):.0f}")
             if verbosity:
                 m = model_by_name.get(name, "")
                 row.append(f"{verbosity.get(m, 0):.0f}")

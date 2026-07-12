@@ -22,9 +22,11 @@ from .tournament.driver import run_tournament
 def _final_table(ended: TournamentEnded) -> Table:
     r: dict[str, Any] = ended.report or {}
     ci = r.get("elo_ci") or {}
+    sc = r.get("elo_style_controlled") or {}
     thinking = r.get("thinking") or {}
     table = Table(title="FINAL STANDINGS")
-    cols = ["#", "Model", "ELO"] + (["95% CI"] if ci else [])
+    cols = (["#", "Model", "ELO"] + (["95% CI"] if ci else [])
+            + (["len-ctrl"] if sc else []))
     for c in cols:
         table.add_column(c)
     ranked = sorted(ended.elo.items(), key=lambda kv: kv[1], reverse=True)
@@ -34,6 +36,8 @@ def _final_table(ended: TournamentEnded) -> Table:
         if ci:
             lo, hi = ci.get(name, (elo, elo))
             row.append(f"{lo:.0f}–{hi:.0f}")
+        if sc:
+            row.append(f"{sc.get(name, elo):.0f}")
         table.add_row(*row)
     return table
 
@@ -66,6 +70,12 @@ async def run_headless(
                 r = ev.report or {}
                 if r.get("mean_agreement") is not None:
                     console.print(f"mean inter-judge agreement: {r['mean_agreement']:.0%}")
+                if r.get("length_coef") is not None:
+                    lean = "longer" if r["length_coef"] > 0 else "shorter"
+                    console.print(
+                        f"style control: jury length coefficient {r['length_coef']:+.2f} "
+                        f"(leaned {lean}); len-ctrl column prices it out"
+                    )
                 tok = r.get("tokens") or {}
                 if tok:
                     console.print(
@@ -73,6 +83,11 @@ async def run_headless(
                         f" · jury {tok['judges_in']:,} in / {tok['judges_out']:,} out"
                     )
                 console.print(f"battle log → {ev.battle_log_path}")
+                from .report import report_path_for
+
+                rp = report_path_for(ev.battle_log_path)
+                if rp.exists():
+                    console.print(f"report page → {rp}")
                 return
 
     printer_task = asyncio.create_task(printer())

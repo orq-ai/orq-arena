@@ -63,7 +63,8 @@ def run(config_path: str | None, prompts_path: str, output_path: str,
     """
     import asyncio
 
-    from .preflight import call_counts, surprises, thinking_probe
+    from .preflight import (call_counts, judge_family_overlaps, surprises,
+                            thinking_probe)
 
     _quiet_logs()
     pick_roster = config_path is None
@@ -87,6 +88,13 @@ def run(config_path: str | None, prompts_path: str, output_path: str,
         f"{counts.warrior_streams} warrior streams + {counts.judge_calls} judge calls"
         + (f" + {counts.probe_calls} probe calls" if counts.probe_calls else "")
     )
+    overlap = judge_family_overlaps(list(cfg.judges), cfg.warriors)
+    if overlap:
+        click.echo(
+            f"  ⚖ judge/contestant family overlap: {', '.join(overlap)}. "
+            "Self-preference bias is not corrected by seat swapping; "
+            "prefer judges from families outside the pool."
+        )
 
     preflight_data: dict = {"counts": counts.__dict__}
     if cfg.preflight.thinking_probe:
@@ -191,6 +199,60 @@ def rejudge(log_path: str, judges: tuple[str, ...], criteria: str | None,
     if report_json:
         save_report_json(report_json, result)
         click.echo(f"summary -> {report_json}")
+
+@cli.command("report")
+@click.argument("log_path", default=DEFAULT_OUTPUT)
+@click.option("--config", "config_path", default=DEFAULT_CONFIG, show_default=True)
+@click.option("--output", "output_path", default=None,
+              help="Destination HTML (default: <log>.report.html next to the log).")
+def report_cmd(log_path: str, config_path: str, output_path: str | None) -> None:
+    """Render the single-file HTML report page from a recorded run.
+
+    Reads battles.jsonl and its *.run.json manifest; makes no API calls.
+    The same page is written automatically at the end of every run.
+    """
+    import json as _json
+    from pathlib import Path
+
+    from .data.schemas import BattleRecord
+    from .report import build_report_html, report_path_for
+    from .tournament.driver import Outcome, _final_report, _triples
+    from .tournament.elo import bradley_terry_mle, build_wins_matrix
+
+    cfg = load_config(config_path)
+    log = Path(log_path)
+    if not log.exists():
+        raise click.ClickException(f"{log_path} not found")
+    records = [
+        BattleRecord.model_validate_json(line)
+        for line in log.read_text().splitlines() if line.strip()
+    ]
+    if not records:
+        raise click.ClickException(f"no rounds in {log_path}")
+    manifest_path = log.with_suffix(".run.json")
+    manifest = _json.loads(manifest_path.read_text()) if manifest_path.exists() else {}
+
+    names = sorted({m for r in records for m in (r.model_a, r.model_b)})
+    outcomes: list[Outcome] = []
+    for r in records:
+        if r.error is not None:
+            continue
+        cat = r.prompt_category or "general"
+        if r.majority_verdict == "A":
+            outcomes.append((r.model_a, r.model_b, "winner", cat))
+        elif r.majority_verdict == "B":
+            outcomes.append((r.model_b, r.model_a, "winner", cat))
+        elif r.majority_verdict == "tie":
+            outcomes.append((r.model_a, r.model_b, "tie", cat))
+    elo = bradley_terry_mle(build_wins_matrix(_triples(outcomes)), names)
+    rep = _final_report(cfg, records, outcomes, names, preflight=manifest.get("preflight"))
+
+    out = Path(output_path) if output_path else report_path_for(log)
+    out.write_text(build_report_html(
+        cfg=cfg, records=records, elo=elo, report=rep, manifest=manifest,
+    ))
+    click.echo(f"report page -> {out}")
+
 
 @cli.command("refresh-models")
 @click.option("--config", "config_path", default=DEFAULT_CONFIG, show_default=True)
