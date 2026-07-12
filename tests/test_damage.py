@@ -1,45 +1,55 @@
-"""Damage mapping: verdict counts → HP damage + loser side."""
+"""Damage adapter tests — evaluatorq PairwiseComparison → HP damage."""
 
-from __future__ import annotations
+from evaluatorq import PairwiseComparison
+from evaluatorq.pairwise import PairwiseVote
 
 from orc_arena.arena.damage import compute_damage
 from orc_arena.config import MatchRules
-from orc_arena.judges.schemas import JudgeResult
+
+RULES = MatchRules()  # 30 unanimous / 15 majority / 0 tie
 
 
-def _v(judge: str, verdict: str) -> JudgeResult:
-    return JudgeResult(judge_name=judge, judge_model=f"model-{judge}", verdict=verdict)  # type: ignore[arg-type]
+def _vote(model: str, vote: str | None, *, flipped: bool = False) -> PairwiseVote:
+    return PairwiseVote(model=model, vote=vote, flipped=flipped)
 
 
-def test_unanimous_a_deals_max_damage_to_b() -> None:
-    rules = MatchRules()
-    verdicts = [_v("j1", "A"), _v("j2", "A"), _v("j3", "A")]
-    result = compute_damage(majority="A", verdicts=verdicts, rules=rules)
-    assert result.damage == rules.damage_unanimous
-    assert result.loser_side == "b"
-    assert result.counts_toward_cap is True
+def _cmp(winner: str, votes: list[PairwiseVote]) -> PairwiseComparison:
+    return PairwiseComparison(winner=winner, votes=votes)
 
 
-def test_majority_b_deals_half_damage_to_a() -> None:
-    rules = MatchRules()
-    verdicts = [_v("j1", "B"), _v("j2", "B"), _v("j3", "A")]
-    result = compute_damage(majority="B", verdicts=verdicts, rules=rules)
-    assert result.damage == rules.damage_majority
-    assert result.loser_side == "a"
-    assert result.counts_toward_cap is True
+def test_unanimous_a_deals_big_damage_to_b():
+    c = _cmp("A", [_vote("j1", "A"), _vote("j2", "A"), _vote("j3", "A")])
+    d = compute_damage(comparison=c, rules=RULES)
+    assert (d.damage, d.loser_side, d.counts_toward_cap) == (30, "b", True)
 
 
-def test_tie_does_not_count_and_no_damage() -> None:
-    rules = MatchRules()
-    result = compute_damage(majority="TIE", verdicts=[_v("j1", "TIE")], rules=rules)
-    assert result.damage == rules.damage_tie
-    assert result.loser_side == "none"
-    assert result.counts_toward_cap is False
+def test_majority_b_deals_split_damage_to_a():
+    c = _cmp("B", [_vote("j1", "B"), _vote("j2", "B"), _vote("j3", "A")])
+    d = compute_damage(comparison=c, rules=RULES)
+    assert (d.damage, d.loser_side, d.counts_toward_cap) == (15, "a", True)
 
 
-def test_discard_behaves_like_tie() -> None:
-    rules = MatchRules()
-    result = compute_damage(majority="DISCARD", verdicts=[], rules=rules)
-    assert result.damage == 0
-    assert result.loser_side == "none"
-    assert result.counts_toward_cap is False
+def test_single_decisive_vote_is_never_unanimous():
+    # Two judges abstained (flipped); one decisive A vote must not land the
+    # 30-damage "unanimous" hit — the Finding 05 guard.
+    c = _cmp("A", [_vote("j1", "A"), _vote("j2", None, flipped=True), _vote("j3", None)])
+    d = compute_damage(comparison=c, rules=RULES)
+    assert (d.damage, d.loser_side) == (15, "b")
+
+
+def test_tie_with_dissent_is_majority_not_unanimous():
+    c = _cmp("A", [_vote("j1", "A"), _vote("j2", "A"), _vote("j3", "tie")])
+    d = compute_damage(comparison=c, rules=RULES)
+    assert d.damage == 15  # a tie vote breaks unanimity
+
+
+def test_tie_deals_no_damage_and_no_cap_tick():
+    c = _cmp("tie", [_vote("j1", "tie"), _vote("j2", "tie"), _vote("j3", "A")])
+    d = compute_damage(comparison=c, rules=RULES)
+    assert (d.damage, d.loser_side, d.counts_toward_cap) == (0, "none", False)
+
+
+def test_inconclusive_deals_no_damage_and_no_cap_tick():
+    c = _cmp("inconclusive", [_vote("j1", None), _vote("j2", None), _vote("j3", None)])
+    d = compute_damage(comparison=c, rules=RULES)
+    assert (d.damage, d.loser_side, d.counts_toward_cap) == (0, "none", False)

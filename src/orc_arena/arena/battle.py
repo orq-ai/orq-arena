@@ -1,16 +1,25 @@
 """Per-match battle engine.
 
 One ``Battle`` owns a single fight: it drives the turn loop, tracks HP,
-invokes the judge panel, and pushes typed events onto an ``asyncio.Queue``
-that the TUI (or any future renderer) subscribes to.
+invokes the evaluatorq pairwise jury, and pushes typed events onto an
+``asyncio.Queue`` that the TUI subscribes to.
+
+Judging: each round's A/B pair goes through ``llm_jury_pairwise`` — every
+judge sees both orderings, a judge that flips abstains (and is recorded), and
+fewer than ``min_successful_judges`` decisive votes yields ``inconclusive``.
+A round whose generation fails after one retry is **voided**: never judged,
+never scored. A model loses on its words, never on its network.
 """
 
 from __future__ import annotations
 
 import asyncio
 import hashlib
+import time
 from dataclasses import dataclass, field
-from typing import Iterable
+from typing import Any, Iterable
+
+from evaluatorq import llm_jury_pairwise
 
 from ..config import ArenaConfig
 from ..data.schemas import BattleRecord
@@ -21,10 +30,11 @@ from ..events import (
     MatchStarted,
     ResponseChunk,
     ResponseComplete,
+    RoundVoided,
+    ThinkingChunk,
     TurnPrompt,
     TurnResolved,
 )
-from ..judges.panel import filter_self_judges, majority_vote, run_panel
 from ..orcs.roster import WarriorSpec
 from ..providers.orq_gateway import OrqGateway
 from .damage import compute_damage
@@ -40,6 +50,14 @@ class MatchResult:
     battles: list[BattleRecord] = field(default_factory=list)
 
 
+@dataclass
+class SideResult:
+    text: str
+    error: str | None
+    usage: dict[str, Any]
+    ttft_ms: int
+
+
 def _prompt_hash(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
 
@@ -49,40 +67,68 @@ async def _generate_side(
     gateway: OrqGateway,
     warrior: WarriorSpec,
     prompt: str,
-    max_tokens: int,
+    default_max_tokens: int,
     events: asyncio.Queue[ArenaEvent],
     match_id: str,
     side: str,  # 'a' | 'b'
-) -> tuple[str, int, str | None]:
-    """Stream one warrior's response; return (full_text, tokens_out, error)."""
-    chunks: list[str] = []
-    error: str | None = None
-    try:
-        async for piece in gateway.stream_completion(
-            model=warrior.model_id,
-            prompt=prompt,
-            max_tokens=max_tokens,
-        ):
-            chunks.append(piece)
+) -> SideResult:
+    """Stream one warrior's response; one silent-ish retry, then error out."""
+    last_error = ""
+    for attempt in (1, 2):
+        chunks: list[str] = []
+        usage: dict[str, Any] = {}
+        t0 = time.monotonic()
+        ttft_ms = 0
+        try:
+            async for kind, piece in gateway.stream_completion(
+                model=warrior.model_id,
+                prompt=prompt,
+                max_tokens=warrior.max_tokens or default_max_tokens,
+                extra_body=warrior.reasoning,
+                usage_out=usage,
+            ):
+                if kind == "think":
+                    await events.put(
+                        ThinkingChunk(match_id=match_id, side=side, text=piece)  # type: ignore[arg-type]
+                    )
+                    continue
+                if not chunks:
+                    ttft_ms = int((time.monotonic() - t0) * 1000)
+                chunks.append(piece)
+                await events.put(
+                    ResponseChunk(match_id=match_id, side=side, text=piece)  # type: ignore[arg-type]
+                )
+        except Exception as exc:
+            last_error = str(exc)
+            if attempt == 1:
+                await events.put(
+                    ResponseChunk(  # type: ignore[arg-type]
+                        match_id=match_id, side=side, text="\n⟲ stream failed — retrying…\n"
+                    )
+                )
+                continue
             await events.put(
-                ResponseChunk(match_id=match_id, side=side, text=piece)  # type: ignore[arg-type]
+                ResponseComplete(  # type: ignore[arg-type]
+                    match_id=match_id, side=side, full_text="".join(chunks), error=last_error
+                )
             )
-    except Exception as exc:
-        error = str(exc)
+            return SideResult(text="", error=last_error, usage=usage, ttft_ms=0)
 
-    full = "".join(chunks)
-    # We don't have usage tokens from streaming; approximate by char/4.
-    tokens_out = max(1, len(full) // 4) if full else 0
-    await events.put(
-        ResponseComplete(
-            match_id=match_id,
-            side=side,  # type: ignore[arg-type]
-            full_text=full,
-            tokens_out=tokens_out,
-            error=error,
+        full = "".join(chunks)
+        await events.put(
+            ResponseComplete(  # type: ignore[arg-type]
+                match_id=match_id,
+                side=side,
+                full_text=full,
+                tokens_in=usage.get("input_tokens", 0),
+                tokens_out=usage.get("output_tokens", 0),
+                reasoning_tokens=usage.get("reasoning_tokens", 0),
+                finish_reason=usage.get("finish_reason", ""),
+                error=None,
+            )
         )
-    )
-    return full, tokens_out, error
+        return SideResult(text=full, error=None, usage=usage, ttft_ms=ttft_ms)
+    raise AssertionError("unreachable")
 
 
 class Battle:
@@ -111,6 +157,47 @@ class Battle:
         self.tournament_id = tournament_id
         self.events = events
 
+        contestants = {warrior_a.model_id, warrior_b.model_id}
+        panel = [m for m in cfg.judges if m not in contestants]
+        if not panel:
+            raise ValueError(
+                f"Every judge is a contestant in {warrior_a.orc_name} vs "
+                f"{warrior_b.orc_name} — add a neutral judge to the config."
+            )
+        replacements = [m for m in cfg.replacement_judges if m not in contestants]
+        self._jury = llm_jury_pairwise(
+            judges=panel,
+            criteria=cfg.criteria,
+            replacement_judges=replacements or None,
+            min_successful_judges=cfg.min_successful_judges,
+            max_tokens=cfg.gateway.judge_max_tokens,
+            timeout_ms=cfg.gateway.judge_timeout_ms,
+            client=gateway.client,
+        )
+
+    async def _void_round(
+        self, *, round_number: int, prompt: str, reason: str,
+        res_a: SideResult, res_b: SideResult, hp_a: int, hp_b: int,
+    ) -> BattleRecord:
+        await self.events.put(
+            RoundVoided(match_id=self.match_id, round_number=round_number, reason=reason)
+        )
+        return BattleRecord(
+            prompt_hash=_prompt_hash(prompt),
+            prompt_text=prompt,
+            model_a=self.a.short_model,
+            model_b=self.b.short_model,
+            response_a=res_a.text,
+            response_b=res_b.text,
+            majority_verdict="inconclusive",
+            winner="void",
+            error=reason,
+            tournament_id=self.tournament_id,
+            match_id=self.match_id,
+            round_number=round_number,
+            hp_a_before=hp_a, hp_b_before=hp_b, hp_a_after=hp_a, hp_b_after=hp_b,
+        )
+
     async def run(self) -> MatchResult:
         rules = self.cfg.match
         hp_a = hp_b = rules.starting_hp
@@ -120,14 +207,16 @@ class Battle:
         await self.events.put(
             MatchStarted(
                 match_id=self.match_id,
-                round_name=self.round_name,  # type: ignore[arg-type]
+                round_name=self.round_name,
                 warrior_a=self.a.orc_name,
                 warrior_b=self.b.orc_name,
             )
         )
 
+        # KO is presentation, not termination: every prompt is judged so the
+        # rating never depends on when the HP bar happened to empty.
         prompt_iter = iter(self.prompts)
-        while hp_a > 0 and hp_b > 0 and rounds_counted < rules.max_rounds:
+        while rounds_counted < rules.max_rounds:
             try:
                 prompt = next(prompt_iter)
             except StopIteration:
@@ -138,56 +227,53 @@ class Battle:
                 TurnPrompt(match_id=self.match_id, round_number=round_number, prompt=prompt)
             )
 
-            # Generate both sides concurrently
-            (resp_a, tok_a, err_a), (resp_b, tok_b, err_b) = await asyncio.gather(
+            res_a, res_b = await asyncio.gather(
                 _generate_side(
-                    gateway=self.gateway,
-                    warrior=self.a,
-                    prompt=prompt,
-                    max_tokens=self.cfg.gateway.warrior_max_tokens,
-                    events=self.events,
-                    match_id=self.match_id,
-                    side="a",
+                    gateway=self.gateway, warrior=self.a, prompt=prompt,
+                    default_max_tokens=self.cfg.gateway.warrior_max_tokens,
+                    events=self.events, match_id=self.match_id, side="a",
                 ),
                 _generate_side(
-                    gateway=self.gateway,
-                    warrior=self.b,
-                    prompt=prompt,
-                    max_tokens=self.cfg.gateway.warrior_max_tokens,
-                    events=self.events,
-                    match_id=self.match_id,
-                    side="b",
+                    gateway=self.gateway, warrior=self.b, prompt=prompt,
+                    default_max_tokens=self.cfg.gateway.warrior_max_tokens,
+                    events=self.events, match_id=self.match_id, side="b",
                 ),
             )
 
-            # Judge panel
-            verdicts = await run_panel(
-                gateway=self.gateway,
-                judges=self.cfg.judges,
-                user_query=prompt,
-                response_a=resp_a,
-                response_b=resp_b,
-                system_prompt=self.cfg.judge_system_prompt,
-                max_tokens=self.cfg.gateway.judge_max_tokens,
-            )
+            if res_a.error or res_b.error:
+                failed = self.a.orc_name if res_a.error else self.b.orc_name
+                reason = f"{failed}: stream failed after retry — {res_a.error or res_b.error}"
+                battles.append(await self._void_round(
+                    round_number=round_number, prompt=prompt, reason=reason,
+                    res_a=res_a, res_b=res_b, hp_a=hp_a, hp_b=hp_b,
+                ))
+                continue
 
-            # Emit each verdict for the TUI
-            for v in verdicts:
+            try:
+                comparison = await self._jury.compare(
+                    question=prompt, response_a=res_a.text, response_b=res_b.text
+                )
+            except Exception as exc:
+                battles.append(await self._void_round(
+                    round_number=round_number, prompt=prompt,
+                    reason=f"jury failed: {exc}",
+                    res_a=res_a, res_b=res_b, hp_a=hp_a, hp_b=hp_b,
+                ))
+                continue
+
+            for vote in comparison.votes:
                 await self.events.put(
                     JudgeVerdictEvent(
                         match_id=self.match_id,
-                        judge_name=v.judge_name,
-                        verdict=v.verdict,
-                        reasoning=v.reasoning,
+                        judge_name=vote.model.split("/")[-1],
+                        verdict=vote.vote or "abstain",
+                        reasoning=vote.explanation,
+                        flipped=vote.flipped,
+                        replacement=vote.replacement,
                     )
                 )
 
-            # Self-judge exclusion (judge model == contestant model)
-            contestants = {self.a.model_id, self.b.model_id}
-            verdicts = filter_self_judges(verdicts, contestants)
-            majority = majority_vote(verdicts)
-
-            damage = compute_damage(majority=majority, verdicts=verdicts, rules=rules)
+            damage = compute_damage(comparison=comparison, rules=rules)
             hp_a_before, hp_b_before = hp_a, hp_b
             if damage.loser_side == "a":
                 hp_a = max(0, hp_a - damage.damage)
@@ -197,79 +283,78 @@ class Battle:
             if damage.counts_toward_cap:
                 rounds_counted += 1
 
-            battle = BattleRecord(
-                prompt_hash=_prompt_hash(prompt),
-                prompt_text=prompt,
-                model_a=self.a.short_model,
-                model_b=self.b.short_model,
-                response_a=resp_a,
-                response_b=resp_b,
-                judge_verdicts=verdicts,
-                majority_verdict=majority,
-                winner=(
-                    self.a.short_model if majority == "A"
-                    else self.b.short_model if majority == "B"
-                    else "tie" if majority == "TIE"
-                    else "discard"
-                ),
-                tokens_a_out=tok_a,
-                tokens_b_out=tok_b,
-                tournament_id=self.tournament_id,
-                match_id=self.match_id,
-                round_number=round_number,
-                damage_dealt=damage.damage,
-                hp_a_before=hp_a_before,
-                hp_b_before=hp_b_before,
-                hp_a_after=hp_a,
-                hp_b_after=hp_b,
+            judge_usage = comparison.token_usage
+            battles.append(
+                BattleRecord(
+                    prompt_hash=_prompt_hash(prompt),
+                    prompt_text=prompt,
+                    model_a=self.a.short_model,
+                    model_b=self.b.short_model,
+                    response_a=res_a.text,
+                    response_b=res_b.text,
+                    judge_votes=[v.model_dump() for v in comparison.votes],
+                    majority_verdict=comparison.winner,
+                    winner=(
+                        self.a.short_model if comparison.winner == "A"
+                        else self.b.short_model if comparison.winner == "B"
+                        else comparison.winner  # 'tie' | 'inconclusive'
+                    ),
+                    tokens_a_in=res_a.usage.get("input_tokens", 0),
+                    tokens_a_out=res_a.usage.get("output_tokens", 0),
+                    tokens_a_reasoning=res_a.usage.get("reasoning_tokens", 0),
+                    tokens_b_in=res_b.usage.get("input_tokens", 0),
+                    tokens_b_out=res_b.usage.get("output_tokens", 0),
+                    tokens_b_reasoning=res_b.usage.get("reasoning_tokens", 0),
+                    finish_reason_a=res_a.usage.get("finish_reason", ""),
+                    finish_reason_b=res_b.usage.get("finish_reason", ""),
+                    ttft_a_ms=res_a.ttft_ms,
+                    ttft_b_ms=res_b.ttft_ms,
+                    judge_tokens_in=judge_usage.input_tokens if judge_usage else 0,
+                    judge_tokens_out=judge_usage.output_tokens if judge_usage else 0,
+                    tournament_id=self.tournament_id,
+                    match_id=self.match_id,
+                    round_number=round_number,
+                    damage_dealt=damage.damage,
+                    hp_a_before=hp_a_before,
+                    hp_b_before=hp_b_before,
+                    hp_a_after=hp_a,
+                    hp_b_after=hp_b,
+                )
             )
-            battles.append(battle)
 
             await self.events.put(
                 TurnResolved(
                     match_id=self.match_id,
                     round_number=round_number,
-                    majority=majority,
-                    verdicts=verdicts,
+                    majority=comparison.winner,
                     damage_dealt=damage.damage,
-                    loser_side=damage.loser_side,  # type: ignore[arg-type]
+                    loser_side=damage.loser_side,
                     hp_a=hp_a,
                     hp_b=hp_b,
                 )
             )
 
-        # Resolve winner
-        if hp_a <= 0 and hp_b <= 0:
-            # Edge case: both KO'd in the same round — higher pre-damage HP wins.
-            # We don't track that precisely; fall back to B wins (arbitrary).
-            winner, loser, by = self.b, self.a, "ko"
-        elif hp_a <= 0:
-            winner, loser, by = self.b, self.a, "ko"
-        elif hp_b <= 0:
-            winner, loser, by = self.a, self.b, "ko"
-        elif hp_a == hp_b:
-            winner, loser, by = self.a, self.b, "round_cap"  # seed advantage
+        # Resolve the match for the show. The rating ignores this entirely —
+        # ELO is fed per-round verdicts — so an HP tie is simply a draw.
+        if hp_a == hp_b:
+            winner, loser, by = self.a, self.b, "draw"
         elif hp_a > hp_b:
-            winner, loser, by = self.a, self.b, "round_cap"
+            winner, loser, by = self.a, self.b, "ko" if hp_b <= 0 else "round_cap"
         else:
-            winner, loser, by = self.b, self.a, "round_cap"
+            winner, loser, by = self.b, self.a, "ko" if hp_a <= 0 else "round_cap"
 
         await self.events.put(
             MatchResolved(
                 match_id=self.match_id,
-                winner=winner.orc_name,
-                loser=loser.orc_name,
-                by=by,  # type: ignore[arg-type]
+                winner="" if by == "draw" else winner.orc_name,
+                loser="" if by == "draw" else loser.orc_name,
+                by=by,
                 final_hp_a=hp_a,
                 final_hp_b=hp_b,
             )
         )
 
         return MatchResult(
-            winner=winner,
-            loser=loser,
-            by=by,
-            final_hp_a=hp_a,
-            final_hp_b=hp_b,
-            battles=battles,
+            winner=winner, loser=loser, by=by,
+            final_hp_a=hp_a, final_hp_b=hp_b, battles=battles,
         )
