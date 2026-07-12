@@ -36,3 +36,10 @@ def test_page_has_intro_annotate_and_done_views():
         assert page.count(f'id="{view_id}"') == 1
     assert "Guidelines" in page and "Download votes.json" in page
     assert "Accuracy and correctness" in page  # default criteria reach the rater
+
+
+def test_page_has_round_navigator():
+    page = _page()
+    assert page.count('id="nav"') == 1 and page.count('id="legend"') == 1
+    for token in ("buildNav", "nextUnvoted", "skipped"):
+        assert token in page
