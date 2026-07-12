@@ -28,3 +28,11 @@ def test_page_embeds_all_items_once():
     page = _page()
     for rec_text in (f"prompt {i}" for i in range(6)):
         assert page.count(rec_text) == 1
+
+
+def test_page_has_intro_annotate_and_done_views():
+    page = _page()
+    for view_id in ("view-intro", "view-annotate", "view-done"):
+        assert page.count(f'id="{view_id}"') == 1
+    assert "Guidelines" in page and "Download votes.json" in page
+    assert "Accuracy and correctness" in page  # default criteria reach the rater
