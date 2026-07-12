@@ -86,14 +86,29 @@ header input{font:inherit;padding:4px 8px;border:1px solid var(--line);border-ra
 .gate button:disabled{opacity:.4;cursor:default}
 .gate .big{font-size:17px}
 .hidden{display:none}
+.nav{display:flex;flex-wrap:wrap;gap:4px;padding:10px 0 2px}
+.dot{width:13px;height:13px;border-radius:4px;cursor:pointer;
+  background:#e6e1d6;border:1px solid #d5cfc0}
+.dot.seen{background:#b3ac9c;border-color:#b3ac9c}
+.dot.voted{background:var(--teal);border-color:var(--teal)}
+.dot.tie{background:#c99a2e;border-color:#c99a2e}
+.dot.cur{outline:2px solid var(--a);outline-offset:1px}
+.legend{font-family:var(--mono);font-size:10.5px;color:var(--muted);padding-bottom:6px}
 """
 
 _PAGE_JS = r"""
 const D = JSON.parse(document.getElementById('data').textContent);
-let idx = 0; const votes = {};
+let idx = 0; const votes = {}; const seen = new Set();
 const cacheKey = 'orq-anchor:' + D.source + ':' + D.seed;
-try { Object.assign(votes, JSON.parse(localStorage.getItem(cacheKey) || '{}')); } catch (e) {}
+try {
+  const c = JSON.parse(localStorage.getItem(cacheKey) || '{}');
+  Object.assign(votes, c.v || {});
+  for (const k of c.s || []) seen.add(k);
+} catch (e) {}
 let downloaded = false;
+function cache(){
+  try{localStorage.setItem(cacheKey,JSON.stringify({v:votes,s:[...seen]}));}catch(e){}
+}
 
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function md(text){
@@ -132,29 +147,68 @@ function show(name){
   for(const v of ['intro','annotate','done'])
     document.getElementById('view-'+v).classList.toggle('hidden',v!==name);
   document.getElementById('bar').classList.toggle('hidden',name!=='annotate');
+  document.getElementById('nav').classList.toggle('hidden',name==='intro');
+  document.getElementById('legend').classList.toggle('hidden',name==='intro');
   if(name==='annotate')render();
   if(name==='done')renderDone();
 }
+function counts(){
+  const voted=Object.keys(votes).length;
+  const skipped=[...seen].filter(k=>!(k in votes)).length;
+  return {voted, skipped, left:D.items.length-voted-skipped};
+}
+function progText(prefix){
+  const c=counts();
+  return prefix+'  ·  voted '+c.voted+' · skipped '+c.skipped+' · left '+c.left;
+}
+function buildNav(){
+  const nav=document.getElementById('nav');
+  D.items.forEach((it,i)=>{
+    const d=document.createElement('span');
+    d.className='dot'; d.title='round '+(i+1);
+    d.onclick=()=>{idx=i;show('annotate');};
+    nav.appendChild(d);
+  });
+}
+function updateNav(){
+  const dots=document.getElementById('nav').children;
+  D.items.forEach((it,i)=>{
+    const v=votes[it.k];
+    dots[i].className='dot'
+      +(v==='tie'?' tie':v?' voted':seen.has(it.k)?' seen':'')
+      +(view==='annotate'&&i===idx?' cur':'');
+  });
+}
 function render(){
   const it=D.items[idx];
+  seen.add(it.k); cache();
   const l=it.f?it.b:it.a, r=it.f?it.a:it.b;
-  document.getElementById('prog').textContent=(idx+1)+' / '+D.items.length+
-    '  ·  voted '+Object.keys(votes).length;
+  document.getElementById('prog').textContent=progText((idx+1)+' / '+D.items.length);
   document.getElementById('prompt').innerHTML=md(it.q);
   document.getElementById('left').innerHTML='<h3>Response 1</h3>'+md(l);
   document.getElementById('right').innerHTML='<h3>Response 2</h3>'+md(r);
   const v=votes[it.k];
   document.getElementById('lpane').classList.toggle('voted',v===canon('left',it));
   document.getElementById('rpane').classList.toggle('voted',v===canon('right',it));
+  updateNav();
 }
 function renderDone(){
-  const n=Object.keys(votes).length, total=D.items.length;
-  document.getElementById('prog').textContent='done · voted '+n+' / '+total;
+  const c=counts(), total=D.items.length;
+  document.getElementById('prog').textContent=progText('done');
   document.getElementById('done-stats').textContent=
-    n+' of '+total+' rounds voted'+(n<total?' ('+(total-n)+' skipped)':'');
+    c.voted+' of '+total+' rounds voted'+(c.voted<total?' ('+(total-c.voted)+' skipped or unseen; click any dot above to finish them)':'');
   document.getElementById('done-hint').textContent=downloaded
     ? 'votes.json downloaded. Send it back to whoever sent you this file.'
     : 'One step left: download your votes and send the file back.';
+  updateNav();
+}
+function nextUnvoted(){
+  const total=D.items.length;
+  for(let s=1;s<=total;s++){
+    const i=(idx+s)%total;
+    if(!(D.items[i].k in votes)){idx=i;show('annotate');return;}
+  }
+  show('done');
 }
 function start(){
   const name=document.getElementById('annotator-in').value.trim();
@@ -163,7 +217,7 @@ function start(){
 }
 function vote(side){const it=D.items[idx];
   if(side==='skip'){delete votes[it.k];}else{votes[it.k]=canon(side,it);}
-  try{localStorage.setItem(cacheKey,JSON.stringify(votes));}catch(e){}
+  cache();
   if(idx<D.items.length-1){idx++;render();}
   else{show('done');}
 }
@@ -183,10 +237,12 @@ document.addEventListener('keydown',e=>{
   if(view==='intro'){ if(e.key==='Enter')start(); return; }
   if(view==='done'){
     if(e.key==='ArrowLeft'){idx=D.items.length-1;show('annotate');}
+    else if(e.key==='n')nextUnvoted();
     return;
   }
   if(e.key==='a')vote('left'); else if(e.key==='b')vote('right');
   else if(e.key==='t')vote('tie'); else if(e.key===' '){e.preventDefault();vote('skip');}
+  else if(e.key==='n')nextUnvoted();
   else if(e.key==='ArrowRight'){ if(idx<D.items.length-1){idx++;render();} else show('done'); }
   else if(e.key==='ArrowLeft'&&idx>0){idx--;render();}
 });
@@ -195,6 +251,7 @@ window.addEventListener('beforeunload',e=>{
 document.getElementById('n-items').textContent=D.items.length;
 document.getElementById('n-mins').textContent=Math.max(1,Math.round(D.items.length*45/60));
 document.getElementById('criteria').textContent=D.criteria;
+buildNav();
 show('intro');
 """
 
@@ -227,6 +284,10 @@ def render_annotate_page(
 <header><b>blind annotation</b>
 <input id="annotator" type="hidden">
 <span class="prog" id="prog"></span></header>
+<div class="nav hidden" id="nav"></div>
+<div class="legend hidden" id="legend">■ voted · <span style="color:#c99a2e">■</span> tie ·
+<span style="color:#b3ac9c">■</span> skipped · □ unseen · click any dot to jump ·
+<b>n</b> = next unvoted</div>
 
 <div id="view-intro" class="gate">
 <h2>Compare two AI answers, pick the better one</h2>
@@ -234,7 +295,9 @@ def render_annotate_page(
 model wrote which, and the sides are shuffled every round on purpose.</p>
 <p class="stats"><span id="n-items"></span> rounds · roughly <span id="n-mins"></span> min ·
 keys: <b>a</b> left better, <b>b</b> right better, <b>t</b> tie, <b>space</b> skip,
-arrows to move around</p>
+<b>n</b> next unvoted, arrows to move around</p>
+<p>A dot strip above the rounds shows where you are and what each round's state is
+(voted, tie, skipped, unseen); click any dot to jump to that round.</p>
 <h3>Guidelines</h3>
 <ul>
 <li>Read both responses fully before voting; don't reward the first or the longer one.</li>
