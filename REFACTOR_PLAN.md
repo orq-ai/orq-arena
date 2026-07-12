@@ -589,6 +589,33 @@ verdict "A" is never visually tied to the left card, and the leaderboard is a ba
 **Rejected for the TUI:** markdown rendering of streams (heavy mid-stream), chart libraries,
 mouse navigation, theming. Plain streaming text reads fine.
 
+## PR 9 — Library-first inversion (the future `evaluatorq.arena` module)
+
+Owner direction (2026-07-12): the benchmark is a **library/framework tied to evaluatorq**; the
+TUI is a bonus skin. Shape the package so a later move to `evaluatorq/arena/` (the exact
+precedent set by `evaluatorq.redteam` and `evaluatorq.simulation`: own extra, own CLI mount,
+own run store) is a rename, not a rewrite. evaluatorq today has micro (evaluators) and meso
+(pairwise) but **no macro pool-ranking layer** — this is that layer.
+
+1. **Package split.** Core (`config`, `preflight`, `arena/`, `tournament/`, `analysis/`,
+   `providers/`, `data/`, `headless`) imports zero Textual. `textual` moves to
+   `[project.optional-dependencies] tui = [...]`; `orc_arena.tui` imports lazily with a
+   friendly "pip install orc-arena[tui]" error.
+2. **CLI inversion.** `orc-arena bench` = primary, headless by default: writes
+   `battles.jsonl` + `run.json` + machine-readable `report.json` (ELO, CIs, κ, categories,
+   tokens); **exit-code asserts** (`--assert-agreement 0.5`, `--assert-min-rated N`) so CI can
+   fail a run. `orc-arena run` (TUI) requires the extra. `demo`/`rejudge` unchanged.
+3. **Programmatic API.** `from orc_arena import run_benchmark` returning a typed result
+   (the report dict, promoted to a pydantic model). GitHub Action recipe in the README:
+   nightly "did the router's new model reshuffle our pool?".
+4. **Event stream stays the seam** — core emits, any renderer consumes (the queue Finding 01
+   mocked is now the architecture's load-bearing wall).
+
+**Merge-to-evaluatorq criteria (not before):** human-anchor validation done, API stable across
+real uses, evaluatorq team wants the surface. On merge: core → `src/evaluatorq/arena/`, extra
+`evaluatorq[arena]`, CLI mount `evaluatorq arena bench`; the orc-themed TUI either rides along
+(precedent: `redteam/ui`) or stays here as the skin consuming the module.
+
 ## Explicitly rejected (the cut list stays cut)
 
 Swiss or bracket modes, human-vote web UI, a database, multi-run aggregation services, custom
@@ -649,6 +676,10 @@ judge-prompt DSLs, parallel match execution. Any of these returns only with a ti
 20. No client-side token-budget/spend guard (owner, 2026-07-12): budgets and limits are the
     orq.ai router/gateway's responsibility (workspace controls). The arena records exact usage;
     the platform enforces policy. Future ops hardening is resume + 429 backoff only.
+21. Library-first (owner, 2026-07-12): the benchmark core is an evaluatorq-tied framework and
+    a candidate `evaluatorq.arena` module (redteam/simulation precedent); the TUI is an
+    optional extra (`orc-arena[tui]`). Separate repo until human-anchor validation + API
+    stability earn the merge.
 10. Visible chain-of-thought is rendered best-effort only ("thinking…" indicator is the
     guaranteed path) — the router's stable contract excludes CoT text.
 11. Warrior + judge traffic stays on `AsyncOpenAI`; orq-ai-sdk (typed reasoning controls,
