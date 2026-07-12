@@ -55,6 +55,8 @@ class ArenaConfig(BaseModel):
     # Fewer decisive reconciled votes than this -> round is 'inconclusive',
     # never a verdict. Guards against jury-of-one "unanimous" hits.
     min_successful_judges: int = 2
+    # Cheap model for the post-run per-model post-mortems (leaderboard "M").
+    analyzer_model: str = "openai/gpt-5.4-mini"
 
     @model_validator(mode="after")
     def _validate(self) -> "ArenaConfig":

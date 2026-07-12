@@ -174,6 +174,7 @@ class ArenaApp(App):
                         champion=ev.champion,
                         log_path=ev.battle_log_path,
                         report=ev.report,
+                        cfg=self.cfg,
                     )
                 )
                 return

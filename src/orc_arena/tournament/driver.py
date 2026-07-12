@@ -99,6 +99,12 @@ def _final_report(
     comparisons = _rebuild_comparisons(records)
     jury = build_report(comparisons) if comparisons else None
 
+    from ..analysis.kappa import cohen_kappa_pairs, fleiss_kappa
+
+    vote_rounds = [r.judge_votes for r in records if r.error is None]
+    fleiss = fleiss_kappa(vote_rounds, list(cfg.judges))
+    cohen = cohen_kappa_pairs(vote_rounds, list(cfg.judges))
+
     tokens: dict[str, list[int]] = {}
     reasoning: dict[str, list[int]] = {}
     for rec in records:
@@ -137,6 +143,8 @@ def _final_report(
         },
         "jury": jury.model_dump() if jury else None,
         "mean_agreement": jury.mean_agreement if jury else None,
+        "fleiss": fleiss,
+        "cohen": cohen,
         "verbosity": {m: sum(v) / len(v) for m, v in tokens.items() if v},
         "reasoning_tokens": {m: sum(v) / len(v) for m, v in reasoning.items() if v},
         "win_grid": grid,
@@ -187,6 +195,7 @@ def _write_manifest(
         manifest["error_rounds"] = report.get("error_rounds")
         manifest["rated_rounds"] = report.get("rated_rounds")
         manifest["category_counts"] = report.get("category_counts")
+        manifest["fleiss"] = report.get("fleiss")
         manifest["tokens"] = report.get("tokens")
     path.write_text(json.dumps(manifest, indent=2, default=str))
 
