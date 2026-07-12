@@ -13,7 +13,10 @@ match:
 gateway:
   base_url: https://api.orq.ai/v3/router
   api_key_env: ORQ_API_KEY
-  warrior_max_tokens: 1024
+  # Per-response output cap. Creative prompts overflow 1024 easily; a cut
+  # response shows as ✂ truncated and judges punish it. Per-warrior
+  # max_tokens overrides this.
+  warrior_max_tokens: 2048
   judge_max_tokens: 512
   # Max silence between stream chunks (seconds). Generous: thinking models may
   # pause for minutes before the first token. Never a total-duration cap.

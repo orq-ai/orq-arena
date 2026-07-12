@@ -25,7 +25,7 @@ class MatchRules(BaseModel):
 class GatewayConfig(BaseModel):
     base_url: str = "https://api.orq.ai/v3/router"
     api_key_env: str = "ORQ_API_KEY"
-    warrior_max_tokens: int = 1024
+    warrior_max_tokens: int = 2048
     judge_max_tokens: int = 512
     # Max silence between stream chunks before we declare the connection dead.
     # Generous on purpose: thinking models may pause for minutes before the
