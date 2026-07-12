@@ -113,7 +113,8 @@ class ArenaApp(App):
 
     async def _probe_then_begin(self) -> None:
         """Picker path: the CLI preflight didn't run, so probe here."""
-        from ..preflight import judge_family_overlaps
+        from ..preflight import call_counts, cost_ceiling, judge_family_overlaps
+        from ..providers.models_list import fetch_price_map
 
         overlap = judge_family_overlaps(list(self.cfg.judges), self.cfg.warriors)
         if overlap:
@@ -122,6 +123,21 @@ class ArenaApp(App):
                 "Self-preference bias survives seat swapping; prefer judges "
                 "from families outside the pool.",
                 severity="warning", timeout=10,
+            )
+        counts = call_counts(self.cfg, self._prompts)
+        self._preflight = {**(self._preflight or {}), "counts": counts.__dict__}
+        try:
+            ceiling = cost_ceiling(
+                self.cfg, self._prompts, counts, await fetch_price_map(self.cfg.gateway)
+            )
+        except Exception:
+            ceiling = None  # advisory, never blocks the show
+        if ceiling and ceiling.total_usd > 0:
+            self._preflight["cost_ceiling"] = ceiling.__dict__
+            self.notify(
+                f"{counts.warrior_streams} streams + {counts.judge_calls} judge "
+                f"calls; spend ceiling ≈ ${ceiling.total_usd:.2f} (caps fully hit)",
+                timeout=8,
             )
         if self.cfg.preflight.thinking_probe:
             from ..preflight import surprises, thinking_probe

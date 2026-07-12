@@ -116,7 +116,20 @@ orq-arena run [--config PATH] [--prompts PATH] [--output PATH] [--headless] [--y
 
   computed by `preflight.call_counts`: `matches = C(len(warriors), 2)`,
   `rounds_per_match = min(match.max_rounds, len(prompts))`, `warrior_streams = matches ×
-  rounds × 2`, `judge_calls = matches × rounds × len(judges) × 2`. If `preflight.thinking_probe`
+  rounds × 2`, `judge_calls = matches × rounds × len(judges) × 2`. Next, a spend ceiling:
+
+  ```text
+  spend ceiling ≈ ${total} (warriors ${w} + judges ${j}[ + probe ${p}]; every output cap fully hit, live runs land under)
+  ```
+
+  computed by `preflight.cost_ceiling` from those exact counts, the config's output caps
+  (`warrior_max_tokens` / per-warrior `max_tokens`, `judge_max_tokens`), and per-model prices
+  fetched live from the router's Model Garden catalog (`providers.models_list.fetch_price_map`).
+  It is an upper bound, the number the run cannot exceed, not a prediction; the judge-input
+  term assumes both responses hit the warrior cap. Models missing from the catalog are
+  excluded and listed on a `⚠ no catalog price for: …` line; if pricing is unreachable the
+  line is skipped entirely (never blocks the run). The ceiling is also recorded in the run
+  manifest under `preflight.cost_ceiling`. If `preflight.thinking_probe`
   is enabled (default `true`), a `thinking probe…` line follows, then one line per warrior that
   either failed the probe (`⚠ {orc_name} ({model}): probe failed, {error}`) or thinks despite
   being configured off (`🧠 {orc_name} ({model}): thinks despite config ({reasoning_tokens}

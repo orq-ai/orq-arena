@@ -64,8 +64,9 @@ def run(config_path: str | None, prompts_path: str, output_path: str,
     """
     import asyncio
 
-    from .preflight import (call_counts, judge_family_overlaps, surprises,
-                            thinking_probe)
+    from .preflight import (call_counts, cost_ceiling, judge_family_overlaps,
+                            surprises, thinking_probe)
+    from .providers.models_list import fetch_price_map
 
     _quiet_logs()
     pick_roster = config_path is None
@@ -98,6 +99,19 @@ def run(config_path: str | None, prompts_path: str, output_path: str,
         )
 
     preflight_data: dict = {"counts": counts.__dict__}
+    ceiling = cost_ceiling(cfg, prompts, counts, asyncio.run(fetch_price_map(cfg.gateway)))
+    if ceiling.total_usd > 0:
+        click.echo(
+            f"  spend ceiling ≈ ${ceiling.total_usd:.2f} "
+            f"(warriors ${ceiling.warriors_usd:.2f} + judges ${ceiling.judges_usd:.2f}"
+            + (f" + probe ${ceiling.probe_usd:.2f}" if ceiling.probe_usd else "")
+            + "; every output cap fully hit, live runs land under)"
+        )
+        preflight_data["cost_ceiling"] = ceiling.__dict__
+    if ceiling.unpriced:
+        click.echo(
+            f"  ⚠ no catalog price for: {', '.join(ceiling.unpriced)}; excluded from ceiling"
+        )
     if cfg.preflight.thinking_probe:
         click.echo("thinking probe…")
         probe = asyncio.run(thinking_probe(cfg))
