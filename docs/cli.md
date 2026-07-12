@@ -405,8 +405,11 @@ and two anonymous responses; votes go by `a` (left better), `b` (right better), 
 `space` (skip), arrows to navigate; markdown and code fences render properly. After the last
 round a **done screen** shows how many rounds were voted vs skipped and holds the explicit
 "Download votes.json" button (plus a leave-warning while votes are undownloaded; left arrow
-goes back to revisit skips). Exported votes are already un-flipped to the canonical A/B
-frame, so the vote file is independent of presentation order.
+goes back to revisit skips). A persistent header count (voted / skipped / left) and a
+clickable per-round dot navigator (voted, tie, skipped, unseen, current) keep position
+visible at all times; `n` jumps to the next unvoted round. Exported votes are already
+un-flipped to the canonical A/B frame, so the vote file is independent of presentation
+order.
 
 ```bash
 uv run orq-arena annotate outputs/g1/battles.jsonl --sample 60
