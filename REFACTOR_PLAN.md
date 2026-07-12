@@ -616,6 +616,56 @@ real uses, evaluatorq team wants the surface. On merge: core → `src/evaluatorq
 `evaluatorq[arena]`, CLI mount `evaluatorq arena bench`; the orc-themed TUI either rides along
 (precedent: `redteam/ui`) or stays here as the skin consuming the module.
 
+## Launch gates (before any A+ work)
+
+| # | Gate | Notes |
+|---|---|---|
+| G1 | **Dress rehearsal** — one full default run (8 warriors, 28 matches, live TUI end to end), then `B`/`M`/leaderboard at real volume | The A− → A gate. Both eyeball-found UX bugs (wrap, vanishing verdicts) were this class. ~1h + a few $ |
+| G2 | **Merge train** — PR `gnhf/…` → master, then `feat/chennai-harvest` → master; regenerate themed demo fixture (`scripts/record_fixture.py`) | master still = pre-refactor toy |
+| G3 | **Show-HN kit** — README SVGs (`s` key), demo GIF, post draft led by the flip-badge story | the repo promotes nothing unposted |
+| G4 | **Judge-quality experiment** — `rejudge` one real log with the strong panel; publish κ + Spearman vs the cheap trio | one command; pre-empts the strongest objection |
+
+## PR 10 — Ops hardening + statistics (A+ track)
+
+1. **`--resume`** from a partial `battles.jsonl`: seeded schedule + manifest identify remaining
+   matches; skip completed, append. Reference impl: Model-Router-Auto-Evaluation's
+   checkpoint/resume.
+2. **429 backoff-with-jitter** inside the stream retry, *before* the void policy — a rate-limit
+   storm must not void rounds. Per decision 20, no budget guard: backoff + resume only.
+3. **`--dry-run`**: validate config + prompts, print call counts, **zero API calls** (the
+   thinking probe is explicitly skipped).
+4. **Regularized BT**: small ridge prior on the MLE kills ±3000 small-n explosions; CIs stay.
+5. **`orc-arena merge a.jsonl b.jsonl …`**: pooled rating across runs, chained manifests
+   (refuse to merge on config-hash mismatch unless `--force`).
+6. Preflight prints an expected-CI-width hint for the chosen n.
+
+## PR 11 — Validation & data quality (A+ track)
+
+1. **Prompt bank**: 30 → 150–300, category-balanced; a pilot-run discrimination pass drops
+   prompts where every pair ties; private-set option (publish hashes, not text) for
+   contamination control.
+2. **Judge sanity suite** (CI, no humans): inject deliberately degraded responses
+   (truncated / wrong / off-topic) into pairs — the panel must catch ≥ threshold.
+3. **Length-controlled scoring toggle** (AlpacaEval-2-style): correct the verbosity confound;
+   leaderboard shows both numbers.
+4. **Human anchor study**: ~50–100 rounds from a real run, 2–3 blind raters; publish
+   panel↔human κ + rank correlation in `METHODS.md`. **This is the citability gate.**
+
+## PR 12 — Report renderer + launch polish (A+ track)
+
+1. **One-file self-contained HTML report per run** (leaderboard, CIs, κ, win grid, jury room,
+   verdict banner — house style): written by `bench` automatically, shareable, PR-attachable.
+   The demo/fixture path also ends in this report (zero-key users get the full artifact).
+2. **Verdict banner**: one headline conclusion per run ("king + confidence" one-liner).
+3. **`METHODS.md`** — how the number is made: pairwise both-orders, gating, BT, CIs, κ, void
+   policy, thinking policy, plus the human-anchor results from PR 11.
+4. **OSS packaging kit**: `.env.example`, QUICKSTART, CONTRIBUTING, badges, CI workflow,
+   media/ screenshots, real `--help` text.
+
+**Sequencing:** G1–G4 → PR 9 (library inversion) → PR 10 → PR 11 → PR 12. Engineering lives in
+9–10; the A+ itself lives in 11–12. Platform tier (provisioned judges, Studio deep-link sync)
+stays parked below until the evaluatorq.arena question is settled.
+
 ## Best practices from Model-Router-Auto-Evaluation (in-house prior art, 2026-07-12)
 
 `~/Developer/workspace/opensource/Model-Router-Auto-Evaluation` (orq-auto-router-evaluation)
