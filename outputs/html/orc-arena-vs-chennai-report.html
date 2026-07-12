@@ -101,8 +101,8 @@
         <p class="sub">Independent git roots; this repo is the focused distillation of chennai's concept.</p></div>
       <div class="vcard"><p class="label">Size</p><div class="big" style="color:var(--clay)">4.3×</div>
         <p class="sub">10,319 vs 2,426 src LOC. 13 TUI screens vs 3. 18 event kinds vs 11.</p></div>
-      <div class="vcard"><p class="label">Worth harvesting</p><div class="big" style="color:var(--green)">9+1</div>
-        <p class="sub">9 now (~900 LOC, PRs 5–8); dollar-cost estimation deferred by owner — token counts ship instead.</p></div>
+      <div class="vcard"><p class="label">Worth harvesting</p><div class="big" style="color:var(--green)">8</div>
+        <p class="sub">~750 LOC across PRs 5–8; $-cost deferred (tokens ship instead), recorder surface dropped to a dev script.</p></div>
       <div class="vcard"><p class="label">Staying dead</p><div class="big" style="color:var(--gold)">~6k</div>
         <p class="sub">LOC of modes, debate protocol, audio, pickers for modes we removed.</p></div>
     </div>
@@ -181,16 +181,15 @@
     </div>
 
     <div class="finding">
-      <p class="rank">HARVEST 03 · <span class="pill port">port</span> · replay/recorder.py (75) + loader.py (71) + --record flags · ~180 LOC</p>
-      <h3>Fixture recorder with real pacing, atomic finalize, and <code>demo --refresh</code></h3>
-      <p>JSONL with a <code>_meta</code> header, <b>real inter-event delays captured from the clock</b>
-      (replay feels like the live run, not a slideshow), <code>.partial</code> → atomic rename, graceful
-      abort. <code>--record</code> on the live command, and <code>demo --refresh</code> re-records the
-      canonical fixture with a cheap real run — this repo generated its fixture from a hand-rolled smoke
-      script doing exactly this, worse.</p>
-      <div class="kv">
-        <span class="k">Adapt</span><span>Single mode — no mode field ceremony. Pairs with PR 5's pacing keys (<code>space</code>/<code>+</code>/<code>-</code>), which chennai also already built.</span>
-      </div>
+      <p class="rank">HARVEST 03 · <span class="pill skip">dropped (owner, 2026-07-12)</span> · replay/recorder.py + --record flags + demo --refresh + pacing keys</p>
+      <h3>Fixture recorder — good code, wrong surface</h3>
+      <p>JSONL with real inter-event pacing, atomic <code>.partial</code> finalize, <code>--record</code>
+      flags, <code>demo --refresh</code>. Owner call: <b>too much machinery for one consumer.</b> The
+      <code>demo</code> command itself stays exactly as shipped — ~30 lines plus one committed fixture,
+      the only zero-key path and the CTA's trigger. But recording exists solely to regenerate that fixture
+      when the schema changes (~quarterly), which is a dev task: it becomes
+      <code>scripts/record_fixture.py</code> (~50 lines, key required, run rarely), not CLI surface.
+      Pacing keys dropped with it — the fixture's curated delays are fine.</p>
     </div>
 
     <div class="finding">
@@ -288,7 +287,7 @@
     <table>
       <thead><tr><th>PR</th><th>Contents</th><th>Harvest items</th><th>~LOC in</th></tr></thead>
       <tbody>
-        <tr><td class="n">PR 5</td><td>Benchmark ergonomics: recorder + <code>--record</code> + <code>demo --refresh</code>, pacing keys, call-count preflight + thinking probe, judge-vs-warrior <b>token</b> split, per-category ELO (already planned), <code>--headless</code> + match concurrency <span class="pill skip">$-cost deferred</span></td><td>03, 09 (02 deferred)</td><td class="n">~250</td></tr>
+        <tr><td class="n">PR 5</td><td>Benchmark ergonomics: call-count preflight + thinking probe, judge-vs-warrior <b>token</b> split, per-category ELO (already planned), <code>--headless</code> + match concurrency, dev-only <code>scripts/record_fixture.py</code> <span class="pill skip">$-cost deferred · recorder surface dropped</span></td><td>09 (02 deferred, 03 dropped)</td><td class="n">~160</td></tr>
         <tr><td class="n">PR 6</td><td>Roster picker + <code>models_list</code> workspace-catalog strategy + <code>refresh-models</code></td><td>01</td><td class="n">~700</td></tr>
         <tr><td class="n">PR 7</td><td>Trust &amp; insight: battle browser (<code>B</code>), Fleiss/Cohen κ in jury panel + manifest, model post-mortems (<code>M</code>, rebuilt on the existing client)</td><td>04, 06, 07</td><td class="n">~560</td></tr>
         <tr><td class="n">PR 8</td><td>Show polish: CRT-neon theme, CTA modal, Swiss auto-switch for &gt;8 pools</td><td>05, 08, 10</td><td class="n">~250</td></tr>

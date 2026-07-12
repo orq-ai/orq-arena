@@ -352,29 +352,32 @@ leaderboard is just what three cheap models like."
 > `outputs/html/orc-arena-vs-chennai-report.html`
 > (https://claude.ai/code/artifact/c66af501-60ae-430c-a32e-8ec5093dd451).
 
-## PR 5 — Benchmark ergonomics (merged: original PR 5 + Harvest 03/09) · ~+250 LOC
+## PR 5 — Benchmark ergonomics (merged: original PR 5 + Harvest 09) · ~+160 LOC
 
-On branch `feat/chennai-harvest`. Nothing here adds a subsystem — knobs, slices, and one port.
+On branch `feat/chennai-harvest`. Nothing here adds a subsystem — knobs and slices.
 
 > **Deferred (owner, 2026-07-12): dollar-cost estimation** (Harvest 02 — `prices.yaml`,
 > `estimate_tournament_cost`, USD panels). Too loose for now: the price table is a hand-maintained
 > guess that goes stale monthly. What we *record* is exact — token counts per side, per judge,
-> per round — and that's what ships. The token-count plumbing below is deliberately shaped so a
-> future `prices.yaml` multiply-through can land as a small, isolated PR.
+> per round — and that's what ships, shaped so a future `prices.yaml` multiply-through lands as
+> one small isolated PR.
+>
+> **Dropped (owner, 2026-07-12): fixture recording as product surface** (Harvest 03 —
+> recorder port, `--record` flags, `demo --refresh`, pacing keys). The `demo` command itself
+> stays exactly as shipped (~30 lines + one committed fixture — the only zero-key path, and the
+> CTA's trigger). Recording has one real consumer: regenerating the fixture when the schema
+> changes. That's a dev task → `scripts/record_fixture.py` (the PR-2 smoke script, formalized;
+> not CLI surface, needs a key, run rarely).
 
-1. **Fixture recorder/replayer** (Harvest 03, port ~150). `replay/recorder.py` + `loader.py`
-   from chennai: JSONL with `_meta` header, real inter-event delays from the clock, `.partial` →
-   atomic rename, abort. No mode field. `--record` / `--record-path` on `run`;
-   `demo --refresh` re-records the canonical fixture from a cheap real run (2 warriors, 1
-   prompt). Replay pacing keys: `space` pause, `+`/`-` speed, `0` reset.
+1. **`scripts/record_fixture.py`** (~50, dev-only): tiny real run → event capture with curated
+   delays → writes `fixtures/demo_tournament.json`. Documented in the script header, not README.
 2. **Preflight** (before the first API call): exact call counts — matches × rounds × warrior
    streams and judge calls (panel × 2 orderings) — plus a **thinking probe**: one tiny call per
    warrior, flag any model whose `reasoning_tokens > 0` despite the uniform-OFF pool (automates
    the kimi audit). Result goes to `run.json` and the mixed-pool badge.
    `preflight: {thinking_probe: true}` config; `--yes` skips the pause. No dollar figures.
 3. **Token accounting rollup**: leaderboard panel splitting **judge tokens vs warrior tokens**
-   (the judges-vs-warriors split from Harvest 02, in tokens — exact, no price table needed);
-   totals in `run.json`.
+   (exact, no price table); totals in `run.json`.
 4. **Per-category ELO.** Prompt rows already carry `category`; `BattleRecord` gets the field;
    BT runs overall + per category with a ≥20-comparison floor; leaderboard category picker;
    per-slice counts in `run.json`. Ship 2–3 curated prompt sets.
@@ -384,9 +387,9 @@ On branch `feat/chennai-harvest`. Nothing here adds a subsystem — knobs, slice
    strictly sequential.
 6. **Panel presets** as config comments (demo trio vs frontier judges). No code.
 
-Acceptance: `run --record` → `demo` replays with live pacing; preflight prints call counts +
-thinking audit; 4-model `--headless` run completes concurrently with correct ELO; category table
-renders; leaderboard shows the judge-vs-warrior token split.
+Acceptance: preflight prints call counts + thinking audit; 4-model `--headless` run completes
+concurrently with correct ELO; category table renders; leaderboard shows the judge-vs-warrior
+token split; `demo` still replays the committed fixture untouched.
 
 ## PR 6 — Roster picker over the workspace catalog (Harvest 01) · ~+700 LOC
 
@@ -635,6 +638,9 @@ judge-prompt DSLs, parallel match execution. Any of these returns only with a ti
 17. Harvest rule: features flow in from chennai, methodology never does.
 18. Dollar-cost estimation deferred (owner, 2026-07-12): stale-prone price tables are guesses;
     exact token counts ship instead, shaped so pricing can bolt on later as an isolated PR.
+19. Demo stays as shipped (zero-key funnel, ~30 lines + fixture); fixture *recording* is a dev
+    script, never product surface (owner, 2026-07-12). No --record flags, no demo --refresh,
+    no pacing keys.
 10. Visible chain-of-thought is rendered best-effort only ("thinking…" indicator is the
     guaranteed path) — the router's stable contract excludes CoT text.
 11. Warrior + judge traffic stays on `AsyncOpenAI`; orq-ai-sdk (typed reasoning controls,
