@@ -13,8 +13,13 @@ from __future__ import annotations
 import hashlib
 import json
 import random
+from dataclasses import dataclass
+from pathlib import Path
 
+from .analysis.kappa import cohen_kappa_pairs
 from .data.schemas import BattleRecord
+from .rejudge import outcomes_from_majorities, spearman
+from .tournament.elo import bradley_terry_mle, build_wins_matrix
 
 
 def record_key(rec: BattleRecord) -> str:
@@ -176,3 +181,102 @@ def render_annotate_page(items: list[dict], *, seed: int, source: str) -> str:
 <script id="data" type="application/json">{payload}</script>
 <script>{_PAGE_JS}</script>
 </body></html>"""
+
+
+_DECISIVE = ("A", "B", "tie")
+_PANEL = "panel"
+
+
+@dataclass(frozen=True)
+class VoteSet:
+    annotator: str
+    seed: int
+    source: str
+    votes: dict[str, str]  # record_key -> 'A' | 'B' | 'tie'
+
+
+def load_votes(paths: list[str | Path]) -> list[VoteSet]:
+    sets: list[VoteSet] = []
+    for p in paths:
+        data = json.loads(Path(p).read_text())
+        votes = {
+            k: v for k, v in (data.get("votes") or {}).items() if v in _DECISIVE
+        }
+        sets.append(VoteSet(
+            annotator=str(data.get("annotator") or Path(p).stem),
+            seed=int(data.get("seed") or 0),
+            source=str(data.get("source") or ""),
+            votes=votes,
+        ))
+    return sets
+
+
+def _ranking(records, majorities, models) -> list[str]:
+    pairs = [(r.model_a, r.model_b) for r in records]
+    outcomes = outcomes_from_majorities(pairs, majorities)
+    if not outcomes:
+        return sorted(models)
+    elo = bradley_terry_mle(build_wins_matrix(outcomes), models)
+    return sorted(models, key=lambda m: elo[m], reverse=True)
+
+
+def _pair_kappa(rounds: list, a: str, b: str) -> dict:
+    return next(iter(cohen_kappa_pairs(rounds, [a, b]).values()),
+                {"kappa": None, "label": "n/a", "rounds": 0})
+
+
+def anchor_result(records, votesets: list[VoteSet]) -> dict:
+    """Human-vs-panel kappa + rank correlation; humans are just more judges."""
+    keyed = {record_key(r): r for r in records}
+    models = sorted({m for r in records for m in (r.model_a, r.model_b)})
+    panel_rank = _ranking(records, [r.majority_verdict for r in records], models)
+
+    unknown = 0
+    per_annotator = []
+    for vs in votesets:
+        co = {k: v for k, v in vs.votes.items() if k in keyed}
+        unknown += len(vs.votes) - len(co)
+        # a rater literally named "panel" must not merge into the panel's votes
+        label = vs.annotator if vs.annotator != _PANEL else vs.annotator + "*"
+        # kappa vs panel over rounds where the panel was decisive
+        rounds = [
+            [{"model": _PANEL, "vote": keyed[k].majority_verdict},
+             {"model": label, "vote": v}]
+            for k, v in co.items() if keyed[k].majority_verdict in _DECISIVE
+        ]
+        pair = _pair_kappa(rounds, _PANEL, label)
+        recs = [keyed[k] for k in co]
+        human_rank = _ranking(recs, list(co.values()), models)
+        per_annotator.append({
+            "annotator": vs.annotator,
+            "n_voted": len(co),
+            "n_kappa": pair["rounds"],
+            "kappa": pair["kappa"],
+            "kappa_label": pair["label"],
+            "spearman": spearman(panel_rank, human_rank),
+        })
+
+    inter = []
+    for i, va in enumerate(votesets):
+        for vb in votesets[i + 1:]:
+            shared = [k for k in va.votes if k in vb.votes and k in keyed]
+            rounds = [
+                [{"model": va.annotator, "vote": va.votes[k]},
+                 {"model": vb.annotator + " (2)" if vb.annotator == va.annotator
+                  else vb.annotator, "vote": vb.votes[k]}]
+                for k in shared
+            ]
+            b_label = va.annotator + " (2)" if vb.annotator == va.annotator else vb.annotator
+            pair = _pair_kappa(rounds, va.annotator, b_label)
+            inter.append({
+                "pair": f"{va.annotator} × {vb.annotator}",
+                "kappa": pair["kappa"], "kappa_label": pair["label"],
+                "rounds": pair["rounds"],
+            })
+
+    return {
+        "per_annotator": per_annotator,
+        "inter_annotator": inter,
+        "panel_ranking": panel_rank,
+        "unknown_keys": unknown,
+    }
