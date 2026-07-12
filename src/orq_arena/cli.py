@@ -310,3 +310,69 @@ def refresh_models(config_path: str, show: bool) -> None:
         click.echo(f"\n{provider}  ({len(by_provider[provider])})")
         for mid in sorted(by_provider[provider]):
             click.echo(f"  {mid}")
+
+
+@cli.command()
+@click.argument("battle_log", type=click.Path(exists=True))
+@click.option("--out", "out_path", default="annotate.html", show_default=True)
+@click.option("--sample", type=int, default=None,
+              help="Annotate a seeded random subset instead of every round.")
+@click.option("--seed", type=int, default=42, show_default=True)
+def annotate(battle_log: str, out_path: str, sample: int | None, seed: int) -> None:
+    """Render a blinded human-annotation page from a recorded run.
+
+    The page is one self-contained HTML file: open it locally or send it
+    to a rater; no model names, no jury votes, seeded side order. Votes
+    come back as votes.json for `orq-arena anchor`.
+    """
+    from pathlib import Path
+
+    from .anchor import annotation_items, render_annotate_page
+    from .rejudge import load_records
+
+    records = load_records(battle_log)
+    if not records:
+        raise click.ClickException(f"no judgeable rounds in {battle_log}")
+    items = annotation_items(records, seed=seed, sample=sample)
+    Path(out_path).write_text(
+        render_annotate_page(items, seed=seed, source=Path(battle_log).name)
+    )
+    click.echo(f"{len(items)} rounds -> {out_path} (blind; votes export as votes.json)")
+
+
+@cli.command()
+@click.argument("battle_log", type=click.Path(exists=True))
+@click.argument("vote_files", nargs=-1, required=True, type=click.Path(exists=True))
+def anchor(battle_log: str, vote_files: tuple[str, ...]) -> None:
+    """Merge human vote files against a recorded run: κ + rank correlation.
+
+    Prints per-annotator Cohen's κ vs the panel majority, Spearman rank
+    correlation between the human and panel Bradley-Terry rankings, and
+    inter-annotator κ when more than one vote file is given.
+    """
+    from rich.console import Console
+    from rich.table import Table
+
+    from .anchor import anchor_result, load_votes
+    from .rejudge import load_records
+
+    result = anchor_result(load_records(battle_log), load_votes(list(vote_files)))
+    t = Table(title="human anchor vs panel")
+    for col in ("annotator", "voted", "κ rounds", "κ vs panel", "label", "rank ρ"):
+        t.add_column(col)
+    for row in result["per_annotator"]:
+        t.add_row(
+            row["annotator"], str(row["n_voted"]), str(row["n_kappa"]),
+            "n/a" if row["kappa"] is None else f"{row['kappa']:.2f}",
+            row["kappa_label"],
+            "n/a" if row["spearman"] != row["spearman"] else f"{row['spearman']:.2f}",
+        )
+    Console().print(t)
+    for pair in result["inter_annotator"]:
+        click.echo(
+            f"inter-annotator {pair['pair']}: "
+            + ("κ=n/a" if pair["kappa"] is None else f"κ={pair['kappa']:.2f}")
+            + f" ({pair['kappa_label']}, {pair['rounds']} rounds)"
+        )
+    if result["unknown_keys"]:
+        click.echo(f"⚠ {result['unknown_keys']} votes matched no round in this log")
