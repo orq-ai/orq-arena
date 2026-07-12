@@ -105,12 +105,14 @@ the end — same engine, same `battles.jsonl`.
 ### Browse the results
 
 From the final leaderboard, `B` pages through every judged round — prompt, both responses, and
-each judge's reconciled vote, flips included. `M` asks an analyzer model for per-model coach
-notes (strengths, weaknesses, what judges rewarded), cached next to the log.
+each judge's reconciled vote, flips included:
 
-| The battle browser (`B`) | The post-mortem coach (`M`) |
-|---|---|
-| ![Battle browser: prompt, both responses, per-judge votes with flip badges](media/battle-browser.svg) | ![Post-mortems: per-model strengths, weaknesses, and judge patterns](media/postmortem.svg) |
+![Battle browser: prompt, both responses, per-judge votes with flip badges](media/battle-browser.svg)
+
+`M` asks an analyzer model for per-model coach notes (strengths, weaknesses, what judges
+rewarded), cached next to the log:
+
+![Post-mortems: per-model strengths, weaknesses, and judge patterns](media/postmortem.svg)
 
 ### Re-judge with a different jury (no regeneration)
 
