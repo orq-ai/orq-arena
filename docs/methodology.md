@@ -21,10 +21,12 @@ For every round, one prompt, two warriors, in a tournament:
    maximum-likelihood** fit across every round judged so far in the tournament; ties count as
    half a win each.
 5. Bradley-Terry produces one rating per warrior, anchored so the field's geometric mean sits at
-   1000, plus a 200-resample percentile **bootstrap 95% confidence interval** on every rating.
+   1000, plus a 200-resample percentile **bootstrap 95% confidence interval** on every rating,
+   and a **length-controlled rating** that refits the same rounds with the jury's length
+   preference priced out.
 6. Alongside the rating, the run reports how often judges agreed with each other (Fleiss'/Cohen's
-   κ) and how often each individual judge flipped between seat orders, public, per-judge
-   evidence of how much to trust that vote.
+   κ), how often each individual judge flipped between seat orders, and the jury's fitted
+   **length coefficient**, public, per-judge evidence of how much to trust that vote.
 
 The rest of this page is the detail behind those six steps, plus what an actual 8-warrior run
 measured.
@@ -282,7 +284,9 @@ Every run is seeded and manifested so its rating can be audited or re-derived af
   `<output>.run.json` immediately at tournament start (config hash, prompt hash, roster, judge
   panel, replacement judges, quorum, the installed `evaluatorq` version, `started_at`) and
   rewrites it at the end with `finished_at` plus the closing report's `mean_agreement`,
-  `error_rounds`, `rated_rounds`, `category_counts`, `fleiss`, and token totals.
+  `error_rounds`, `rated_rounds`, `category_counts`, `fleiss`, `length_coef` (the jury's fitted
+  length coefficient, see [Style control](#style-control-the-length-confound-priced-out)), and
+  token totals.
 - **Content-addressed hashes, not filenames**: `config_sha256` and `prompts_sha256` are SHA-256
   digests (first 16 hex characters) of the serialized config and the newline-joined prompt texts,
   so two runs against the same config and prompt content are provably comparable even if either
@@ -315,6 +319,33 @@ rejected by a quorum sized for the original run's larger panel.
 This is the project's answer to "how do I know the ranking isn't just an artifact of which judges
 I happened to pick?", swap the jury, keep the responses, and measure rank stability directly
 instead of asserting it.
+
+## Human anchor: does the panel agree with people?
+
+Everything above measures the panel against itself. The human-anchor workflow measures it
+against people, the accuracy claim reliability metrics cannot make:
+
+1. `orq-arena annotate <log>` renders the recorded rounds into one self-contained, **blind**
+   annotation page (`src/orq_arena/anchor.py`): no model names, no jury votes, no verdicts in the
+   payload; rounds shuffled and sides swapped per round under a seed; round keys are one-way
+   hashes. The same seat-order discipline applied to the jury applies to the human, a rater
+   can't favor a side or a model they can't identify. Send the file to 2-3 raters (guidelines,
+   round count, and a time estimate are shown up front; the rubric shown is `--criteria`,
+   default identical to the jury's default).
+2. Each rater's votes come back as `votes.json`, exported in the canonical A/B frame (the page
+   un-flips before export, so vote files are independent of presentation order).
+3. `orq-arena anchor <log> votes.json […]` treats each human as one more judge and reports,
+   per rater: **Cohen's κ vs the panel majority** (over rounds where the panel was decisive;
+   inconclusive rounds are excluded from κ but still feed the human Bradley-Terry fit),
+   the **Spearman correlation between the human-vote Bradley-Terry ranking and the panel's**,
+   and, with several raters, **inter-annotator κ** per pair.
+
+Read the numbers the same way as the jury metrics: κ says whether the panel's round-level
+verdicts track human preference; the rank correlation says whether disagreements, where they
+exist, actually move the leaderboard. One residual bias survives the blinding: a rater who
+works with these models daily may recognize a family's prose style, the same self-preference
+caveat the jury carries, so prefer raters who don't, and report who rated alongside the
+numbers.
 
 ## Measured evidence: what a real 8-model run measured
 
@@ -362,10 +393,12 @@ Stated plainly, so you can weigh them against your own use case:
   this page, but well below the 20-comparison-per-category floor within a single round-robin run
   (`match.max_rounds=5` draws only 5 prompts per match). Treat the shipped bank as a smoke test,
   not a rigorous benchmark, until you supply your own larger prompt set.
-- **No human-anchor study yet.** Nothing in this project currently correlates jury verdicts
-  against blinded human preference judgments. The Fleiss'/Cohen's κ numbers above measure *judges
-  agreeing with each other*, not *judges agreeing with people*, a self-consistent panel is not
-  the same claim as an accurate one.
+- **No human-anchor *results* yet.** The workflow now exists
+  ([Human anchor](#human-anchor-does-the-panel-agree-with-people): `annotate` + `anchor`), but
+  no study has been run and published against it. Until then the Fleiss'/Cohen's κ numbers
+  above still only measure *judges agreeing with each other*, not *judges agreeing with
+  people*, a self-consistent panel is not the same claim as an accurate one. Target: 50-100
+  rounds, 2-3 blind raters.
 - **Style control covers length only.** The len-ctrl rating (see
   [Style control](#style-control-the-length-confound-priced-out)) corrects for response length;
   markdown/formatting covariates (headers, lists, bold), which LMArena's full style control also
