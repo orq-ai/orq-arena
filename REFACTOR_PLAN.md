@@ -352,29 +352,79 @@ leaderboard is just what three cheap models like."
 > `outputs/html/orc-arena-vs-chennai-report.html`
 > (https://claude.ai/code/artifact/c66af501-60ae-430c-a32e-8ec5093dd451).
 
-## PR 5 — Utility unlock: per-category rankings + run ergonomics (~+90 LOC, after PR 4)
+## PR 5 — Benchmark ergonomics (merged: original PR 5 + Harvest 02/03/09) · ~+550 LOC
 
-The upgrades that turn one vibes-number into router-decision evidence. Nothing here adds a
-subsystem — knobs and slices only.
+On branch `feat/chennai-harvest`. Nothing here adds a subsystem — knobs, slices, and two ports.
 
-1. **Categorized prompts → per-category ELO.** Prompt JSONL rows gain an optional
-   `category` field (untagged rows fall into `"general"`). `BattleRecord` carries it through;
-   the ELO step runs BT once overall and once per category with ≥ a minimum comparison count
-   (skip slices below ~20 comparisons rather than print noise). Leaderboard gets a category
-   picker; `run.json` records per-slice counts. This is the router pitch made concrete:
-   "sonnet leads reasoning, 4o leads coding — route accordingly." Ship 2–3 curated starter sets
-   (`prompts/reasoning.jsonl`, `prompts/coding.jsonl`, …) instead of one generic file.
-2. **Cost preflight.** Before the first API call, print: matches × rounds × judge calls
-   (panel × 2 orderings), plus a rough token estimate from config max-tokens — then proceed.
-   Good UX, and it demos gateway token accounting. `--yes` skips the pause.
-3. **Panel presets in config comments.** Document a `demo` panel (current cheap trio — fast,
-   pennies, fine for the show) vs a `strong` panel (frontier judges — for numbers you intend to
-   defend). No code, just an honest config file.
-4. **`--headless`.** Same run, no TUI: a null renderer drains the event queue and Rich-prints
-   match results + final table. For CI/cron benchmark generation. (~30 LOC — and the event queue
-   Finding 01 mocked finally gets its second consumer, legitimately this time.)
-5. *(Stretch)* Post-run static HTML export of leaderboard + CIs + jury table — a shareable
-   artifact per run. Only if PR 1–4 land clean; do not start here.
+1. **Fixture recorder/replayer** (Harvest 03, port ~150). `replay/recorder.py` + `loader.py`
+   from chennai: JSONL with `_meta` header, real inter-event delays from the clock, `.partial` →
+   atomic rename, abort. No mode field. `--record` / `--record-path` on `run`;
+   `demo --refresh` re-records the canonical fixture from a cheap real run (2 warriors, 1
+   prompt). Replay pacing keys: `space` pause, `+`/`-` speed, `0` reset.
+2. **Cost engine** (Harvest 02, port ~350 slimmed). `analysis/cost.py` without the per-provider
+   tokenizers: `prices.yaml` (USD/Mtok, optional `cached_input`, default-with-guess-flag),
+   `estimate_tournament_cost` pricing the `max_tokens`-bounded worst case, `compute_actual_cost`
+   over records. Leaderboard cost panel **splits judges vs warriors**. Impl-time check: does
+   `/v2/models` carry pricing metadata? If yes, generate `prices.yaml` from it; else hand-refresh
+   the table for the current roster (stale entries render as guesses).
+3. **Preflight** (before the first API call): matches × rounds × judge calls, est. cost range,
+   plus a **thinking probe** — one tiny call per warrior, flag any model whose
+   `reasoning_tokens > 0` despite the uniform-OFF pool (automates the kimi audit). Result goes to
+   `run.json` and the mixed-pool badge. `preflight: {thinking_probe: true}` config; `--yes` skips
+   the pause.
+4. **Per-category ELO.** Prompt rows already carry `category`; `BattleRecord` gets the field;
+   BT runs overall + per category with a ≥20-comparison floor; leaderboard category picker;
+   per-slice counts in `run.json`. Ship 2–3 curated prompt sets.
+5. **`--headless`** + **match concurrency** (Harvest 09, ~60): null renderer drains the queue,
+   Rich-prints match results + final table; matches run under an `asyncio.Semaphore`
+   (`headless_concurrency: 4` default — verify router rate limits at impl time). TUI runs stay
+   strictly sequential.
+6. **Panel presets** as config comments (demo trio vs frontier judges). No code.
+
+Acceptance: `run --record` → `demo` replays with live pacing; preflight prints cost + thinking
+audit; 4-model `--headless` run completes concurrently with correct ELO; category table renders.
+
+## PR 6 — Roster picker over the workspace catalog (Harvest 01) · ~+700 LOC
+
+1. **`providers/models_list.py`** (port): `GET /v2/router/models` (workspace-enabled subset) ∩
+   `GET /v2/models` (`type == "chat"`), on `api.orq.ai`; 24h cache at
+   `~/.cache/orq-arena/models.json`; `refresh-models` CLI command (`--show` groups by provider).
+2. **`roster_select.py`** (port, adapted): live-search input, provider chips, seed-order roster
+   panel, live cost estimate via PR 5's engine. Drop the `{2,4,8,16,32}` size gate — any ≥2.
+   `orc-arena run` with no `--config` opens the picker; `--config` skips it. Picked warriors get
+   orc names auto-assigned from a name pool; reasoning defaults to none (provider default) with
+   the preflight probe as the safety net.
+3. Ships default-styled; restyled by PR 8's theme.
+
+Acceptance: pick 3 models including one think-by-default → probe flags it → manifest records it.
+
+## PR 7 — Trust & insight (Harvest 04/06/07) · ~+560 LOC
+
+1. **Battle browser** (port ~350, adapted to schema v2): leaderboard key `B`; one judged round
+   per page — prompt, both responses, per-judge votes **with flip/abstain badges and reasoning**,
+   damage/HP deltas, reasoning-token counts. Arrow-key navigation.
+2. **κ statistics** (~80 from `judge_stats.py`): Fleiss' κ (+ Landis-Koch label) and pairwise
+   Cohen's κ over `judge_votes`; rendered in the jury panel and written to `run.json`. Their
+   position-bias section is *not* taken (superseded by evaluatorq's both-orders flips).
+3. **Per-model post-mortems** (rebuild ~150, not a port — chennai's uses `instructor`):
+   one analyzer call per warrior over its battles + `PairwiseVote.explanation` texts, structured
+   output via the existing router client; cached in `analysis.jsonl`; leaderboard key `M`.
+   `analyzer_model: openai/gpt-5.4-mini` config default.
+
+Acceptance: `B` pages through a real log; κ shows with its label; `M` renders a post-mortem.
+
+## PR 8 — Show polish (Harvest 05/08/10) · ~+250 LOC
+
+1. **CRT-neon theme** (port `theme.py` + widget restyle). Side identity: **A = magenta,
+   B = cyan** (owner decision 2026-07-12) — green/orange are reserved for HP states and
+   win/loss semantics. Never pure #000/#fff.
+2. **Post-demo CTA modal**: play-live / quit keys, `export ORQ_API_KEY` + orq.ai pointer.
+3. **Swiss auto-switch** for pools >8 (`SwissScheduler` port ~70): score-group pairing with
+   rematch avoidance; pairs by **match winner** (the HP show) while the rating stays per-round —
+   pairing quality affects efficiency only, never validity. ≤8 pools keep full round-robin.
+
+Acceptance: demo ends in the CTA; 10-model headless Swiss run produces per-round-fed ELO; fight
+screen screenshots read arcade.
 
 ## Reasoning-model support (folded across PRs 1–3)
 
@@ -570,6 +620,14 @@ judge-prompt DSLs, parallel match execution. Any of these returns only with a ti
 12. Streams are waited out, not raced: 1200s read-gap guard (config), no total cap, no router
     `call_timeout`. A round with an incomplete response is retried once, then voided — partial
     output is never judged, so slow thinking is never penalized.
+13. Side identity colors are A = magenta / B = cyan once the CRT theme lands (owner,
+    2026-07-12); green/orange are HP-state and win/loss colors only.
+14. Preflight runs a per-warrior thinking probe by default (config-off) — vendor-default
+    thinking is detected before it contaminates a run, not after.
+15. Swiss pairing consumes match winners (the show); the rating never stops being per-round.
+16. Post-mortem analyzer defaults to a cheap model (`openai/gpt-5.4-mini`), one call per warrior
+    per run, cached in `analysis.jsonl`.
+17. Harvest rule: features flow in from chennai, methodology never does.
 10. Visible chain-of-thought is rendered best-effort only ("thinking…" indicator is the
     guaranteed path) — the router's stable contract excludes CoT text.
 11. Warrior + judge traffic stays on `AsyncOpenAI`; orq-ai-sdk (typed reasoning controls,
