@@ -95,8 +95,8 @@ already set. `.env` is git-ignored; only `.env.example` is committed.
 
 `ORQ_API_KEY` is **not** required for `orq-arena demo` or `orq-arena list-warriors`, only for
 `run` and `rejudge`, which construct a gateway client. `refresh-models` wants it too, but
-degrades instead of failing: without a key the catalog fetch quietly falls back to the cache
-or the YAML roster. Full variable reference:
+degrades instead of failing: without a key the catalog fetch quietly falls back to any
+existing cache, else an empty list (the YAML-roster fallback belongs to `run`'s picker only). Full variable reference:
 [configuration.md](configuration.md#environment-variables).
 
 ---
@@ -156,11 +156,16 @@ warriors) against the default `prompts/starter.jsonl` (30 prompts, capped at `ma
 preflight: 28 matches × 5 rounds → 280 warrior streams + 840 judge calls + 8 probe calls
 ```
 
+The prompt set is swappable: `--prompts your_prompts.jsonl` for a local file (format:
+[Configuration](configuration.md#prompts-file-format)), or `--prompts orq:<dataset_id>` to
+fight over an [orq.ai Dataset](https://docs.orq.ai/docs/ai-studio/optimize/datasets) straight
+from your workspace, same API key.
+
 Add `--headless` for CI/cron, no TUI; matches run in parallel under `headless_concurrency`
 (default 4) through a Rich one-liner printer instead of the Textual show. `--headless`
 **requires** `--config`, there's no roster picker without a TUI. Full flag reference for
-`run` and every other subcommand (`demo`, `rejudge`, `list-warriors`, `refresh-models`):
-**[cli.md](cli.md)**.
+`run` and every other subcommand (`demo`, `rejudge`, `jury-compare`, `report`, `annotate`, `anchor`, `list-warriors`,
+`refresh-models`): **[cli.md](cli.md)**.
 
 ---
 
@@ -188,7 +193,7 @@ disk to re-score a run with a different jury, at no regeneration cost.
 real key from [my.orq.ai](https://my.orq.ai) > workspace settings > API keys, and re-run. This
 only fires on `run` or `rejudge`, `demo`, `list-warriors`, and `refresh-models` never
 construct a gateway client, so they run with no key at all (`refresh-models` just falls back
-to cached results).
+to cached results, or an empty list).
 
 **`Error: --headless needs --config (no picker without a TUI)`**
 `orq-arena run --headless` was run without `--config`. Headless mode has no roster picker, so

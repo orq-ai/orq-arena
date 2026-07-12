@@ -1,7 +1,7 @@
 <!-- generated-by: gsd-doc-writer -->
 # Testing
 
-Test suite reference for orq-arena, how to run it, what each of the 11 test files covers, the
+Test suite reference for orq-arena, how to run it, what each of the 21 test files covers, the
 headless Textual rendering pattern used for TUI screens, and how to add a new test.
 
 ## Framework and Setup
@@ -51,7 +51,7 @@ looking for them:
 uv run pytest
 ```
 
-Collects from `tests/` and runs all **41 tests across 11 files**. None of them touch the network
+Collects from `tests/` and runs all **84 tests across 21 files**. None of them touch the network
 or need an API key, and the whole run finishes in well under a second (0.86s measured locally;
 `uv run pytest --collect-only -q` alone takes about half that).
 
@@ -104,7 +104,7 @@ This is the exact command CI runs, see [CI Integration](#ci-integration).
 |---|---|---|
 | `tests/test_damage.py` | 6 | The damage adapter (`arena/damage.py::compute_damage`), evaluatorq's `PairwiseComparison` → HP damage. Unanimous vs. majority damage tiers, the guard that a single surviving decisive vote (after two abstentions) can never trigger the "unanimous" tier, a tie vote breaking unanimity, and zero damage / no round-cap tick on `tie` or `inconclusive`. |
 | `tests/test_battle_rounds.py` | 5 | `arena/battle.py::Battle.run()` round semantics, driven by an in-file `FakeGateway` (streams canned text, or raises for models in a `failing` set) and `FakeJury` (returns a canned `PairwiseComparison`, or asserts it's never called). Covers: a stream failure voiding the round without ever invoking the jury, the happy path (judged, damage applied, events emitted), `Battle.__init__` raising when every judge is also a contestant, KO not stopping the judging loop (all drawn prompts are still judged even after HP hits 0), and equal final HP resolving as a draw. |
-| `tests/test_elo.py` | 5 | Bradley-Terry MLE (`tournament/elo.py`), a clean sweep ranks the winner highest, identical win/loss records yield equal ratings, a tie splits rating movement evenly, ties shift ratings symmetrically relative to a shared opponent, and the bootstrap confidence interval brackets the point estimate with a real (non-zero-width) range. |
+| `tests/test_elo.py` | 9 | Bradley-Terry MLE (`tournament/elo.py`), a clean sweep ranks the winner highest, identical win/loss records yield equal ratings, a tie splits rating movement evenly, ties shift ratings symmetrically relative to a shared opponent, and the bootstrap confidence interval brackets the point estimate with a real (non-zero-width) range. Style control (`style_controlled_elo`): pure-length wins shrink the rating gap and expose a positive length coefficient, equal-length rows leave gamma at zero with the raw ranking intact, empty input yields a flat 1000 field. Plus `preflight.py::judge_family_overlaps` flagging a judge that shares a provider family with a warrior. |
 | `tests/test_scheduler.py` | 4 | The round-robin scheduler and per-round outcome feed (`tournament/driver.py`), every pair meets exactly once for 8 warriors (`C(8,2) = 28` matches, no self-pairs), the schedule is stable for a fixed seed, `outcomes_from_records` keeps wins/ties and skips `inconclusive`/voided rounds, and `elo_by_category` only emits a category once it has reached the 20-comparison floor. |
 | `tests/test_swiss.py` | 4 | `tournament/swiss.py::SwissScheduler`, the first round pairs everyone, round 2 avoids rematches and pairs round-1 winners against each other, an odd-sized pool floats exactly one competitor, and a recorded tie splits score credit 0.5/0.5. |
 | `tests/test_kappa.py` | 4 | Chance-corrected inter-judge agreement (`analysis/kappa.py`), perfect agreement yields `kappa == 1.0` with the `"almost perfect"` label, rounds with an abstaining judge are excluded from the Fleiss' calculation (`rounds_used` < `rounds_total`), pairwise Cohen's kappa is computed over co-voted rounds only, and `landis_koch()`'s label boundaries (e.g. `0.15` → `"slight"`, `0.75` → `"substantial"`). |
@@ -113,12 +113,23 @@ This is the exact command CI runs, see [CI Integration](#ci-integration).
 | `tests/test_fight_render.py` | 1 | Headless render pilot for `tui/screens/fight.py::FightScreen`, see [Headless Textual Render Tests](#headless-textual-render-tests). |
 | `tests/test_leaderboard_render.py` | 2 | Headless render pilots for `tui/screens/leaderboard.py::LeaderboardScreen`, with and without a report payload. |
 | `tests/test_browser_render.py` | 1 | Headless render pilot for `tui/screens/battle_browser.py::BattleBrowserScreen`. |
+| `tests/test_prompts.py` | 5 | Prompt loaders (`data/prompts.py`), JSONL rows parse with `prompt`/`text` fallback and category default, an orq.ai datapoint maps its last user message with `{{var}}` substitution from `inputs`, datapoints without a user turn are skipped, multi-part content joins its text parts, and the `orq:` scheme fails fast when the API key env var is missing. |
+| `tests/test_report.py` | 2 | The HTML report page (`report.py`), every section renders from a recorded run and `report_path_for` follows the `<log>.report.html` convention. |
+| `tests/test_rejudge_compare.py` | 1 | `rejudge.py` comparison table rows from a recorded run. |
+| `tests/test_anchor_items.py` | 5 | Blinded annotation items (`anchor.py`), one-way round keys, seeded shuffle, no model names leak. |
+| `tests/test_anchor_page.py` | 5 | The blinded annotation page renders self-contained with no verdict/name strings. |
+| `tests/test_anchor_math.py` | 8 | Human-vs-panel Cohen's κ and BT rank correlation from merged vote files. |
+| `tests/test_anchor_cli.py` | 3 | `annotate`/`anchor` command wiring and guards. |
+| `tests/test_anchor_serve.py` | 4 | `annotate --serve` localhost mode, votes POST to /save. |
+| `tests/test_headless_display.py` | 2 | The headless printer, plain lines on pipes and the progress bar on terminals. |
+| `tests/test_preflight_cost.py` | 4 | Preflight spend-ceiling estimate. |
+| `tests/test_prompts.py` | 5 | Prompt loading incl. `length_bucket` handling. |
 
 There is no shared `conftest.py` row because none exists, see [Framework and Setup](#framework-and-setup).
 
 ## Headless Textual Render Tests
 
-Four of the eleven files mount a real Textual screen inside a headless terminal and drive it
+Four of the 21 files mount a real Textual screen inside a headless terminal and drive it
 with Textual's own test harness, rather than only calling into the screen's methods and checking
 returned Python values. The pattern is the same in each:
 
@@ -194,7 +205,7 @@ its reason for existing.
 ## Coverage
 
 No coverage tooling is installed, `pytest-cov` is not in the `dev` dependency group, and CI
-enforces no coverage threshold. The only gate, locally and in CI, is that all 41 tests pass.
+enforces no coverage threshold. The only gate, locally and in CI, is that all 84 tests pass.
 
 ## CI Integration
 

@@ -10,8 +10,9 @@ every flag, default, and behavior documented below is read directly from it (plu
 [`providers/models_list.py`](../src/orq_arena/providers/models_list.py) for the two commands
 that delegate to them).
 
-It exposes five subcommands: [`run`](#run), [`demo`](#demo), [`list-warriors`](#list-warriors),
-[`rejudge`](#rejudge), and [`refresh-models`](#refresh-models). The `cli` group itself defines
+It exposes nine subcommands: [`run`](#run), [`demo`](#demo), [`list-warriors`](#list-warriors),
+[`rejudge`](#rejudge), [`jury-compare`](#jury-compare), [`report`](#report),
+[`annotate`](#annotate), [`anchor`](#anchor), and [`refresh-models`](#refresh-models). The `cli` group itself defines
 no flags beyond Click's built-in `--help`; there is no `--version` option. Every flag below
 lives on a specific subcommand.
 
@@ -211,7 +212,7 @@ orq-arena list-warriors [--config PATH]
 
 - Prints a fixed-width table, seed number, `orc_name` (falls back to the model's short name,
   see [configuration.md](configuration.md#warriors-the-roster)), and the full `model_id`, in
-  roster order, 1-indexed. Format string: `f"{'Seed':<5} {'Orc name':<26} Model ID"` for the
+  roster order, 1-indexed. Format string: `f"{'Seed':<5} {'Name':<26} Model ID"` for the
   header, `f"{i:<5} {w.orc_name:<26} {w.model_id}"` per row.
 
 **Example**, against the shipped `orq_arena.yaml` (8 warriors, none with a custom `orc_name`):
@@ -221,7 +222,7 @@ uv run orq-arena list-warriors
 ```
 
 ```text
-Seed  Orc name                   Model ID
+Seed  Name                   Model ID
 ----------------------------------------------------------------------
 1     claude-opus-4-8             anthropic/claude-opus-4-8
 2     claude-sonnet-4-6           anthropic/claude-sonnet-4-6

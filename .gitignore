@@ -17,3 +17,6 @@ outputs/
 # Textual screenshot default naming (root clutter from the `s` key)
 orc-arena_*.svg
 *_orc_arena_*.svg
+.planning/tmp/
+annotate.html
+votes*.json

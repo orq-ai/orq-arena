@@ -7,7 +7,7 @@ Guides for running, configuring, trusting, and extending the arena. The
 | Guide | Read it when you want to |
 |-------|--------------------------|
 | [Getting Started](getting-started.md) | Install, run the zero-key demo, and get your first live tournament running |
-| [CLI Reference](cli.md) | Look up any command or flag, `run`, `demo`, `rejudge`, `list-warriors`, `refresh-models` |
+| [CLI Reference](cli.md) | Look up any command or flag, `run`, `demo`, `rejudge`, `report`, `list-warriors`, `refresh-models` |
 | [Configuration](configuration.md) | Understand every `orq_arena.yaml` key, its type, default, and effect |
 | [Methodology](methodology.md) | See exactly how the ELO is made, judging protocol, Bradley-Terry, CIs, κ, and what a real run measured |
 | [Architecture](architecture.md) | Learn the component layout, event flow, and design invariants before changing code |

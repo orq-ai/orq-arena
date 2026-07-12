@@ -21,7 +21,7 @@ cd orq-arena
 uv sync
 
 # 3. Verify
-uv run pytest            # 41 tests, no network
+uv run pytest            # 84 tests, no network
 uv run orq-arena demo    # replay a recorded tournament, no API key
 ```
 

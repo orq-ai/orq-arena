@@ -23,6 +23,7 @@ dependencies = [
     "httpx>=0.27",
     # pairwise jury (llm_jury_pairwise landed in 1.3.x)
     "evaluatorq>=1.8.0",
+    "orq-ai-sdk>=4.11.7",
 ]
 
 [project.urls]

@@ -69,7 +69,7 @@ single one-way event queue. Core packages import zero `textual` today:
 
 | Layer | Packages | Role |
 |---|---|---|
-| Core | `cli.py`, `config.py`, `events.py`, `preflight.py`, `rejudge.py`, `headless.py`, `orcs/`, `providers/`, `tournament/`, `arena/`, `data/`, `analysis/` | Schedules matches, streams both sides, invokes the evaluatorq jury, scores damage, computes ELO/CIs/κ, the benchmark itself. |
+| Core | `cli.py`, `config.py`, `events.py`, `preflight.py`, `rejudge.py`, `anchor.py`, `report.py`, `headless.py`, `orcs/`, `providers/`, `tournament/`, `arena/`, `data/`, `analysis/` | Schedules matches, streams both sides, invokes the evaluatorq jury, scores damage, computes ELO/CIs/κ, the benchmark itself. |
 | Presentation | `tui/` (`app.py`, `screens/`, `widgets/`) | The only package that imports `textual`. Renders the CRT-neon show; a pure consumer. |
 
 The seam between them is [`events.py`](../src/orq_arena/events.py)`::ArenaEvent`, a pydantic

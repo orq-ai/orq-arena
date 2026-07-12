@@ -47,6 +47,9 @@ subcommand runs:
 ```python
 def _load_dotenv() -> None:
     """Read KEY=VALUE lines from ./.env into the env (never overriding it)."""
+    import os
+    from pathlib import Path
+
     env = Path(".env")
     if not env.is_file():
         return
@@ -245,7 +248,7 @@ config where the thinking budget meets or exceeds the output cap fails to load w
 (`ArenaConfig._validate`, `src/orq_arena/config.py`).
 
 The shipped `orq_arena.yaml` also documents which models it deliberately excludes from the
-default pool because the router can't disable their thinking (see the comment above `warriors:`
+default pool because the router can't disable their thinking (see the comment below the `warriors` list
 in that file), those belong in `configs/reasoning_arena.yaml` instead.
 
 ### `judges`, `replacement_judges`, `criteria`, `min_successful_judges`
@@ -273,6 +276,14 @@ Prompts are not part of `ArenaConfig`, the file is a separate `--prompts` CLI fl
 JSON object per line (JSONL), parsed by `load_prompts()` into a list of `PromptItem`
 (`src/orq_arena/data/prompts.py`).
 
+Instead of a file path, `--prompts orq:<dataset_id>` pulls the datapoints of an
+[orq.ai Dataset](https://docs.orq.ai/docs/ai-studio/optimize/datasets) through the orq-python
+SDK, authenticated with the same environment variable as the gateway (`gateway.api_key_env`).
+Mapping per datapoint: the last `user` message becomes the prompt text, `{{var}}` placeholders
+are filled from the datapoint's `inputs`, multi-part content is joined, and datapoints without
+a user message are skipped (the count is reported if the dataset yields nothing usable).
+Dataset prompts all land in the `general` category; `expected_output` is not read today.
+
 | Field | Type | Required | Effect |
 |---|---|---|---|
 | `prompt` | `str` | Required (or `text`, see below) | The prompt text, becomes `PromptItem.text`. |
@@ -289,7 +300,7 @@ The shipped `prompts/starter.jsonl` has 30 prompts across four categories: `code
 {"prompt": "Write a Python function that finds the longest palindromic substring in a given string. Explain your approach.", "category": "code", "length_bucket": "medium"}
 ```
 
-Note: some rows in the shipped file carry an extra `length_bucket` key (`short`/`medium`), it
+Note: every row in the shipped file carries a `length_bucket` key (`short`/`medium`), it
 is not read by `load_prompts()` today and has no effect on the run.
 
 ---
