@@ -1,0 +1,45 @@
+"""Round-robin scheduler + per-round outcome feed."""
+
+from orc_arena.data.schemas import BattleRecord
+from orc_arena.orcs.roster import WarriorSpec
+from orc_arena.tournament.driver import outcomes_from_records, round_robin_schedule
+
+
+def _w(i: int) -> WarriorSpec:
+    return WarriorSpec(orc_name=f"orc{i}", model_id=f"x/m{i}")
+
+
+def test_every_pair_exactly_once():
+    warriors = [_w(i) for i in range(8)]
+    schedule = round_robin_schedule(warriors)
+    assert len(schedule) == 28  # C(8,2)
+    pairs = {frozenset((a.orc_name, b.orc_name)) for a, b in schedule}
+    assert len(pairs) == 28
+    assert all(len(p) == 2 for p in pairs)  # no self-pairs
+
+
+def test_schedule_is_seed_stable():
+    warriors = [_w(i) for i in range(6)]
+    s1 = round_robin_schedule(warriors, seed=7)
+    s2 = round_robin_schedule(warriors, seed=7)
+    assert [(a.orc_name, b.orc_name) for a, b in s1] == [
+        (a.orc_name, b.orc_name) for a, b in s2
+    ]
+
+
+def _rec(majority: str, error: str | None = None) -> BattleRecord:
+    return BattleRecord(
+        prompt_hash="h", prompt_text="p", model_a="ma", model_b="mb",
+        majority_verdict=majority, error=error,
+    )
+
+
+def test_outcomes_include_wins_and_ties_skip_rest():
+    records = [_rec("A"), _rec("B"), _rec("tie"), _rec("inconclusive"),
+               _rec("inconclusive", error="void")]
+    out = outcomes_from_records(records, "Alpha", "Beta")
+    assert out == [
+        ("Alpha", "Beta", "winner"),
+        ("Beta", "Alpha", "winner"),
+        ("Alpha", "Beta", "tie"),
+    ]

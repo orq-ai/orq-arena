@@ -1,48 +1,58 @@
-"""Battle record — superset of orq-battlebench BattleRecord.
+"""Battle record — schema v2, one JSONL row per judged (or voided) round.
 
-Keeping the core fields byte-identical means orc-arena's battle log plugs
-straight into the orq-battlebench matrix-factorization training pipeline.
-Additive fields (hp_*, match_id, tournament_id, damage_dealt) are orc-arena
-specific and ignored by the router trainer.
+v2 replaces the hand-rolled judge schema with evaluatorq's reconciled
+``PairwiseVote`` dumps and drops orq-battlebench byte-compat (the token
+fields it promised were never real; these are).
 """
 
 from __future__ import annotations
 
 import time
-from typing import Literal
+from typing import Any
 
 from pydantic import BaseModel, Field
 
-from ..judges.schemas import JudgeResult
-
 
 class BattleRecord(BaseModel):
-    """A single prompt-turn battle record (orq-battlebench compatible)."""
+    """A single prompt-turn battle record."""
 
-    # --- orq-battlebench compatible core ---
+    schema_version: int = 2
+
     prompt_hash: str
     prompt_text: str
     prompt_category: str = ""
-    prompt_length_bucket: str = ""
 
     model_a: str = Field(description="Normalized name of model A (short_model).")
     model_b: str = Field(description="Normalized name of model B.")
     response_a: str = ""
     response_b: str = ""
 
-    judge_verdicts: list[JudgeResult] = Field(default_factory=list)
-    majority_verdict: Literal["A", "B", "TIE", "DISCARD"] = "DISCARD"
-    winner: str = ""
+    # evaluatorq PairwiseVote dumps: model, vote, flipped, completed,
+    # replacement, explanation.
+    judge_votes: list[dict[str, Any]] = Field(default_factory=list)
+    majority_verdict: str = "inconclusive"  # 'A' | 'B' | 'tie' | 'inconclusive'
+    winner: str = ""  # short_model | 'tie' | 'inconclusive' | 'void'
 
     tokens_a_in: int = 0
     tokens_a_out: int = 0
+    tokens_a_reasoning: int = 0
     tokens_b_in: int = 0
     tokens_b_out: int = 0
+    tokens_b_reasoning: int = 0
+    finish_reason_a: str = ""
+    finish_reason_b: str = ""
+    ttft_a_ms: int = 0
+    ttft_b_ms: int = 0
+    judge_tokens_in: int = 0
+    judge_tokens_out: int = 0
 
-    generation_type: Literal["augmentation", "new"] = "new"
+    # Set when the round was voided (stream failure after retry) — such a
+    # round is never judged and never scored.
+    error: str | None = None
+
     timestamp: float = Field(default_factory=time.time)
 
-    # --- orc-arena extensions (ignored by trainer) ---
+    # --- arena bookkeeping ---
     tournament_id: str = ""
     match_id: str = ""
     round_number: int = 0
