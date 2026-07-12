@@ -13,7 +13,7 @@ build/
 battles.jsonl
 battles.run.json
 analysis.jsonl
-outputs/smoke/
+outputs/
 # Textual screenshot default naming (root clutter from the `s` key)
 orc-arena_*.svg
 *_orc_arena_*.svg
