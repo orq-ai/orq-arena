@@ -12,12 +12,12 @@
       <stop offset="0" stop-color="#00342D" stop-opacity="0.95"/>
       <stop offset="1" stop-color="#00342D" stop-opacity="0"/>
     </linearGradient>
-    <!-- Fine vertical striations — the shimmering "glass" fractal texture -->
+    <!-- Fine vertical striations: the shimmering "glass" fractal texture -->
     <pattern id="streak" width="10" height="400" patternUnits="userSpaceOnUse">
       <rect x="0" width="1" height="400" fill="#FFFFFF" opacity="0.05"/>
       <rect x="5" width="2" height="400" fill="#00FFDD" opacity="0.045"/>
     </pattern>
-    <!-- orq.ai symbol — one pinwheel arm, reused 4x -->
+    <!-- orq.ai symbol: one pinwheel arm, reused 4x -->
     <g id="arm" fill="currentColor">
       <rect x="3" y="-26" width="19" height="19" rx="6.2"/>
       <rect x="26" y="-10" width="11.5" height="11.5" rx="3.8"/>

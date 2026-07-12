@@ -1,4 +1,4 @@
-"""Chance-corrected jury agreement — Fleiss' κ and pairwise Cohen's κ.
+"""Chance-corrected jury agreement, Fleiss' κ and pairwise Cohen's κ.
 
 Pure Python, textbook math (adapted from the chennai fork's judge_stats):
 
@@ -10,7 +10,7 @@ Pure Python, textbook math (adapted from the chennai fork's judge_stats):
 * Landis & Koch (1977) thresholds label the result.
 
 Categories are the decisive votes: A / B / tie. Abstentions are evaluatorq's
-consistency gate doing its job — they are not ratings and don't enter κ.
+consistency gate doing its job, they are not ratings and don't enter κ.
 """
 
 from __future__ import annotations

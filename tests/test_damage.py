@@ -1,4 +1,4 @@
-"""Damage adapter tests — evaluatorq PairwiseComparison → HP damage."""
+"""Damage adapter tests, evaluatorq PairwiseComparison → HP damage."""
 
 from evaluatorq import PairwiseComparison
 from evaluatorq.pairwise import PairwiseVote
@@ -31,7 +31,7 @@ def test_majority_b_deals_split_damage_to_a():
 
 def test_single_decisive_vote_is_never_unanimous():
     # Two judges abstained (flipped); one decisive A vote must not land the
-    # 30-damage "unanimous" hit — the Finding 05 guard.
+    # 30-damage "unanimous" hit, the Finding 05 guard.
     c = _cmp("A", [_vote("j1", "A"), _vote("j2", None, flipped=True), _vote("j3", None)])
     d = compute_damage(comparison=c, rules=RULES)
     assert (d.damage, d.loser_side) == (15, "b")

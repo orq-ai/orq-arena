@@ -1,4 +1,4 @@
-"""Textual App — wires the tournament engine to the TUI.
+"""Textual App, wires the tournament engine to the TUI.
 
 Flow:
   Title screen
@@ -123,7 +123,7 @@ class ArenaApp(App):
                 odd = surprises(probe)
                 if odd:
                     self.notify(
-                        f"🧠 thinks despite config: {', '.join(odd)} — ranking will be footnoted",
+                        f"🧠 thinks despite config: {', '.join(odd)}, ranking will be footnoted",
                         severity="warning", timeout=8,
                     )
             except Exception as exc:

@@ -1,4 +1,4 @@
-"""Fight screen — the main attraction.
+"""Fight screen, the main attraction.
 
 Layout:
   ┌─────────────────────────────────────────────┐
@@ -13,7 +13,7 @@ Layout:
   │ Judge cards (3 across)                      │
   └─────────────────────────────────────────────┘
 
-Side identity: A is magenta, B is cyan (CRT theme) — on the warrior cards,
+Side identity: A is magenta, B is cyan (CRT theme), on the warrior cards,
 the response panels, and the judge verdict cues.
 """
 
@@ -178,7 +178,7 @@ class FightScreen(Screen):
         if card is not None:
             card.set_verdict(verdict, reasoning, flipped=flipped, replacement=replacement)
             return
-        # A stand-in judge has no pre-built card — surface it on the status line.
+        # A stand-in judge has no pre-built card, surface it on the status line.
         self._status.update(f"[dim]stand-in[/dim] [b]{judge_name}[/b] votes {verdict}")
 
     def apply_damage(
@@ -188,25 +188,25 @@ class FightScreen(Screen):
         self._card_b.set_hp(hp_b)
         if majority in ("A", "B"):
             hit = self._orc_a if loser_side == "a" else self._orc_b
-            self._status.update(f"verdict [b]{majority}[/b] — [b red]{damage} damage[/b red] to {hit}")
+            self._status.update(f"verdict [b]{majority}[/b], [b red]{damage} damage[/b red] to {hit}")
         else:
-            self._status.update(f"verdict [b]{majority}[/b] — no damage")
-        # KO moment — the show ends here, the judging doesn't.
+            self._status.update(f"verdict [b]{majority}[/b], no damage")
+        # KO moment, the show ends here, the judging doesn't.
         for hp, card, orc in ((hp_a, self._card_a, self._orc_a), (hp_b, self._card_b, self._orc_b)):
             if hp == 0 and orc and orc not in self._ko_announced:
                 self._ko_announced.add(orc)
                 card.knock_out()
                 self.app.bell()
                 self._status.update(
-                    f"[b red]💀 K.O.![/b red] [b]{orc}[/b] is down — remaining rounds judged for the rating"
+                    f"[b red]💀 K.O.![/b red] [b]{orc}[/b] is down, remaining rounds judged for the rating"
                 )
 
     def round_voided(self, reason: str) -> None:
-        self._status.update(f"[yellow]⚠ round void — {reason}[/yellow]")
+        self._status.update(f"[yellow]⚠ round void, {reason}[/yellow]")
 
     def match_resolved(self, winner: str, by: str) -> None:
         if by == "draw":
-            self._status.update("[b]🤝 DRAW[/b] — even on HP; the rating heard every round anyway")
+            self._status.update("[b]🤝 DRAW[/b], even on HP; the rating heard every round anyway")
         elif by == "ko":
             self.app.bell()
             self._status.update(f"[b red]💀 K.O.![/b red]  [b]{winner}[/b] wins!")

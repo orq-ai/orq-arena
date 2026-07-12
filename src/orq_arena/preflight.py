@@ -1,6 +1,6 @@
 """Pre-run checks: exact call counts and a per-warrior thinking probe.
 
-No dollar figures — counts are exact, prices are guesses (plan decision 18).
+No dollar figures, counts are exact, prices are guesses (plan decision 18).
 The probe automates the audit that caught kimi-k2.6 burning its whole token
 budget on vendor-default thinking: one tiny call per warrior, flag anything
 that produces reasoning despite its config.
@@ -57,7 +57,7 @@ async def _probe_one(gateway: OrqGateway, w: WarriorSpec) -> tuple[str, dict[str
                 think_chunks += 1
         reasoning_tokens = usage.get("reasoning_tokens", 0)
         # The router under-reports reasoning_tokens on some providers
-        # (Anthropic returns 0 while thinking) — visible CoT chunks count too.
+        # (Anthropic returns 0 while thinking), visible CoT chunks count too.
         thinks = reasoning_tokens > 0 or think_chunks > 0
         return w.orc_name, {
             "model": w.model_id,

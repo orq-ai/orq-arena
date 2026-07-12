@@ -1,7 +1,7 @@
 [project]
 name = "orq-arena"
 version = "0.1.0"
-description = "LLM arena benchmark: models battle in a terminal arena, an evaluatorq pairwise jury judges, Bradley-Terry ELO comes out — every token via the orq.ai router gateway."
+description = "LLM arena benchmark: models battle in a terminal arena, an evaluatorq pairwise jury judges, and a Bradley-Terry ELO ranking comes out; every token flows through the orq.ai router gateway."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }

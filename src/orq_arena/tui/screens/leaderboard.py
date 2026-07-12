@@ -1,4 +1,4 @@
-"""Leaderboard screen — final ELO rankings with the statistics that make
+"""Leaderboard screen, final ELO rankings with the statistics that make
 them defensible: bootstrap CIs, per-judge jury behaviour, verbosity, and a
 win grid. Renders plain (rank/ELO only) when no report is available, e.g.
 replaying an old fixture."""
@@ -59,19 +59,19 @@ class LeaderboardScreen(Screen):
             agreement = r.get("mean_agreement")
             if agreement is not None and agreement < 0.6:
                 yield Static(
-                    f"⚠ low-confidence ranking — judges agreed only {agreement:.0%} "
+                    f"⚠ low-confidence ranking, judges agreed only {agreement:.0%} "
                     "of the time; treat adjacent ranks as unordered",
                     classes="warn",
                 )
             if r.get("mixed_pool"):
                 yield Static(
                     "⚠ mixed pool: thinking-enabled (🧠) and disabled warriors share "
-                    "this ranking — cost/latency differ by design",
+                    "this ranking, cost/latency differ by design",
                     classes="warn",
                 )
             if r.get("error_rounds"):
                 yield Static(
-                    f"{r['error_rounds']} round(s) voided on stream failure — "
+                    f"{r['error_rounds']} round(s) voided on stream failure, "
                     "never judged, never rated",
                     classes="warn",
                 )
@@ -86,18 +86,18 @@ class LeaderboardScreen(Screen):
                     (tok["judges_in"] + tok["judges_out"]) / max(1, total_in + total_out)
                 )
                 yield Static(
-                    f"tokens — warriors {tok['warriors_in']:,} in / {tok['warriors_out']:,} out"
+                    f"tokens, warriors {tok['warriors_in']:,} in / {tok['warriors_out']:,} out"
                     f"   ·   jury {tok['judges_in']:,} in / {tok['judges_out']:,} out"
                     f"   ({jury_share:.0%} of all tokens went to judging)",
                     classes="section",
                 )
 
             if r.get("elo_by_category"):
-                yield Static("BY CATEGORY — Bradley-Terry per prompt slice", classes="section")
+                yield Static("BY CATEGORY, Bradley-Terry per prompt slice", classes="section")
                 yield DataTable(id="cats")
 
             if r.get("jury"):
-                yield Static("THE JURY ROOM — per-judge behaviour", classes="section")
+                yield Static("THE JURY ROOM, per-judge behaviour", classes="section")
                 yield DataTable(id="jury")
                 fleiss = r.get("fleiss") or {}
                 if fleiss.get("kappa") is not None:
@@ -112,7 +112,7 @@ class LeaderboardScreen(Screen):
                         classes="section",
                     )
             if r.get("win_grid"):
-                yield Static("WIN GRID — row beats column (ties = ½)", classes="section")
+                yield Static("WIN GRID, row beats column (ties = ½)", classes="section")
                 yield DataTable(id="grid")
 
             yield Static(f"battle log → {self._log_path}   ·   manifest → *.run.json", id="log-path")

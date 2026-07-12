@@ -1,4 +1,4 @@
-"""Prompt panel — shows the current turn's prompt."""
+"""Prompt panel, shows the current turn's prompt."""
 
 from __future__ import annotations
 

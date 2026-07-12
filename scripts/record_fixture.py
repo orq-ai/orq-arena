@@ -1,6 +1,6 @@
 """Dev script: regenerate fixtures/demo_tournament.json from a tiny real run.
 
-Not product surface — run this when the event schema or vocabulary changes
+Not product surface, run this when the event schema or vocabulary changes
 (roughly once a quarter). Needs ORQ_API_KEY. Costs a few cents.
 
     uv run python scripts/record_fixture.py

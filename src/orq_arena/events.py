@@ -1,7 +1,7 @@
 """Typed events emitted by the engine and consumed by the TUI + fixture replay.
 
 All events are ``pydantic.BaseModel`` so the ``demo`` fixture can round-trip
-them as JSON. The engine never calls into the TUI directly — it pushes events
+them as JSON. The engine never calls into the TUI directly, it pushes events
 into an ``asyncio.Queue``.
 
 Verdict vocabulary follows evaluatorq's pairwise contract:
@@ -48,7 +48,7 @@ class ResponseChunk(BaseModel):
 
 
 class ThinkingChunk(BaseModel):
-    """Best-effort visible reasoning delta — optional per router contract."""
+    """Best-effort visible reasoning delta, optional per router contract."""
 
     type: Literal["thinking_chunk"] = "thinking_chunk"
     match_id: str
@@ -79,7 +79,7 @@ class JudgeVerdictEvent(BaseModel):
 
 
 class RoundVoided(BaseModel):
-    """A side's stream failed after retry — round never judged, never scored."""
+    """A side's stream failed after retry, round never judged, never scored."""
 
     type: Literal["round_voided"] = "round_voided"
     match_id: str

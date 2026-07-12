@@ -1,8 +1,8 @@
-"""Per-model post-mortems — "why did I win, why did I lose?".
+"""Per-model post-mortems, "why did I win, why did I lose?".
 
 One analyzer call per warrior: its battles, its own responses (trimmed), and
 the judges' reconciled explanations go to a cheap analyzer model that returns
-a structured summary. Cached in ``analysis.jsonl`` next to the battle log —
+a structured summary. Cached in ``analysis.jsonl`` next to the battle log,
 re-running the leaderboard doesn't re-spend tokens.
 
 Rebuilt from the chennai concept on the existing router client (no
@@ -73,7 +73,7 @@ def _battles_for(model: str, records: list[BattleRecord]) -> list[dict]:
 
 _SYSTEM = (
     "You are a blunt performance coach for LLMs in a pairwise arena. Given one "
-    "model's rounds — prompts, its responses, outcomes, and the judges' notes — "
+    "model's rounds, prompts, its responses, outcomes, and the judges' notes, "
     "identify recurring strengths, recurring weaknesses, and patterns in what "
     "judges praised or punished. Be specific and evidence-based; no flattery. "
     "Respond ONLY with JSON: {\"strengths\": [..], \"weaknesses\": [..], "

@@ -30,7 +30,7 @@ def compute_damage(*, comparison: PairwiseComparison, rules: MatchRules) -> Dama
         return DamageResult(damage=rules.damage_tie, loser_side="none", counts_toward_cap=False)
 
     decisive = [v for v in comparison.votes if v.vote in ("A", "B", "tie")]
-    # "Unanimous" needs at least two decisive votes agreeing on the winner —
+    # "Unanimous" needs at least two decisive votes agreeing on the winner,
     # a degraded panel can never land the big hit on its own say-so.
     unanimous = len(decisive) >= 2 and all(v.vote == winner for v in decisive)
     damage = rules.damage_unanimous if unanimous else rules.damage_majority

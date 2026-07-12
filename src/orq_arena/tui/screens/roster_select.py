@@ -1,9 +1,9 @@
-"""Roster picker — choose the pool from your orq.ai workspace catalog.
+"""Roster picker, choose the pool from your orq.ai workspace catalog.
 
 Opens first on ``orq-arena run`` (unless ``--config`` pins the YAML roster).
 Fetches the workspace-enabled chat catalog once (24h cache), filters locally:
 live-search input, provider chips, and a seed-order roster panel. Any pool
-size ≥ 2 — the arena is a round-robin, not a bracket.
+size ≥ 2, the arena is a round-robin, not a bracket.
 
 Shows exact call counts as you pick (matches × rounds × judge calls), never
 dollar estimates (plan decision 18).
@@ -111,7 +111,7 @@ class RosterSelectScreen(Screen):
         self._chips: list[_ProviderChip] = []
 
         self._hud = Static("", classes="hud-line", markup=True)
-        self._search = Input(placeholder="search models — / to focus, esc to leave")
+        self._search = Input(placeholder="search models, / to focus, esc to leave")
         self._providers_row = Horizontal(id="providers-row")
         self._picker: SelectionList[str] = SelectionList()
         self._roster_header = Static("", markup=True)
@@ -182,15 +182,15 @@ class RosterSelectScreen(Screen):
         src = {
             "loading": "[dim]contacting gateway…[/dim]",
             "live": "[green]LIVE[/green] [dim]workspace-enabled catalog[/dim]",
-            "cache": "[yellow]CACHE[/yellow] [dim]~/.cache/orq-arena/models.json — refresh-models to update[/dim]",
-            "fallback": "[red]FALLBACK[/red] [dim]gateway unreachable — YAML roster only[/dim]",
+            "cache": "[yellow]CACHE[/yellow] [dim]~/.cache/orq-arena/models.json, refresh-models to update[/dim]",
+            "fallback": "[red]FALLBACK[/red] [dim]gateway unreachable, YAML roster only[/dim]",
         }.get(self._source, "")
         self._status_line.update(
             f"{src}   [dim]·   {len(self._visible())}/{len(self._all_models)} models shown[/dim]"
         )
         self._roster_header.update(f"[b]YOUR POOL[/b] [dim]({n}, seed order)[/dim]")
         if not self._chosen:
-            self._roster_list.update("[dim]empty — SPACE to add models[/dim]")
+            self._roster_list.update("[dim]empty, SPACE to add models[/dim]")
         else:
             lines = []
             for i, mid in enumerate(self._chosen, 1):

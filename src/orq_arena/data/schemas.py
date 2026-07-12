@@ -1,4 +1,4 @@
-"""Battle record — schema v2, one JSONL row per judged (or voided) round.
+"""Battle record, schema v2, one JSONL row per judged (or voided) round.
 
 v2 replaces the hand-rolled judge schema with evaluatorq's reconciled
 ``PairwiseVote`` dumps and drops orq-battlebench byte-compat (the token
@@ -46,7 +46,7 @@ class BattleRecord(BaseModel):
     judge_tokens_in: int = 0
     judge_tokens_out: int = 0
 
-    # Set when the round was voided (stream failure after retry) — such a
+    # Set when the round was voided (stream failure after retry), such a
     # round is never judged and never scored.
     error: str | None = None
 

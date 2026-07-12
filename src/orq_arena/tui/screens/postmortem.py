@@ -1,4 +1,4 @@
-"""Post-mortem screen — per-model "why did I win / lose" coaching cards.
+"""Post-mortem screen, per-model "why did I win / lose" coaching cards.
 
 Pushed from the leaderboard via ``M``. One analyzer call per model (cheap,
 configurable), cached in ``analysis.jsonl`` so revisits are free.
@@ -47,7 +47,7 @@ class PostmortemScreen(Screen):
         self._cards: dict[str, Static] = {}
 
     def compose(self) -> ComposeResult:
-        yield Static("THE COACH'S NOTES — per-model post-mortems", id="title")
+        yield Static("THE COACH'S NOTES, per-model post-mortems", id="title")
         with VerticalScroll(id="cards"):
             for model in self._models():
                 card = Static(f"[b]{escape(model)}[/b]\n[dim]analyzing…[/dim]",
@@ -74,7 +74,7 @@ class PostmortemScreen(Screen):
             client = OrqGateway(self._cfg.gateway).client
         except RuntimeError as exc:  # no API key (e.g. demo replay)
             for card in self._cards.values():
-                card.update(f"[yellow]needs a live run — {escape(str(exc))}[/yellow]")
+                card.update(f"[yellow]needs a live run, {escape(str(exc))}[/yellow]")
             return
         for model, card in self._cards.items():
             pm = cached.get(model)

@@ -145,7 +145,7 @@ async def test_all_judges_contestants_raises(monkeypatch):
 
 async def test_ko_does_not_stop_the_judging(monkeypatch):
     # 30 HP, 30-damage unanimous verdicts: Beta is KO'd in round 1, but both
-    # remaining prompts are still judged — KO is rendering, not sampling.
+    # remaining prompts are still judged, KO is rendering, not sampling.
     comparison = PairwiseComparison(
         winner="A",
         votes=[PairwiseVote(model="x/j1", vote="A"), PairwiseVote(model="x/j2", vote="A")],

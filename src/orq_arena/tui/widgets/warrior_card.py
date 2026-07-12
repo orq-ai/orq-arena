@@ -1,7 +1,7 @@
-"""Warrior card — name, model, HP bar with damage flashes, ELO.
+"""Warrior card, name, model, HP bar with damage flashes, ELO.
 
 Child widget references are stored directly on the card instance so we never
-query by ID — two WarriorCards can be mounted on the same screen without
+query by ID, two WarriorCards can be mounted on the same screen without
 colliding on shared IDs.
 """
 

@@ -1,4 +1,4 @@
-"""CRT-neon palette — dark arcade glass, loud neon foregrounds.
+"""CRT-neon palette, dark arcade glass, loud neon foregrounds.
 
 Ported from the chennai fork. One module so every widget draws from the same
 colors. Side identity (owner decision 13): **A = magenta, B = cyan**;

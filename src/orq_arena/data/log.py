@@ -1,4 +1,4 @@
-"""Battle log writer — append-only JSONL compatible with orq-battlebench."""
+"""Battle log writer, append-only JSONL compatible with orq-battlebench."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ class BattleLog:
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        # Truncate on open — one tournament per run.
+        # Truncate on open, one tournament per run.
         self.path.write_text("")
 
     def append(self, battle: BattleRecord) -> None:
