@@ -162,10 +162,12 @@
       </tbody>
     </table>
     </div>
-    <div class="callout warn"><b>Standing risks:</b> evaluatorq is pinned to a git SHA of an unreleased 1.3.0
-    (re-pin on release); the model registry drifts (one preview model broke mid-refactor — the picker +
-    probe mitigate but don't eliminate); Anthropic reasoning-token accounting is still wrong upstream
-    (reported, watch for the fix).</div>
+    <div class="callout warn"><b>Standing risks:</b> the model registry drifts (one preview model broke
+    mid-refactor — the picker + probe mitigate but don't eliminate); Anthropic reasoning-token accounting
+    is still wrong upstream (reported, watch for the fix). <i>Resolved since first publication:</i> the
+    evaluatorq git-SHA pin — the "1.3.0 unreleased" premise came from a stale CHANGELOG header in the
+    sibling checkout; PyPI had long since shipped, and the dependency is now the official
+    <code>evaluatorq&gt;=1.8.0</code> release with the path override removed.</div>
     <div class="callout good"><b>One-line verdict:</b> the instrument is honest, the show is dressed, the
     story is written in its own run logs. What stands between A− and A is not code — it's one full
     tournament watched end to end, and a merge button.</div>
