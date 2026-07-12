@@ -74,6 +74,18 @@ header input{font:inherit;padding:4px 8px;border:1px solid var(--line);border-ra
   background:var(--paper);cursor:pointer}
 .bar button:hover{border-color:var(--teal)}
 .bar .key{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.gate{max-width:640px;margin:48px auto;background:var(--card);border:1px solid var(--line);
+  border-radius:12px;padding:28px 34px}
+.gate h2{margin-top:0;color:var(--teal)}
+.gate ul{padding-left:20px} .gate li{margin-bottom:6px}
+.gate .stats{font-family:var(--mono);font-size:13px;color:var(--muted);margin:14px 0}
+.gate input{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;
+  width:100%;margin:6px 0 16px}
+.gate button{font:inherit;padding:10px 22px;border:none;border-radius:8px;
+  background:var(--teal);color:#fff;cursor:pointer}
+.gate button:disabled{opacity:.4;cursor:default}
+.gate .big{font-size:17px}
+.hidden{display:none}
 """
 
 _PAGE_JS = r"""
@@ -114,6 +126,15 @@ function canon(side, it){
   if(side==='tie')return 'tie';
   return (side==='left')===(!it.f)?'A':'B';
 }
+let view='intro';
+function show(name){
+  view=name;
+  for(const v of ['intro','annotate','done'])
+    document.getElementById('view-'+v).classList.toggle('hidden',v!==name);
+  document.getElementById('bar').classList.toggle('hidden',name!=='annotate');
+  if(name==='annotate')render();
+  if(name==='done')renderDone();
+}
 function render(){
   const it=D.items[idx];
   const l=it.f?it.b:it.a, r=it.f?it.a:it.b;
@@ -126,11 +147,25 @@ function render(){
   document.getElementById('lpane').classList.toggle('voted',v===canon('left',it));
   document.getElementById('rpane').classList.toggle('voted',v===canon('right',it));
 }
+function renderDone(){
+  const n=Object.keys(votes).length, total=D.items.length;
+  document.getElementById('prog').textContent='done · voted '+n+' / '+total;
+  document.getElementById('done-stats').textContent=
+    n+' of '+total+' rounds voted'+(n<total?' ('+(total-n)+' skipped)':'');
+  document.getElementById('done-hint').textContent=downloaded
+    ? 'votes.json downloaded. Send it back to whoever sent you this file.'
+    : 'One step left: download your votes and send the file back.';
+}
+function start(){
+  const name=document.getElementById('annotator-in').value.trim();
+  document.getElementById('annotator').value=name;
+  show('annotate');
+}
 function vote(side){const it=D.items[idx];
   if(side==='skip'){delete votes[it.k];}else{votes[it.k]=canon(side,it);}
   try{localStorage.setItem(cacheKey,JSON.stringify(votes));}catch(e){}
   if(idx<D.items.length-1){idx++;render();}
-  else{render(); if(Object.keys(votes).length===D.items.length) download();}
+  else{show('done');}
 }
 function download(){
   const name=document.getElementById('annotator').value||'anonymous';
@@ -138,23 +173,50 @@ function download(){
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([JSON.stringify(payload,null,1)],{type:'application/json'}));
   a.download='votes.json'; a.click(); downloaded=true;
+  if(view==='done')renderDone();
 }
 document.addEventListener('keydown',e=>{
-  if(e.target.tagName==='INPUT')return;
+  if(e.target.tagName==='INPUT'){
+    if(e.key==='Enter'&&view==='intro')start();
+    return;
+  }
+  if(view==='intro'){ if(e.key==='Enter')start(); return; }
+  if(view==='done'){
+    if(e.key==='ArrowLeft'){idx=D.items.length-1;show('annotate');}
+    return;
+  }
   if(e.key==='a')vote('left'); else if(e.key==='b')vote('right');
   else if(e.key==='t')vote('tie'); else if(e.key===' '){e.preventDefault();vote('skip');}
-  else if(e.key==='ArrowRight'&&idx<D.items.length-1){idx++;render();}
+  else if(e.key==='ArrowRight'){ if(idx<D.items.length-1){idx++;render();} else show('done'); }
   else if(e.key==='ArrowLeft'&&idx>0){idx--;render();}
 });
 window.addEventListener('beforeunload',e=>{
   if(Object.keys(votes).length&&!downloaded)e.preventDefault();});
-render();
+document.getElementById('n-items').textContent=D.items.length;
+document.getElementById('n-mins').textContent=Math.max(1,Math.round(D.items.length*45/60));
+document.getElementById('criteria').textContent=D.criteria;
+show('intro');
 """
 
 
-def render_annotate_page(items: list[dict], *, seed: int, source: str) -> str:
-    """One self-contained blinded page; votes leave only via download."""
-    payload = json.dumps({"seed": seed, "source": source, "items": items})
+DEFAULT_CRITERIA = (
+    "Accuracy and correctness, helpfulness and completeness, "
+    "clarity, and relevance to the prompt."
+)
+
+
+def render_annotate_page(
+    items: list[dict], *, seed: int, source: str, criteria: str = DEFAULT_CRITERIA
+) -> str:
+    """One self-contained blinded page; votes leave only via download.
+
+    Three views: intro (what this is, round count, expected time, guidelines,
+    rater name), the annotation duel, and a done screen with an explicit
+    download step; no surprise auto-download.
+    """
+    payload = json.dumps(
+        {"seed": seed, "source": source, "criteria": criteria, "items": items}
+    )
     payload = payload.replace("</", "<\\/")  # keep the closing script tag inert
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
@@ -163,14 +225,48 @@ def render_annotate_page(items: list[dict], *, seed: int, source: str) -> str:
 <style>{_PAGE_CSS}</style></head><body>
 <div class="wrap">
 <header><b>blind annotation</b>
-<input id="annotator" placeholder="your name">
+<input id="annotator" type="hidden">
 <span class="prog" id="prog"></span></header>
+
+<div id="view-intro" class="gate">
+<h2>Compare two AI answers, pick the better one</h2>
+<p>You will see one prompt and two anonymous responses at a time. You don't know which
+model wrote which, and the sides are shuffled every round on purpose.</p>
+<p class="stats"><span id="n-items"></span> rounds · roughly <span id="n-mins"></span> min ·
+keys: <b>a</b> left better, <b>b</b> right better, <b>t</b> tie, <b>space</b> skip,
+arrows to move around</p>
+<h3>Guidelines</h3>
+<ul>
+<li>Read both responses fully before voting; don't reward the first or the longer one.</li>
+<li>Weigh: <span id="criteria"></span></li>
+<li>Prefer <b>tie</b> when both are genuinely comparable; prefer <b>skip</b> when the
+topic is out of your depth. Neither hurts the study; forced guesses do.</li>
+<li>When you finish, a final screen lets you download <code>votes.json</code>;
+send that file back to whoever sent you this page.</li>
+</ul>
+<label>Your name (attached to your votes)</label>
+<input id="annotator-in" placeholder="e.g. dana">
+<button class="big" onclick="start()">Start annotating ⏎</button>
+</div>
+
+<div id="view-annotate" class="hidden">
 <div class="prompt" id="prompt"></div>
 <div class="duel">
 <div class="resp left" id="lpane"><div id="left"></div></div>
 <div class="resp right" id="rpane"><div id="right"></div></div>
 </div>
-<div class="bar">
+</div>
+
+<div id="view-done" class="gate hidden">
+<h2>All rounds seen ✓</h2>
+<p class="stats" id="done-stats"></p>
+<p id="done-hint"></p>
+<button class="big" onclick="download()">Download votes.json</button>
+<p class="stats">Missed something? Left arrow goes back to the rounds; skipped rounds
+can still be voted.</p>
+</div>
+
+<div class="bar hidden" id="bar">
 <button onclick="vote('left')">1 better <span class="key">a</span></button>
 <button onclick="vote('tie')">tie <span class="key">t</span></button>
 <button onclick="vote('right')">2 better <span class="key">b</span></button>

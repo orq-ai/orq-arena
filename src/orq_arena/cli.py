@@ -318,7 +318,10 @@ def refresh_models(config_path: str, show: bool) -> None:
 @click.option("--sample", type=int, default=None,
               help="Annotate a seeded random subset instead of every round.")
 @click.option("--seed", type=int, default=42, show_default=True)
-def annotate(battle_log: str, out_path: str, sample: int | None, seed: int) -> None:
+@click.option("--criteria", default=None,
+              help="Judging guidelines shown to the rater; default matches the jury's default.")
+def annotate(battle_log: str, out_path: str, sample: int | None, seed: int,
+             criteria: str | None) -> None:
     """Render a blinded human-annotation page from a recorded run.
 
     The page is one self-contained HTML file: open it locally or send it
@@ -327,7 +330,7 @@ def annotate(battle_log: str, out_path: str, sample: int | None, seed: int) -> N
     """
     from pathlib import Path
 
-    from .anchor import annotation_items, render_annotate_page
+    from .anchor import DEFAULT_CRITERIA, annotation_items, render_annotate_page
     from .rejudge import load_records
 
     records = load_records(battle_log)
@@ -335,7 +338,8 @@ def annotate(battle_log: str, out_path: str, sample: int | None, seed: int) -> N
         raise click.ClickException(f"no judgeable rounds in {battle_log}")
     items = annotation_items(records, seed=seed, sample=sample)
     Path(out_path).write_text(
-        render_annotate_page(items, seed=seed, source=Path(battle_log).name)
+        render_annotate_page(items, seed=seed, source=Path(battle_log).name,
+                             criteria=criteria or DEFAULT_CRITERIA)
     )
     click.echo(f"{len(items)} rounds -> {out_path} (blind; votes export as votes.json)")
 
