@@ -1,8 +1,8 @@
 """Round-robin scheduler + per-round outcome feed."""
 
-from orc_arena.data.schemas import BattleRecord
-from orc_arena.orcs.roster import WarriorSpec
-from orc_arena.tournament.driver import outcomes_from_records, round_robin_schedule
+from orq_arena.data.schemas import BattleRecord
+from orq_arena.orcs.roster import WarriorSpec
+from orq_arena.tournament.driver import outcomes_from_records, round_robin_schedule
 
 
 def _w(i: int) -> WarriorSpec:
@@ -46,7 +46,7 @@ def test_outcomes_include_wins_and_ties_skip_rest():
 
 
 def test_elo_by_category_respects_floor():
-    from orc_arena.tournament.driver import elo_by_category
+    from orq_arena.tournament.driver import elo_by_category
 
     # 25 code outcomes (passes the 20 floor), 3 math (skipped)
     outcomes = [("a", "b", "winner", "code")] * 25 + [("b", "a", "winner", "math")] * 3

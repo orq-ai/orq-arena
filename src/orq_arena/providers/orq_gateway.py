@@ -22,7 +22,7 @@ class OrqGateway:
         api_key = os.environ.get(cfg.api_key_env, "")
         if not api_key:
             raise RuntimeError(
-                f"{cfg.api_key_env} is not set. Export it before running orc-arena."
+                f"{cfg.api_key_env} is not set. Export it before running orq-arena."
             )
         self._cfg = cfg
         # read = max silence between stream chunks; generous so thinking models

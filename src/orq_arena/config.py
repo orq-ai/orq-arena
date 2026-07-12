@@ -1,4 +1,4 @@
-"""orc_arena.yaml loader + Pydantic config models."""
+"""orq_arena.yaml loader + Pydantic config models."""
 
 from __future__ import annotations
 
@@ -44,7 +44,7 @@ class PreflightConfig(BaseModel):
 
 
 class ArenaConfig(BaseModel):
-    """Top-level orc-arena config."""
+    """Top-level orq-arena config."""
 
     match: MatchRules = Field(default_factory=MatchRules)
     preflight: PreflightConfig = Field(default_factory=PreflightConfig)

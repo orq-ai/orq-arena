@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from textual.app import App
 
-from orc_arena.tui.screens.fight import FightScreen
+from orq_arena.tui.screens.fight import FightScreen
 
 
 class _Host(App):

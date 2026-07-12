@@ -1,6 +1,6 @@
-# orc-arena — reasoning pool: the "does thinking help?" benchmark.
-# Uniform thinking-ON counterpart of the default orc_arena.yaml.
-# Run: orc-arena run --config configs/reasoning_arena.yaml
+# orq-arena — reasoning pool: the "does thinking help?" benchmark.
+# Uniform thinking-ON counterpart of the default orq_arena.yaml.
+# Run: orq-arena run --config configs/reasoning_arena.yaml
 
 match:
   starting_hp: 100

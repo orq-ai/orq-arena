@@ -9,7 +9,7 @@ from .config import load_config
 from .data.prompts import load_prompts
 from .tui.app import ArenaApp
 
-DEFAULT_CONFIG = "orc_arena.yaml"
+DEFAULT_CONFIG = "orq_arena.yaml"
 DEFAULT_PROMPTS = "prompts/starter.jsonl"
 DEFAULT_OUTPUT = "battles.jsonl"
 DEFAULT_FIXTURE = "fixtures/demo_tournament.json"
@@ -23,9 +23,25 @@ def _quiet_logs() -> None:
     logger.add(sys.stderr, level="ERROR")
 
 
+def _load_dotenv() -> None:
+    """Read KEY=VALUE lines from ./.env into the env (never overriding it)."""
+    import os
+    from pathlib import Path
+
+    env = Path(".env")
+    if not env.is_file():
+        return
+    for line in env.read_text().splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            key, _, value = line.partition("=")
+            os.environ.setdefault(key.strip(), value.strip().strip("'\""))
+
+
 @click.group()
 def cli() -> None:
-    """orc-arena — LLM arena benchmark: orq.ai router + evaluatorq jury."""
+    """orq-arena — LLM arena benchmark: orq.ai router + evaluatorq jury."""
+    _load_dotenv()
 
 
 @cli.command()

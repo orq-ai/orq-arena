@@ -8,7 +8,7 @@ from pathlib import Path
 from textual.app import App
 from textual.widgets import DataTable
 
-from orc_arena.tui.screens.leaderboard import LeaderboardScreen
+from orq_arena.tui.screens.leaderboard import LeaderboardScreen
 
 FIXTURE = Path(__file__).resolve().parent.parent / "fixtures" / "demo_tournament.json"
 

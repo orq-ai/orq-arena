@@ -1,6 +1,6 @@
 """Roster picker — choose the pool from your orq.ai workspace catalog.
 
-Opens first on ``orc-arena run`` (unless ``--config`` pins the YAML roster).
+Opens first on ``orq-arena run`` (unless ``--config`` pins the YAML roster).
 Fetches the workspace-enabled chat catalog once (24h cache), filters locally:
 live-search input, provider chips, and a seed-order roster panel. Any pool
 size ≥ 2 — the arena is a round-robin, not a bracket.

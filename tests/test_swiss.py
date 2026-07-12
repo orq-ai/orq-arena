@@ -1,6 +1,6 @@
 """Swiss pairing: score groups, rematch avoidance, odd float."""
 
-from orc_arena.tournament.swiss import SwissScheduler
+from orq_arena.tournament.swiss import SwissScheduler
 
 
 def test_first_round_pairs_everyone():

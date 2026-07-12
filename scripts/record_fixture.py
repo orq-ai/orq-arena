@@ -12,9 +12,9 @@ import asyncio
 import json
 from pathlib import Path
 
-from orc_arena.config import ArenaConfig
-from orc_arena.data.prompts import PromptItem
-from orc_arena.tournament.driver import run_tournament
+from orq_arena.config import ArenaConfig
+from orq_arena.data.prompts import PromptItem
+from orq_arena.tournament.driver import run_tournament
 
 CFG = ArenaConfig.model_validate(
     {

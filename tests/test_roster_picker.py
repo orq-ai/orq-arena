@@ -5,10 +5,10 @@ from __future__ import annotations
 from textual.app import App
 from textual.widgets import SelectionList
 
-from orc_arena.config import ArenaConfig
-from orc_arena.orcs.roster import WarriorSpec, assign_warriors
-from orc_arena.providers.models_list import ModelEntry, _parse_payload, _filter_by_type
-from orc_arena.tui.screens.roster_select import RosterSelectScreen
+from orq_arena.config import ArenaConfig
+from orq_arena.orcs.roster import WarriorSpec, assign_warriors
+from orq_arena.providers.models_list import ModelEntry, _parse_payload, _filter_by_type
+from orq_arena.tui.screens.roster_select import RosterSelectScreen
 
 
 def test_parse_payload_strips_non_chat_and_dupes():
