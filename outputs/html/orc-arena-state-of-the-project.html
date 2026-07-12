@@ -1,0 +1,283 @@
+<title>orc-arena — Post-G1 State of the Project</title>
+<style>
+  :root {
+    --ivory: #f8f5ec; --paper: #fffdf7; --slate: #2a2d33; --slate-soft: #4a4f57;
+    --oat: #ded6c3; --oat-line: #e7e0d0; --clay: #b45739; --olive: #6f7748;
+    --gold: #b8892b; --green: #55713f; --muted: #8a8578; --evq: #44607f;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    --mono: "SF Mono", "JetBrains Mono", "Fira Code", ui-monospace, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--ivory); color: var(--slate); font-family: var(--sans); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 0 28px 96px; }
+  header.page { border-bottom: 3px double var(--oat); padding: 56px 0 30px; margin-bottom: 8px; }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--clay); margin: 0 0 14px; }
+  h1 { font-family: var(--serif); font-weight: 600; font-size: 40px; line-height: 1.12; margin: 0 0 12px; text-wrap: balance; }
+  .dateline { font-family: var(--mono); font-size: 13px; color: var(--muted); }
+  .dateline b { color: var(--slate-soft); font-weight: 600; }
+  h2 { font-family: var(--serif); font-size: 25px; font-weight: 600; margin: 52px 0 6px; padding-bottom: 8px; border-bottom: 1px solid var(--oat-line); }
+  h2 .num { font-family: var(--mono); font-size: 14px; color: var(--clay); margin-right: 12px; vertical-align: 2px; }
+  h3 { font-family: var(--serif); font-size: 18px; font-weight: 600; margin: 26px 0 4px; }
+  p { margin: 10px 0; }
+  .lede { font-size: 17px; color: var(--slate-soft); }
+  code { font-family: var(--mono); font-size: 0.86em; background: #efe9db; padding: 1px 5px; border-radius: 3px; color: #7a3a26; }
+  a { color: var(--clay); }
+  .verdict { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 14px; margin: 30px 0 8px; }
+  .vcard { background: var(--paper); border: 1px solid var(--oat-line); border-radius: 10px; padding: 18px 18px 16px; }
+  .vcard .label { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; }
+  .vcard .big { font-family: var(--serif); font-size: 34px; font-weight: 600; line-height: 1; }
+  .vcard .sub { font-size: 12.5px; color: var(--slate-soft); margin-top: 6px; }
+  .grade-strip { border-top: 3px solid var(--clay); }
+  .callout { background: var(--paper); border-left: 4px solid var(--clay); border-radius: 0 8px 8px 0; padding: 16px 20px; margin: 22px 0; }
+  .callout.good { border-left-color: var(--green); }
+  .callout.warn { border-left-color: var(--gold); }
+  table { border-collapse: collapse; width: 100%; margin: 18px 0; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--oat-line); vertical-align: top; }
+  th { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); border-bottom: 1.5px solid var(--oat); }
+  td.n { font-family: var(--mono); white-space: nowrap; }
+  .tablewrap { overflow-x: auto; }
+  .grades { margin: 20px 0; }
+  .grade-row { display: grid; grid-template-columns: 62px 62px 1fr; gap: 14px; align-items: start; padding: 14px 0; border-bottom: 1px solid var(--oat-line); }
+  .grade-badge { font-family: var(--serif); font-weight: 600; font-size: 26px; text-align: center; line-height: 1.7; border-radius: 10px; border: 1.5px solid var(--oat); background: var(--paper); }
+  .grade-badge.old { opacity: 0.45; }
+  .g-a { color: #3f6b2f; border-color: #a9c78f; background: #eef4e6; }
+  .g-b { color: #6a7530; border-color: #cad39a; background: #f3f2e0; }
+  .g-c { color: #8a6510; border-color: #e0c98d; background: #f6ecd6; }
+  .grade-row .axis { font-family: var(--serif); font-size: 17px; font-weight: 600; }
+  .grade-row .why { font-size: 13.5px; color: var(--slate-soft); margin-top: 2px; }
+  .pill { display: inline-block; font-family: var(--mono); font-size: 11px; padding: 1px 8px; border-radius: 20px; border: 1px solid var(--oat); color: var(--slate-soft); white-space: nowrap; }
+  .pill.p1 { background: #f6e2dc; border-color: #e2b7a8; color: #9c3f26; }
+  .pill.p2 { background: #f6ecd6; border-color: #e0c98d; color: #8a6510; }
+  .pill.p3 { background: #e7efdd; border-color: #b8cf9e; color: #465e33; }
+  ul.tight { margin: 8px 0; padding-left: 20px; }
+  ul.tight li { margin: 5px 0; }
+  pre.diagram { font-family: var(--mono); font-size: 12.5px; line-height: 1.5; background: var(--paper); border: 1px solid var(--oat-line); border-radius: 10px; padding: 18px 22px; overflow-x: auto; color: var(--slate-soft); }
+  pre.diagram b { color: var(--slate); }
+  pre.diagram .evq { color: var(--evq); font-weight: 600; }
+  pre.diagram .clay { color: var(--clay); font-weight: 600; }
+  .status-done { color: var(--green); font-weight: 600; }
+  .status-open { color: var(--gold); font-weight: 600; }
+  .footer { margin-top: 60px; padding-top: 18px; border-top: 3px double var(--oat); font-size: 12.5px; color: var(--muted); font-family: var(--mono); }
+  @media (max-width: 720px) { .verdict { grid-template-columns: 1fr 1fr; } .grade-row { grid-template-columns: 50px 50px 1fr; } }
+</style>
+<div class="wrap">
+
+  <header class="page">
+    <p class="eyebrow">Project Report · Post-G1 State of the Project</p>
+    <h1>The refactor is done and battle-tested. The launch is a checklist, not a rewrite.</h1>
+    <p class="dateline"><b>2026-07-12</b> · branch <code>feat/chennai-harvest</code> · 47 commits ahead of master ·
+    4,172 src LOC (2,429 core / 1,743 TUI) · 41 tests · earlier reports:
+    <a href="https://claude.ai/code/artifact/cb006f76-6fec-4586-a550-a18bfc91617a">analysis</a> ·
+    <a href="https://claude.ai/code/artifact/f02388ad-5f11-4f0a-b152-0dd414f18996">refactor</a> ·
+    <a href="https://claude.ai/code/artifact/c66af501-60ae-430c-a32e-8ec5093dd451">harvest</a> ·
+    <a href="https://claude.ai/code/artifact/969f030d-db1c-4b70-b550-6a98b337ab98">grade</a> ·
+    <a href="https://claude.ai/code/artifact/e705dc27-507c-4e14-ad72-651a7b5b2e90">plan</a></p>
+  </header>
+
+  <section>
+    <p class="lede">Short answers first. <b>Yes — the refactoring you commissioned is fully implemented</b>,
+    and as of today it is also <b>verified at full scale</b>: the G1 dress rehearsal ran all 8 warriors through
+    28 matches and 140 judged rounds in 10.7 minutes, unattended, with zero voided rounds. It caught three real
+    bugs (all fixed same-day) and produced the strongest evidence yet that the instrument is honest: 93%
+    decisive-vote agreement, Fleiss' κ 0.815, and a ranking that holds at Spearman 0.83 under a different jury.
+    <b>Grade: A−</b>, up from a provisional A− that had never been stress-tested — the engineering is now an A;
+    what keeps the project off A+ is validation and packaging, not code. What remains before going public is a
+    sequenced launch track (merge, kit, one experiment, four PRs), already written down, none of it risky.</p>
+    <div class="verdict grade-strip">
+      <div class="vcard"><p class="label">Grade</p><div class="big" style="color:var(--green)">A−</div>
+        <p class="sub">Engineering A · validation B− · was B− three days ago.</p></div>
+      <div class="vcard"><p class="label">Refactor scope</p><div class="big" style="color:var(--olive)">100%</div>
+        <p class="sub">All 8 PRs + G1 verified live. Launch track (G2–G4, PRs 9–12) is separate, ahead.</p></div>
+      <div class="vcard"><p class="label">G1 rehearsal</p><div class="big" style="color:var(--clay)">140/140</div>
+        <p class="sub">rounds judged, 0 voids, 10.7 min, 840 judge calls. Three bugs caught → fixed.</p></div>
+      <div class="vcard"><p class="label">To public</p><div class="big" style="color:var(--evq)">3 tiers</div>
+        <p class="sub">Demo-ready this week · usable tool (PR 9–10) · citable benchmark (PR 11–12).</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">01</span>Is the refactoring implemented? Ask the original brief</h2>
+    <p>Every item of the original commission, against what is on the branch today:</p>
+    <div class="tablewrap">
+    <table>
+      <thead><tr><th>You asked for</th><th>Status</th><th>What shipped</th></tr></thead>
+      <tbody>
+        <tr><td>Remove tournament modes, "less and more focused"</td><td class="status-done">done</td>
+          <td>Bracket deleted. One mode: round-robin (auto-Swiss above 8 warriors). Pickers choose <i>what</i> to test, never <i>how</i>.</td></tr>
+        <tr><td>Use evaluatorq entirely for judging</td><td class="status-done">done</td>
+          <td>Every verdict from <code>llm_jury_pairwise</code> (official PyPI ≥1.8.0): both orderings per judge, flip ⇒ recorded abstention, replacement judges, min-2 quorum. The hand-rolled judge panel is gone.</td></tr>
+        <tr><td>Arena-only ELO benchmark of a model pool</td><td class="status-done">done</td>
+          <td>Per-round Bradley-Terry with ties, bootstrap 95% CIs, per-category slices, Fleiss/Cohen κ, seeded manifests, schema-v2 <code>battles.jsonl</code>. KO is presentation; all rounds feed the rating.</td></tr>
+        <tr><td>Promote orq router + evaluatorq</td><td class="status-done">done</td>
+          <td>Every token — warriors, judges, analyzer, probe — through <code>api.orq.ai/v3/router</code>; every verdict through evaluatorq; CTA screen after demo.</td></tr>
+        <tr><td>Support reasoning models correctly</td><td class="status-done">done</td>
+          <td>Config-only <code>reasoning:</code> passthrough, uniform thinking-OFF default pool (live-verified), preflight thinking probe, streamed CoT window, reasoning-token column, timeouts that never punish thinking (1200s read-gap, void-not-lose).</td></tr>
+        <tr><td>Model names, not orc names</td><td class="status-done">done</td>
+          <td><code>orc_name</code> defaults to the short model name everywhere; demo fixture regenerated today after it surfaced the last stale-name bug.</td></tr>
+        <tr><td>A cool Show-HN TUI that generates real data</td><td class="status-done">done</td>
+          <td>CRT-neon theme (A magenta / B cyan), roster picker over the live workspace catalog, damage drama, judge cards with flip badges, battle browser, post-mortem coach — all four screens verified over the real 140-round log.</td></tr>
+        <tr><td><i>Prove it end-to-end</i> (the gap flagged in the last grade)</td><td class="status-done">done</td>
+          <td>G1 dress rehearsal, 2026-07-12. Full checklist and artifacts in <code>REFACTOR_PLAN.md</code> + <code>outputs/g1/</code>.</td></tr>
+        <tr><td>Merge to master, launch kit, validation study</td><td class="status-open">open</td>
+          <td>By design: gates G2–G4 and PRs 9–12 are the launch track, sequenced in the plan. Master is still the pre-refactor toy until G2.</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">02</span>The architecture after the refactor</h2>
+    <p>The codebase is a pipeline with one spine (a typed event queue) and two consumers (TUI, headless
+    printer). Nothing downstream of the engine can affect a verdict — the show is strictly a viewer.</p>
+    <pre class="diagram">
+ orc_arena.yaml ──▶ <b>config.py</b> (pydantic, validated knobs)
+                        │
+        <b>cli.py</b> run / demo / rejudge / list-warriors / refresh-models
+                        │
+                  <b>preflight.py</b>  exact call counts + thinking probe (1 call/warrior)
+                        │
+              <b>tournament/driver.py</b>  round-robin (Swiss &gt;8) · seeded prompt slices
+                │       │        └─ per-round BT-MLE + bootstrap CIs (<b>tournament/elo.py</b>)
+                │  <b>arena/battle.py</b>  the only place a round happens
+                │       ├─ streams both sides via <b>providers/orq_gateway.py</b> ──▶ <span class="clay">api.orq.ai/v3/router</span>
+                │       ├─ verdict via <span class="evq">evaluatorq.llm_jury_pairwise</span> (panel minus contestants)
+                │       ├─ damage via <b>arena/damage.py</b> (unanimity needs ≥2 decisive)
+                │       └─ stream failure → retry → <b>round voided</b>, never scored
+                │
+         ┌──────┴───────────────────────┐
+   asyncio.Queue[<b>events.py</b>]      <b>data/log.py</b> + <b>schemas.py</b>
+         │                        battles.jsonl (schema v2) + *.run.json manifest
+   ┌─────┴──────┐                       │
+ <b>tui/app.py</b>   <b>headless.py</b>        <b>analysis/</b> κ (Fleiss/Cohen) · post-mortems (cached)
+ 4 screens    Rich printer,      <b>rejudge.py</b>  swap the jury over a recorded log,
+ + theme      parallel matches                zero regeneration → Spearman rank delta</pre>
+    <div class="tablewrap">
+    <table>
+      <thead><tr><th>Module</th><th>LOC</th><th>Role</th></tr></thead>
+      <tbody>
+        <tr><td class="n">tournament/</td><td class="n">502</td><td>Scheduling (round-robin, Swiss), BT-MLE + CIs, final report, manifest.</td></tr>
+        <tr><td class="n">arena/</td><td class="n">408</td><td>One battle = stream → judge → damage → record. Void policy lives here.</td></tr>
+        <tr><td class="n">providers/</td><td class="n">276</td><td>Router client (streaming, reasoning passthrough, usage capture) + workspace model catalog (v2∩v2, 24h cache).</td></tr>
+        <tr><td class="n">analysis/ + rejudge</td><td class="n">451</td><td>Agreement stats, per-model coach notes, jury-swap audit.</td></tr>
+        <tr><td class="n">data/ + events + config</td><td class="n">349</td><td>Schema-v2 records, typed event vocabulary, validated config.</td></tr>
+        <tr><td class="n">cli + preflight + headless</td><td class="n">385</td><td>Entry points; cost preview + thinking probe; CI-grade parallel runner.</td></tr>
+        <tr><td class="n">tui/</td><td class="n">1,743</td><td>The optional show: 42% of the code, 0% of the benchmark. PR 9 makes this literal (<code>orc-arena[tui]</code> extra).</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <div class="callout"><b>Design invariants</b> (each one is a decision in the plan's log):
+      one mode, ever · every verdict from evaluatorq, both orderings, flips abstain · unanimity needs ≥2
+      decisive votes — no jury-of-one · network failure voids a round, it never scores · thinking is never
+      timeout-penalized · KO is theater, the rating uses all judged rounds · leaderboard names are model
+      names · budgets/pricing belong to the orq platform, not this repo.</div>
+  </section>
+
+  <section>
+    <h2><span class="num">03</span>What G1 proved (and what it caught)</h2>
+    <p>The dress rehearsal existed because nothing beyond 3 models had ever run end to end. Result: the
+    pipeline is boringly reliable — and the run bought three bug fixes and one recalibrated assumption.</p>
+    <div class="tablewrap">
+    <table>
+      <thead><tr><th>Measure</th><th>Result</th><th>Reading</th></tr></thead>
+      <tbody>
+        <tr><td>Completion</td><td class="n">28/28 matches · 140/140 rounds · 10.7 min · 0 voids</td>
+          <td>Unattended, concurrency 4. Token accounting complete on every round.</td></tr>
+        <tr><td>Champion</td><td class="n">claude-opus-4-8 · ELO 1267 (CI 1090–1938)</td>
+          <td>Sonnet 1239, deepseek-chat 1154 close behind; CIs overlap — the tool says so itself.</td></tr>
+        <tr><td>Jury honesty</td><td class="n">93% agreement · Fleiss' κ 0.815</td>
+          <td>When decisive votes exist, judges agree almost perfectly.</td></tr>
+        <tr><td>Judge-robustness</td><td class="n">Spearman 0.83 under a swapped panel</td>
+          <td><code>rejudge</code> re-scored all 140 rounds with a different jury; ranking held. A solo judge managed only 0.50 — panels matter, and the tool can prove it about itself.</td></tr>
+        <tr><td>Inconclusive share</td><td class="n">48.6% — gate said &lt;25%</td>
+          <td>The one "failure" — and it indicted the gate, not the run. 59 of 68 inconclusives are
+          position-bias abstentions (judge flip rates 30–45%; even gpt-5.1 flips 25%), only 6 are true splits.
+          The consistency gate is being honest about close frontier pairs. New proposed gate: rated ≥50%,
+          κ ≥ 0.6, agreement ≥ 85% — this run passes all three.</td></tr>
+        <tr><td>Cost shape</td><td class="n">jury = 87% of all tokens</td>
+          <td>1.47M judge-in vs 219k warrior-out. Both-orderings judging is the product; this is its price tag, printed on the leaderboard.</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <div class="callout good"><b>Three catches, all fixed same-day</b> (commits <code>c4820ca</code>,
+    <code>fbe8b9d</code>): ① <code>rejudge</code> crashed on panels smaller than the run's quorum — clamped.
+    ② the end-of-run manifest rewrite clobbered <code>started_at</code> — preserved, <code>finished_at</code>
+    added. ③ <code>judge_max_tokens: 512</code> silently starved thinking-by-default judges — gemini-2.5-flash
+    lost <i>every</i> vote to a length error and a 74%-flip replacement covered for it; the cap is now 2048
+    (a cap, not a cost). Plus today's user-reported catch: the demo replayed a pre-rename fixture and blanked
+    the warrior names — fixture regenerated, and unknown names now render instead of silently skipping.</div>
+  </section>
+
+  <section>
+    <h2><span class="num">04</span>The grade, axis by axis</h2>
+    <div class="grades">
+      <div class="grade-row"><div class="grade-badge old g-a">A−</div><div class="grade-badge g-a">A</div>
+        <div><div class="axis">Code quality &amp; architecture</div><div class="why">Now verified at scale, not
+        just clean on paper. Event spine, zero-Textual core path, every G1 bug fixed within the hour with a
+        test-green suite.</div></div></div>
+      <div class="grade-row"><div class="grade-badge old g-a">A</div><div class="grade-badge g-a">A</div>
+        <div><div class="axis">Statistical honesty</div><div class="why">The instrument reports its own
+        uncertainty everywhere — and when its own launch gate was miscalibrated, the data said so and the gate
+        moved, not the numbers.</div></div></div>
+      <div class="grade-row"><div class="grade-badge old g-a">A</div><div class="grade-badge g-a">A</div>
+        <div><div class="axis">Reuse &amp; scope discipline</div><div class="why">evaluatorq judges, router
+        carries, chennai's 8 best features ported, one mode, $-cost still deferred. Cuts stayed cut.</div></div></div>
+      <div class="grade-row"><div class="grade-badge old g-c">C+</div><div class="grade-badge g-b">B−</div>
+        <div><div class="axis">Validation &amp; citability</div><div class="why">New evidence: 140-round run,
+        κ 0.815, rejudge robustness 0.83. Still missing: a real prompt bank (30 prompts today), judge sanity
+        suite, length-control, human anchor. This axis is the A+ gate and it is PR 11, not more code
+        elsewhere.</div></div></div>
+      <div class="grade-row"><div class="grade-badge old g-b">B+</div><div class="grade-badge g-b">B+</div>
+        <div><div class="axis">Tests</div><div class="why">41 green, including the render pilots that keep
+        catching Textual API traps. G1's screen checks ran as scripts — folding them into the suite is cheap
+        and worth it.</div></div></div>
+      <div class="grade-row"><div class="grade-badge old g-b">B+</div><div class="grade-badge g-a">A−</div>
+        <div><div class="axis">Show-readiness</div><div class="why">All four screens verified over real data;
+        README-grade SVGs exported; demo fixed today. Missing only the kit: README, GIF, post draft.</div></div></div>
+    </div>
+    <div class="callout warn"><b>Overall: A−.</b> The engineering earned its A this morning. The project keeps
+    the minus because "benchmark someone else can trust" is a claim about validation, and validation is
+    scheduled (PR 11), not done. No amount of TUI polish moves this — the human anchor study does.</div>
+  </section>
+
+  <section>
+    <h2><span class="num">05</span>Path to public, in three tiers</h2>
+    <p>"Public worth it" means three different bars depending on the audience. They stack — each tier is
+    shippable on its own.</p>
+    <div class="tablewrap">
+    <table>
+      <thead><tr><th>#</th><th>Step</th><th>Why it gates the tier</th><th>Size</th></tr></thead>
+      <tbody>
+        <tr><td class="n" colspan="4" style="background:#f6e2dc33"><span class="pill p1">Tier 1 — Show-HN demo · this week</span></td></tr>
+        <tr><td class="n">G2</td><td><b>Merge train.</b> <code>gnhf/…</code> → master, <code>feat/chennai-harvest</code> → master.</td>
+          <td>Master is still the pre-refactor toy — anyone who clones today gets the B−. Nothing ships before this.</td><td class="n">½ day</td></tr>
+        <tr><td class="n">G3</td><td><b>Show-HN kit.</b> README with the exported SVGs, a demo GIF, post draft.</td>
+          <td>The story writes itself: "individual judges flip 30–45% under order swap; the gated panel still ranks at Spearman 0.83 — the tool proves it about itself."</td><td class="n">1 day</td></tr>
+        <tr><td class="n">G4</td><td><b>Strong-panel rejudge.</b> One command over the G1 log with opus / gpt-5.4 / gemini-pro; publish κ + Spearman vs the cheap trio.</td>
+          <td>Pre-empts the first objection ("your judges are cheap"). The infrastructure ran twice today; this is a config change and ~$5–10.</td><td class="n">½ day</td></tr>
+        <tr><td class="n" colspan="4" style="background:#f6ecd633"><span class="pill p2">Tier 2 — a tool people use · ~1 week</span></td></tr>
+        <tr><td class="n">PR 9</td><td><b>Library-first inversion.</b> Core imports zero Textual; <code>orc-arena bench</code> becomes the primary CLI (writes <code>report.json</code>, exit-code assertions for CI); <code>pip install orc-arena[tui]</code> for the show; <code>run_benchmark()</code> API.</td>
+          <td>This is the actual public artifact — a pool-ranking layer evaluatorq doesn't have, shaped to become <code>evaluatorq.arena</code> later.</td><td class="n">2–3 days</td></tr>
+        <tr><td class="n">PR 10</td><td><b>Ops hardening.</b> <code>--resume</code>, 429 backoff-with-jitter before voiding, <code>--dry-run</code>, regularized BT for sparse pools, <code>merge</code> command.</td>
+          <td>Strangers' runs fail in ways yours don't. Resume + backoff is the difference between a demo and a tool.</td><td class="n">2 days</td></tr>
+        <tr><td class="n" colspan="4" style="background:#e7efdd55"><span class="pill p3">Tier 3 — a benchmark people cite · ~2–3 weeks</span></td></tr>
+        <tr><td class="n">PR 11</td><td><b>Validation.</b> Prompt bank 150–300 stratified by category; judge sanity suite (known-answer pairs); length-controlled judging toggle; <b>small human anchor study</b> — agreement of the panel with human preferences on a sample.</td>
+          <td>The citability gate. Every serious reader asks "do the judges track humans?" — today the honest answer is "unknown."</td><td class="n">1–2 wks</td></tr>
+        <tr><td class="n">PR 12</td><td><b>Publication surface.</b> One-file HTML report per run (verdict banner, CIs, κ, grids), <code>METHODS.md</code>, OSS kit (license, contributing, issue templates).</td>
+          <td>A benchmark is a document, not a terminal screenshot. This turns every run into something linkable.</td><td class="n">2–3 days</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <div class="callout"><b>Recommendation:</b> ship Tier 1 now — the demo is genuinely good and the
+    flip-badge story is novel. Say "early benchmark, validation study in progress" out loud in the post;
+    HN respects a tool that grades itself honestly. Tiers 2–3 proceed behind the launch on their own
+    schedule.</div>
+  </section>
+
+  <div class="footer">
+    orc-arena · post-G1 report · 2026-07-12 · G1 artifacts in <code>outputs/g1/</code> (log, manifest,
+    2 rejudge runs, SVGs) · plan: <code>REFACTOR_PLAN.md</code> ·
+    <a href="https://claude.ai/code/artifact/e705dc27-507c-4e14-ad72-651a7b5b2e90">rendered plan</a>
+  </div>
+
+</div>
