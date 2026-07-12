@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 400" width="1280" height="400"
+     font-family="'Helvetica Neue', 'Inter', Arial, sans-serif">
+  <defs>
+    <!-- Fractal wash: Glowing Turquoise glow anchored to the top edge -->
+    <linearGradient id="wash" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#00FFDD" stop-opacity="0.50"/>
+      <stop offset="0.5" stop-color="#00FFDD" stop-opacity="0.07"/>
+      <stop offset="1" stop-color="#00FFDD" stop-opacity="0"/>
+    </linearGradient>
+    <!-- Left-side fade so the text block sits on solid Deep Teal -->
+    <linearGradient id="fade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#00342D" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#00342D" stop-opacity="0"/>
+    </linearGradient>
+    <!-- Fine vertical striations — the shimmering "glass" fractal texture -->
+    <pattern id="streak" width="10" height="400" patternUnits="userSpaceOnUse">
+      <rect x="0" width="1" height="400" fill="#FFFFFF" opacity="0.05"/>
+      <rect x="5" width="2" height="400" fill="#00FFDD" opacity="0.045"/>
+    </pattern>
+    <!-- orq.ai symbol — one pinwheel arm, reused 4x -->
+    <g id="arm" fill="currentColor">
+      <rect x="3" y="-26" width="19" height="19" rx="6.2"/>
+      <rect x="26" y="-10" width="11.5" height="11.5" rx="3.8"/>
+    </g>
+    <g id="mark">
+      <use href="#arm"/>
+      <use href="#arm" transform="rotate(90)"/>
+      <use href="#arm" transform="rotate(180)"/>
+      <use href="#arm" transform="rotate(270)"/>
+    </g>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1280" height="400" fill="#00342D"/>
+  <rect width="1280" height="400" fill="url(#wash)"/>
+  <rect width="1280" height="400" fill="url(#streak)"/>
+
+  <!-- Oversized brand mark, faint, bleeding off the right edge -->
+  <g transform="translate(1090,205) scale(3.4)" color="#00FFDD" opacity="0.20">
+    <use href="#mark"/>
+  </g>
+
+  <!-- Left fade keeps the copy crisp over the wash -->
+  <rect width="820" height="400" fill="url(#fade)"/>
+
+  <!-- Hairline frame -->
+  <rect x="0.75" y="0.75" width="1278.5" height="398.5" fill="none"
+        stroke="#00FFDD" stroke-opacity="0.16" stroke-width="1.5"/>
+
+  <!-- Logo lockup -->
+  <g transform="translate(106,58)" color="#EAE2D9">
+    <use href="#mark" transform="scale(0.62)"/>
+  </g>
+  <text x="142" y="66" font-size="26" font-weight="600" fill="#EAE2D9"
+        letter-spacing="-0.5">orq.ai</text>
+
+  <!-- Eyebrow -->
+  <text x="92" y="172" font-size="14" font-weight="600" fill="#00FFDD"
+        letter-spacing="3.4" font-family="ui-monospace, 'SF Mono', Menlo, monospace">
+    LLM ARENA BENCHMARK
+  </text>
+
+  <!-- Headline -->
+  <text x="89" y="240" font-size="54" font-weight="600" fill="#FAF8F3"
+        letter-spacing="-1.4">orq-arena</text>
+
+  <!-- Tagline -->
+  <text x="92" y="288" font-size="19" fill="#EAE2D9" opacity="0.82">
+    Models fight in a terminal arena; a position-bias-gated jury judges; ELO comes out.
+  </text>
+
+  <!-- The two sides: A magenta vs B cyan, the arena's color code -->
+  <g font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="13" font-weight="600">
+    <rect x="92"  y="316" width="118" height="26" rx="6" fill="#ff3bd4" opacity="0.16"
+          stroke="#ff3bd4" stroke-opacity="0.55" stroke-width="1.2"/>
+    <text x="112" y="334" fill="#ff8ae6">SIDE A</text>
+    <text x="226" y="334" fill="#EAE2D9" opacity="0.6">vs</text>
+    <rect x="256" y="316" width="118" height="26" rx="6" fill="#00e5ff" opacity="0.14"
+          stroke="#00e5ff" stroke-opacity="0.55" stroke-width="1.2"/>
+    <text x="276" y="334" fill="#7deeff">SIDE B</text>
+  </g>
+
+  <!-- Footer -->
+  <text x="92" y="376" font-size="13" fill="#EAE2D9" opacity="0.5" letter-spacing="1"
+        font-family="ui-monospace, 'SF Mono', Menlo, monospace">
+    github.com/orq-ai/orq-arena
+  </text>
+</svg>
