@@ -33,6 +33,7 @@ orq-arena is that missing layer. It runs a round-robin over any pool of models r
 - **A live show worth projecting**: a CRT-neon TUI with streaming responses, judge cards that call out position-biased votes in public, HP drama, live standings.
 - **Real benchmark data out the back**: every round lands in `battles.jsonl` (schema v2) with both responses, reconciled per-judge votes, exact token/reasoning-token usage, TTFT.
 - **Jury swaps without regeneration**: re-judge any recorded run with a different panel and get a rank-stability answer (Spearman).
+- **A human anchor in one file**: `annotate` renders any recorded run into a blind browser page (no names, no jury votes, seeded side swaps); send it to raters, feed their `votes.json` to `anchor`, and get panel-vs-human κ plus rank correlation.
 - **Headless for CI/cron**: same benchmark, parallel matches, no TUI.
 
 ## Installation
@@ -63,7 +64,7 @@ When you are ready for a live run against real models:
 
 ## Usage
 
-**Run a tournament**: `uv run orq-arena run` opens the interactive roster picker; add `--config orq_arena.yaml` to run the YAML roster as-is, or `--headless --yes` for CI/cron (no TUI, matches run in parallel). Full flag reference: **[docs/cli.md](docs/cli.md)**.
+**Run a tournament**: `uv run orq-arena run` opens the interactive roster picker; add `--config orq_arena.yaml` to run the YAML roster as-is, or `--headless --yes` for CI/cron (no TUI, matches run in parallel). `--prompts` takes a local JSONL or `orq:<dataset_id>` to fight over a [Dataset](https://docs.orq.ai/docs/ai-studio/optimize/datasets) straight from your workspace. Full flag reference: **[docs/cli.md](docs/cli.md)**.
 
 **Browse the results**: from the final leaderboard, `B` pages through every judged round (prompt, both responses, per-judge votes with flip badges); `M` generates per-model coach notes from an analyzer model.
 
@@ -108,7 +109,7 @@ Full guides live in [`docs/`](docs/); start with the [docs index](docs/README.md
 | Guide | Description |
 |-------|-------------|
 | [Getting Started](docs/getting-started.md) | Prerequisites, install, first live run, common setup issues |
-| [CLI Reference](docs/cli.md) | Every command and flag, `run`, `demo`, `rejudge`, `list-warriors`, `refresh-models` |
+| [CLI Reference](docs/cli.md) | Every command and flag, `run`, `demo`, `rejudge`, `report`, `list-warriors`, `refresh-models` |
 | [Configuration](docs/configuration.md) | Every `orq_arena.yaml` key, reasoning recipes, defaults |
 | [Methodology](docs/methodology.md) | Bradley-Terry scoring, bias controls, confidence intervals, reproducibility |
 | [Architecture](docs/architecture.md) | Component overview, data flow, key abstractions |

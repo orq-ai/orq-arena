@@ -120,7 +120,7 @@ Spearman vs the recorded ranking, inconclusive rate, agreement, worst per-judge 
 rate, changed verdicts. Everything it measures is reliability; the accuracy axis (which jury
 is *right*, not just consistent) arrives with PR 11's gold-pair sanity suite and human anchor.
 
-### G5: Human anchor *(PR 11.4 pulled forward, decisions 28-29)*
+### G5: Human anchor *(PR 11.4 pulled forward, decisions 28-29)*. **TOOLING SHIPPED 2026-07-12, study pending**
 Blind web annotation of a recorded run, merged back into panel↔human κ and rank correlation;
 the launch-worthy accuracy number ("panel agrees with humans at κ=X"). Two commands, no server:
 `orq-arena annotate <log>` renders one self-contained blinded page (no model names, no jury
@@ -128,8 +128,13 @@ votes, seeded side order; votes export as `votes.json`); `orq-arena anchor <log>
 prints per-annotator Cohen's κ vs the panel majority, Spearman of BT(human) vs BT(panel), and
 inter-annotator κ. Explicitly a web artifact, not a TUI screen: annotation is a reading task,
 raters may not live in terminals, and blinding is only real when names never enter the page.
-Full task-level plan: `.planning/plans/2026-07-12-human-anchor.md`. Target: 50–100 rounds,
-2–3 raters, results into methodology docs (PR 12.2 consumes them).
+Full task-level plan: `.planning/plans/2026-07-12-human-anchor.md`.
+**Shipped** (`src/orq_arena/anchor.py`, 16 tests): both commands, page with intro/guidelines
+(round count, time estimate, `--criteria` rubric, rater name) → blind duel → explicit done
+screen with download (first-rater feedback: the auto-download surprised; fixed same day).
+The blindness contract is test-enforced (`test_page_is_blind` even bans the substring
+"judge" from the page). **Remaining: the study itself**, 50–100 rounds, 2–3 raters, results
+into methodology docs (PR 12.2 consumes them).
 
 ---
 

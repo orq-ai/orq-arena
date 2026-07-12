@@ -33,6 +33,8 @@ full `orq_arena.yaml` key reference, see [configuration.md](configuration.md).
 | [`rejudge`](#rejudge) | Re-score a recorded `battles.jsonl` with a different judge panel, zero regeneration. |
 | [`report`](#report) | Render the single-file HTML report page from a recorded run; no API calls. |
 | [`jury-compare`](#jury-compare) | Tabulate candidate juries from saved rejudge reports, side by side; no API calls. |
+| [`annotate`](#annotate) | Render a blinded human-annotation page from a recorded run; no API calls. |
+| [`anchor`](#anchor) | Merge human vote files back against a run: panel↔human κ + rank correlation; no API calls. |
 | [`refresh-models`](#refresh-models) | Force re-fetch of the 24h workspace model-catalog cache. |
 
 ---
@@ -370,6 +372,70 @@ manifest hashes for reproducibility.
 ```bash
 uv run orq-arena report outputs/g1/battles.jsonl
 uv run orq-arena report battles.jsonl --output /tmp/run.html
+```
+
+## `annotate`
+
+Render a blinded human-annotation page from a recorded run. Reads `battles.jsonl`; makes no
+API calls. This is the front half of the human-anchor workflow (the back half is
+[`anchor`](#anchor)): the accuracy check that converts "the panel agrees with itself" into
+"the panel agrees with people" (see
+[Methodology → Human anchor](methodology.md#human-anchor-does-the-panel-agree-with-people)).
+
+```text
+orq-arena annotate BATTLE_LOG [--out PATH] [--sample N] [--seed N]
+```
+
+| Flag / arg | Default | Effect |
+|---|---|---|
+| `BATTLE_LOG` (positional) | required | The recorded run to annotate. |
+| `--out PATH` | `annotate.html` | Destination HTML file. |
+| `--sample N` | all rounds | Annotate a seeded random subset instead of every round. |
+| `--seed N` | `42` | Drives round order and per-round side flips; keep it if you want two raters on identical pages. |
+
+The page is one self-contained HTML file (inline CSS/JS, no external assets, works from
+`file://`), so "deployment" is sending someone the file. It is **blind by construction**:
+model names, jury votes, and verdicts never enter the payload; rounds are shuffled and the
+two responses swap sides per round under the seed; round keys are one-way hashes.
+
+The rater's flow has three views. An **intro** states what the task is, the round count, a
+rough time estimate, the criteria to weigh (`--criteria`, defaulting to the jury's default
+rubric), the key legend, and asks for their name. The **annotation view** shows one prompt
+and two anonymous responses; votes go by `a` (left better), `b` (right better), `t` (tie),
+`space` (skip), arrows to navigate; markdown and code fences render properly. After the last
+round a **done screen** shows how many rounds were voted vs skipped and holds the explicit
+"Download votes.json" button (plus a leave-warning while votes are undownloaded; left arrow
+goes back to revisit skips). Exported votes are already un-flipped to the canonical A/B
+frame, so the vote file is independent of presentation order.
+
+```bash
+uv run orq-arena annotate outputs/g1/battles.jsonl --sample 60
+uv run orq-arena annotate battles.jsonl --out rater2.html --seed 42
+```
+
+## `anchor`
+
+Merge one or more human vote files back against the recorded run and print the human-anchor
+numbers; no API calls.
+
+```text
+orq-arena anchor BATTLE_LOG VOTES_JSON [VOTES_JSON ...]
+```
+
+| Flag / arg | Default | Effect |
+|---|---|---|
+| `BATTLE_LOG` (positional) | required | The same log the annotation page was generated from. |
+| `VOTES_JSON` (positional, repeatable) | required | Vote files exported by the annotation page, one per rater. |
+
+Output, per annotator: rounds voted, rounds usable for κ (the panel must have been decisive;
+inconclusive rounds are excluded from κ but still feed the human Bradley-Terry fit), Cohen's
+κ vs the panel majority with its Landis-Koch label, and the Spearman correlation between the
+human-vote Bradley-Terry ranking and the panel's. With two or more vote files it also prints
+each rater pair's inter-annotator κ over their shared rounds. Votes whose key matches no
+round in the log are counted and warned, never crash.
+
+```bash
+uv run orq-arena anchor outputs/g1/battles.jsonl votes-h1.json votes-h2.json
 ```
 
 ## `refresh-models`
