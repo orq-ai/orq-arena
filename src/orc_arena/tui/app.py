@@ -36,9 +36,12 @@ from ..events import (
     TurnPrompt,
     TurnResolved,
 )
+from ..orcs.roster import WarriorSpec, assign_warriors
 from ..tournament.driver import run_tournament
+from .screens.cta_modal import CTAModalScreen
 from .screens.fight import FightScreen
 from .screens.leaderboard import LeaderboardScreen
+from .screens.roster_select import RosterSelectScreen
 from .screens.title import TitleScreen
 
 
@@ -64,9 +67,13 @@ class ArenaApp(App):
         battle_log_path: str,
         live: bool = True,
         fixture: str | None = None,
+        preflight: dict | None = None,
+        pick_roster: bool = False,
     ) -> None:
         super().__init__()
         self.cfg = cfg
+        self._preflight = preflight
+        self._pick_roster = pick_roster
         self._prompts = prompts
         self._battle_log_path = battle_log_path
         self._live = live
@@ -80,7 +87,48 @@ class ArenaApp(App):
     # ----- lifecycle -----
 
     def on_mount(self) -> None:
+        from .theme import CRT_THEME
+
+        self.register_theme(CRT_THEME)
+        self.theme = "crt-neon"
+        if self._pick_roster:
+            self.push_screen(RosterSelectScreen(self.cfg, prompt_count=len(self._prompts)))
+        else:
+            self.push_screen(TitleScreen())
+
+    def on_roster_select_screen_roster_selected(
+        self, message: RosterSelectScreen.RosterSelected
+    ) -> None:
+        self.cfg.warriors = assign_warriors(message.model_ids, self.cfg.warriors)
+        self._by_name = {w.orc_name: w for w in self.cfg.warriors}
+        self.pop_screen()
+        self.run_worker(self._probe_then_begin(), exclusive=True)
+
+    def on_roster_select_screen_load_failed(
+        self, message: RosterSelectScreen.LoadFailed
+    ) -> None:
+        self.notify(f"catalog load failed: {message.reason}", severity="warning")
+        self.pop_screen()
         self.push_screen(TitleScreen())
+
+    async def _probe_then_begin(self) -> None:
+        """Picker path: the CLI preflight didn't run, so probe here."""
+        if self.cfg.preflight.thinking_probe:
+            from ..preflight import surprises, thinking_probe
+
+            self.notify("probing pool for vendor-default thinking…", timeout=4)
+            try:
+                probe = await thinking_probe(self.cfg)
+                self._preflight = {**(self._preflight or {}), "thinking_probe": probe}
+                odd = surprises(probe)
+                if odd:
+                    self.notify(
+                        f"🧠 thinks despite config: {', '.join(odd)} — ranking will be footnoted",
+                        severity="warning", timeout=8,
+                    )
+            except Exception as exc:
+                self.notify(f"thinking probe failed: {exc}", severity="warning")
+        self.begin()
 
     def begin(self) -> None:
         """Called from TitleScreen when the user presses ENTER."""
@@ -101,6 +149,7 @@ class ArenaApp(App):
                 prompts=self._prompts,
                 battle_log_path=self._battle_log_path,
                 events=self._events,
+                preflight=self._preflight,
             )
         except Exception as exc:
             await self._events.put(
@@ -130,8 +179,11 @@ class ArenaApp(App):
                         champion=ev.champion,
                         log_path=ev.battle_log_path,
                         report=ev.report,
+                        cfg=self.cfg,
                     )
                 )
+                if not self._live:
+                    self.push_screen(CTAModalScreen())
                 return
 
     # ----- event handling -----
@@ -143,14 +195,16 @@ class ArenaApp(App):
         if isinstance(ev, StandingsUpdated):
             fs.set_standings(ev.elo, ev.matches_done, ev.matches_total)
         elif isinstance(ev, MatchStarted):
-            w_a = self._by_name.get(ev.warrior_a)
-            w_b = self._by_name.get(ev.warrior_b)
-            if w_a and w_b:
-                fs.start_match(
-                    w_a.orc_name, w_a.model_id, w_a.emblem, w_a.thinking_enabled,
-                    w_b.orc_name, w_b.model_id, w_b.emblem, w_b.thinking_enabled,
-                    self.cfg.match.starting_hp,
-                )
+            # Fall back to a bare spec so a name the roster doesn't know
+            # (e.g. a fixture recorded with another pool) still renders
+            # instead of silently blanking the cards.
+            w_a = self._by_name.get(ev.warrior_a) or WarriorSpec(model_id=ev.warrior_a)
+            w_b = self._by_name.get(ev.warrior_b) or WarriorSpec(model_id=ev.warrior_b)
+            fs.start_match(
+                w_a.orc_name, w_a.model_id, w_a.emblem, w_a.thinking_enabled,
+                w_b.orc_name, w_b.model_id, w_b.emblem, w_b.thinking_enabled,
+                self.cfg.match.starting_hp,
+            )
         elif isinstance(ev, TurnPrompt):
             fs.set_prompt(ev.round_number, ev.prompt)
         elif isinstance(ev, ResponseChunk):

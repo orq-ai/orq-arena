@@ -22,6 +22,7 @@ from typing import Any, Iterable
 from evaluatorq import llm_jury_pairwise
 
 from ..config import ArenaConfig
+from ..data.prompts import PromptItem
 from ..data.schemas import BattleRecord
 from ..events import (
     ArenaEvent,
@@ -141,7 +142,7 @@ class Battle:
         gateway: OrqGateway,
         warrior_a: WarriorSpec,
         warrior_b: WarriorSpec,
-        prompts: Iterable[str],
+        prompts: Iterable[PromptItem],
         match_id: str,
         round_name: str,
         tournament_id: str,
@@ -176,15 +177,16 @@ class Battle:
         )
 
     async def _void_round(
-        self, *, round_number: int, prompt: str, reason: str,
+        self, *, round_number: int, item: PromptItem, reason: str,
         res_a: SideResult, res_b: SideResult, hp_a: int, hp_b: int,
     ) -> BattleRecord:
         await self.events.put(
             RoundVoided(match_id=self.match_id, round_number=round_number, reason=reason)
         )
         return BattleRecord(
-            prompt_hash=_prompt_hash(prompt),
-            prompt_text=prompt,
+            prompt_hash=_prompt_hash(item.text),
+            prompt_text=item.text,
+            prompt_category=item.category,
             model_a=self.a.short_model,
             model_b=self.b.short_model,
             response_a=res_a.text,
@@ -218,9 +220,10 @@ class Battle:
         prompt_iter = iter(self.prompts)
         while rounds_counted < rules.max_rounds:
             try:
-                prompt = next(prompt_iter)
+                item = next(prompt_iter)
             except StopIteration:
                 break
+            prompt = item.text
 
             round_number = rounds_counted + 1
             await self.events.put(
@@ -244,7 +247,7 @@ class Battle:
                 failed = self.a.orc_name if res_a.error else self.b.orc_name
                 reason = f"{failed}: stream failed after retry — {res_a.error or res_b.error}"
                 battles.append(await self._void_round(
-                    round_number=round_number, prompt=prompt, reason=reason,
+                    round_number=round_number, item=item, reason=reason,
                     res_a=res_a, res_b=res_b, hp_a=hp_a, hp_b=hp_b,
                 ))
                 continue
@@ -255,7 +258,7 @@ class Battle:
                 )
             except Exception as exc:
                 battles.append(await self._void_round(
-                    round_number=round_number, prompt=prompt,
+                    round_number=round_number, item=item,
                     reason=f"jury failed: {exc}",
                     res_a=res_a, res_b=res_b, hp_a=hp_a, hp_b=hp_b,
                 ))
@@ -288,6 +291,7 @@ class Battle:
                 BattleRecord(
                     prompt_hash=_prompt_hash(prompt),
                     prompt_text=prompt,
+                    prompt_category=item.category,
                     model_a=self.a.short_model,
                     model_b=self.b.short_model,
                     response_a=res_a.text,
@@ -333,6 +337,9 @@ class Battle:
                     hp_b=hp_b,
                 )
             )
+            # Let the verdict land on screen before the next round starts.
+            if rules.verdict_hold_s > 0:
+                await asyncio.sleep(rules.verdict_hold_s)
 
         # Resolve the match for the show. The rating ignores this entirely —
         # ELO is fed per-round verdicts — so an HP tie is simply a draw.

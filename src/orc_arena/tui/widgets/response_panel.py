@@ -23,10 +23,12 @@ class ResponsePanel(Vertical):
         border: round $primary;
         background: $panel-darken-2;
     }
-    ResponsePanel.side-a { border: round $success; }
-    ResponsePanel.side-b { border: round $warning; }
+    ResponsePanel.side-a { border: round $accent; }
+    ResponsePanel.side-b { border: round $primary; }
     ResponsePanel #scroll { height: 1fr; padding: 0 1; }
-    ResponsePanel #scroll Static { width: auto; }
+    /* width: 1fr constrains the Static to the panel so long lines wrap;
+       width: auto would grow it to the longest line and clip horizontally. */
+    ResponsePanel #scroll Static { width: 1fr; }
     ResponsePanel #thinking-window {
         height: auto;
         max-height: 4;

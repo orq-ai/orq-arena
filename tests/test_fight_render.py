@@ -55,3 +55,12 @@ async def test_fight_screen_full_match_lifecycle():
         assert screen._card_b.has_class("ko")
         assert screen._judges["flash-lite"].has_class("verdict-abstain")
         assert screen._judges["haiku"].has_class("verdict-a")
+
+        # next round keeps previous verdicts visible, dimmed
+        screen.set_prompt(2, "Second question?")
+        await pilot.pause()
+        assert screen._judges["haiku"].has_class("stale")
+        assert screen._judges["haiku"].has_class("verdict-a")  # still shows the vote
+        screen.set_judge_verdict("haiku", "B", "changed my mind")
+        assert not screen._judges["haiku"].has_class("stale")
+        assert screen._judges["haiku"].has_class("verdict-b")

@@ -20,9 +20,10 @@ class JudgeCard(Static):
         background: $panel-darken-1;
     }
     JudgeCard.waiting { opacity: 0.4; }
-    JudgeCard.verdict-a { border: round $success; }
-    JudgeCard.verdict-b { border: round $warning; }
-    JudgeCard.verdict-tie { border: round $accent; }
+    JudgeCard.stale { opacity: 0.55; }
+    JudgeCard.verdict-a { border: round $accent; }
+    JudgeCard.verdict-b { border: round $primary; }
+    JudgeCard.verdict-tie { border: round #ffd54d; }
     JudgeCard.verdict-abstain { border: round $error; }
     """
 
@@ -56,6 +57,7 @@ class JudgeCard(Static):
         self._flipped = flipped
         self._replacement = replacement
         self.remove_class("waiting")
+        self.remove_class("stale")
         for c in _VERDICT_CLASSES:
             self.remove_class(c)
         cls = f"verdict-{verdict.lower()}"
@@ -63,7 +65,15 @@ class JudgeCard(Static):
             self.add_class(cls)
         self.update(self._markup())
 
+    def mark_stale(self) -> None:
+        """Keep last round's verdict visible but dimmed while the next streams."""
+        if self._verdict:
+            self.add_class("stale")
+        else:
+            self.reset()
+
     def reset(self) -> None:
+        self.remove_class("stale")
         self._verdict = ""
         self._reasoning = ""
         self._flipped = False

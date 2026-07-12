@@ -3,8 +3,8 @@
   "type": "match_started",
   "match_id": "M1",
   "round_name": "match 1/3",
-  "warrior_a": "Snot the Quick",
-  "warrior_b": "Ugluk Stormcaller",
+  "warrior_a": "gpt-5.4-mini",
+  "warrior_b": "mistral-medium-2604",
   "_delay": 0.35
  },
  {
@@ -46,14 +46,14 @@
   "type": "response_chunk",
   "match_id": "M1",
   "side": "b",
-  "text": " scaling and",
+  "text": " scaling and deployment",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M1",
   "side": "b",
-  "text": " deployment of services",
+  "text": " of services",
   "_delay": 0.01
  },
  {
@@ -61,27 +61,6 @@
   "match_id": "M1",
   "side": "b",
   "text": ", improving",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " ag",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": "ility and resilience",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " by",
   "_delay": 0.01
  },
  {
@@ -96,6 +75,13 @@
   "match_id": "M1",
   "side": "a",
   "text": "For",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "b",
+  "text": " ag",
   "_delay": 0.01
  },
  {
@@ -116,7 +102,7 @@
   "type": "response_chunk",
   "match_id": "M1",
   "side": "b",
-  "text": " isolating",
+  "text": "ility and resilience",
   "_delay": 0.01
  },
  {
@@ -137,14 +123,7 @@
   "type": "response_chunk",
   "match_id": "M1",
   "side": "b",
-  "text": " failures to",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " single",
+  "text": " by",
   "_delay": 0.01
  },
  {
@@ -165,14 +144,14 @@
   "type": "response_chunk",
   "match_id": "M1",
   "side": "b",
-  "text": " components. Teams",
+  "text": " isolating",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M1",
   "side": "a",
-  "text": " develop",
+  "text": " build",
   "_delay": 0.01
  },
  {
@@ -200,21 +179,21 @@
   "type": "response_chunk",
   "match_id": "M1",
   "side": "b",
-  "text": " can also work",
+  "text": " failures to",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M1",
   "side": "b",
-  "text": " autonom",
+  "text": " specific",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M1",
   "side": "b",
-  "text": "ously,",
+  "text": " components. Teams",
   "_delay": 0.01
  },
  {
@@ -249,21 +228,14 @@
   "type": "response_chunk",
   "match_id": "M1",
   "side": "a",
-  "text": " an",
+  "text": " a",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M1",
   "side": "a",
-  "text": " application",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " using",
+  "text": " system",
   "_delay": 0.01
  },
  {
@@ -283,13 +255,6 @@
  {
   "type": "response_chunk",
   "match_id": "M1",
-  "side": "b",
-  "text": " different technologies best",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
   "side": "a",
   "text": " which",
   "_delay": 0.01
@@ -299,20 +264,6 @@
   "match_id": "M1",
   "side": "a",
   "text": " can",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " suited for",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " their",
   "_delay": 0.01
  },
  {
@@ -332,15 +283,8 @@
  {
   "type": "response_chunk",
   "match_id": "M1",
-  "side": "b",
-  "text": " specific service",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
   "side": "a",
-  "text": " delivery",
+  "text": " development",
   "_delay": 0.01
  },
  {
@@ -348,97 +292,6 @@
   "match_id": "M1",
   "side": "a",
   "text": " and",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": ".\n\n",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " reduce",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " coordination",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": "**Against micros",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " bott",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": "lene",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": "cks",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": ".",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": "ervices:** They introduce",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " significant",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " They",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " also",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " complexity in",
   "_delay": 0.01
  },
  {
@@ -452,7 +305,245 @@
   "type": "response_chunk",
   "match_id": "M1",
   "side": "a",
-  "text": " fault",
+  "text": " resilience",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": ".",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " If",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "b",
+  "text": " can also work",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "b",
+  "text": " autonom",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " one",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " service",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "b",
+  "text": "ously,",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "b",
+  "text": " using",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " fails",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " or",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " needs",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " a",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "b",
+  "text": " different technologies for",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "b",
+  "text": " different services",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " change",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": ",",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " the",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " rest",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " of",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "b",
+  "text": ".\n\n**Against",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " the",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " system",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " can",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " often",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "b",
+  "text": " microservices:** They",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "b",
+  "text": " introduce",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " keep",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " running",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "b",
+  "text": " significant",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "b",
+  "text": " complexity in",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " without",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " being",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " rede",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": "ployed",
   "_delay": 0.01
  },
  {
@@ -473,161 +564,7 @@
   "type": "response_chunk",
   "match_id": "M1",
   "side": "a",
-  "text": " isolation",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": ",",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " so",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " a",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": ",",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " failure",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " in",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " requiring robust",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " one",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " service",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " is",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " less",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " infrastructure",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " likely",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " to",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " bring",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " down",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " for",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " the",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " entire",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " system",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
   "text": ".\n\n",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " service",
   "_delay": 0.01
  },
  {
@@ -654,22 +591,22 @@
  {
   "type": "response_chunk",
   "match_id": "M1",
+  "side": "b",
+  "text": ", requiring",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "b",
+  "text": " robust",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
   "side": "a",
   "text": "services",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " discovery, communication",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": ", and monitoring.",
   "_delay": 0.01
  },
  {
@@ -682,15 +619,15 @@
  {
   "type": "response_chunk",
   "match_id": "M1",
-  "side": "a",
-  "text": " They",
+  "side": "b",
+  "text": " networking",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M1",
-  "side": "b",
-  "text": " Debug",
+  "side": "a",
+  "text": " They",
   "_delay": 0.01
  },
  {
@@ -703,15 +640,15 @@
  {
   "type": "response_chunk",
   "match_id": "M1",
-  "side": "a",
-  "text": " significant",
+  "side": "b",
+  "text": ", monitoring, and",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M1",
-  "side": "b",
-  "text": "ging and maintaining",
+  "side": "a",
+  "text": " significant",
   "_delay": 0.01
  },
  {
@@ -724,6 +661,20 @@
  {
   "type": "response_chunk",
   "match_id": "M1",
+  "side": "b",
+  "text": " coordination",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "b",
+  "text": ".",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
   "side": "a",
   "text": " complexity",
   "_delay": 0.01
@@ -731,29 +682,29 @@
  {
   "type": "response_chunk",
   "match_id": "M1",
-  "side": "b",
-  "text": " consistency across services can",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " also",
+  "side": "a",
+  "text": " because",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M1",
   "side": "a",
-  "text": ",",
+  "text": " you",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M1",
   "side": "a",
-  "text": " including",
+  "text": " must",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " manage",
   "_delay": 0.01
  },
  {
@@ -767,42 +718,7 @@
   "type": "response_chunk",
   "match_id": "M1",
   "side": "a",
-  "text": " discovery",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " become",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": ",",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " network",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " challenging",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " latency",
+  "text": " communication",
   "_delay": 0.01
  },
  {
@@ -829,15 +745,15 @@
  {
   "type": "response_chunk",
   "match_id": "M1",
-  "side": "b",
-  "text": ",",
+  "side": "a",
+  "text": " deployment",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M1",
-  "side": "b",
-  "text": " increasing",
+  "side": "a",
+  "text": ",",
   "_delay": 0.01
  },
  {
@@ -851,33 +767,56 @@
   "type": "response_chunk",
   "match_id": "M1",
   "side": "a",
-  "text": " distributed",
+  "text": " data",
   "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " operational overhead.",
-  "_delay": 0.01
- },
- {
-  "type": "response_complete",
-  "match_id": "M1",
-  "side": "b",
-  "full_text": "**For microservices:** They enable independent scaling and deployment of services, improving agility and resilience by isolating failures to single components. Teams can also work autonomously, using different technologies best suited for their specific service.\n\n**Against microservices:** They introduce significant complexity in distributed systems, requiring robust infrastructure for service discovery, communication, and monitoring. Debugging and maintaining consistency across services can also become challenging, increasing operational overhead.",
-  "tokens_in": 30,
-  "tokens_out": 86,
-  "reasoning_tokens": 0,
-  "finish_reason": "stop",
-  "error": null,
-  "_delay": 0.35
  },
  {
   "type": "response_chunk",
   "match_id": "M1",
   "side": "a",
-  "text": " debugging",
+  "text": " consistency",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " across",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "b",
+  "text": " The overhead",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " many",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " moving",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "b",
+  "text": " of",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " parts",
   "_delay": 0.01
  },
  {
@@ -885,6 +824,20 @@
   "match_id": "M1",
   "side": "a",
   "text": ".",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "b",
+  "text": " managing inter",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "b",
+  "text": "-service communication and",
   "_delay": 0.01
  },
  {
@@ -904,6 +857,13 @@
  {
   "type": "response_chunk",
   "match_id": "M1",
+  "side": "b",
+  "text": " data",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
   "side": "a",
   "text": " teams",
   "_delay": 0.01
@@ -914,6 +874,46 @@
   "side": "a",
   "text": " or",
   "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "b",
+  "text": " consistency can outwe",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "b",
+  "text": "igh the",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "b",
+  "text": " benefits for smaller",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "b",
+  "text": " applications.",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_complete",
+  "match_id": "M1",
+  "side": "b",
+  "full_text": "**For microservices:** They enable independent scaling and deployment of services, improving agility and resilience by isolating failures to specific components. Teams can also work autonomously, using different technologies for different services.\n\n**Against microservices:** They introduce significant complexity in distributed systems, requiring robust networking, monitoring, and coordination. The overhead of managing inter-service communication and data consistency can outweigh the benefits for smaller applications.",
+  "tokens_in": 30,
+  "tokens_out": 83,
+  "reasoning_tokens": 0,
+  "finish_reason": "stop",
+  "error": null,
+  "_delay": 0.35
  },
  {
   "type": "response_chunk",
@@ -989,56 +989,42 @@
   "type": "response_chunk",
   "match_id": "M1",
   "side": "a",
-  "text": " make",
+  "text": " slow",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M1",
   "side": "a",
-  "text": " the",
+  "text": " delivery",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M1",
   "side": "a",
-  "text": " system",
+  "text": " instead",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M1",
   "side": "a",
-  "text": " harder",
+  "text": " of",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M1",
   "side": "a",
-  "text": " to",
+  "text": " improving",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M1",
   "side": "a",
-  "text": " build",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " and",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " maintain",
+  "text": " it",
   "_delay": 0.01
  },
  {
@@ -1052,9 +1038,9 @@
   "type": "response_complete",
   "match_id": "M1",
   "side": "a",
-  "full_text": "**For microservices:** They let teams develop, deploy, and scale parts of an application independently, which can speed up delivery and reduce coordination bottlenecks. They also improve fault isolation, so a failure in one service is less likely to bring down the entire system.\n\n**Against microservices:** They add significant operational complexity, including service discovery, network latency, monitoring, and distributed debugging. For smaller teams or simpler products, this overhead can outweigh the benefits and make the system harder to build and maintain.",
+  "full_text": "**For microservices:** They let teams build, deploy, and scale parts of a system independently, which can speed up development and improve resilience. If one service fails or needs a change, the rest of the system can often keep running without being redeployed.\n\n**Against microservices:** They add significant operational complexity because you must manage service communication, monitoring, deployment, and data consistency across many moving parts. For smaller teams or simpler products, this overhead can outweigh the benefits and slow delivery instead of improving it.",
   "tokens_in": 21,
-  "tokens_out": 104,
+  "tokens_out": 105,
   "reasoning_tokens": 0,
   "finish_reason": "stop",
   "error": null,
@@ -1065,7 +1051,7 @@
   "match_id": "M1",
   "judge_name": "claude-haiku-4-5-20251001",
   "verdict": "A",
-  "reasoning": "Both responses correctly identify key advantages and disadvantages of microservices with comparable accuracy. Response A provides clearer, more concrete language ('speed up delivery,' 'reduce coordination bottlenecks,' 'fault isolation') and better articulates why teams benefit, while also emphasizing practical concerns specific to smaller teams. Response B covers similar technical points but is slightly more abstract and doesn't connect the 'against' argument to context (e.g., team size) as effectively. Both meet the two-sentence requirement, but Response A offers marginally better clarity and relevance by grounding its arguments in real-world scenarios.",
+  "reasoning": "Both responses provide valid, well-reasoned arguments for and against microservices. Response A offers slightly stronger clarity by explicitly explaining the consequences (independent deployment speeds development, failure isolation keeps system running) and connecting the \"against\" argument specifically to team size/product complexity. Response B covers similar ground but uses more technical terminology (\"distributed systems\", \"inter-service communication\") without as much concrete explanation of why these matter. Both are accurate and relevant, but Response A's concrete examples and direct connection between arguments and outcomes make it marginally more helpful and clearer.",
   "flipped": false,
   "replacement": false,
   "_delay": 0.35
@@ -1075,7 +1061,7 @@
   "match_id": "M1",
   "judge_name": "gemini-2.5-flash-lite",
   "verdict": "tie",
-  "reasoning": "Both responses provide strong, accurate, and relevant arguments for and against microservices, adhering to the two-sentence limit for each point. They are equally clear and helpful in their explanations.",
+  "reasoning": "Both responses provide strong, accurate arguments for and against microservices that adhere to the length constraints. They are equally clear, relevant, and helpful in addressing the prompt.",
   "flipped": false,
   "replacement": false,
   "_delay": 0.35
@@ -1085,7 +1071,7 @@
   "match_id": "M1",
   "judge_name": "gpt-5.4-nano",
   "verdict": "A",
-  "reasoning": "Both responses provide one clear argument for and one against microservices, and they keep each side to two sentences. Response A is slightly more concrete and balanced, explicitly mentioning fault isolation and specific operational issues (service discovery, latency, monitoring, distributed debugging), while Response B adds a bit of extra breadth (different technologies) but is marginally less specific. Overall, A is clearer and more directly tied to the practical \u201cagainst\u201d drawbacks.",
+  "reasoning": "Both responses correctly provide one pro and one con in two sentences each, and they align well with the prompt. Response A is slightly more specific about keeping the rest of the system running without redeploy and mentions data consistency explicitly, while Response B is marginally more general and adds an extra point about different technologies that doesn\u2019t strengthen the main argument. Overall, Response A is clearer and more tightly focused to the requested argument structure.",
   "flipped": false,
   "replacement": false,
   "_delay": 0.35
@@ -1111,104 +1097,6 @@
  {
   "type": "response_chunk",
   "match_id": "M1",
-  "side": "b",
-  "text": "A",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " hash",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " map",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " is",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " a",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " data",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " structure",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " that",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " stores",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " key",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": "-value",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " pairs",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": ",",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " allowing",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
   "side": "a",
   "text": "A",
   "_delay": 0.01
@@ -1232,13 +1120,6 @@
   "match_id": "M1",
   "side": "a",
   "text": " is",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " fast",
   "_delay": 0.01
  },
  {
@@ -1272,13 +1153,6 @@
  {
   "type": "response_chunk",
   "match_id": "M1",
-  "side": "b",
-  "text": " lookup",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
   "side": "a",
   "text": " stores",
   "_delay": 0.01
@@ -1288,20 +1162,6 @@
   "match_id": "M1",
   "side": "a",
   "text": " key",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": ",",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " insertion",
   "_delay": 0.01
  },
  {
@@ -1321,71 +1181,22 @@
  {
   "type": "response_chunk",
   "match_id": "M1",
-  "side": "b",
-  "text": ",",
+  "side": "a",
+  "text": " so",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M1",
   "side": "a",
-  "text": " and",
+  "text": " you",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M1",
   "side": "a",
-  "text": " uses",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " and",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " a",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " hash",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " deletion",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " function",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " to",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " by",
+  "text": " can",
   "_delay": 0.01
  },
  {
@@ -1405,15 +1216,8 @@
  {
   "type": "response_chunk",
   "match_id": "M1",
-  "side": "b",
-  "text": " using",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
   "side": "a",
-  "text": " the",
+  "text": " a",
   "_delay": 0.01
  },
  {
@@ -1427,28 +1231,14 @@
   "type": "response_chunk",
   "match_id": "M1",
   "side": "a",
-  "text": " for",
+  "text": " using",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M1",
   "side": "a",
-  "text": " a",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " a",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " given",
+  "text": " its",
   "_delay": 0.01
  },
  {
@@ -1456,13 +1246,6 @@
   "match_id": "M1",
   "side": "a",
   "text": " key",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " hash",
   "_delay": 0.01
  },
  {
@@ -1477,13 +1260,6 @@
   "match_id": "M1",
   "side": "a",
   "text": " like",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " function",
   "_delay": 0.01
  },
  {
@@ -1517,13 +1293,6 @@
  {
   "type": "response_chunk",
   "match_id": "M1",
-  "side": "b",
-  "text": " to",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
   "side": "a",
   "text": " in",
   "_delay": 0.01
@@ -1552,13 +1321,6 @@
  {
   "type": "response_chunk",
   "match_id": "M1",
-  "side": "b",
-  "text": " compute",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
   "side": "a",
   "text": " It",
   "_delay": 0.01
@@ -1567,7 +1329,161 @@
   "type": "response_chunk",
   "match_id": "M1",
   "side": "a",
-  "text": "\u2019s",
+  "text": " uses",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " a",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " hash",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " function",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " to",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " turn",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " the",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " key",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " into",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " a",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " position",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " in",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " memory",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": ",",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " which",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " makes",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " inserts",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": ",",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " look",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": "ups",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": ",",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " and",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "a",
+  "text": " deletes",
   "_delay": 0.01
  },
  {
@@ -1587,155 +1503,125 @@
  {
   "type": "response_chunk",
   "match_id": "M1",
-  "side": "b",
-  "text": " an",
+  "side": "a",
+  "text": " on",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M1",
   "side": "a",
-  "text": " for",
+  "text": " average",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M1",
   "side": "a",
-  "text": " adding",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " index",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": ",",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " finding",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": ",",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " and",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " where",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " removing",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " items",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " the",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " value",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " because",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " it",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " is",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " stored",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " can",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " jump",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
   "text": ".",
   "_delay": 0.01
  },
  {
-  "type": "response_chunk",
+  "type": "response_complete",
   "match_id": "M1",
   "side": "a",
-  "text": " straight",
+  "full_text": "A hash map is a data structure that stores key-value pairs so you can quickly find a value using its key, like looking up a word in a dictionary. It uses a hash function to turn the key into a position in memory, which makes inserts, lookups, and deletes very fast on average.",
+  "tokens_in": 19,
+  "tokens_out": 64,
+  "reasoning_tokens": 0,
+  "finish_reason": "stop",
+  "error": null,
+  "_delay": 0.35
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "b",
+  "text": "A",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M1",
-  "side": "a",
-  "text": " to",
+  "side": "b",
+  "text": " hash map is a",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "b",
+  "text": " data structure that stores",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "b",
+  "text": " key-value pairs,",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "b",
+  "text": " allowing fast",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "b",
+  "text": " insertion",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "b",
+  "text": ",",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "b",
+  "text": " deletion, and lookup",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "b",
+  "text": " by using",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "b",
+  "text": " a hash function to",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "b",
+  "text": " compute an",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "b",
+  "text": " index into an",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M1",
+  "side": "b",
+  "text": " array.",
   "_delay": 0.01
  },
  {
@@ -1748,20 +1634,6 @@
  {
   "type": "response_chunk",
   "match_id": "M1",
-  "side": "a",
-  "text": " where",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " the",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
   "side": "b",
   "text": " works",
   "_delay": 0.01
@@ -1769,274 +1641,101 @@
  {
   "type": "response_chunk",
   "match_id": "M1",
-  "side": "a",
-  "text": " data",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " is",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " stored",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " instead",
+  "side": "b",
+  "text": " by converting",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M1",
   "side": "b",
-  "text": " like",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " of",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " checking",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " everything",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " one",
+  "text": " the key into a",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M1",
   "side": "b",
-  "text": " a",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " by",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": " one",
+  "text": " hash code",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M1",
   "side": "b",
-  "text": " dictionary",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "a",
-  "text": ".",
+  "text": ", which determines",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M1",
   "side": "b",
-  "text": ":",
-  "_delay": 0.01
- },
- {
-  "type": "response_complete",
-  "match_id": "M1",
-  "side": "a",
-  "full_text": "A hash map is a data structure that stores key-value pairs and uses a hash function to quickly find the value for a given key, like looking up a word in a dictionary. It\u2019s very fast for adding, finding, and removing items because it can jump straight to where the data is stored instead of checking everything one by one.",
-  "tokens_in": 19,
-  "tokens_out": 70,
-  "reasoning_tokens": 0,
-  "finish_reason": "stop",
-  "error": null,
-  "_delay": 0.35
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " you",
+  "text": " where",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M1",
   "side": "b",
-  "text": " provide",
+  "text": " the value",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M1",
   "side": "b",
-  "text": " a",
+  "text": " is stored,",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M1",
   "side": "b",
-  "text": " key",
+  "text": " making",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M1",
   "side": "b",
-  "text": " (",
+  "text": " operations",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M1",
   "side": "b",
-  "text": "like",
+  "text": " average",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M1",
   "side": "b",
-  "text": " a",
+  "text": "-case",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M1",
   "side": "b",
-  "text": " word",
+  "text": " O(1)",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M1",
   "side": "b",
-  "text": "),",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " and",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " it",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " quickly",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " returns",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " the",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " associated",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " value",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " (",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": "like",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " its",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": " definition",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M1",
-  "side": "b",
-  "text": ").",
+  "text": " time complexity.",
   "_delay": 0.01
  },
  {
   "type": "response_complete",
   "match_id": "M1",
   "side": "b",
-  "full_text": "A hash map is a data structure that stores key-value pairs, allowing fast lookup, insertion, and deletion by using a hash function to compute an index where the value is stored. It works like a dictionary: you provide a key (like a word), and it quickly returns the associated value (like its definition).",
+  "full_text": "A hash map is a data structure that stores key-value pairs, allowing fast insertion, deletion, and lookup by using a hash function to compute an index into an array. It works by converting the key into a hash code, which determines where the value is stored, making operations average-case O(1) time complexity.",
   "tokens_in": 28,
-  "tokens_out": 64,
+  "tokens_out": 65,
   "reasoning_tokens": 0,
   "finish_reason": "stop",
   "error": null,
@@ -2047,7 +1746,7 @@
   "match_id": "M1",
   "judge_name": "claude-haiku-4-5-20251001",
   "verdict": "A",
-  "reasoning": "Both responses accurately explain hash maps with clarity and relevance. Response A uses the dictionary analogy effectively and explains the speed advantage by contrasting it with linear search. Response B is also accurate and includes the dictionary analogy while explaining the hash function's role more technically. Response A is slightly more accessible to new programmers by emphasizing the practical benefit (speed through direct access) rather than just stating technical mechanisms, making it marginally more helpful for the target audience.",
+  "reasoning": "Both responses accurately explain hash maps in two sentences with good clarity. Response A excels with a relatable analogy (dictionary lookup) that makes it more accessible to a new programmer, while Response B is more technical, mentioning O(1) time complexity\u2014a concept a beginner may not yet understand. For a new programmer, Response A's approach with the familiar dictionary comparison is more helpful and easier to grasp.",
   "flipped": false,
   "replacement": false,
   "_delay": 0.35
@@ -2066,9 +1765,9 @@
   "type": "judge_verdict",
   "match_id": "M1",
   "judge_name": "gpt-5.4-nano",
-  "verdict": "abstain",
-  "reasoning": "",
-  "flipped": true,
+  "verdict": "B",
+  "reasoning": "Both responses are accurate and relevant, and they clearly explain what a hash map is using an analogy and the role of a hash function. Response B is slightly more precise and helpful by mentioning that it computes an index into an array and explicitly notes average-case O(1), whereas Response A is a bit more general and memory-position phrasing is less concrete.",
+  "flipped": false,
   "replacement": false,
   "_delay": 0.35
  },
@@ -2086,8 +1785,8 @@
  {
   "type": "match_resolved",
   "match_id": "M1",
-  "winner": "Snot the Quick",
-  "loser": "Ugluk Stormcaller",
+  "winner": "gpt-5.4-mini",
+  "loser": "mistral-medium-2604",
   "by": "round_cap",
   "final_hp_a": 100,
   "final_hp_b": 85,
@@ -2096,9 +1795,9 @@
  {
   "type": "standings_updated",
   "elo": {
-   "Snot the Quick": 5000.0,
-   "Gruk Flashfist": 1000.0,
-   "Ugluk Stormcaller": -3000.0
+   "gpt-5.4-mini": 5000.0,
+   "gemini-2.5-flash": 1000.0,
+   "mistral-medium-2604": -3000.0
   },
   "matches_done": 1,
   "matches_total": 3,
@@ -2108,8 +1807,8 @@
   "type": "match_started",
   "match_id": "M2",
   "round_name": "match 2/3",
-  "warrior_a": "Snot the Quick",
-  "warrior_b": "Gruk Flashfist",
+  "warrior_a": "gpt-5.4-mini",
+  "warrior_b": "gemini-2.5-flash",
   "_delay": 0.35
  },
  {
@@ -2124,6 +1823,13 @@
   "match_id": "M2",
   "side": "b",
   "text": "Data",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "b",
+  "text": " drags its feet,\nSpinner spins, a test of will,\nSilence,",
   "_delay": 0.01
  },
  {
@@ -2151,14 +1857,14 @@
   "type": "response_chunk",
   "match_id": "M2",
   "side": "a",
-  "text": " cold",
+  "text": " the",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M2",
   "side": "a",
-  "text": " mist",
+  "text": " void",
   "_delay": 0.01
  },
  {
@@ -2172,37 +1878,16 @@
   "type": "response_chunk",
   "match_id": "M2",
   "side": "b",
-  "text": " slowly loads,\nSpinning wheel, a painful wait,\nTime for new index",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M2",
-  "side": "a",
-  "text": "Index",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M2",
-  "side": "a",
-  "text": " sleeps",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M2",
-  "side": "b",
-  "text": ".",
+  "text": " then it loads.",
   "_delay": 0.01
  },
  {
   "type": "response_complete",
   "match_id": "M2",
   "side": "b",
-  "full_text": "Data slowly loads,\nSpinning wheel, a painful wait,\nTime for new index.",
+  "full_text": "Data drags its feet,\nSpinner spins, a test of will,\nSilence, then it loads.",
   "tokens_in": 10,
-  "tokens_out": 19,
+  "tokens_out": 21,
   "reasoning_tokens": 0,
   "finish_reason": "stop",
   "error": null,
@@ -2212,56 +1897,14 @@
   "type": "response_chunk",
   "match_id": "M2",
   "side": "a",
-  "text": ";",
+  "text": "Seconds",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M2",
   "side": "a",
-  "text": " the",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M2",
-  "side": "a",
-  "text": " clock",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M2",
-  "side": "a",
-  "text": " ticks",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M2",
-  "side": "a",
-  "text": " once",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M2",
-  "side": "a",
-  "text": "  \n",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M2",
-  "side": "a",
-  "text": "Waiting",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M2",
-  "side": "a",
-  "text": " blooms",
+  "text": " bloom",
   "_delay": 0.01
  },
  {
@@ -2275,16 +1918,58 @@
   "type": "response_chunk",
   "match_id": "M2",
   "side": "a",
-  "text": " time",
+  "text": " slow",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": " rain",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": "  \n",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": "The",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": " cursor",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": " waits",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": " still",
   "_delay": 0.01
  },
  {
   "type": "response_complete",
   "match_id": "M2",
   "side": "a",
-  "full_text": "Rows drift through cold mist  \nIndex sleeps; the clock ticks once  \nWaiting blooms into time",
+  "full_text": "Rows drift through the void  \nSeconds bloom into slow rain  \nThe cursor waits still",
   "tokens_in": 16,
-  "tokens_out": 21,
+  "tokens_out": 19,
   "reasoning_tokens": 0,
   "finish_reason": "stop",
   "error": null,
@@ -2294,9 +1979,9 @@
   "type": "judge_verdict",
   "match_id": "M2",
   "judge_name": "claude-haiku-4-5-20251001",
-  "verdict": "abstain",
-  "reasoning": "",
-  "flipped": true,
+  "verdict": "B",
+  "reasoning": "Both responses successfully create haikus about slow database queries with accurate 5-7-5 syllable structure. Response A uses more poetic, abstract imagery (void, rain, cursor) that evokes the frustration of waiting, while Response B employs more concrete, relatable technical terminology (spinner, test of will, loads) that directly references the actual user experience of a slow query. Response B is slightly more helpful and complete because it captures the full journey from initiation through loading, whereas Response A focuses solely on the waiting state. Both are clear and relevant, but Response B edges ahead through its more grounded, accessible representation of the problem.",
+  "flipped": false,
   "replacement": false,
   "_delay": 0.35
  },
@@ -2304,9 +1989,9 @@
   "type": "judge_verdict",
   "match_id": "M2",
   "judge_name": "gemini-2.5-flash-lite",
-  "verdict": "abstain",
-  "reasoning": "",
-  "flipped": true,
+  "verdict": "tie",
+  "reasoning": "Both responses A and B accurately capture the essence of a slow database query in a haiku format. They both effectively convey the frustration and waiting associated with such an issue, adhering to the 5-7-5 syllable structure. The imagery in both is fitting and relevant.",
+  "flipped": false,
   "replacement": false,
   "_delay": 0.35
  },
@@ -2348,6 +2033,13 @@
  {
   "type": "response_chunk",
   "match_id": "M2",
+  "side": "b",
+  "text": "Argument For Microservices:**\nThey enable independent development and deployment of services, accelerating",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
   "side": "a",
   "text": "**",
   "_delay": 0.01
@@ -2376,13 +2068,6 @@
  {
   "type": "response_chunk",
   "match_id": "M2",
-  "side": "b",
-  "text": "For Microservices:**\n\nThey promote independent development and deployment of services, enabling teams",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M2",
   "side": "a",
   "text": ":**",
   "_delay": 0.01
@@ -2406,6 +2091,13 @@
   "match_id": "M2",
   "side": "a",
   "text": " teams",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "b",
+  "text": " release cycles and allowing teams to choose the best technology for each specific component, leading to greater agility",
   "_delay": 0.01
  },
  {
@@ -2468,14 +2160,14 @@
   "type": "response_chunk",
   "match_id": "M2",
   "side": "a",
-  "text": " an",
+  "text": " a",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M2",
   "side": "a",
-  "text": " application",
+  "text": " system",
   "_delay": 0.01
  },
  {
@@ -2538,63 +2230,7 @@
   "type": "response_chunk",
   "match_id": "M2",
   "side": "a",
-  "text": " improve",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M2",
-  "side": "a",
-  "text": " resilience",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M2",
-  "side": "b",
-  "text": " to work autonomously and rapidly iterate on specific functionalities without impacting the entire system. This modular",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M2",
-  "side": "a",
-  "text": ".",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M2",
-  "side": "a",
-  "text": " This",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M2",
-  "side": "a",
-  "text": " is",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M2",
-  "side": "a",
-  "text": " especially",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M2",
-  "side": "a",
-  "text": " valuable",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M2",
-  "side": "a",
-  "text": " for",
+  "text": " make",
   "_delay": 0.01
  },
  {
@@ -2608,56 +2244,84 @@
   "type": "response_chunk",
   "match_id": "M2",
   "side": "a",
-  "text": " systems",
+  "text": " applications",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M2",
   "side": "a",
-  "text": " where",
+  "text": " easier",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M2",
   "side": "a",
-  "text": " different",
+  "text": " to",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": " manage",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": ".",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": " If",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": " one",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": " service",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M2",
   "side": "b",
-  "text": "ity also enhances fault isolation, as a failure in one service is less likely to bring down the whole application.\n\n**Against Microservices:**\n\nThey introduce significant",
+  "text": " and innovation. This modularity also improves fault isolation, meaning a failure in one service is less likely to bring down the entire application.\n\n**Argument Against Microservices:**",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M2",
   "side": "a",
-  "text": " services",
+  "text": " needs",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M2",
   "side": "a",
-  "text": " have",
+  "text": " more",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M2",
   "side": "a",
-  "text": " different",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M2",
-  "side": "a",
-  "text": " performance",
+  "text": " resources",
   "_delay": 0.01
  },
  {
@@ -2671,14 +2335,98 @@
   "type": "response_chunk",
   "match_id": "M2",
   "side": "a",
-  "text": " release",
+  "text": " changes",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M2",
   "side": "a",
-  "text": " needs",
+  "text": " frequently",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": ",",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": " you",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": " can",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": " update",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": " just",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": " that",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": " piece",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": " without",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": " affecting",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": " the",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": " whole",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": " system",
   "_delay": 0.01
  },
  {
@@ -2740,15 +2488,15 @@
  {
   "type": "response_chunk",
   "match_id": "M2",
-  "side": "a",
-  "text": " significant",
+  "side": "b",
+  "text": "\nThey introduce significant operational complexity due to the distributed nature of the system, requiring robust infrastructure for service discovery, load balancing, monitoring, and debugging across many independent",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M2",
   "side": "a",
-  "text": " operational",
+  "text": " significant",
   "_delay": 0.01
  },
  {
@@ -2762,63 +2510,14 @@
   "type": "response_chunk",
   "match_id": "M2",
   "side": "a",
-  "text": " because",
+  "text": " in",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M2",
   "side": "a",
-  "text": " you",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M2",
-  "side": "b",
-  "text": " operational complexity due to the distributed nature of the architecture, requiring advanced tooling for monitoring, logging, and tracing across numerous services. Managing data consistency and transactions across multiple independent",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M2",
-  "side": "a",
-  "text": " have",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M2",
-  "side": "a",
-  "text": " many",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M2",
-  "side": "a",
-  "text": " separate",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M2",
-  "side": "a",
-  "text": " services",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M2",
-  "side": "a",
-  "text": " to",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M2",
-  "side": "a",
-  "text": " monitor",
+  "text": " networking",
   "_delay": 0.01
  },
  {
@@ -2832,7 +2531,7 @@
   "type": "response_chunk",
   "match_id": "M2",
   "side": "a",
-  "text": " secure",
+  "text": " monitoring",
   "_delay": 0.01
  },
  {
@@ -2846,27 +2545,8 @@
   "type": "response_chunk",
   "match_id": "M2",
   "side": "a",
-  "text": " debug",
+  "text": " testing",
   "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M2",
-  "side": "b",
-  "text": " databases also becomes a much more challenging and error-prone endeavor.",
-  "_delay": 0.01
- },
- {
-  "type": "response_complete",
-  "match_id": "M2",
-  "side": "b",
-  "full_text": "**For Microservices:**\n\nThey promote independent development and deployment of services, enabling teams to work autonomously and rapidly iterate on specific functionalities without impacting the entire system. This modularity also enhances fault isolation, as a failure in one service is less likely to bring down the whole application.\n\n**Against Microservices:**\n\nThey introduce significant operational complexity due to the distributed nature of the architecture, requiring advanced tooling for monitoring, logging, and tracing across numerous services. Managing data consistency and transactions across multiple independent databases also becomes a much more challenging and error-prone endeavor.",
-  "tokens_in": 15,
-  "tokens_out": 112,
-  "reasoning_tokens": 0,
-  "finish_reason": "stop",
-  "error": null,
-  "_delay": 0.35
  },
  {
   "type": "response_chunk",
@@ -2886,35 +2566,28 @@
   "type": "response_chunk",
   "match_id": "M2",
   "side": "a",
-  "text": " coordinate",
+  "text": " deployment",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M2",
   "side": "a",
-  "text": ".",
+  "text": ",",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M2",
   "side": "a",
-  "text": " For",
+  "text": " so",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M2",
   "side": "a",
-  "text": " smaller",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M2",
-  "side": "a",
-  "text": " teams",
+  "text": " small",
   "_delay": 0.01
  },
  {
@@ -2928,35 +2601,14 @@
   "type": "response_chunk",
   "match_id": "M2",
   "side": "a",
-  "text": " simpler",
+  "text": " medium",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M2",
   "side": "a",
-  "text": " products",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M2",
-  "side": "a",
-  "text": ",",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M2",
-  "side": "a",
-  "text": " this",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M2",
-  "side": "a",
-  "text": " overhead",
+  "text": " systems",
   "_delay": 0.01
  },
  {
@@ -2970,21 +2622,28 @@
   "type": "response_chunk",
   "match_id": "M2",
   "side": "a",
-  "text": " outweigh",
+  "text": " become",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M2",
   "side": "a",
-  "text": " the",
+  "text": " harder",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M2",
   "side": "a",
-  "text": " benefits",
+  "text": " to",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": " build",
   "_delay": 0.01
  },
  {
@@ -2998,6 +2657,123 @@
   "type": "response_chunk",
   "match_id": "M2",
   "side": "a",
+  "text": " operate",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": " than",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": " a",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": " mon",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": "olith",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": ".",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": " The",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "b",
+  "text": " services. This increased complexity can lead to higher overhead in terms of development, deployment, and maintenance, especially for smaller teams or less complex applications.",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": " overhead",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": " of",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_complete",
+  "match_id": "M2",
+  "side": "b",
+  "full_text": "**Argument For Microservices:**\nThey enable independent development and deployment of services, accelerating release cycles and allowing teams to choose the best technology for each specific component, leading to greater agility and innovation. This modularity also improves fault isolation, meaning a failure in one service is less likely to bring down the entire application.\n\n**Argument Against Microservices:**\nThey introduce significant operational complexity due to the distributed nature of the system, requiring robust infrastructure for service discovery, load balancing, monitoring, and debugging across many independent services. This increased complexity can lead to higher overhead in terms of development, deployment, and maintenance, especially for smaller teams or less complex applications.",
+  "tokens_in": 15,
+  "tokens_out": 131,
+  "reasoning_tokens": 0,
+  "finish_reason": "stop",
+  "error": null,
+  "_delay": 0.35
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": " coordinating",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": " many",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": " services",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": " can",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": " also",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
   "text": " slow",
   "_delay": 0.01
  },
@@ -3005,7 +2781,7 @@
   "type": "response_chunk",
   "match_id": "M2",
   "side": "a",
-  "text": " development",
+  "text": " teams",
   "_delay": 0.01
  },
  {
@@ -3019,6 +2795,41 @@
   "type": "response_chunk",
   "match_id": "M2",
   "side": "a",
+  "text": " and",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": " introduce",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": " more",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": " failure",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
+  "text": " points",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M2",
+  "side": "a",
   "text": ".",
   "_delay": 0.01
  },
@@ -3026,9 +2837,9 @@
   "type": "response_complete",
   "match_id": "M2",
   "side": "a",
-  "full_text": "**For microservices:** They let teams build, deploy, and scale parts of an application independently, which can speed up development and improve resilience. This is especially valuable for large systems where different services have different performance or release needs.\n\n**Against microservices:** They add significant operational complexity because you have many separate services to monitor, secure, debug, and coordinate. For smaller teams or simpler products, this overhead can outweigh the benefits and slow development down.",
+  "full_text": "**For microservices:** They let teams build, deploy, and scale parts of a system independently, which can speed up development and make large applications easier to manage. If one service needs more resources or changes frequently, you can update just that piece without affecting the whole system.\n\n**Against microservices:** They add significant complexity in networking, monitoring, testing, and deployment, so small or medium systems can become harder to build and operate than a monolith. The overhead of coordinating many services can also slow teams down and introduce more failure points.",
   "tokens_in": 21,
-  "tokens_out": 93,
+  "tokens_out": 111,
   "reasoning_tokens": 0,
   "finish_reason": "stop",
   "error": null,
@@ -3038,9 +2849,9 @@
   "type": "judge_verdict",
   "match_id": "M2",
   "judge_name": "claude-haiku-4-5-20251001",
-  "verdict": "B",
-  "reasoning": "Both responses provide accurate, well-structured arguments for and against microservices. Response A is more concise and accessible, using clear language that directly addresses the core trade-offs (development speed/resilience vs. operational overhead). Response B provides more technical depth, introducing additional valid concerns like fault isolation benefits and data consistency challenges across distributed databases, making it slightly more comprehensive. However, Response B's arguments are presented in a denser format that may be less immediately clear. Both meet the two-sentence requirement and are relevant to the prompt; Response B edges ahead slightly due to greater technical completeness, though Response A's clarity and directness are also valuable.",
-  "flipped": false,
+  "verdict": "abstain",
+  "reasoning": "",
+  "flipped": true,
   "replacement": false,
   "_delay": 0.35
  },
@@ -3049,7 +2860,7 @@
   "match_id": "M2",
   "judge_name": "gemini-2.5-flash-lite",
   "verdict": "tie",
-  "reasoning": "Both responses provide strong, accurate, and relevant arguments for and against microservices. They are both clear and adhere to the two-sentence limit per argument. Response B is slightly more detailed in its explanations, but both are excellent.",
+  "reasoning": "Both responses accurately and helpfully provide strong arguments for and against microservices, adhering to the two-sentence limit for each. They are equally clear and relevant to the prompt.",
   "flipped": false,
   "replacement": false,
   "_delay": 0.35
@@ -3059,7 +2870,7 @@
   "match_id": "M2",
   "judge_name": "gpt-5.4-nano",
   "verdict": "B",
-  "reasoning": "Both responses satisfy the \u201cone strong argument for and one against\u201d structure with two sentences each and are relevant and clear. Response B is slightly stronger and more complete on the \u201cagainst\u201d side by specifically calling out data consistency/transactions across independent databases, while Response A is more general about operational complexity. Therefore, B is better overall for accuracy and completeness.",
+  "reasoning": "Both responses are relevant and provide one clear argument for and against microservices, with each side presented in two sentences as requested. Response A is slightly less complete because the \u201cfor\u201d argument is more generic and doesn\u2019t mention fault isolation as clearly, while Response B is more comprehensive and still concise with clearer reasoning on both agility and fault isolation versus operational complexity. Therefore, B is better overall.",
   "flipped": false,
   "replacement": false,
   "_delay": 0.35
@@ -3068,29 +2879,29 @@
   "type": "turn_resolved",
   "match_id": "M2",
   "round_number": 1,
-  "majority": "B",
-  "damage_dealt": 15,
-  "loser_side": "a",
-  "hp_a": 85,
+  "majority": "inconclusive",
+  "damage_dealt": 0,
+  "loser_side": "none",
+  "hp_a": 100,
   "hp_b": 100,
   "_delay": 0.35
  },
  {
   "type": "match_resolved",
   "match_id": "M2",
-  "winner": "Gruk Flashfist",
-  "loser": "Snot the Quick",
-  "by": "round_cap",
-  "final_hp_a": 85,
+  "winner": "",
+  "loser": "",
+  "by": "draw",
+  "final_hp_a": 100,
   "final_hp_b": 100,
   "_delay": 0.35
  },
  {
   "type": "standings_updated",
   "elo": {
-   "Snot the Quick": 2540.8347518315804,
-   "Gruk Flashfist": 3459.165259717415,
-   "Ugluk Stormcaller": -3000.0
+   "gpt-5.4-mini": 5000.0,
+   "gemini-2.5-flash": 1000.0,
+   "mistral-medium-2604": -3000.0
   },
   "matches_done": 2,
   "matches_total": 3,
@@ -3100,8 +2911,8 @@
   "type": "match_started",
   "match_id": "M3",
   "round_name": "match 3/3",
-  "warrior_a": "Gruk Flashfist",
-  "warrior_b": "Ugluk Stormcaller",
+  "warrior_a": "gemini-2.5-flash",
+  "warrior_b": "mistral-medium-2604",
   "_delay": 0.35
  },
  {
@@ -3137,6 +2948,13 @@
   "match_id": "M3",
   "side": "b",
   "text": " enable independent",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M3",
+  "side": "a",
+  "text": "Here",
   "_delay": 0.01
  },
  {
@@ -3171,28 +2989,63 @@
   "type": "response_chunk",
   "match_id": "M3",
   "side": "b",
-  "text": "ility and fault",
+  "text": "ility and resilience",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M3",
+  "side": "a",
+  "text": "'s one strong argument for and one against microservices:\n\n**For Micro",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M3",
   "side": "b",
-  "text": " isolation",
+  "text": " by",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M3",
   "side": "b",
-  "text": ". Teams",
+  "text": " isolating",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M3",
   "side": "b",
-  "text": " can work",
+  "text": " failures to",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M3",
+  "side": "b",
+  "text": " single",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M3",
+  "side": "a",
+  "text": "services:**\nThey promote independent development and deployment, allowing different teams to work on separate",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M3",
+  "side": "b",
+  "text": " components. Teams",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M3",
+  "side": "b",
+  "text": " can also work",
   "_delay": 0.01
  },
  {
@@ -3220,35 +3073,21 @@
   "type": "response_chunk",
   "match_id": "M3",
   "side": "b",
-  "text": " the",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M3",
-  "side": "a",
-  "text": "**",
+  "text": " different technologies tailored",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M3",
   "side": "b",
-  "text": " best tools",
+  "text": " to specific",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M3",
   "side": "b",
-  "text": " for each",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M3",
-  "side": "b",
-  "text": " service.\n\n**Again",
+  "text": " needs.\n\n**Again",
   "_delay": 0.01
  },
  {
@@ -3262,7 +3101,14 @@
   "type": "response_chunk",
   "match_id": "M3",
   "side": "b",
-  "text": " They introduce complexity in",
+  "text": " They introduce significant",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M3",
+  "side": "b",
+  "text": " complexity in",
   "_delay": 0.01
  },
  {
@@ -3275,115 +3121,108 @@
  {
   "type": "response_chunk",
   "match_id": "M3",
-  "side": "b",
-  "text": " systems",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M3",
-  "side": "b",
-  "text": ", requiring",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M3",
-  "side": "b",
-  "text": " robust",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M3",
   "side": "a",
-  "text": "Argument for Microservices:**\n\nMicroservices promote independent development and deployment, allowing teams",
+  "text": " services without blocking each other. This significantly increases development velocity and makes it easier to adopt new technologies for individual components.\n\n**Against Microservices:**\nThey introduce significant",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M3",
   "side": "b",
-  "text": " networking, monitoring,",
+  "text": " system",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M3",
   "side": "b",
-  "text": " and coordination",
+  "text": " management, including",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M3",
   "side": "b",
-  "text": ". Debug",
+  "text": " networking",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M3",
   "side": "b",
-  "text": "ging and transactions",
+  "text": ", monitoring",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M3",
   "side": "b",
-  "text": " across",
+  "text": ", and data consistency",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M3",
   "side": "b",
-  "text": " services can",
+  "text": " challenges. The overhead",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M3",
   "side": "b",
-  "text": " become",
+  "text": " of coordination",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M3",
   "side": "b",
-  "text": " significantly harder",
+  "text": " and communication",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M3",
   "side": "b",
-  "text": " than",
+  "text": " between",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M3",
   "side": "b",
-  "text": " in mon",
+  "text": " services can also slow",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M3",
   "side": "b",
-  "text": "olithic architectures.",
+  "text": " down development and increase",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M3",
+  "side": "b",
+  "text": " operational costs",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M3",
+  "side": "b",
+  "text": ".",
   "_delay": 0.01
  },
  {
   "type": "response_complete",
   "match_id": "M3",
   "side": "b",
-  "full_text": "**For microservices:** They enable independent scaling and deployment of services, improving agility and fault isolation. Teams can work autonomously, using the best tools for each service.\n\n**Against microservices:** They introduce complexity in distributed systems, requiring robust networking, monitoring, and coordination. Debugging and transactions across services can become significantly harder than in monolithic architectures.",
+  "full_text": "**For microservices:** They enable independent scaling and deployment of services, improving agility and resilience by isolating failures to single components. Teams can also work autonomously, using different technologies tailored to specific needs.\n\n**Against microservices:** They introduce significant complexity in distributed system management, including networking, monitoring, and data consistency challenges. The overhead of coordination and communication between services can also slow down development and increase operational costs.",
   "tokens_in": 30,
-  "tokens_out": 74,
+  "tokens_out": 85,
   "reasoning_tokens": 0,
   "finish_reason": "stop",
   "error": null,
@@ -3393,37 +3232,23 @@
   "type": "response_chunk",
   "match_id": "M3",
   "side": "a",
-  "text": " to work on specific services without impacting the entire application. This agility enables faster innovation",
+  "text": " operational complexity due to distributed systems, requiring advanced expertise in areas like service discovery, fault tolerance, and distributed tracing. This increased complexity can lead to higher overhead and potential for difficult",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M3",
   "side": "a",
-  "text": " and more frequent releases, as changes can be rolled out incrementally and with reduced risk.\n\n**Argument against Microservices:**\n\nThe distributed nature of microservices introduces significant operational",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M3",
-  "side": "a",
-  "text": " complexity, requiring robust infrastructure for monitoring, logging, and tracing across numerous services. Managing inter-service communication and ensuring data consistency across multiple databases can become a daunting challenge, increasing development",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M3",
-  "side": "a",
-  "text": " and maintenance overhead.",
+  "text": "-to-diagnose issues in production.",
   "_delay": 0.01
  },
  {
   "type": "response_complete",
   "match_id": "M3",
   "side": "a",
-  "full_text": "**Argument for Microservices:**\n\nMicroservices promote independent development and deployment, allowing teams to work on specific services without impacting the entire application. This agility enables faster innovation and more frequent releases, as changes can be rolled out incrementally and with reduced risk.\n\n**Argument against Microservices:**\n\nThe distributed nature of microservices introduces significant operational complexity, requiring robust infrastructure for monitoring, logging, and tracing across numerous services. Managing inter-service communication and ensuring data consistency across multiple databases can become a daunting challenge, increasing development and maintenance overhead.",
+  "full_text": "Here's one strong argument for and one against microservices:\n\n**For Microservices:**\nThey promote independent development and deployment, allowing different teams to work on separate services without blocking each other. This significantly increases development velocity and makes it easier to adopt new technologies for individual components.\n\n**Against Microservices:**\nThey introduce significant operational complexity due to distributed systems, requiring advanced expertise in areas like service discovery, fault tolerance, and distributed tracing. This increased complexity can lead to higher overhead and potential for difficult-to-diagnose issues in production.",
   "tokens_in": 15,
-  "tokens_out": 107,
+  "tokens_out": 111,
   "reasoning_tokens": 0,
   "finish_reason": "stop",
   "error": null,
@@ -3433,9 +3258,9 @@
   "type": "judge_verdict",
   "match_id": "M3",
   "judge_name": "claude-haiku-4-5-20251001",
-  "verdict": "abstain",
-  "reasoning": "",
-  "flipped": true,
+  "verdict": "B",
+  "reasoning": "Both responses provide balanced arguments for and against microservices within the two-sentence constraint. Response A focuses on development velocity and technology adoption benefits, with strong operational complexity drawbacks. Response B emphasizes scaling/resilience and autonomy, while highlighting distributed system challenges and cost implications. Response B's \"for\" argument is slightly stronger as it mentions both scalability and failure isolation (more comprehensive benefits), while Response A's \"against\" argument is more specific and concrete. Both are accurate and relevant, though Response B provides marginally more complete coverage of key microservices tradeoffs.",
+  "flipped": false,
   "replacement": false,
   "_delay": 0.35
  },
@@ -3444,7 +3269,7 @@
   "match_id": "M3",
   "judge_name": "gemini-2.5-flash-lite",
   "verdict": "tie",
-  "reasoning": "Both responses provide strong arguments for and against microservices, adhering to the two-sentence limit for each. Response A offers slightly more detail in its explanations, while Response B is more concise. Both are accurate, helpful, and relevant.",
+  "reasoning": "Both responses provide strong arguments for and against microservices, adhering to the two-sentence limit for each point. They are both accurate, helpful, clear, and relevant to the prompt.",
   "flipped": false,
   "replacement": false,
   "_delay": 0.35
@@ -3453,8 +3278,8 @@
   "type": "judge_verdict",
   "match_id": "M3",
   "judge_name": "gpt-5.4-nano",
-  "verdict": "A",
-  "reasoning": "Both responses correctly provide one argument for and one against microservices, with appropriate emphasis on agility/fault isolation versus operational/distributed-system complexity. Response A is slightly more complete and specific about risks like incremental rollout and data consistency, and it stays clear and relevant while remaining exactly two sentences per argument. Response B is also strong but is marginally more general and less specific than A.",
+  "verdict": "B",
+  "reasoning": "Both responses are accurate and directly address the prompt with two sentences for the \u201cfor\u201d and two for the \u201cagainst.\u201d Response B is slightly clearer and more complete because it mentions key microservices tradeoffs (independent scaling/resilience and specific distributed complexity areas like networking/monitoring/data consistency) in a more structured way. Response A is also good, but its \u201cagainst\u201d argument leans more toward expertise/distributed tracing without explicitly noting other major cost/consistency concerns as clearly as B.",
   "flipped": false,
   "replacement": false,
   "_delay": 0.35
@@ -3463,17 +3288,17 @@
   "type": "turn_resolved",
   "match_id": "M3",
   "round_number": 1,
-  "majority": "inconclusive",
-  "damage_dealt": 0,
-  "loser_side": "none",
-  "hp_a": 100,
+  "majority": "B",
+  "damage_dealt": 15,
+  "loser_side": "a",
+  "hp_a": 85,
   "hp_b": 100,
   "_delay": 0.35
  },
  {
   "type": "turn_prompt",
   "match_id": "M3",
-  "round_number": 1,
+  "round_number": 2,
   "prompt": "Write a haiku about a slow database query.",
   "_delay": 0.35
  },
@@ -3502,7 +3327,14 @@
   "type": "response_chunk",
   "match_id": "M3",
   "side": "b",
-  "text": "s on",
+  "text": "s",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M3",
+  "side": "b",
+  "text": " on",
   "_delay": 0.01
  },
  {
@@ -3516,28 +3348,7 @@
   "type": "response_chunk",
   "match_id": "M3",
   "side": "b",
-  "text": "Data craw",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M3",
-  "side": "b",
-  "text": "ls like",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M3",
-  "side": "b",
-  "text": " a sn",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M3",
-  "side": "b",
-  "text": "ail's pace",
+  "text": "Sil",
   "_delay": 0.01
  },
  {
@@ -3551,14 +3362,91 @@
   "type": "response_chunk",
   "match_id": "M3",
   "side": "b",
-  "text": "\nP",
+  "text": "ent",
   "_delay": 0.01
  },
  {
   "type": "response_chunk",
   "match_id": "M3",
   "side": "b",
-  "text": "atience wears",
+  "text": " wait",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M3",
+  "side": "b",
+  "text": ",",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M3",
+  "side": "b",
+  "text": " the",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M3",
+  "side": "b",
+  "text": " screen",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M3",
+  "side": "b",
+  "text": " is",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M3",
+  "side": "b",
+  "text": " still",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M3",
+  "side": "b",
+  "text": "\n",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M3",
+  "side": "b",
+  "text": "P",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M3",
+  "side": "b",
+  "text": "atience",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M3",
+  "side": "a",
+  "text": " slowly churns,\nCursor waits, a spinning top,\nInsights yet to bloom",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M3",
+  "side": "b",
+  "text": " wears",
+  "_delay": 0.01
+ },
+ {
+  "type": "response_chunk",
+  "match_id": "M3",
+  "side": "a",
+  "text": ".",
   "_delay": 0.01
  },
  {
@@ -3567,6 +3455,18 @@
   "side": "b",
   "text": " so",
   "_delay": 0.01
+ },
+ {
+  "type": "response_complete",
+  "match_id": "M3",
+  "side": "a",
+  "full_text": "Data slowly churns,\nCursor waits, a spinning top,\nInsights yet to bloom.",
+  "tokens_in": 10,
+  "tokens_out": 19,
+  "reasoning_tokens": 0,
+  "finish_reason": "stop",
+  "error": null,
+  "_delay": 0.35
  },
  {
   "type": "response_chunk",
@@ -3579,35 +3479,9 @@
   "type": "response_complete",
   "match_id": "M3",
   "side": "b",
-  "full_text": "Slow query drags on\nData crawls like a snail's pace\nPatience wears so thin",
+  "full_text": "Slow query drags on\nSilent wait, the screen is still\nPatience wears so thin",
   "tokens_in": 25,
-  "tokens_out": 22,
-  "reasoning_tokens": 0,
-  "finish_reason": "stop",
-  "error": null,
-  "_delay": 0.35
- },
- {
-  "type": "response_chunk",
-  "match_id": "M3",
-  "side": "a",
-  "text": " trickles slow,\nCursors wait, a spinning top,\nTime itself stands",
-  "_delay": 0.01
- },
- {
-  "type": "response_chunk",
-  "match_id": "M3",
-  "side": "a",
-  "text": " still.",
-  "_delay": 0.01
- },
- {
-  "type": "response_complete",
-  "match_id": "M3",
-  "side": "a",
-  "full_text": "Data trickles slow,\nCursors wait, a spinning top,\nTime itself stands still.",
-  "tokens_in": 10,
-  "tokens_out": 19,
+  "tokens_out": 21,
   "reasoning_tokens": 0,
   "finish_reason": "stop",
   "error": null,
@@ -3618,7 +3492,7 @@
   "match_id": "M3",
   "judge_name": "claude-haiku-4-5-20251001",
   "verdict": "A",
-  "reasoning": "Response A creates a more vivid and poetic haiku with stronger imagery (trickles, spinning top, time stands still) that effectively captures the experience of a slow query. Response B's language is more direct but less imaginative, and \"crawls like a snail's pace\" is somewhat clich\u00e9d. Both follow the 5-7-5 syllable structure correctly and address the prompt relevantly, but A demonstrates superior craft in word choice and metaphor while maintaining technical relevance.",
+  "reasoning": "Response A uses more sophisticated imagery with \"cursor waits, a spinning top\" and \"insights yet to bloom,\" creating vivid metaphors that effectively convey the frustration and anticipation of a slow database query. Response B, while capturing the emotional experience of impatience, uses more literal descriptions that are less poetic. Both maintain proper haiku structure (5-7-5 syllables), but A demonstrates superior craft with its metaphorical language and more precisely captures the technical aspect of database queries while maintaining poetic elegance.",
   "flipped": false,
   "replacement": false,
   "_delay": 0.35
@@ -3646,30 +3520,30 @@
  {
   "type": "turn_resolved",
   "match_id": "M3",
-  "round_number": 1,
+  "round_number": 2,
   "majority": "inconclusive",
   "damage_dealt": 0,
   "loser_side": "none",
-  "hp_a": 100,
+  "hp_a": 85,
   "hp_b": 100,
   "_delay": 0.35
  },
  {
   "type": "match_resolved",
   "match_id": "M3",
-  "winner": "",
-  "loser": "",
-  "by": "draw",
-  "final_hp_a": 100,
+  "winner": "mistral-medium-2604",
+  "loser": "gemini-2.5-flash",
+  "by": "round_cap",
+  "final_hp_a": 85,
   "final_hp_b": 100,
   "_delay": 0.35
  },
  {
   "type": "standings_updated",
   "elo": {
-   "Snot the Quick": 2540.8347518315804,
-   "Gruk Flashfist": 3459.165259717415,
-   "Ugluk Stormcaller": -3000.0
+   "gpt-5.4-mini": 3459.603709272729,
+   "gemini-2.5-flash": -3000.0,
+   "mistral-medium-2604": 2540.4007626862995
   },
   "matches_done": 3,
   "matches_total": 3,
@@ -3677,27 +3551,37 @@
  },
  {
   "type": "tournament_ended",
-  "champion": "Gruk Flashfist",
+  "champion": "gpt-5.4-mini",
   "elo": {
-   "Snot the Quick": 2540.8347518315804,
-   "Gruk Flashfist": 3459.165259717415,
-   "Ugluk Stormcaller": -3000.0
+   "gpt-5.4-mini": 3459.603709272729,
+   "gemini-2.5-flash": -3000.0,
+   "mistral-medium-2604": 2540.4007626862995
   },
-  "battle_log_path": "outputs/smoke/battles.jsonl",
+  "battle_log_path": "",
   "report": {
    "elo_ci": {
-    "Snot the Quick": [
-     -3000.0,
+    "gpt-5.4-mini": [
+     1000.000003136657,
      4999.999993915531
     ],
-    "Gruk Flashfist": [
-     1000.0000030422344,
-     4999.999993726686
-    ],
-    "Ugluk Stormcaller": [
+    "gemini-2.5-flash": [
      -3000.0,
-     1000.000003136657
+     1000.0000030422344
+    ],
+    "mistral-medium-2604": [
+     -3000.0,
+     4999.999993726686
     ]
+   },
+   "elo_by_category": {},
+   "category_counts": {
+    "general": 2
+   },
+   "tokens": {
+    "warriors_in": 240,
+    "warriors_out": 835,
+    "judges_in": 12876,
+    "judges_out": 3619
    },
    "jury": {
     "comparisons": 6,
@@ -3705,36 +3589,59 @@
     "b_win_rate": 0.5,
     "tie_rate": 0.0,
     "inconclusive_rate": 0.6666666666666666,
-    "mean_agreement": 0.611111111111111,
+    "mean_agreement": 0.5666666666666667,
     "per_judge": [
      {
       "model": "anthropic/claude-haiku-4-5-20251001",
-      "a_rate": 0.75,
-      "b_rate": 0.25,
-      "position_bias": 0.3333333333333333,
+      "a_rate": 0.6,
+      "b_rate": 0.4,
+      "position_bias": 0.16666666666666666,
       "tie_rate": 0.0
      },
      {
       "model": "google/gemini-2.5-flash-lite",
       "a_rate": null,
       "b_rate": null,
-      "position_bias": 0.5,
-      "tie_rate": 0.5
+      "position_bias": 0.3333333333333333,
+      "tie_rate": 0.6666666666666666
      },
      {
       "model": "openai/gpt-5.4-nano",
-      "a_rate": 0.6666666666666666,
-      "b_rate": 0.3333333333333333,
-      "position_bias": 0.5,
+      "a_rate": 0.25,
+      "b_rate": 0.75,
+      "position_bias": 0.3333333333333333,
       "tie_rate": 0.0
      }
     ]
    },
-   "mean_agreement": 0.611111111111111,
+   "mean_agreement": 0.5666666666666667,
+   "fleiss": {
+    "kappa": 0.0,
+    "label": "slight",
+    "rounds_used": 2,
+    "rounds_total": 6
+   },
+   "cohen": {
+    "claude-haiku-4-5-20251001 \u00d7 gemini-2.5-flash-lite": {
+     "kappa": 0.0,
+     "label": "slight",
+     "rounds": 3
+    },
+    "claude-haiku-4-5-20251001 \u00d7 gpt-5.4-nano": {
+     "kappa": 0.4,
+     "label": "fair",
+     "rounds": 3
+    },
+    "gemini-2.5-flash-lite \u00d7 gpt-5.4-nano": {
+     "kappa": 0.0,
+     "label": "slight",
+     "rounds": 3
+    }
+   },
    "verbosity": {
-    "gpt-5.4-mini": 72.0,
-    "mistral-medium-2604": 61.5,
-    "gemini-2.5-flash": 64.25
+    "gpt-5.4-mini": 74.75,
+    "mistral-medium-2604": 63.5,
+    "gemini-2.5-flash": 70.5
    },
    "reasoning_tokens": {
     "gpt-5.4-mini": 0.0,
@@ -3742,34 +3649,34 @@
     "gemini-2.5-flash": 0.0
    },
    "win_grid": {
-    "Snot the Quick": {
-     "Snot the Quick": 0.0,
-     "Gruk Flashfist": 0.0,
-     "Ugluk Stormcaller": 1.0
+    "gpt-5.4-mini": {
+     "gpt-5.4-mini": 0.0,
+     "gemini-2.5-flash": 0.0,
+     "mistral-medium-2604": 1.0
     },
-    "Gruk Flashfist": {
-     "Snot the Quick": 1.0,
-     "Gruk Flashfist": 0.0,
-     "Ugluk Stormcaller": 0.0
+    "gemini-2.5-flash": {
+     "gpt-5.4-mini": 0.0,
+     "gemini-2.5-flash": 0.0,
+     "mistral-medium-2604": 0.0
     },
-    "Ugluk Stormcaller": {
-     "Snot the Quick": 0.0,
-     "Gruk Flashfist": 0.0,
-     "Ugluk Stormcaller": 0.0
+    "mistral-medium-2604": {
+     "gpt-5.4-mini": 0.0,
+     "gemini-2.5-flash": 1.0,
+     "mistral-medium-2604": 0.0
     }
    },
    "thinking": {
-    "Snot the Quick": false,
-    "Gruk Flashfist": false,
-    "Ugluk Stormcaller": false
+    "gpt-5.4-mini": false,
+    "gemini-2.5-flash": false,
+    "mistral-medium-2604": false
    },
    "mixed_pool": false,
    "error_rounds": 0,
    "rated_rounds": 2,
    "by_model_names": {
-    "gpt-5.4-mini": "Snot the Quick",
-    "gemini-2.5-flash": "Gruk Flashfist",
-    "mistral-medium-2604": "Ugluk Stormcaller"
+    "gpt-5.4-mini": "gpt-5.4-mini",
+    "gemini-2.5-flash": "gemini-2.5-flash",
+    "mistral-medium-2604": "mistral-medium-2604"
    }
   },
   "_delay": 0.35
