@@ -63,3 +63,9 @@ def test_load_votes_roundtrip(tmp_path):
     }))
     (vs,) = load_votes([p])
     assert vs.annotator == "h1" and vs.votes[KEYS[1]] == "tie"
+
+
+def test_zero_covoted_rounds_yields_nan_spearman_not_alphabetical():
+    res = anchor_result(RECORDS, [_vs("h1", {"deadbeefdeadbeef": "A"})])
+    row = res["per_annotator"][0]
+    assert row["spearman"] != row["spearman"]  # NaN

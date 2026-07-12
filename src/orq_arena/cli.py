@@ -323,8 +323,14 @@ def refresh_models(config_path: str, show: bool) -> None:
 @click.option("--exclude", "exclude_files", multiple=True, type=click.Path(exists=True),
               help="votes.json to exclude already-voted rounds; repeat per file. "
                    "Builds a resume page with only the remaining rounds.")
+@click.option("--serve", is_flag=True, default=False,
+              help="Serve the page on localhost instead of writing a file; votes save "
+                   "automatically next to the log. Ctrl-C prints the anchor numbers.")
+@click.option("--port", type=int, default=8765, show_default=True,
+              help="Port for --serve (0 picks a free one).")
 def annotate(battle_log: str, out_path: str, sample: int | None, seed: int,
-             criteria: str | None, exclude_files: tuple[str, ...]) -> None:
+             criteria: str | None, exclude_files: tuple[str, ...],
+             serve: bool, port: int) -> None:
     """Render a blinded human-annotation page from a recorded run.
 
     The page is one self-contained HTML file: open it locally or send it
@@ -346,10 +352,31 @@ def annotate(battle_log: str, out_path: str, sample: int | None, seed: int,
     items = annotation_items(records, seed=seed, sample=sample, exclude=excluded)
     if not items:
         raise click.ClickException("every round is already voted in the --exclude files")
-    Path(out_path).write_text(
-        render_annotate_page(items, seed=seed, source=Path(battle_log).name,
-                             criteria=criteria or DEFAULT_CRITERIA)
-    )
+    page = render_annotate_page(items, seed=seed, source=Path(battle_log).name,
+                                criteria=criteria or DEFAULT_CRITERIA)
+    if serve:
+        import webbrowser
+
+        from .anchor import anchor_result, make_annotation_server, render_anchor_result
+
+        server = make_annotation_server(page, Path(battle_log).parent, port=port)
+        url = f"http://127.0.0.1:{server.server_address[1]}"
+        click.echo(f"serving {len(items)} rounds at {url} (Ctrl-C when done)")
+        webbrowser.open(url)
+        try:
+            server.serve_forever()
+        except KeyboardInterrupt:
+            pass
+        finally:
+            server.server_close()
+        files = sorted(server.votes_written)  # type: ignore[attr-defined]
+        if not files:
+            click.echo("\nno votes saved")
+            return
+        click.echo(f"\nvotes: {', '.join(str(f) for f in files)}")
+        render_anchor_result(anchor_result(records, load_votes(files)))
+        return
+    Path(out_path).write_text(page)
     click.echo(
         f"{len(items)} rounds -> {out_path} (blind; votes export as votes.json)"
         + (f", {len(excluded)} already-voted excluded" if excluded else "")
@@ -366,29 +393,9 @@ def anchor(battle_log: str, vote_files: tuple[str, ...]) -> None:
     correlation between the human and panel Bradley-Terry rankings, and
     inter-annotator κ when more than one vote file is given.
     """
-    from rich.console import Console
-    from rich.table import Table
-
-    from .anchor import anchor_result, load_votes
+    from .anchor import anchor_result, load_votes, render_anchor_result
     from .rejudge import load_records
 
-    result = anchor_result(load_records(battle_log), load_votes(list(vote_files)))
-    t = Table(title="human anchor vs panel")
-    for col in ("annotator", "voted", "κ rounds", "κ vs panel", "label", "rank ρ"):
-        t.add_column(col)
-    for row in result["per_annotator"]:
-        t.add_row(
-            row["annotator"], str(row["n_voted"]), str(row["n_kappa"]),
-            "n/a" if row["kappa"] is None else f"{row['kappa']:.2f}",
-            row["kappa_label"],
-            "n/a" if row["spearman"] != row["spearman"] else f"{row['spearman']:.2f}",
-        )
-    Console().print(t)
-    for pair in result["inter_annotator"]:
-        click.echo(
-            f"inter-annotator {pair['pair']}: "
-            + ("κ=n/a" if pair["kappa"] is None else f"κ={pair['kappa']:.2f}")
-            + f" ({pair['kappa_label']}, {pair['rounds']} rounds)"
-        )
-    if result["unknown_keys"]:
-        click.echo(f"⚠ {result['unknown_keys']} votes matched no round in this log")
+    render_anchor_result(
+        anchor_result(load_records(battle_log), load_votes(list(vote_files)))
+    )
