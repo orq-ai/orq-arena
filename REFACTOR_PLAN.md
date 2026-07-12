@@ -616,6 +616,33 @@ real uses, evaluatorq team wants the surface. On merge: core → `src/evaluatorq
 `evaluatorq[arena]`, CLI mount `evaluatorq arena bench`; the orc-themed TUI either rides along
 (precedent: `redteam/ui`) or stays here as the skin consuming the module.
 
+## Best practices from Model-Router-Auto-Evaluation (in-house prior art, 2026-07-12)
+
+`~/Developer/workspace/opensource/Model-Router-Auto-Evaluation` (orq-auto-router-evaluation)
+already proved several patterns on our A+ list — reference its implementation when building:
+
+**Adopt:**
+- **One-file self-contained HTML dashboard per run** — "share it, attach it to a PR, diff two
+  runs, no server". This is PR 12's static report, already validated in-house; steal the shape.
+- **Zero-key demo generates the full report**, not just the show — our fixture replay should
+  also end in the HTML report artifact (mock-data path).
+- **`--dry-run`**: validate config + prompts + counts with *zero* API calls (our preflight probe
+  spends tokens; dry-run must not).
+- **Checkpoints + resume** for large runs — their asyncio checkpoint/resume is the reference
+  for PR 10's `--resume`.
+- **`.env` + `.env.example`** onboarding, real `--help` descriptions, and the OSS packaging kit
+  (QUICKSTART, CONTRIBUTING, SUPPORT, CHANGELOG, media/ screenshots, badges, CI workflows) —
+  the launch-readiness bar.
+- **Verdict banner** — one headline conclusion per run; ours: "king + confidence" one-liner atop
+  the leaderboard/report.
+
+**Consider (platform-integration tier):**
+- **Provisioned, versioned judges in the workspace** (`provision-judge`) — judges as reusable
+  platform evaluator assets instead of ad-hoc panel calls; strongest form of "promote the
+  platform", likely lands via evaluatorq rather than arena code.
+- **Cloud sync with deep links** to dataset/evaluator/experiment in Orq Studio — the reference
+  implementation for our long-deferred platform-upload story.
+
 ## Explicitly rejected (the cut list stays cut)
 
 Swiss or bracket modes, human-vote web UI, a database, multi-run aggregation services, custom
