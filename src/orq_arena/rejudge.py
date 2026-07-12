@@ -192,3 +192,56 @@ def save_report_json(path: str | Path, result: dict) -> None:
         "jury": result["report"].model_dump(),
     }
     Path(path).write_text(json.dumps(payload, indent=2, default=str))
+
+
+def compare_reports(paths: list[str | Path]) -> list[dict]:
+    """Rows for the jury-selection table, one per saved rejudge report JSON."""
+    rows: list[dict] = []
+    for path in paths:
+        data = json.loads(Path(path).read_text())
+        jury = data.get("jury") or {}
+        per_judge = jury.get("per_judge") or []
+        panel = ", ".join(str(j.get("model", "?")).split("/")[-1] for j in per_judge)
+        worst = max(per_judge, key=lambda j: j.get("position_bias") or 0.0, default=None)
+        rows.append({
+            "file": str(path),
+            "panel": panel or "?",
+            "inconclusive": jury.get("inconclusive_rate"),
+            "agreement": jury.get("mean_agreement"),
+            "spearman": data.get("spearman"),
+            "changed": data.get("changed_verdicts"),
+            "total": data.get("total"),
+            "tie_rate": jury.get("tie_rate"),
+            "worst_flip": None if worst is None else worst.get("position_bias"),
+            "worst_flip_judge": (
+                "" if worst is None else str(worst.get("model", "")).split("/")[-1]
+            ),
+        })
+    return rows
+
+
+def render_comparison(rows: list[dict]) -> None:
+    from rich.console import Console
+    from rich.table import Table
+
+    def pct(x):
+        return "n/a" if x is None else f"{x:.0%}"
+
+    t = Table(title="jury candidates over the same recorded log")
+    for col in ("panel", "spearman vs run", "inconclusive", "agreement",
+                "worst flip (judge)", "tie rate", "changed verdicts"):
+        t.add_column(col)
+    for r in rows:
+        sp = "n/a" if r["spearman"] is None else f"{r['spearman']:.2f}"
+        t.add_row(
+            r["panel"], sp, pct(r["inconclusive"]), pct(r["agreement"]),
+            f"{pct(r['worst_flip'])} ({r['worst_flip_judge']})" if r["worst_flip"] is not None else "n/a",
+            pct(r["tie_rate"]),
+            f"{r['changed']}/{r['total']}" if r["changed"] is not None else "n/a",
+        )
+    Console().print(t)
+    Console().print(
+        "read: high spearman = the ranking does not depend on this jury; low inconclusive = "
+        "decisive; low flip = self-consistent. These measure reliability, not accuracy; "
+        "accuracy needs gold pairs or a human anchor."
+    )
