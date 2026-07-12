@@ -343,6 +343,15 @@ leaderboard is just what three cheap models like."
 
 ---
 
+> **Harvest addendum (2026-07-12):** a comparative review of the chennai brainstorm fork
+> (`~/conductor/workspaces/orc-arena-v1/chennai`) identified 10 features worth taking — roster
+> picker over the workspace-enabled catalog, cost engine + prices.yaml, fixture recorder with real
+> pacing, battle browser, Fleiss/Cohen κ, per-model post-mortems, CRT-neon theme, Swiss auto-switch
+> for >8 pools, headless match concurrency, post-demo CTA — sequenced as PRs 5–8. Methodology never
+> flows in (chennai's rating core is match-level, tie-less, CI-less). Full report:
+> `outputs/html/orc-arena-vs-chennai-report.html`
+> (https://claude.ai/code/artifact/c66af501-60ae-430c-a32e-8ec5093dd451).
+
 ## PR 5 — Utility unlock: per-category rankings + run ergonomics (~+90 LOC, after PR 4)
 
 The upgrades that turn one vibes-number into router-decision evidence. Nothing here adds a

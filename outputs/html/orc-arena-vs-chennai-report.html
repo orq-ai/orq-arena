@@ -1,0 +1,319 @@
+<title>orc-arena vs chennai — What to Harvest from the Brainstorm Fork</title>
+<style>
+  :root {
+    --ivory: #f8f5ec;
+    --paper: #fffdf7;
+    --slate: #2a2d33;
+    --slate-soft: #4a4f57;
+    --oat: #ded6c3;
+    --oat-line: #e7e0d0;
+    --clay: #b45739;
+    --olive: #6f7748;
+    --gold: #b8892b;
+    --green: #55713f;
+    --muted: #8a8578;
+    --evq: #44607f;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    --mono: "SF Mono", "JetBrains Mono", "Fira Code", ui-monospace, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--ivory); color: var(--slate); font-family: var(--sans); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 0 28px 96px; }
+  header.page { border-bottom: 3px double var(--oat); padding: 56px 0 30px; margin-bottom: 8px; }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--clay); margin: 0 0 14px; }
+  h1 { font-family: var(--serif); font-weight: 600; font-size: 40px; line-height: 1.12; margin: 0 0 12px; letter-spacing: -0.01em; text-wrap: balance; }
+  .dateline { font-family: var(--mono); font-size: 13px; color: var(--muted); }
+  .dateline b { color: var(--slate-soft); font-weight: 600; }
+  h2 { font-family: var(--serif); font-size: 25px; font-weight: 600; margin: 52px 0 6px; padding-bottom: 8px; border-bottom: 1px solid var(--oat-line); }
+  h2 .num { font-family: var(--mono); font-size: 14px; color: var(--clay); margin-right: 12px; vertical-align: 2px; }
+  h3 { font-family: var(--serif); font-size: 18px; margin: 26px 0 4px; }
+  p { margin: 10px 0; }
+  .lede { font-size: 17px; color: var(--slate-soft); }
+  code, .mono { font-family: var(--mono); font-size: 0.86em; }
+  code { background: #efe9db; padding: 1px 5px; border-radius: 3px; color: #7a3a26; }
+  a { color: var(--clay); }
+  .verdict { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 14px; margin: 30px 0 8px; }
+  .vcard { background: var(--paper); border: 1px solid var(--oat-line); border-radius: 10px; padding: 18px 18px 16px; }
+  .vcard .label { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; }
+  .vcard .big { font-family: var(--serif); font-size: 34px; font-weight: 600; line-height: 1; }
+  .vcard .sub { font-size: 12.5px; color: var(--slate-soft); margin-top: 6px; }
+  .grade-strip { border-top: 3px solid var(--clay); }
+  .callout { background: var(--paper); border-left: 4px solid var(--clay); border-radius: 0 8px 8px 0; padding: 16px 20px; margin: 22px 0; }
+  .callout.good { border-left-color: var(--green); }
+  .callout.warn { border-left-color: var(--gold); }
+  .callout.evq { border-left-color: var(--evq); }
+  table { border-collapse: collapse; width: 100%; margin: 18px 0; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--oat-line); vertical-align: top; }
+  th { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); border-bottom: 1.5px solid var(--oat); }
+  tbody tr:hover { background: #fbf8f0; }
+  td.n { font-family: var(--mono); white-space: nowrap; }
+  .tablewrap { overflow-x: auto; }
+  .pill { display: inline-block; font-family: var(--mono); font-size: 11px; padding: 1px 8px; border-radius: 20px; border: 1px solid var(--oat); color: var(--slate-soft); white-space: nowrap; }
+  .pill.port { background: #e7efdd; border-color: #b8cf9e; color: #465e33; }
+  .pill.adapt { background: #e6ebf1; border-color: #a9b8ca; color: #33475e; }
+  .pill.skip { background: #f6e2dc; border-color: #e2b7a8; color: #9c3f26; }
+  .finding { background: var(--paper); border: 1px solid var(--oat-line); border-radius: 10px; padding: 4px 22px 18px; margin: 20px 0; }
+  .finding .rank { font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: 0.1em; }
+  .finding h3 { margin-top: 12px; }
+  .kv { display: grid; grid-template-columns: 96px 1fr; gap: 4px 14px; font-size: 14px; margin-top: 8px; }
+  .kv .k { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); padding-top: 2px; }
+  ul.tight { margin: 8px 0; padding-left: 20px; }
+  ul.tight li { margin: 5px 0; }
+  .footer { margin-top: 60px; padding-top: 18px; border-top: 3px double var(--oat); font-size: 12.5px; color: var(--muted); font-family: var(--mono); }
+  .toc { font-family: var(--mono); font-size: 12.5px; color: var(--slate-soft); margin: 4px 0 0; }
+  .toc a { color: var(--slate-soft); text-decoration: none; margin-right: 16px; }
+  .toc a:hover { color: var(--clay); }
+  @media (max-width: 720px) { .verdict { grid-template-columns: 1fr 1fr; } .kv { grid-template-columns: 80px 1fr; } }
+</style>
+<div class="wrap">
+
+  <header class="page">
+    <p class="eyebrow">Comparative Review · Feature Harvest</p>
+    <h1>orc-arena vs the chennai fork — what the brainstorm got right</h1>
+    <p class="dateline"><b>2026-07-12</b> · this repo @ <code>gnhf/…</code> (2,426 src LOC, post-refactor) vs
+    <code>~/conductor/workspaces/orc-arena-v1/chennai</code> @ <code>arena-modes-brainstorm</code>
+    (10,319 src LOC, 42 commits, independent git history, Apr 2026) ·
+    companions: <a href="https://claude.ai/code/artifact/cb006f76-6fec-4586-a550-a18bfc91617a">analysis</a> ·
+    <a href="https://claude.ai/code/artifact/f02388ad-5f11-4f0a-b152-0dd414f18996">refactor report</a></p>
+    <p class="toc">
+      <a href="#context">What chennai is</a>
+      <a href="#method">Why the core stays ours</a>
+      <a href="#harvest">The harvest, ranked</a>
+      <a href="#skip">The skip list</a>
+      <a href="#plan">Sequencing</a>
+    </p>
+  </header>
+
+  <section id="verdict">
+    <p class="lede">chennai is the <b>maximalist v1 brainstorm</b> this repo was distilled from — four
+    tournament modes, an arcade theme, audio, a mode picker, a debate protocol. Most of it is exactly the
+    scope this repo's refactor exists to refuse. But buried in the sprawl are <b>ten genuinely good
+    features</b>, several of them production-quality and directly on-mission: an interactive roster picker
+    fed by the router's <em>workspace-enabled</em> catalog, a real cost engine with a judges-vs-warriors
+    spend split, a proper fixture recorder with real pacing, a battle browser for auditing verdicts, and
+    chance-corrected judge-agreement statistics (Fleiss' κ). The rule for every port:
+    <b>features flow in, methodology never does</b> — chennai's rating core is strictly weaker than what
+    this repo now has.</p>
+    <div class="verdict grade-strip">
+      <div class="vcard"><p class="label">Relationship</p><div class="big" style="color:var(--olive)">v1 ⇢ v2</div>
+        <p class="sub">Independent git roots; this repo is the focused distillation of chennai's concept.</p></div>
+      <div class="vcard"><p class="label">Size</p><div class="big" style="color:var(--clay)">4.3×</div>
+        <p class="sub">10,319 vs 2,426 src LOC. 13 TUI screens vs 3. 18 event kinds vs 11.</p></div>
+      <div class="vcard"><p class="label">Worth harvesting</p><div class="big" style="color:var(--green)">10</div>
+        <p class="sub">5 ports, 5 adaptations — ~1,200 LOC in, sequenced as PRs 5–8.</p></div>
+      <div class="vcard"><p class="label">Staying dead</p><div class="big" style="color:var(--gold)">~6k</div>
+        <p class="sub">LOC of modes, debate protocol, audio, pickers for modes we removed.</p></div>
+    </div>
+  </section>
+
+  <!-- ============ CONTEXT ============ -->
+  <section id="context">
+    <h2><span class="num">01</span>What chennai is</h2>
+    <p>A Conductor worktree on the personal repo (<code>arianpasquali/orc-arena</code>, branch
+    <code>arena-modes-brainstorm</code>) with its own 42-commit history from <code>Initial commit</code> —
+    not a fork of this repo's code, but its conceptual ancestor. It answers "what if the arena did
+    <em>everything</em>": <code>run</code> (single-elim) + <code>arcade</code> (double-elim with losers
+    bracket) + <code>simulate</code> (round-robin/Swiss) + <code>debate</code> (Lincoln-Douglas protocol
+    with a two-phase judge committee), a mode picker, a CRT-neon theme, an audio player, per-model LLM
+    post-mortems, a cost engine, a battle browser, and a fixture record/replay system. Judging is the
+    hand-rolled 50/50-swap panel this repo just deleted; there is no evaluatorq anywhere.</p>
+    <p>Amusing convergence: chennai's single extra fix on the shared sidequests master — renaming
+    <code>JudgeCard._render</code> because it shadows Textual's internal — is the same bug this repo hit
+    and fixed independently yesterday.</p>
+  </section>
+
+  <!-- ============ METHODOLOGY ============ -->
+  <section id="method">
+    <h2><span class="num">02</span>Why the measurement core stays ours</h2>
+    <p>Before harvesting anything, establish the direction of flow. On every axis that makes the number
+    defensible, this repo is ahead:</p>
+    <div class="tablewrap">
+    <table>
+      <thead><tr><th>Axis</th><th>chennai</th><th>this repo</th></tr></thead>
+      <tbody>
+        <tr><td>Judging</td><td>Hand-rolled panel, 50/50 random single ordering</td><td>evaluatorq pairwise: both orders, flip ⇒ recorded abstention, replacements, min-2 floor</td></tr>
+        <tr><td>Rating input</td><td><b>Match-level</b> outcomes; <code>tie=False</code> hardcoded in the simulation driver</td><td><b>Per-round</b> verdicts incl. ties at 0.5</td></tr>
+        <tr><td>Uncertainty</td><td>None; live standings use a fake provisional ELO (<code>1000 + 50·(W−L)</code>)</td><td>Bootstrap 95% CIs; live standings recompute real BT-MLE each match</td></tr>
+        <tr><td>Failures</td><td>Judged on whatever text arrived</td><td>Retry once → round voided, excluded from rating</td></tr>
+        <tr><td>Reasoning models</td><td>Unaware</td><td>Verbatim router controls, verified uniform-OFF pool, reasoning-token accounting</td></tr>
+        <tr><td>Reproducibility</td><td>—</td><td>Run manifest, seeded schedule, <code>rejudge</code> rank-stability</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p><b>Rule for every item below: port the feature, rewire it to this repo's engine.</b> Nothing from
+    chennai's judging or rating paths crosses over.</p>
+  </section>
+
+  <!-- ============ HARVEST ============ -->
+  <section id="harvest">
+    <h2><span class="num">03</span>The harvest, ranked by value-per-line</h2>
+
+    <div class="finding">
+      <p class="rank">HARVEST 01 · <span class="pill port">port</span> · roster_select.py (629) + providers/models_list.py · ~700 LOC adapted</p>
+      <h3>Interactive roster picker over the workspace-enabled catalog</h3>
+      <p>Run <code>orc-arena run</code> with no <code>--config</code> → a picker opens: live-search input,
+      provider filter chips, a seed-order roster panel that fills as you pick, and a <b>live cost estimate
+      updating with every selection</b>. Behind it sits chennai's best research artifact,
+      <code>models_list.py</code>: <code>GET /v2/router/models</code> is the <em>workspace-enabled subset</em>
+      (models disabled in the Model Garden simply don't appear), intersected with <code>GET /v2/models</code>
+      for authoritative <code>type == "chat"</code>, cached 24h, with a <code>refresh-models</code> CLI
+      command. This repo's roster pain — a broken preview model and think-by-default surprises discovered
+      mid-smoke — is exactly what picking from the enabled catalog mitigates.</p>
+      <div class="kv">
+        <span class="k">Why</span><span>Kills YAML-editing friction; showcases the router's catalog as a product surface; "benchmark <em>your</em> pool" becomes literal.</span>
+        <span class="k">Adapt</span><span>Drop the <code>{2,4,8,16,32}</code> bracket-size gate (round-robin takes any ≥2); default-theme styling; picked roster carries the uniform-OFF reasoning policy with a 🧠 toggle per pick later.</span>
+      </div>
+    </div>
+
+    <div class="finding">
+      <p class="rank">HARVEST 02 · <span class="pill port">port</span> · analysis/cost.py (390, slimmed) + prices.yaml + leaderboard cost panel · ~350 LOC</p>
+      <h3>Cost engine: pre-run estimate, post-run actuals, judges-vs-warriors split</h3>
+      <p><code>prices.yaml</code> (USD per Mtok, optional <code>cached_input</code>, default fallback with an
+      explicit "this is a guess" flag), <code>estimate_tournament_cost</code> for the picker/preflight, and
+      <code>compute_actual_cost</code> feeding a leaderboard panel that <b>separates what the jury cost from
+      what the fighters cost</b>. This is PR 5's cost-preflight item, already built — and the split is an
+      honesty feature: with both-orderings judging, the jury bill is the methodology's price tag, in dollars.</p>
+      <div class="kv">
+        <span class="k">Adapt</span><span>Drop the per-provider tokenizer estimators (this repo records <em>exact</em> usage; the preflight can price <code>max_tokens</code>-bounded worst cases) — keeps the port dependency-free. Refresh the price table to the new roster.</span>
+      </div>
+    </div>
+
+    <div class="finding">
+      <p class="rank">HARVEST 03 · <span class="pill port">port</span> · replay/recorder.py (75) + loader.py (71) + --record flags · ~180 LOC</p>
+      <h3>Fixture recorder with real pacing, atomic finalize, and <code>demo --refresh</code></h3>
+      <p>JSONL with a <code>_meta</code> header, <b>real inter-event delays captured from the clock</b>
+      (replay feels like the live run, not a slideshow), <code>.partial</code> → atomic rename, graceful
+      abort. <code>--record</code> on the live command, and <code>demo --refresh</code> re-records the
+      canonical fixture with a cheap real run — this repo generated its fixture from a hand-rolled smoke
+      script doing exactly this, worse.</p>
+      <div class="kv">
+        <span class="k">Adapt</span><span>Single mode — no mode field ceremony. Pairs with PR 5's pacing keys (<code>space</code>/<code>+</code>/<code>-</code>), which chennai also already built.</span>
+      </div>
+    </div>
+
+    <div class="finding">
+      <p class="rank">HARVEST 04 · <span class="pill port">port</span> · battle_browser.py (343 adapted) · leaderboard key <code>B</code></p>
+      <h3>Battle browser — step through every judged round after the run</h3>
+      <p>Prompt, both responses, every judge's verdict and reasoning, damage and HP deltas — one round per
+      page, arrow-key navigation, straight off <code>battles.jsonl</code>. For a benchmark, this is the
+      trust feature: <b>spot-check the jury before you believe the leaderboard</b>. Adapting to schema v2
+      makes it better than the original: flip/abstain badges and reasoning-token counts come along free.</p>
+    </div>
+
+    <div class="finding">
+      <p class="rank">HARVEST 05 · <span class="pill port">port</span> · tui/theme.py (61) + widget touch-ups</p>
+      <h3>The CRT-neon arcade theme</h3>
+      <p>A deliberate, documented palette ("near-black with a whisper of violet, never pure #000") with
+      markup helpers and HP color ramps. This repo's TUI runs on stock Textual dark — functional, anonymous.
+      For a Show-HN artifact the visual identity <em>is</em> the thumbnail. Side-identity semantics (A green /
+      B orange) survive inside the neon palette (P1 magenta / P2 cyan is their equivalent — pick one pair,
+      keep it everywhere).</p>
+    </div>
+
+    <div class="finding">
+      <p class="rank">HARVEST 06 · <span class="pill adapt">adapt</span> · analysis/model_analysis.py (317) + screen (329) → rebuilt thinner</p>
+      <h3>"Why did I lose" — per-model LLM post-mortems</h3>
+      <p>After a run, one background task per model digests its battles — prompts, its own responses, the
+      judges' free-text reasoning — through an analyzer LLM into a structured summary, cached in
+      <code>analysis.jsonl</code>, rendered from the leaderboard. Genuinely novel and very Show-HN
+      ("Grak wins on completeness, bleeds points to verbosity"). Rebuild, don't port: chennai uses
+      <code>instructor</code> (which this repo just removed); the same feature is ~150 lines on the existing
+      client's structured output, fed by <code>PairwiseVote.explanation</code> — richer input than v1 had.</p>
+    </div>
+
+    <div class="finding">
+      <p class="rank">HARVEST 07 · <span class="pill adapt">adapt</span> · analysis/judge_stats.py (299) → ~80 LOC of it</p>
+      <h3>Fleiss' κ and Cohen's κ — chance-corrected jury agreement</h3>
+      <p>Textbook implementations with Landis-Koch labels ("substantial agreement"), pure Python, cited
+      (Fleiss 1971, Cohen 1960, Zheng et al. 2023). evaluatorq's <code>build_report</code> gives raw modal
+      agreement and flip rates; κ corrects for chance — <i>"mean agreement 61%"</i> and
+      <i>"κ = 0.18, slight agreement"</i> tell very different stories, and the second is the one a
+      statistician will ask for. Take the κ math, skip their position-bias section (superseded by
+      evaluatorq's both-orders flips). Lands in the leaderboard jury panel and <code>run.json</code>.</p>
+    </div>
+
+    <div class="finding">
+      <p class="rank">HARVEST 08 · <span class="pill adapt">adapt</span> · SwissScheduler (~70 LOC) from round_robin.py</p>
+      <h3>Swiss pairing for large pools — same benchmark, scaled</h3>
+      <p>Score-group pairing with rematch avoidance, and a real statistical argument in the docstring: BT
+      converges faster when strong plays strong; random pairing needs ~3× the matches for the same ranking
+      confidence. Not a mode — an <b>auto-switch by pool size</b> (≤8 → full round-robin, &gt;8 → Swiss),
+      which is what "ELO over a pool of models" needs the day someone points it at 20 models. Wire it to
+      per-round outcomes (their version feeds match-level, no ties — the flaw this repo already fixed).</p>
+    </div>
+
+    <div class="finding">
+      <p class="rank">HARVEST 09 · <span class="pill adapt">adapt</span> · match concurrency (semaphore + standings lock) from round_robin.py</p>
+      <h3>Concurrent matches — for headless runs only</h3>
+      <p>Chennai runs up to <code>simulation.concurrency</code> matches in parallel; events interleave but
+      carry <code>match_id</code>. The TUI stays one-fight-at-a-time (it's the show), but PR 5's
+      <code>--headless</code> CI mode wants exactly this: a 20-model Swiss run overnight is wall-clock
+      hostile sequentially. ~30 lines on the existing driver, gated behind headless.</p>
+    </div>
+
+    <div class="finding">
+      <p class="rank">HARVEST 10 · <span class="pill adapt">adapt</span> · cta_modal.py (78)</p>
+      <h3>Post-demo call-to-action</h3>
+      <p>Demo ends → modal: "run it live with your own pool — <code>export ORQ_API_KEY</code>" with
+      play-live/quit keys. The repo exists to promote two products; this is the one moment a delighted
+      demo viewer is asked to become a user. Tiny, unobtrusive, worth it.</p>
+    </div>
+  </section>
+
+  <!-- ============ SKIP ============ -->
+  <section id="skip">
+    <h2><span class="num">04</span>The skip list — and why</h2>
+    <div class="tablewrap">
+    <table>
+      <thead><tr><th>Feature</th><th>LOC</th><th>Why it stays dead</th></tr></thead>
+      <tbody>
+        <tr><td>Double-elim <code>arcade</code> mode + bracket overlay</td><td class="n">~770</td><td>Tournament theater; the refactor deleted single-elim for the same reason. Elimination formats throw away comparisons the rating wants.</td></tr>
+        <tr><td>Debate mode + two-phase committee + debate screen</td><td class="n">~650</td><td>A different product (structured argumentation ≠ pairwise benchmark). The committee's discuss-then-revote idea is interesting — as an <em>evaluatorq</em> upstream proposal, not arena code.</td></tr>
+        <tr><td>Mode picker screen + mode plumbing</td><td class="n">~340+</td><td>One mode now. The picker slot is taken by the roster picker (Harvest 01) — a better first screen.</td></tr>
+        <tr><td><code>audio.py</code> + assets</td><td class="n">~124+</td><td>Charming, but platform-fragile (afplay detection), invisible in every shareable (SVG/gif), and the bell already lands the KO beat.</td></tr>
+        <tr><td>Per-provider tokenizer cost estimators</td><td class="n">~120</td><td>This repo records exact usage; worst-case pricing off <code>max_tokens</code> is honest enough for a preflight. No tokenizer deps.</td></tr>
+        <tr><td>Simulation matrix screen / fake provisional ELO</td><td class="n">~330</td><td>Live standings here recompute real BT with CIs; the win-grid already ships on the leaderboard.</td></tr>
+        <tr><td>18-kind event vocabulary</td><td class="n">—</td><td>This repo's 11 kinds all have consumers; chennai's extras serve modes that aren't coming.</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <!-- ============ SEQUENCING ============ -->
+  <section id="plan">
+    <h2><span class="num">05</span>Sequencing — PRs 5–8</h2>
+    <div class="tablewrap">
+    <table>
+      <thead><tr><th>PR</th><th>Contents</th><th>Harvest items</th><th>~LOC in</th></tr></thead>
+      <tbody>
+        <tr><td class="n">PR 5</td><td>Benchmark ergonomics: recorder + <code>--record</code> + <code>demo --refresh</code>, pacing keys, cost engine + <code>prices.yaml</code> + preflight + leaderboard cost panel, per-category ELO (already planned), <code>--headless</code> + match concurrency</td><td>02, 03, 09</td><td class="n">~550</td></tr>
+        <tr><td class="n">PR 6</td><td>Roster picker + <code>models_list</code> workspace-catalog strategy + <code>refresh-models</code></td><td>01</td><td class="n">~700</td></tr>
+        <tr><td class="n">PR 7</td><td>Trust &amp; insight: battle browser (<code>B</code>), Fleiss/Cohen κ in jury panel + manifest, model post-mortems (<code>M</code>, rebuilt on the existing client)</td><td>04, 06, 07</td><td class="n">~560</td></tr>
+        <tr><td class="n">PR 8</td><td>Show polish: CRT-neon theme, CTA modal, Swiss auto-switch for &gt;8 pools</td><td>05, 08, 10</td><td class="n">~250</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <div class="callout warn">
+      <b>Guardrail:</b> every harvested line still has to pass the refactor's test — <i>render the show,
+      route the tokens, or measure honestly</i>. That's how ~1,200 LOC comes in while ~6,000 LOC of modes,
+      audio, and pickers-for-deleted-modes stays out. Post-harvest the repo lands around ~3,600 src LOC —
+      still a third of chennai, with a strictly stronger core.
+    </div>
+    <div class="callout good">
+      <b>One-line verdict:</b> chennai answered "what could the arena be" with everything; this repo
+      answers "what should it be" — and ten of chennai's answers were right. Take the picker, the prices,
+      the recorder, the browser, the κ, the post-mortems, the theme, the Swiss, the concurrency, and the
+      CTA. Leave the modes in the museum.
+    </div>
+  </section>
+
+  <div class="footer">
+    orc-arena vs chennai harvest review · 2026-07-12 · static read of both trees + live registry knowledge
+    from the refactor smokes · companions:
+    <a href="https://claude.ai/code/artifact/cb006f76-6fec-4586-a550-a18bfc91617a">analysis &amp; migration</a> ·
+    <a href="https://claude.ai/code/artifact/f02388ad-5f11-4f0a-b152-0dd414f18996">refactor executed</a>
+  </div>
+
+</div>
