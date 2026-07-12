@@ -36,9 +36,11 @@ from ..events import (
     TurnPrompt,
     TurnResolved,
 )
+from ..orcs.roster import assign_warriors
 from ..tournament.driver import run_tournament
 from .screens.fight import FightScreen
 from .screens.leaderboard import LeaderboardScreen
+from .screens.roster_select import RosterSelectScreen
 from .screens.title import TitleScreen
 
 
@@ -65,10 +67,12 @@ class ArenaApp(App):
         live: bool = True,
         fixture: str | None = None,
         preflight: dict | None = None,
+        pick_roster: bool = False,
     ) -> None:
         super().__init__()
         self.cfg = cfg
         self._preflight = preflight
+        self._pick_roster = pick_roster
         self._prompts = prompts
         self._battle_log_path = battle_log_path
         self._live = live
@@ -82,7 +86,44 @@ class ArenaApp(App):
     # ----- lifecycle -----
 
     def on_mount(self) -> None:
+        if self._pick_roster:
+            self.push_screen(RosterSelectScreen(self.cfg, prompt_count=len(self._prompts)))
+        else:
+            self.push_screen(TitleScreen())
+
+    def on_roster_select_screen_roster_selected(
+        self, message: RosterSelectScreen.RosterSelected
+    ) -> None:
+        self.cfg.warriors = assign_warriors(message.model_ids, self.cfg.warriors)
+        self._by_name = {w.orc_name: w for w in self.cfg.warriors}
+        self.pop_screen()
+        self.run_worker(self._probe_then_begin(), exclusive=True)
+
+    def on_roster_select_screen_load_failed(
+        self, message: RosterSelectScreen.LoadFailed
+    ) -> None:
+        self.notify(f"catalog load failed: {message.reason}", severity="warning")
+        self.pop_screen()
         self.push_screen(TitleScreen())
+
+    async def _probe_then_begin(self) -> None:
+        """Picker path: the CLI preflight didn't run, so probe here."""
+        if self.cfg.preflight.thinking_probe:
+            from ..preflight import surprises, thinking_probe
+
+            self.notify("probing pool for vendor-default thinking…", timeout=4)
+            try:
+                probe = await thinking_probe(self.cfg)
+                self._preflight = {**(self._preflight or {}), "thinking_probe": probe}
+                odd = surprises(probe)
+                if odd:
+                    self.notify(
+                        f"🧠 thinks despite config: {', '.join(odd)} — ranking will be footnoted",
+                        severity="warning", timeout=8,
+                    )
+            except Exception as exc:
+                self.notify(f"thinking probe failed: {exc}", severity="warning")
+        self.begin()
 
     def begin(self) -> None:
         """Called from TitleScreen when the user presses ENTER."""

@@ -87,8 +87,15 @@ def _rebuild_comparisons(records: list[BattleRecord]) -> list[PairwiseComparison
 
 
 def _final_report(
-    cfg: ArenaConfig, records: list[BattleRecord], outcomes: list[Outcome], names: list[str]
+    cfg: ArenaConfig, records: list[BattleRecord], outcomes: list[Outcome], names: list[str],
+    preflight: dict | None = None,
 ) -> dict:
+    # A warrior "thinks" if its config says so OR the preflight probe saw it
+    # thinking anyway (vendor defaults the router can't disable).
+    probed = {
+        name: bool(r.get("thinks"))
+        for name, r in ((preflight or {}).get("thinking_probe") or {}).items()
+    }
     comparisons = _rebuild_comparisons(records)
     jury = build_report(comparisons) if comparisons else None
 
@@ -133,8 +140,13 @@ def _final_report(
         "verbosity": {m: sum(v) / len(v) for m, v in tokens.items() if v},
         "reasoning_tokens": {m: sum(v) / len(v) for m, v in reasoning.items() if v},
         "win_grid": grid,
-        "thinking": {w.orc_name: w.thinking_enabled for w in cfg.warriors},
-        "mixed_pool": len({w.thinking_enabled for w in cfg.warriors}) > 1,
+        "thinking": {
+            w.orc_name: (w.thinking_enabled or probed.get(w.orc_name, False))
+            for w in cfg.warriors
+        },
+        "mixed_pool": len({
+            w.thinking_enabled or probed.get(w.orc_name, False) for w in cfg.warriors
+        }) > 1,
         "error_rounds": sum(1 for r in records if r.error is not None),
         "rated_rounds": len(outcomes),
         "by_model_names": {w.short_model: w.orc_name for w in by_model.values()},
@@ -265,7 +277,7 @@ async def run_tournament(
             _run_match(i, w_a, w_b) for i, (w_a, w_b) in enumerate(schedule, 1)
         ))
 
-    report = _final_report(cfg, all_records, outcomes, names)
+    report = _final_report(cfg, all_records, outcomes, names, preflight=preflight)
     _write_manifest(
         manifest_path, cfg=cfg, prompts=prompts, seed=seed,
         tournament_id=tournament_id, report=report, preflight=preflight,
