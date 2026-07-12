@@ -1,6 +1,6 @@
 """Chance-corrected agreement math."""
 
-from orc_arena.analysis.kappa import cohen_kappa_pairs, fleiss_kappa, landis_koch
+from orq_arena.analysis.kappa import cohen_kappa_pairs, fleiss_kappa, landis_koch
 
 
 def _round(votes):  # [(judge, vote)] -> judge_votes dicts

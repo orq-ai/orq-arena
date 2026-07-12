@@ -3,8 +3,8 @@
 from evaluatorq import PairwiseComparison
 from evaluatorq.pairwise import PairwiseVote
 
-from orc_arena.arena.damage import compute_damage
-from orc_arena.config import MatchRules
+from orq_arena.arena.damage import compute_damage
+from orq_arena.config import MatchRules
 
 RULES = MatchRules()  # 30 unanimous / 15 majority / 0 tie
 

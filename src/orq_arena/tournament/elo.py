@@ -1,6 +1,6 @@
 """Bradley-Terry MLE ELO — adapted from orq-battlebench/ranking.py.
 
-Pure Python, no numpy/scipy. Simplified for orc-arena: no bootstrap CIs.
+Pure Python, no numpy/scipy. Simplified for orq-arena: no bootstrap CIs.
 Ties split 0.5 / 0.5 (standard Bradley-Terry treatment).
 """
 

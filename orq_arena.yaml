@@ -1,4 +1,4 @@
-# orc-arena default configuration.
+# orq-arena default configuration.
 # All warrior + judge calls route through the orq.ai router gateway.
 
 # Match rules (hybrid: HP + round cap)

@@ -5,8 +5,8 @@ from pathlib import Path
 
 from textual.app import App
 
-from orc_arena.data.schemas import BattleRecord
-from orc_arena.tui.screens.battle_browser import BattleBrowserScreen
+from orq_arena.data.schemas import BattleRecord
+from orq_arena.tui.screens.battle_browser import BattleBrowserScreen
 
 LOG = Path(__file__).resolve().parent.parent / "outputs" / "smoke" / "pr5.jsonl"
 

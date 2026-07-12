@@ -1,4 +1,4 @@
-# orc-arena plan
+# orq-arena plan
 
 > **Status (2026-07-12):** PRs 1–8 executed and live-verified; dependency is the official
 > `evaluatorq>=1.8.0` from PyPI; leaderboard shows model names only. Working branch: `master`
@@ -101,16 +101,16 @@ and **no macro pool-ranking layer** — this is that layer.
 
 1. **Package split.** Core (`config`, `preflight`, `arena/`, `tournament/`, `analysis/`,
    `providers/`, `data/`, `headless`) imports zero Textual. `textual` → 
-   `[project.optional-dependencies] tui`; `orc_arena.tui` imports lazily with a friendly
-   "pip install orc-arena[tui]" error. Same commit: core vocabulary goes model-neutral
+   `[project.optional-dependencies] tui`; `orq_arena.tui` imports lazily with a friendly
+   "pip install orq-arena[tui]" error. Same commit: core vocabulary goes model-neutral
    (`warriors:` → `models:`, `WarriorSpec` → `ModelSpec`, `orc_name` → `name`, `orcs/roster.py`
    → `roster.py`) — an `evaluatorq.arena` candidate can't ship fantasy nouns; the TUI keeps the
    warrior/HP/damage theatre as pure presentation (decision 24).
-2. **CLI inversion.** `orc-arena bench` = primary, headless by default: writes `battles.jsonl`
+2. **CLI inversion.** `orq-arena bench` = primary, headless by default: writes `battles.jsonl`
    + `run.json` + machine-readable `report.json` (ELO, CIs, κ, categories, tokens); exit-code
    asserts (`--assert-agreement 0.5`, `--assert-min-rated N`) so CI can fail a run.
-   `orc-arena run` (TUI) requires the extra. `demo`/`rejudge` unchanged.
-3. **Programmatic API.** `from orc_arena import run_benchmark` returning a typed result.
+   `orq-arena run` (TUI) requires the extra. `demo`/`rejudge` unchanged.
+3. **Programmatic API.** `from orq_arena import run_benchmark` returning a typed result.
    GitHub Action recipe: nightly "did the router's new model reshuffle our pool?".
 4. **Event stream stays the seam** — core emits, any renderer consumes.
 
@@ -128,7 +128,7 @@ extra `evaluatorq[arena]`, CLI `evaluatorq arena bench`; the themed TUI rides al
 3. **`--dry-run`**: validate config + prompts, print call counts, **zero API calls** (thinking
    probe explicitly skipped).
 4. **Regularized BT** (small ridge prior): kills ±3000 small-n explosions; CIs stay.
-5. **`orc-arena merge a.jsonl b.jsonl …`**: pooled rating, chained manifests; refuse on
+5. **`orq-arena merge a.jsonl b.jsonl …`**: pooled rating, chained manifests; refuse on
    config-hash mismatch unless `--force`.
 6. Preflight prints an expected-CI-width hint for the chosen n.
 
@@ -164,7 +164,7 @@ report, `--dry-run`, checkpoint/resume, `.env.example` onboarding, OSS packaging
 banner. Platform tier to consider later: provisioned versioned judges (`provision-judge`) and
 cloud sync with Studio deep links.
 
-**chennai worktree** (`~/conductor/workspaces/orc-arena-v1/chennai`): harvested (8 features in);
+**chennai worktree** (`~/conductor/workspaces/orq-arena-v1/chennai`): harvested (8 features in);
 its modes/audio/pickers-for-modes stay dead. Features flow in, methodology never (decision 17).
 
 ## Explicitly rejected
@@ -230,7 +230,7 @@ tokens ≈ 8× warrior tokens under both-orders judging; cheap judges flip 67–
 20. No client-side token-budget/spend guard: budgets are the router/gateway's job (workspace
     controls). Arena records exact usage; the platform enforces policy.
 21. Library-first: the core is an evaluatorq-tied framework and a candidate `evaluatorq.arena`
-    module; TUI is the `orc-arena[tui]` extra. Separate repo until human-anchor validation +
+    module; TUI is the `orq-arena[tui]` extra. Separate repo until human-anchor validation +
     API stability earn the merge.
 22. Model names only on the leaderboard: `orc_name` defaults to the model short name; flavor
     pool deleted; custom names possible, never generated.

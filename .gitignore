@@ -9,10 +9,10 @@ dist/
 build/
 *.egg-info/
 .DS_Store
-battles.jsonl
 .env
-uv.lock
-outputs/smoke/
 battles.jsonl
 battles.run.json
+outputs/smoke/
+# Textual screenshot default naming (root clutter from the `s` key)
+orc-arena_*.svg
 *_orc_arena_*.svg

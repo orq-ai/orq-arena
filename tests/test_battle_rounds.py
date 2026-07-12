@@ -8,11 +8,11 @@ import pytest
 from evaluatorq import PairwiseComparison
 from evaluatorq.pairwise import PairwiseVote
 
-import orc_arena.arena.battle as battle_mod
-from orc_arena.arena.battle import Battle
-from orc_arena.config import ArenaConfig
-from orc_arena.data.prompts import PromptItem
-from orc_arena.events import JudgeVerdictEvent, RoundVoided, TurnResolved
+import orq_arena.arena.battle as battle_mod
+from orq_arena.arena.battle import Battle
+from orq_arena.config import ArenaConfig
+from orq_arena.data.prompts import PromptItem
+from orq_arena.events import JudgeVerdictEvent, RoundVoided, TurnResolved
 
 
 def _cfg() -> ArenaConfig:
@@ -180,6 +180,6 @@ async def test_equal_hp_is_a_draw(monkeypatch):
     result = await b.run()
     assert result.by == "draw"
     evs = _drain(events)
-    from orc_arena.events import MatchResolved
+    from orq_arena.events import MatchResolved
     resolved = [e for e in evs if isinstance(e, MatchResolved)]
     assert resolved and resolved[0].by == "draw" and resolved[0].winner == ""

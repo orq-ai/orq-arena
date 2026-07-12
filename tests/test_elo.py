@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from orc_arena.tournament.elo import bradley_terry_mle, build_wins_matrix
+from orq_arena.tournament.elo import bradley_terry_mle, build_wins_matrix
 
 
 def test_clean_sweep_ranks_winner_highest() -> None:
@@ -42,7 +42,7 @@ def test_ties_shift_ratings_symmetrically():
 
 
 def test_bootstrap_ci_brackets_the_point_estimate():
-    from orc_arena.tournament.elo import bootstrap_ci
+    from orq_arena.tournament.elo import bootstrap_ci
 
     matches = [("a", "b", "winner")] * 6 + [("b", "a", "winner")] * 2
     ci = bootstrap_ci(matches, ["a", "b"], iterations=50)

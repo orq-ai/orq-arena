@@ -9,7 +9,7 @@ Flow:
 
 Two modes:
   live   = cfg+prompts, runs ``run_tournament``
-  replay = loads a JSON fixture and re-emits recorded events (``orc-arena demo``).
+  replay = loads a JSON fixture and re-emits recorded events (``orq-arena demo``).
 """
 
 from __future__ import annotations
@@ -52,7 +52,7 @@ def _judge_display(model_id: str) -> str:
 class ArenaApp(App):
     """Main Textual app."""
 
-    TITLE = "orc-arena"
+    TITLE = "orq-arena"
     BINDINGS = [("q", "quit", "Quit"), ("s", "shot", "Screenshot")]
 
     def action_shot(self) -> None:
