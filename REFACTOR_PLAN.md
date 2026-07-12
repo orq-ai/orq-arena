@@ -646,6 +646,9 @@ judge-prompt DSLs, parallel match execution. Any of these returns only with a ti
 19. Demo stays as shipped (zero-key funnel, ~30 lines + fixture); fixture *recording* is a dev
     script, never product surface (owner, 2026-07-12). No --record flags, no demo --refresh,
     no pacing keys.
+20. No client-side token-budget/spend guard (owner, 2026-07-12): budgets and limits are the
+    orq.ai router/gateway's responsibility (workspace controls). The arena records exact usage;
+    the platform enforces policy. Future ops hardening is resume + 429 backoff only.
 10. Visible chain-of-thought is rendered best-effort only ("thinking…" indicator is the
     guaranteed path) — the router's stable contract excludes CoT text.
 11. Warrior + judge traffic stays on `AsyncOpenAI`; orq-ai-sdk (typed reasoning controls,
