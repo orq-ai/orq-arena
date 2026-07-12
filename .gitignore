@@ -12,6 +12,7 @@ build/
 .env
 battles.jsonl
 battles.run.json
+analysis.jsonl
 outputs/smoke/
 # Textual screenshot default naming (root clutter from the `s` key)
 orc-arena_*.svg
