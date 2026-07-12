@@ -9,8 +9,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 A terminal arena where LLMs fight — and the fight is a real benchmark. It answers the question
-every model pool raises: **"which of these models actually wins on *my* prompts, and can I trust
-the ranking?"**
+every model pool raises: **"which of these models actually wins on *my* prompts, and can I
+trust the ranking?"**
 
 Models stream answers side by side, an LLM jury judges every round from both seat orders, HP
 bars drop, and a **Bradley-Terry ELO leaderboard** comes out the other end with confidence
@@ -18,16 +18,26 @@ intervals attached. The arena is the show; the data is the point.
 
 ![Final leaderboard: ELO with bootstrap CIs, token split, per-category ratings, jury behaviour, win grid](media/leaderboard.svg)
 
-Under the hood it is a deliberately thin demo of two things:
+## Why orq-arena?
 
-- **[orq.ai router gateway](https://docs.orq.ai/docs/ai-gateway)** — every token in the arena
-  flows through one OpenAI-compatible client and one API key (`api.orq.ai/v3/router`), across
-  Anthropic, OpenAI, Google, DeepSeek, Mistral and friends. Per-model reasoning controls
-  (`thinking`, `reasoning_effort`) are raw router fields, forwarded verbatim.
-- **[evaluatorq](https://github.com/orq-ai/evaluatorq)** — every verdict on screen is an
-  `llm_jury_pairwise` decision: each judge sees the pair in *both orders*; a judge that
-  contradicts itself abstains and is recorded as position-biased; a degraded panel yields
-  `inconclusive` rather than a fake verdict.
+Scoring one model against a rubric is a solved problem — that's
+[evaluatorq](https://github.com/orq-ai/evaluatorq). What it doesn't give you is a **ranking of
+a whole pool**: when five models all pass your evals, which one should be the default? Absolute
+scores saturate; pairwise preference under a bias-controlled jury still separates them.
+
+orq-arena is that missing layer. It runs a round-robin over any pool of models reachable
+through the [orq.ai router gateway](https://docs.orq.ai/docs/ai-gateway) — one OpenAI-compatible
+client, one API key, every provider — and hands every verdict to evaluatorq's pairwise jury:
+each judge sees the pair in *both orders*; a judge that contradicts itself abstains and is
+recorded as position-biased; a degraded panel yields `inconclusive` rather than a fake verdict.
+
+**Use it when you want to:**
+
+- Pick a default model for a product on **your own prompts**, not a public leaderboard's
+- Re-rank the pool when a new model drops — one command, ~10 minutes, exact token accounting
+- Generate **pairwise preference data** (`battles.jsonl`) with per-judge votes for later analysis
+- Check whether "thinking" actually helps on your workload (uniform ON vs OFF pools)
+- Project a genuinely fun terminal show that is quietly producing all of the above
 
 ## What you get
 
@@ -38,8 +48,8 @@ Under the hood it is a deliberately thin demo of two things:
   out position-biased votes in public, HP drama, live standings.
 - **Real benchmark data out the back** — every round lands in `battles.jsonl` (schema v2):
   both responses, reconciled per-judge votes, exact token/reasoning-token usage, TTFT.
-- **Jury swaps without regeneration** — `orq-arena rejudge` re-scores any recorded run with a
-  different panel and reports rank stability (Spearman).
+- **Jury swaps without regeneration** — re-judge any recorded run with a different panel and
+  get a rank-stability answer (Spearman).
 - **Headless for CI/cron** — same benchmark, parallel matches, no TUI.
 
 ## Installation
@@ -50,7 +60,6 @@ Requires **Python >= 3.10** and [uv](https://docs.astral.sh/uv/).
 git clone https://github.com/orq-ai/orq-arena.git
 cd orq-arena
 uv sync
-cp .env.example .env   # then add your ORQ_API_KEY (skip for the demo)
 ```
 
 ## Quick start
@@ -63,27 +72,47 @@ uv run orq-arena demo
 
 When you are ready for a live run against real models:
 
+1. Get an API key from your [orq.ai](https://my.orq.ai) workspace and make it available:
+   `cp .env.example .env`, then fill in `ORQ_API_KEY` (loaded automatically).
+2. Start a tournament — a roster picker opens over your workspace-enabled model catalog;
+   choose any pool ≥ 2:
+
+   ```bash
+   uv run orq-arena run
+   ```
+
+3. Before spending tokens, the preflight prints exact match/stream/judge-call counts and
+   probes the pool for vendor-default thinking. Confirm, and the arena begins.
+
+In the TUI: `s` saves an SVG screenshot, `q` quits. On the final leaderboard `B` opens the
+battle browser and `M` the post-mortem coach.
+
+## Usage
+
+### Run a tournament
+
 ```bash
-# a roster picker opens over your workspace-enabled model catalog —
-# choose any pool >= 2 (round-robin; Swiss above 8):
-uv run orq-arena run
-
-# or skip the picker and use the YAML roster as-is (default: 8 models, 28 matches):
-uv run orq-arena run --config orq_arena.yaml
-
-# CI / cron: no TUI, matches in parallel, same battles.jsonl out the end:
-uv run orq-arena run --headless --yes --config orq_arena.yaml --output outputs/run.jsonl
+uv run orq-arena run                                   # interactive roster picker
+uv run orq-arena run --config orq_arena.yaml           # YAML roster as-is (8 models, 28 matches)
+uv run orq-arena run --headless --yes \
+    --config orq_arena.yaml --output outputs/run.jsonl # CI/cron: no TUI, parallel matches
 ```
 
-Before spending tokens, `run` prints a preflight (exact match/stream/judge-call counts) and
-probes the pool for vendor-default thinking. In the TUI: `s` saves an SVG screenshot, `q`
-quits. On the final leaderboard `B` opens the battle browser and `M` the post-mortem coach.
+Every pair fights once (round-robin; Swiss pairing above 8 models), `max_rounds` prompts per
+match. The headless runner prints one-liners per match and the full statistical leaderboard at
+the end — same engine, same `battles.jsonl`.
+
+### Browse the results
+
+From the final leaderboard, `B` pages through every judged round — prompt, both responses, and
+each judge's reconciled vote, flips included. `M` asks an analyzer model for per-model coach
+notes (strengths, weaknesses, what judges rewarded), cached next to the log.
 
 | The battle browser (`B`) | The post-mortem coach (`M`) |
 |---|---|
 | ![Battle browser: prompt, both responses, per-judge votes with flip badges](media/battle-browser.svg) | ![Post-mortems: per-model strengths, weaknesses, and judge patterns](media/postmortem.svg) |
 
-## Re-judge yesterday's tournament (no regeneration)
+### Re-judge with a different jury (no regeneration)
 
 The responses are already in `battles.jsonl`, so swapping the jury costs judge tokens only:
 
@@ -96,6 +125,13 @@ uv run orq-arena rejudge battles.jsonl \
 Prints the new panel's behaviour (per-judge lean, flip rate, tie rate) and the Spearman
 correlation between the recorded ranking and the re-judged one — the direct answer to
 *"is this leaderboard just judge preference?"*
+
+### Roster and model catalog
+
+```bash
+uv run orq-arena list-warriors     # print the configured pool
+uv run orq-arena refresh-models    # re-fetch the workspace catalog (cached 24h)
+```
 
 ## Configuration
 
@@ -128,7 +164,7 @@ the ELO compares models, not vendor default settings. `configs/reasoning_arena.y
 uniform thinking-ON counterpart — the "does thinking help?" benchmark. Mixed pools are allowed
 and get badged and footnoted on the leaderboard.
 
-## What makes the number defensible
+## How the number is made
 
 - **Pairwise, same prompt, both seat orders** — the Chatbot-Arena family of methodology, with
   evaluatorq's consistency gate on top.
@@ -156,29 +192,18 @@ and get badged and footnoted on the leaderboard.
 | `battles.run.json` | run manifest: hashes, roster + reasoning settings, panel, seed, agreement, wall-clock |
 | `orq-arena rejudge …` | jury-swap re-scoring + rank-stability check over any recorded log |
 
-## Development
+## Running tests
 
 ```bash
-uv sync
 uv run pytest          # 41 tests, no network (incl. headless TUI render pilots)
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow. evaluatorq is the official PyPI
-release (`evaluatorq>=1.8.0`) — no pin, no path override.
+evaluatorq is the official PyPI release (`evaluatorq>=1.8.0`) — no pin, no path override.
 
-Prefer the typed client? The [official SDK](https://github.com/orq-ai/orq-python) exposes the
-same router surface, reasoning controls included:
+## Contributing
 
-```python
-from orq_ai_sdk import Orq
-
-client = Orq(api_key=os.environ["ORQ_API_KEY"])
-resp = client.router.chat.completions.create(
-    model="anthropic/claude-opus-4-8",
-    messages=[{"role": "user", "content": "..."}],
-    thinking={"type": "enabled", "budget_tokens": 4096},
-)
-```
+Bug reports, feature ideas, documentation fixes, and pull requests are all welcome — see
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Related projects
 
@@ -186,8 +211,10 @@ resp = client.router.chat.completions.create(
   judging here (pairwise juries, red teaming, agent simulation).
 - **[orq-auto-router-evaluation](https://github.com/orq-ai/orq-auto-router-evaluation)** —
   benchmark the Orq Auto Router on quality, cost, and latency over your own workload.
+- **[orq-python](https://github.com/orq-ai/orq-python)** — the official typed SDK for the same
+  router surface, reasoning controls included.
 - **[Orq.ai docs](https://docs.orq.ai)** — the router gateway, evaluators, and platform.
 
 ## License
 
-[MIT](LICENSE) © Orq.ai
+MIT — see [LICENSE](LICENSE) for details.
