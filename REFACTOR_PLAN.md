@@ -69,9 +69,19 @@ done 2026-07-12 (`fbe8b9d`): the stale pre-rename fixture blanked the warrior ca
 regenerated with model-name specs, and the app now falls back to a bare spec instead of
 silently skipping `MatchStarted` for names the roster doesn't know.
 
+### G2.5 — Run report page *(pulled forward from PR 12, decision 23)*
+One-file self-contained HTML report rendered from `battles.jsonl` + `*.run.json` (the G1
+verification already proved the full report dict reconstructs from those two files): verdict-led
+hero (champion + CI-overlap caveat + κ badge), ELO ladder with CIs, win grid, jury room
+(per-judge flips, agreement), token split, category slices, void/inconclusive accounting.
+Pattern proven by Model-Router-Auto-Evaluation's `dashboard.py`: single file, inline assets,
+orq lockup, regenerable without re-running. Static per-run page — no server, no live dashboard.
+Pulled ahead of G3 because the HN post wants a linkable result, not a terminal screenshot.
+
 ### G3 — Show-HN kit
 README SVGs + demo GIF; post draft led by the flip-badge story ("individual judges are
-position-biased; the gated panel is judge-robust — the tool proves it about itself").
+position-biased; the gated panel is judge-robust — the tool proves it about itself") and
+linking a real G2.5 report page.
 
 ### G4 — Judge-quality experiment
 `rejudge` one real log with a strong panel (opus / gpt-5.4 / gemini-pro); publish κ + Spearman
@@ -125,18 +135,17 @@ extra `evaluatorq[arena]`, CLI `evaluatorq arena bench`; the themed TUI rides al
 4. **Human anchor study**: ~50–100 rounds, 2–3 blind raters; publish panel↔human κ + rank
    correlation in `METHODS.md`. **This converts "self-consistent" into "validated".**
 
-## PR 12 — Report renderer + launch polish
+## PR 12 — Launch polish (report renderer moved to G2.5)
 
-1. **One-file self-contained HTML report per run** (leaderboard, CIs, κ, win grid, jury room,
-   verdict banner — house style), written by `bench` automatically; the zero-key demo path also
-   ends in this report.
-2. **Verdict banner**: one headline conclusion per run.
-3. **`METHODS.md`**: how the number is made (pairwise both-orders, gating, BT, CIs, κ, void
+1. ~~One-file HTML report per run~~ → **G2.5** (decision 23). PR 9's `bench` wires it in as the
+   default post-run output; the zero-key demo path also ends in this report.
+2. **`METHODS.md`**: how the number is made (pairwise both-orders, gating, BT, CIs, κ, void
    policy, thinking policy) + the PR 11 human-anchor results.
-4. **OSS packaging kit**: `.env.example`, QUICKSTART, CONTRIBUTING, badges, CI workflow,
+3. **OSS packaging kit**: `.env.example`, QUICKSTART, CONTRIBUTING, badges, CI workflow,
    media/ screenshots, real `--help` text.
 
-**Sequencing:** G1–G4 → PR 9 → 10 → 11 → 12. Engineering lives in 9–10; the A+ lives in 11–12.
+**Sequencing:** G1–G2 → **G2.5** → G3–G4 → PR 9 → 10 → 11 → 12. Engineering lives in 9–10; the
+A+ lives in 11–12.
 
 ---
 
@@ -218,3 +227,6 @@ tokens ≈ 8× warrior tokens under both-orders judging; cheap judges flip 67–
     API stability earn the merge.
 22. Model names only on the leaderboard: `orc_name` defaults to the model short name; flavor
     pool deleted; custom names possible, never generated.
+23. Per-run HTML report pulled forward to G2.5 (before the HN post): static single file in the
+    Model-Router-Auto-Evaluation dashboard mold, rendered from the log + manifest alone.
+    Explicitly not a live dashboard — no server, no state.
