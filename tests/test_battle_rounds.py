@@ -23,6 +23,7 @@ def _cfg() -> ArenaConfig:
                 {"orc_name": "Beta", "model_id": "x/beta"},
             ],
             "judges": ["x/j1", "x/j2", "x/j3"],
+            "match": {"verdict_hold_s": 0},
         }
     )
 
@@ -154,6 +155,7 @@ async def test_ko_does_not_stop_the_judging(monkeypatch):
     cfg = _cfg()
     cfg.match.starting_hp = 30
     cfg.match.max_rounds = 3
+    cfg.match.verdict_hold_s = 0
     events: asyncio.Queue = asyncio.Queue()
     b = Battle(
         cfg=cfg, gateway=FakeGateway(),

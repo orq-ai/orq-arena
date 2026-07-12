@@ -46,6 +46,7 @@ async def run_headless(
     preflight: dict | None = None,
 ) -> dict[str, float]:
     console = Console()
+    cfg.match.verdict_hold_s = 0.0  # no screen to hold a beat for
     events: asyncio.Queue = asyncio.Queue()
 
     async def printer() -> None:

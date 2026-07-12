@@ -337,6 +337,9 @@ class Battle:
                     hp_b=hp_b,
                 )
             )
+            # Let the verdict land on screen before the next round starts.
+            if rules.verdict_hold_s > 0:
+                await asyncio.sleep(rules.verdict_hold_s)
 
         # Resolve the match for the show. The rating ignores this entirely —
         # ELO is fed per-round verdicts — so an HP tie is simply a draw.

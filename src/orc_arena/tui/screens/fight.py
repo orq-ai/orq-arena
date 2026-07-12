@@ -149,8 +149,10 @@ class FightScreen(Screen):
         self._prompt.set_prompt(round_number, text)
         self._resp_a.reset()
         self._resp_b.reset()
+        # Previous round's verdicts stay readable (dimmed) while the next
+        # responses stream; they refresh when the new votes land.
         for card in self._judges.values():
-            card.reset()
+            card.mark_stale()
 
     def append_response(self, side: str, text: str) -> None:
         (self._resp_a if side == "a" else self._resp_b).append_chunk(text)
