@@ -127,7 +127,7 @@ class LeaderboardScreen(Screen):
         names_by_model = r.get("by_model_names") or {}
 
         table = self.query_one("#table", DataTable)
-        cols = ["Rank", "Orc", "ELO"]
+        cols = ["Rank", "Model", "ELO"]
         if ci:
             cols.append("95% CI")
         if verbosity:
@@ -154,7 +154,7 @@ class LeaderboardScreen(Screen):
             counts = r.get("category_counts") or {}
             ct = self.query_one("#cats", DataTable)
             cats = list(by_cat.keys())
-            ct.add_columns("Orc", "overall", *(f"{c} (n={counts.get(c, '?')})" for c in cats))
+            ct.add_columns("Model", "overall", *(f"{c} (n={counts.get(c, '?')})" for c in cats))
             for name, elo in ranked:
                 ct.add_row(
                     name,

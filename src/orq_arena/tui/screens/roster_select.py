@@ -176,7 +176,7 @@ class RosterSelectScreen(Screen):
         ready = n >= MIN_POOL
         color = "green" if ready else "yellow"
         self._hud.update(
-            f"[b]ORC-ARENA[/b] · pick your pool   [{color}]{n} selected[/{color}]"
+            f"[b]ORQ-ARENA[/b] · pick your pool   [{color}]{n} selected[/{color}]"
             f"   [dim]·[/dim]   {self._counts_line()}"
         )
         src = {
