@@ -41,6 +41,53 @@ def test_ties_shift_ratings_symmetrically():
     assert ratings["a"] > ratings["c"]
 
 
+def test_style_control_absorbs_pure_length_wins():
+    from orq_arena.tournament.elo import style_controlled_elo
+
+    # A always answers 4x longer and always wins; equally often as seat A or B.
+    rows = [("a", "b", 1.0, 400, 100)] * 10 + [("b", "a", 0.0, 100, 400)] * 10
+    elo, gamma = style_controlled_elo(rows, ["a", "b"])
+    assert gamma > 0  # the jury's length preference is exposed
+    raw = bradley_terry_mle(
+        build_wins_matrix([("a", "b", "winner")] * 20), ["a", "b"]
+    )
+    # pricing length out shrinks the gap vs the raw fit
+    assert abs(elo["a"] - elo["b"]) < abs(raw["a"] - raw["b"])
+
+
+def test_style_control_neutral_without_length_signal():
+    from orq_arena.tournament.elo import style_controlled_elo
+
+    # Same lengths both sides: gamma has nothing to fit, ranking matches raw BT.
+    rows = [("a", "b", 1.0, 200, 200)] * 6 + [("a", "b", 0.0, 200, 200)] * 2
+    elo, gamma = style_controlled_elo(rows, ["a", "b"])
+    assert abs(gamma) < 1e-6
+    assert elo["a"] > elo["b"]
+
+
+def test_style_control_empty_rows_is_flat():
+    from orq_arena.tournament.elo import style_controlled_elo
+
+    elo, gamma = style_controlled_elo([], ["a", "b"])
+    assert elo == {"a": 1000.0, "b": 1000.0}
+    assert gamma == 0.0
+
+
+def test_judge_family_overlap_flags_shared_provider():
+    from orq_arena.orcs.roster import WarriorSpec
+    from orq_arena.preflight import judge_family_overlaps
+
+    warriors = [
+        WarriorSpec(model_id="anthropic/claude-opus-4-8"),
+        WarriorSpec(model_id="google/gemini-3.1-pro-preview"),
+    ]
+    judges = ["anthropic/claude-haiku-4-5-20251001", "mistral/mistral-small-2603"]
+    assert judge_family_overlaps(judges, warriors) == [
+        "anthropic/claude-haiku-4-5-20251001"
+    ]
+    assert judge_family_overlaps(["mistral/mistral-small-2603"], warriors) == []
+
+
 def test_bootstrap_ci_brackets_the_point_estimate():
     from orq_arena.tournament.elo import bootstrap_ci
 

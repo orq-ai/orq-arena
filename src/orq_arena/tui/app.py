@@ -113,6 +113,16 @@ class ArenaApp(App):
 
     async def _probe_then_begin(self) -> None:
         """Picker path: the CLI preflight didn't run, so probe here."""
+        from ..preflight import judge_family_overlaps
+
+        overlap = judge_family_overlaps(list(self.cfg.judges), self.cfg.warriors)
+        if overlap:
+            self.notify(
+                f"⚖ judge/contestant family overlap: {', '.join(overlap)}. "
+                "Self-preference bias survives seat swapping; prefer judges "
+                "from families outside the pool.",
+                severity="warning", timeout=10,
+            )
         if self.cfg.preflight.thinking_probe:
             from ..preflight import surprises, thinking_probe
 

@@ -46,6 +46,13 @@ This dual-ordering design is the standard defense the Chatbot-Arena family of me
 against position bias, a well-documented tendency for LLM judges to prefer whichever answer they
 see first.
 
+One bias survives both blinding and seat-swapping: **self-preference**. LLM judges recognize
+their own family's prose stylistically and favor it (Panickssery et al., NeurIPS 2024), so
+excluding the exact self-judge per match is necessary but not sufficient. When any configured
+judge shares a provider family with any warrior, preflight prints a family-overlap warning
+(`preflight.py::judge_family_overlaps`); the run proceeds, but the ranking ships with that
+caveat on record. The clean setup is a jury drawn entirely from families outside the pool.
+
 ### Consistency gating, a flip is an abstention, not a coin flip
 
 For each judge, evaluatorq's `reconcile_pair(first, second)` compares that judge's verdict from
@@ -149,6 +156,31 @@ overlapping intervals**, that is not hidden, it is the honest statistical output
 built on a limited number of comparisons; the module's own comment says as much: "Small pools +
 few comparisons ⇒ wide intervals, which is the honest output." Read overlapping CIs on the
 leaderboard as "not statistically distinguishable at this sample size," not as a tie.
+
+### Style control: the length confound, priced out
+
+Seat-swapping fixes position bias and nothing else; a jury that prefers the *longer* answer
+prefers it in both orders. The field's standard correction (LMArena style control,
+length-controlled AlpacaEval) is to estimate that preference jointly with model strength instead
+of pretending it isn't there. `src/orq_arena/tournament/elo.py::style_controlled_elo` refits
+Bradley-Terry as a logistic regression with one extra covariate per round:
+
+```
+P(A wins) = sigmoid(theta_A - theta_B + gamma * d),   d = (len_A - len_B) / (len_A + len_B)
+```
+
+fit over the same judged rounds (ties enter as y = 0.5), anchored like the raw fit so the
+field's geometric mean sits at 1000. Two numbers come out:
+
+- **`gamma`, the jury's length coefficient**, printed with the standings. Positive means the
+  panel favored longer answers; the magnitude says how much.
+- **The len-ctrl ELO**, the rating with the length term zeroed: what the ranking looks like once
+  the jury's length preference is priced out. It appears as its own leaderboard column next to
+  the raw ELO, never instead of it.
+
+A large raw-vs-len-ctrl gap on your run means verbosity, not quality, is doing the separating;
+read the len-ctrl column before crowning anyone. This controls response *length* only; markdown
+and formatting features (headers, lists, bold) are a known further refinement, not yet built.
 
 ### Per-category slices
 
@@ -334,11 +366,11 @@ Stated plainly, so you can weigh them against your own use case:
   against blinded human preference judgments. The Fleiss'/Cohen's κ numbers above measure *judges
   agreeing with each other*, not *judges agreeing with people*, a self-consistent panel is not
   the same claim as an accurate one.
-- **No length-control toggle yet.** There is currently no mechanism to correct for a verbosity
-  confound (a judge preferring the longer answer independent of quality). The shipped prompt set
-  even carries an unused `length_bucket` field per prompt (`short`/`medium`) that
-  `src/orq_arena/data/prompts.py::load_prompts` does not read today, a length-controlled scoring mode is a
-  known gap, not yet built.
+- **Style control covers length only.** The len-ctrl rating (see
+  [Style control](#style-control-the-length-confound-priced-out)) corrects for response length;
+  markdown/formatting covariates (headers, lists, bold), which LMArena's full style control also
+  regresses out, are not modeled yet. The prompt bank's `length_bucket` field (`short`/`medium`)
+  is likewise still unread by `src/orq_arena/data/prompts.py::load_prompts`.
 - **One free-text criteria string per run.** Every judge scores every prompt category against the
   same `criteria` field, there is no per-category or per-prompt-type rubric today, so a run
   spanning very different prompt types (code correctness vs. creative writing) is judged against

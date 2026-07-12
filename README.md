@@ -53,6 +53,8 @@ The fastest way to see everything, with **no API key needed**:
 uv run orq-arena demo
 ```
 
+![orq-arena demo: a replayed match streaming side by side, judge cards calling out flipped votes, and the final leaderboard](media/demo.gif)
+
 When you are ready for a live run against real models:
 
 1. Get an API key from your [orq.ai](https://my.orq.ai) workspace: `cp .env.example .env`, then fill in `ORQ_API_KEY` (loaded automatically).
@@ -69,11 +71,15 @@ When you are ready for a live run against real models:
 
 ![Post-mortems: per-model strengths, weaknesses, and judge patterns](media/postmortem.svg)
 
+**Share the result**: every run also writes a self-contained HTML report page (`<log>.report.html`): verdict headline, ELO ladder with CI bars, len-ctrl column, win grid, jury behaviour. Regenerate any time with `uv run orq-arena report battles.jsonl`; no API calls.
+
 **Re-judge with a different jury**: the responses are already in `battles.jsonl`, so swapping the panel costs judge tokens only: `uv run orq-arena rejudge battles.jsonl --judge mistral/mistral-small-2603`. Prints the new jury's behaviour and the Spearman correlation against the recorded ranking. Multi-judge example: **[docs/cli.md](docs/cli.md)**.
 
 ## Configuration
 
 Everything lives in `orq_arena.yaml`, no flags to remember. The default pool is **uniform thinking-OFF** (verified per model against the live router) so the ELO compares models, not vendor defaults; `configs/reasoning_arena.yaml` is the thinking-ON counterpart. Reasoning recipes per provider, replacement judges, and every other key: **[docs/configuration.md](docs/configuration.md)**.
+
+**Not locked to orq.ai.** The engine speaks plain OpenAI-compatible chat: point `gateway.base_url` at any endpoint that speaks that format and set `api_key_env` to match. The orq.ai router is the default because one key covers every provider (and powers the roster picker); it is the recommended path, not the only one. Details: [docs/configuration.md](docs/configuration.md#bring-your-own-endpoint).
 
 ```yaml
 warriors:
@@ -91,6 +97,7 @@ min_successful_judges: 2   # jury-of-one -> inconclusive, never a verdict
 
 - **Pairwise, same prompt, both seat orders**: the Chatbot-Arena family of methodology, with evaluatorq's consistency gate on top.
 - **Per-round Bradley-Terry MLE with bootstrap 95% CIs**: a default run rates on up to 140 comparisons, not 7 knockouts; overlapping intervals are the honest output on small runs.
+- **Length-controlled rating alongside the raw one**: the LMArena / length-controlled-AlpacaEval move. Bradley-Terry refit with a normalized length-difference covariate, the jury's length coefficient reported in public, and the ELO shown with that preference priced out. A model can still win by being longer; it can't do it invisibly.
 - **A model loses on its words, never on its network**: a dead stream retries once, then the round is voided; read-gap timeouts (default 20 min of silence) never penalize slow thinkers.
 - **Self-aware and reproducible**: Fleiss'/Cohen's κ and per-judge flip rates ship with the standings; every run writes a seeded manifest (config/prompt hashes, panel, evaluatorq version). Full methodology, bias controls, tie handling, voided-round bookkeeping, manifest schema: **[docs/methodology.md](docs/methodology.md)**.
 

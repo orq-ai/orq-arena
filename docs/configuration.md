@@ -174,6 +174,23 @@ hardcoded in `OrqGateway.__init__` alongside `stream_read_timeout_s`, only the r
 is exposed as a config key. The preflight probe call (see below) also uses a hardcoded
 `max_tokens=1000`, independent of `warrior_max_tokens`/`judge_max_tokens`.
 
+#### Bring your own endpoint
+
+The gateway client is a plain `AsyncOpenAI` client: nothing in the tournament engine is
+orq.ai-specific. Point `base_url` at any OpenAI-compatible chat endpoint and set `api_key_env`
+to whatever variable holds that endpoint's key.
+Two features do depend on the orq.ai router and degrade cleanly without it:
+
+- **The roster picker and `refresh-models`** read the workspace model catalog from the router.
+  On another endpoint, declare `warriors` in the YAML and run with `--config` so the picker is
+  skipped.
+- **Reasoning controls** (`warriors[].reasoning`) are forwarded verbatim as `extra_body`; the
+  router normalizes them per provider. Other endpoints receive them as-is and may ignore or
+  reject unknown fields, so on a non-router endpoint only include fields your server accepts.
+
+The default stays on the router because one key covering every provider is what makes a mixed
+pool a one-command run. It is the recommended path, not the only one.
+
 ### `preflight` (`PreflightConfig`)
 
 | Key | Type | Default | Effect |

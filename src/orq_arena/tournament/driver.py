@@ -25,7 +25,8 @@ from ..data.schemas import BattleRecord
 from ..events import ArenaEvent, StandingsUpdated, TournamentEnded
 from ..orcs.roster import WarriorSpec
 from ..providers.orq_gateway import OrqGateway
-from .elo import bootstrap_ci, bradley_terry_mle, build_wins_matrix
+from .elo import (bootstrap_ci, bradley_terry_mle, build_wins_matrix,
+                  style_controlled_elo)
 
 Outcome = tuple[str, str, str, str]  # (name, name, 'winner' | 'tie', category)
 
@@ -133,8 +134,24 @@ def _final_report(
         cat_counts[o[3]] = cat_counts.get(o[3], 0) + 1
 
     by_model = {w.short_model: w for w in cfg.warriors}
+    orc_by_model = {w.short_model: w.orc_name for w in cfg.warriors}
+    y_by_verdict = {"A": 1.0, "B": 0.0, "tie": 0.5}
+    style_rows = [
+        (
+            orc_by_model[rec.model_a], orc_by_model[rec.model_b],
+            y_by_verdict[rec.majority_verdict],
+            len(rec.response_a or ""), len(rec.response_b or ""),
+        )
+        for rec in records
+        if rec.error is None
+        and rec.majority_verdict in y_by_verdict
+        and rec.model_a in orc_by_model and rec.model_b in orc_by_model
+    ]
+    elo_sc, length_coef = style_controlled_elo(style_rows, names)
     return {
         "elo_ci": bootstrap_ci(_triples(outcomes), names),
+        "elo_style_controlled": elo_sc if style_rows else None,
+        "length_coef": length_coef if style_rows else None,
         "elo_by_category": elo_by_category(outcomes, names),
         "category_counts": cat_counts,
         "tokens": {
@@ -200,6 +217,7 @@ def _write_manifest(
         manifest["category_counts"] = report.get("category_counts")
         manifest["fleiss"] = report.get("fleiss")
         manifest["tokens"] = report.get("tokens")
+        manifest["length_coef"] = report.get("length_coef")
     path.write_text(json.dumps(manifest, indent=2, default=str))
 
 
@@ -328,6 +346,18 @@ async def run_tournament(
         tournament_id=tournament_id, started_at=started_at,
         finished_at=time.time(), report=report, preflight=preflight,
     )
+
+    try:
+        from ..report import write_report
+
+        write_report(
+            cfg=cfg, records=all_records, elo=elo, report=report,
+            manifest=json.loads(manifest_path.read_text()), log_path=battle_log_path,
+        )
+    except Exception as exc:  # a finished run must never die on its report page
+        from loguru import logger
+
+        logger.warning(f"report page not written: {exc}")
 
     champion = max(elo, key=lambda n: elo[n]) if elo else ""
     await events.put(

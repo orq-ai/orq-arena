@@ -1,7 +1,7 @@
 """Bradley-Terry MLE ELO, adapted from orq-battlebench/ranking.py.
 
-Pure Python, no numpy/scipy. Simplified for orq-arena: no bootstrap CIs.
-Ties split 0.5 / 0.5 (standard Bradley-Terry treatment).
+Pure Python, no numpy/scipy. Ties split 0.5 / 0.5 (standard Bradley-Terry
+treatment); percentile bootstrap CIs; optional length-controlled fit.
 """
 
 from __future__ import annotations
@@ -67,6 +67,62 @@ def bradley_terry_mle(
             break
 
     return {m: 400 * math.log10(max(r, 1e-10)) + 1000 for m, r in ratings.items()}
+
+
+def style_controlled_elo(
+    rows: list[tuple[str, str, float, int, int]],
+    models: list[str],
+    iterations: int = 2000,
+    lr: float = 0.05,
+    tol: float = 1e-7,
+) -> tuple[dict[str, float], float]:
+    """Bradley-Terry as logistic regression with a length-difference covariate.
+
+    The LMArena style-control / length-controlled AlpacaEval approach:
+    P(A wins) = sigmoid(theta_a - theta_b + gamma * d) with
+    d = (len_a - len_b) / (len_a + len_b), fit jointly, then the reported
+    rating zeroes the length term. gamma > 0 means the jury favored longer
+    answers; the style-controlled ELO is what remains once that preference
+    is priced out.
+
+    ``rows``: (model_a, model_b, y, len_a, len_b) with y = 1.0 A wins,
+    0.0 B wins, 0.5 tie. Returns ({model: elo}, gamma), anchored like
+    ``bradley_terry_mle`` (geometric mean at 1000).
+    """
+    if not rows or not models:
+        return ({m: 1000.0 for m in models}, 0.0)
+    theta = {m: 0.0 for m in models}
+    gamma = 0.0
+    n = len(rows)
+    feats = [
+        (a, b, y, (la - lb) / (la + lb) if (la + lb) > 0 else 0.0)
+        for a, b, y, la, lb in rows
+    ]
+    for _ in range(iterations):
+        g_theta = {m: 0.0 for m in models}
+        g_gamma = 0.0
+        for a, b, y, d in feats:
+            z = theta[a] - theta[b] + gamma * d
+            p = 1.0 / (1.0 + math.exp(-max(-30.0, min(30.0, z))))
+            err = y - p
+            g_theta[a] += err
+            g_theta[b] -= err
+            g_gamma += err * d
+        step = 0.0
+        for m in models:
+            delta = lr * g_theta[m] / n
+            theta[m] += delta
+            step = max(step, abs(delta))
+        gd = lr * g_gamma / n
+        gamma += gd
+        step = max(step, abs(gd))
+        mean = sum(theta.values()) / len(theta)
+        for m in theta:
+            theta[m] -= mean
+        if step < tol:
+            break
+    ln10 = math.log(10)
+    return ({m: 400 * t / ln10 + 1000 for m, t in theta.items()}, gamma)
 
 
 def bootstrap_ci(
