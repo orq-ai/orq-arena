@@ -47,7 +47,8 @@ def cli() -> None:
 @cli.command()
 @click.option("--config", "config_path", default=None, show_default=False,
               help="Use this YAML roster as-is and skip the interactive picker.")
-@click.option("--prompts", "prompts_path", default=DEFAULT_PROMPTS, show_default=True)
+@click.option("--prompts", "prompts_path", default=DEFAULT_PROMPTS, show_default=True,
+              help="JSONL file, or orq:<dataset_id> to pull an orq.ai Dataset.")
 @click.option("--output", "output_path", default=DEFAULT_OUTPUT, show_default=True)
 @click.option("--headless", is_flag=True, default=False,
               help="No TUI; matches run in parallel (headless_concurrency). Requires --config.")
@@ -69,7 +70,7 @@ def run(config_path: str | None, prompts_path: str, output_path: str,
     _quiet_logs()
     pick_roster = config_path is None
     cfg = load_config(config_path or DEFAULT_CONFIG)
-    prompts = load_prompts(prompts_path)
+    prompts = load_prompts(prompts_path, api_key_env=cfg.gateway.api_key_env)
 
     if pick_roster:
         if headless:
@@ -199,6 +200,21 @@ def rejudge(log_path: str, judges: tuple[str, ...], criteria: str | None,
     if report_json:
         save_report_json(report_json, result)
         click.echo(f"summary -> {report_json}")
+
+
+@cli.command("jury-compare")
+@click.argument("report_jsons", nargs=-1, required=True)
+def jury_compare(report_jsons: tuple[str, ...]) -> None:
+    """Compare candidate juries from saved rejudge reports, side by side.
+
+    The jury-selection loop: run once, then `rejudge <log> --judge ...
+    --report-json candidate.json` per candidate panel (judge tokens only),
+    then compare the candidates here. No API calls.
+    """
+    from .rejudge import compare_reports, render_comparison
+
+    render_comparison(compare_reports(list(report_jsons)))
+
 
 @cli.command("report")
 @click.argument("log_path", default=DEFAULT_OUTPUT)

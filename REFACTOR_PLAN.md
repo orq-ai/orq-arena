@@ -29,7 +29,7 @@ gateway (`api.orq.ai/v3/router`). One mode. The benchmark core is a library/fram
 
 ## Launch gates (do these before any A+ work)
 
-### G1, Dress rehearsal *(the A− → A gate)*, **RAN 2026-07-12, artifacts in `outputs/g1/`**
+### G1: Dress rehearsal *(the A− → A gate)*. **RAN 2026-07-12, artifacts in `outputs/g1/`**
 One full default run: 8 warriors, 28 matches, headless start to finish, then the leaderboard
 surfaces at real volume (TUI screens piloted over the real log; SVGs exported headlessly).
 
@@ -66,7 +66,7 @@ raised to 2048 (a cap, costs nothing on frugal judges).
 raw −3000 BT clamp for a cratered model; replacement-judge quality is invisible in the TUI (the
 74%-flip stand-in surfaced only in rejudge stats).
 
-### G2, Merge train, **DONE 2026-07-12**
+### G2: Merge train. **DONE 2026-07-12**
 [#1](https://github.com/orq-ai/orq-arena/pull/1) (refactor, PRs 1–4) and
 [#2](https://github.com/orq-ai/orq-arena/pull/2) (harvest + G1, PRs 5–8) squash-merged to
 master; suite green on the result. Squash because the repo ruleset requires signed commits and
@@ -74,7 +74,7 @@ six early commits weren't, the granular history lives on the kept branches. Fixt
 also done (`demo` blanked names off the stale pre-rename fixture; regenerated, plus unknown
 names now render instead of silently skipping `MatchStarted`).
 
-### G2.5, Run report page, **DONE 2026-07-12** *(pulled from PR 12, decision 23)*
+### G2.5: Run report page. **DONE 2026-07-12** *(pulled from PR 12, decision 23)*
 Shipped: `src/orq_arena/report.py` renders a self-contained page (verdict hero with CI-overlap
 caveat and κ badge, ELO ladder with CI bars and the len-ctrl column, win grid with full-name
 rows, jury room, category/token accounting, manifest hashes); written automatically after every
@@ -85,7 +85,7 @@ jury length coefficient printed with the standings; on the G1 log the jury leane
 preflight warning** (self-preference caveat), **BYOK docs** (any OpenAI-compatible endpoint),
 and the **demo GIF** (G3 item).
 
-### G3, Show-HN kit, **README/OSS half done 2026-07-12**
+### G3: Show-HN kit. **README/OSS half done 2026-07-12**
 Done (`8fcc993`, `e2cebe6`): project renamed **orq-arena** (decision 25); README rebuilt on the
 house pattern (splash, badges, G1 screenshots, zero-key demo first); LICENSE, CONTRIBUTING,
 PR template, `.env.example` (+ stdlib loader), CI workflow, `media/`, pyproject metadata.
@@ -93,13 +93,20 @@ Remaining: demo GIF; post draft led by the flip-badge story ("individual judges 
 position-biased; the gated panel is judge-robust, the tool proves it about itself") and
 linking a real G2.5 report page.
 
-### G4, Judge-quality experiment
+### G4: Judge-quality experiment and the jury-selection recipe
 `rejudge` one real log with a strong panel (opus / gpt-5.4 / gemini-pro); publish κ + Spearman
 vs the cheap trio. One command; pre-empts the strongest objection.
 
+**Jury selection is a first-class use-case (decision 26), and the loop shipped 2026-07-12:**
+record once, then per candidate panel `rejudge <log> --judge ... --report-json c.json` (judge
+tokens only), then `orq-arena jury-compare c1.json c2.json ...` tabulates the candidates:
+Spearman vs the recorded ranking, inconclusive rate, agreement, worst per-judge flip, tie
+rate, changed verdicts. Everything it measures is reliability; the accuracy axis (which jury
+is *right*, not just consistent) arrives with PR 11's gold-pair sanity suite and human anchor.
+
 ---
 
-## PR 9, Library-first inversion (the future `evaluatorq.arena` module)
+## PR 9: Library-first inversion (the future `evaluatorq.arena` module)
 
 The benchmark is an evaluatorq-tied framework; the TUI is a bonus (decision 21). evaluatorq has
 the exact module precedent (`redteam`, `simulation`: own extra, own CLI mount, own run store)
@@ -125,7 +132,7 @@ across real uses, evaluatorq team wants the surface. On merge: core → `src/eva
 extra `evaluatorq[arena]`, CLI `evaluatorq arena bench`; the themed TUI rides along
 (`redteam/ui` precedent) or stays here as the skin.
 
-## PR 10, Ops hardening + statistics
+## PR 10: Ops hardening + statistics
 
 1. **`--resume`** from a partial `battles.jsonl` (seeded schedule + manifest identify remaining
    matches). Reference: Model-Router-Auto-Evaluation's checkpoint/resume.
@@ -138,7 +145,7 @@ extra `evaluatorq[arena]`, CLI `evaluatorq arena bench`; the themed TUI rides al
    config-hash mismatch unless `--force`.
 6. Preflight prints an expected-CI-width hint for the chosen n.
 
-## PR 11, Validation & data quality *(the citability gate)*
+## PR 11: Validation & data quality *(the citability gate)*
 
 1. **Prompt bank**: 30 → 150–300, category-balanced; pilot-run discrimination pass drops
    prompts where every pair ties; private-set option (publish hashes, not text).
@@ -148,7 +155,7 @@ extra `evaluatorq[arena]`, CLI `evaluatorq arena bench`; the themed TUI rides al
 4. **Human anchor study**: ~50–100 rounds, 2–3 blind raters; publish panel↔human κ + rank
    correlation in `METHODS.md`. **This converts "self-consistent" into "validated".**
 
-## PR 12, Launch polish (report renderer moved to G2.5)
+## PR 12: Launch polish (report renderer moved to G2.5)
 
 1. ~~One-file HTML report per run~~ → **G2.5** (decision 23). PR 9's `bench` wires it in as the
    default post-run output; the zero-key demo path also ends in this report.
@@ -252,3 +259,7 @@ tokens ≈ 8× warrior tokens under both-orders judging; cheap judges flip 67–
     promoting orq.ai, and the GitHub repo was already `orq-ai/orq-arena`. Package
     `orq_arena`, CLI `orq-arena`, config `orq_arena.yaml`. Internal fantasy identifiers still
     exit at PR 9 (decision 24).
+26. Jury selection is a first-class use-case: the arena doubles as a judge test-bench because
+    responses are recorded and juries are swappable at judge-token cost (`rejudge` +
+    `jury-compare`). Reliability signals ship now; accuracy claims wait for PR 11's gold
+    pairs and human anchor.
