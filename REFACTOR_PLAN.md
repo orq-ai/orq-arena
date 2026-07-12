@@ -753,6 +753,10 @@ judge-prompt DSLs, parallel match execution. Any of these returns only with a ti
 20. No client-side token-budget/spend guard (owner, 2026-07-12): budgets and limits are the
     orq.ai router/gateway's responsibility (workspace controls). The arena records exact usage;
     the platform enforces policy. Future ops hardening is resume + 429 backoff only.
+22. Model names only (owner, 2026-07-12): orc flavor names made the leaderboard hard to read.
+    `orc_name` defaults to the model short name; the flavor pool is deleted; yamls carry model
+    ids only. Custom names remain possible, never generated. Demo fixture still shows old orc
+    names until the G2 regeneration.
 21. Library-first (owner, 2026-07-12): the benchmark core is an evaluatorq-tied framework and
     a candidate `evaluatorq.arena` module (redteam/simulation precedent); the TUI is an
     optional extra (`orc-arena[tui]`). Separate repo until human-anchor validation + API

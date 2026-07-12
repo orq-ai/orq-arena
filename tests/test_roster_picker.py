@@ -6,7 +6,7 @@ from textual.app import App
 from textual.widgets import SelectionList
 
 from orc_arena.config import ArenaConfig
-from orc_arena.orcs.roster import ORC_NAME_POOL, WarriorSpec, assign_warriors
+from orc_arena.orcs.roster import WarriorSpec, assign_warriors
 from orc_arena.providers.models_list import ModelEntry, _parse_payload, _filter_by_type
 from orc_arena.tui.screens.roster_select import RosterSelectScreen
 
@@ -39,8 +39,7 @@ def test_assign_warriors_keeps_configured_specs_and_names_new_ones():
     )
     assert out[0] is existing[0]                      # spec (incl. reasoning) preserved
     assert out[1].model_id == "moonshotai/kimi-k2.6"
-    assert (out[1].orc_name, out[1].emblem) in ORC_NAME_POOL
-    assert out[1].orc_name != "Azog Deepmind"
+    assert out[1].orc_name == "kimi-k2.6"             # model names only (decision 22)
     assert out[1].reasoning is None                   # probe is the safety net
 
 
