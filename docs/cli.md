@@ -203,6 +203,15 @@ uv run orq-arena demo
 uv run orq-arena demo --fixture fixtures/demo_tournament.json --config orq_arena.yaml
 ```
 
+**From the final leaderboard** (live TUI runs and `demo` alike): `B` opens the battle browser,
+paging through every judged round with the prompt, both responses, and per-judge votes with
+flip badges; `M` generates per-model coach notes from the analyzer model (cached in
+`analysis.jsonl`); `s` saves an SVG screenshot; `q` quits.
+
+![Battle browser: prompt, both responses, per-judge votes with flip badges](../media/battle-browser.svg)
+
+![Post-mortems: per-model strengths, weaknesses, and judge patterns](../media/postmortem.svg)
+
 ---
 
 ## `list-models`
