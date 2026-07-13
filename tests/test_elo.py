@@ -74,18 +74,18 @@ def test_style_control_empty_rows_is_flat():
 
 
 def test_judge_family_overlap_flags_shared_provider():
-    from orq_arena.orcs.roster import WarriorSpec
+    from orq_arena.roster import CandidateSpec
     from orq_arena.preflight import judge_family_overlaps
 
-    warriors = [
-        WarriorSpec(model_id="anthropic/claude-opus-4-8"),
-        WarriorSpec(model_id="google/gemini-3.1-pro-preview"),
+    candidates = [
+        CandidateSpec(model_id="anthropic/claude-opus-4-8"),
+        CandidateSpec(model_id="google/gemini-3.1-pro-preview"),
     ]
     judges = ["anthropic/claude-haiku-4-5-20251001", "mistral/mistral-small-2603"]
-    assert judge_family_overlaps(judges, warriors) == [
+    assert judge_family_overlaps(judges, candidates) == [
         "anthropic/claude-haiku-4-5-20251001"
     ]
-    assert judge_family_overlaps(["mistral/mistral-small-2603"], warriors) == []
+    assert judge_family_overlaps(["mistral/mistral-small-2603"], candidates) == []
 
 
 def test_bootstrap_ci_brackets_the_point_estimate():

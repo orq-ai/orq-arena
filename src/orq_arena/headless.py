@@ -65,7 +65,8 @@ def _print_summary(console: Console, ev: TournamentEnded) -> None:
     tok = r.get("tokens") or {}
     if tok:
         console.print(
-            f"tokens, warriors {tok['warriors_in']:,} in / {tok['warriors_out']:,} out"
+            f"tokens, models {tok.get('models_in', tok.get('warriors_in', 0)):,} in "
+            f"/ {tok.get('models_out', tok.get('warriors_out', 0)):,} out"
             f" · jury {tok['judges_in']:,} in / {tok['judges_out']:,} out"
         )
     console.print(f"battle log → {ev.battle_log_path}")

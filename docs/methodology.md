@@ -6,9 +6,9 @@ audit the panel, the reliability and reproducibility policies, and what a real r
 
 ## Plain-English summary
 
-For every round, one prompt, two warriors, in a tournament:
+For every round, one prompt, two candidates, in a tournament:
 
-1. Both warriors stream a response to the same prompt through the same orq.ai router gateway
+1. Both candidates stream a response to the same prompt through the same orq.ai router gateway
    call.
 2. evaluatorq's pairwise jury compares the two responses. **Every judge sees the pair twice, once
    in each seat order**, and its two verdicts are reconciled into one vote. A judge that
@@ -19,7 +19,7 @@ For every round, one prompt, two warriors, in a tournament:
 4. Every other judged round, a win for A, a win for B, or a tie, feeds a **Bradley-Terry
    maximum-likelihood** fit across every round judged so far in the tournament; ties count as
    half a win each.
-5. Bradley-Terry produces one rating per warrior, anchored so the field's geometric mean sits at
+5. Bradley-Terry produces one rating per candidate, anchored so the field's geometric mean sits at
    1000, plus a 200-resample percentile **bootstrap 95% confidence interval** on every rating,
    and a **length-controlled rating** that refits the same rounds with the jury's length
    preference priced out.
@@ -27,7 +27,7 @@ For every round, one prompt, two warriors, in a tournament:
    κ), how often each individual judge flipped between seat orders, and the jury's fitted
    **length coefficient**, public, per-judge evidence of how much to trust that vote.
 
-The rest of this page is the detail behind those six steps, plus what an actual 8-warrior run
+The rest of this page is the detail behind those six steps, plus what an actual 8-candidate run
 measured.
 
 ## Judging protocol
@@ -39,8 +39,8 @@ would empty the panel, the match raises instead of judging with a compromised ju
 `.compare(question, response_a, response_b)` call then runs the whole panel in **both seat
 orders**, concurrently:
 
-- **Order 1**: A = warrior A's response, B = warrior B's response.
-- **Order 2**: A = warrior B's response, B = warrior A's response (un-swapped back to the
+- **Order 1**: A = candidate A's response, B = candidate B's response.
+- **Order 2**: A = candidate B's response, B = candidate A's response (un-swapped back to the
   canonical A/B frame before reconciliation).
 
 This dual-ordering design is the standard defense the Chatbot-Arena family of methodologies uses
@@ -50,7 +50,7 @@ see first.
 One bias survives both blinding and seat-swapping: **self-preference**. LLM judges recognize
 their own family's prose stylistically and favor it (Panickssery et al., NeurIPS 2024), so
 excluding the exact self-judge per match is necessary but not sufficient. When any configured
-judge shares a provider family with any warrior, preflight prints a family-overlap warning
+judge shares a provider family with any candidate, preflight prints a family-overlap warning
 (`preflight.py::judge_family_overlaps`); the run proceeds, but the ranking ships with that
 caveat on record. The clean setup is a jury drawn entirely from families outside the pool.
 
@@ -124,10 +124,10 @@ match's `BattleRecord`s and extracts one outcome per **judged round**:
   to the rating, and specifically never counted as a tie.
 
 That per-round outcome list, never the per-match HP winner, is what
-`src/orq_arena/tournament/elo.py::bradley_terry_mle` fits. A default 8-warrior round-robin
+`src/orq_arena/tournament/elo.py::bradley_terry_mle` fits. A default 8-candidate round-robin
 (`match.max_rounds=5`) therefore rates on up to `C(8,2) × 5 = 140` round-level comparisons pooled
-across the whole field, not the 7 match-level knockouts any single warrior would show on the HP
-scoreboard (each warrior meets every other warrior exactly once). See
+across the whole field, not the 7 match-level knockouts any single candidate would show on the HP
+scoreboard (each candidate meets every other candidate exactly once). See
 [Architecture → one judged round, in detail](architecture.md#one-judged-round-in-detail) for the
 full sequence diagram from prompt to `battles.jsonl`.
 
@@ -151,7 +151,7 @@ fit over every round judged so far, not a value frozen at tournament design time
 ### 95% confidence intervals
 
 `bootstrap_ci` resamples the full outcome list with replacement **200 times** (seeded,
-`seed=42`), refits Bradley-Terry on each resample, and reports each warrior's 2.5th/97.5th
+`seed=42`), refits Bradley-Terry on each resample, and reports each candidate's 2.5th/97.5th
 percentile rating across the 200 refits as its 95% CI. On a small pool this produces **wide,
 overlapping intervals**, that is not hidden, it is the honest statistical output of a benchmark
 built on a limited number of comparisons; the module's own comment says as much: "Small pools +
@@ -193,12 +193,12 @@ rather than shown with misleadingly precise ratings. On the shipped 30-prompt st
 single round-robin run, per-category breakdowns become meaningful once you scale the prompt set
 or accumulate multiple runs.
 
-### Swiss pairing above 8 warriors
+### Swiss pairing above 8 candidates
 
-Above 8 warriors, `src/orq_arena/tournament/swiss.py::SwissScheduler` replaces the full round-robin with
-score-group Swiss pairing automatically, `len(cfg.warriors) > 8`, no config flag. Swiss pairing
+Above 8 candidates, `src/orq_arena/tournament/swiss.py::SwissScheduler` replaces the full round-robin with
+score-group Swiss pairing automatically, `len(cfg.candidates) > 8`, no config flag. Swiss pairing
 exists purely to spend match budget efficiently: it consumes each match's **HP-based winner** to
-pair strong warriors against strong warriors sooner, converging the Bradley-Terry estimate in
+pair strong candidates against strong candidates sooner, converging the Bradley-Terry estimate in
 fewer matches than random pairing would. The rating computation itself is unaffected, every
 judged round from a Swiss-paired match still goes through the exact same
 `outcomes_from_records → bradley_terry_mle` path as a round-robin match. Swiss changes which
@@ -242,7 +242,7 @@ it.
 
 ## Reliability policies
 
-The rating should reflect a warrior's words, never the network's mood. Three policies enforce
+The rating should reflect a candidate's words, never the network's mood. Three policies enforce
 that.
 
 ### Void on stream failure, after exactly one retry
@@ -262,11 +262,11 @@ genuinely gone silent times out.
 
 ### Truncation is judged, not hidden, but it stays visible
 
-There is no retry or exclusion path for a truncated response: if a warrior's output is cut off by
+There is no retry or exclusion path for a truncated response: if a candidate's output is cut off by
 its token cap, the round is judged normally on the truncated text. `finish_reason` (e.g.
 `"length"`) is recorded per side on the `BattleRecord` and surfaced as a `✂ truncated` flag in the
 TUI's response panel, the jury sees exactly what the reader sees, and a truncation-driven loss is
-legible rather than mysterious. See `gateway.warrior_max_tokens` / `gateway.judge_max_tokens` in
+legible rather than mysterious. See `gateway.candidate_max_tokens` / `gateway.judge_max_tokens` in
 [Configuration](configuration.md#gateway-gatewayconfig), an under-sized `judge_max_tokens` cap
 starving a thinking-by-default judge's own verdict is exactly the kind of failure this policy is
 designed to make visible rather than silently absorb.
@@ -300,7 +300,7 @@ Every run is seeded and manifested so its rating can be audited or re-derived af
 ## Jury swapping: re-judge without regenerating
 
 `orq-arena rejudge <battles.jsonl> --judge <id> [...]` (`src/orq_arena/rejudge.py::rejudge_run`) re-scores every
-recorded round's **already-generated responses** against a new judge panel, no warrior calls,
+recorded round's **already-generated responses** against a new judge panel, no candidate calls,
 judge tokens only. It then reports whether the new panel's ranking agrees with the original:
 
 - `spearman(old_rank, new_rank)`: rank correlation between the Bradley-Terry ranking implied by
@@ -350,10 +350,10 @@ numbers.
 ## Measured evidence: what a real 8-model run measured
 
 Everything in this section is not simulated or illustrative, it is what an actual full
-round-robin run over 8 warriors measured against the shipped default config and judge panel
+round-robin run over 8 candidates measured against the shipped default config and judge panel
 (recorded in the project's own engineering log, `REFACTOR_PLAN.md`):
 
-- **28 matches, 140 rounds, 10.7 minutes**, unattended, at concurrency 4, 280 warrior streams,
+- **28 matches, 140 rounds, 10.7 minutes**, unattended, at concurrency 4, 280 model streams,
   840 judge calls (140 rounds × the 3-judge default panel × 2 seat orders).
 - **Zero voided rounds.** Every one of the 140 rounds streamed cleanly on both sides; token
   accounting was complete on all 140.
@@ -365,7 +365,7 @@ round-robin run over 8 warriors measured against the shipped default config and 
   decisively disagreeing with each other). Per-judge flip rates on that panel: haiku **30%**,
   flash-lite **45%**, nano **45%**: with two of three judges flipping on roughly half their
   rounds, the default `min_successful_judges=2` quorum frequently couldn't be met.
-- **The jury cost roughly 87% of the run's total tokens**: warriors used 8.3k input / 219k
+- **The jury cost roughly 87% of the run's total tokens**: candidates used 8.3k input / 219k
   output tokens; the judge panel used 1.47M input / 109k output tokens. Two seat orders times a
   3-judge panel, on every round, adds up fast.
 - **A jury swap held rank correlation at Spearman 0.83** under a different 3-judge candidate

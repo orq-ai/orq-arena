@@ -1,32 +1,33 @@
-"""Warrior specification."""
+"""Candidate specification: one model under evaluation."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import AliasChoices, BaseModel, Field, model_validator
 
 
-class WarriorSpec(BaseModel):
-    """A single warrior, a model routed via the orq.ai gateway.
+class CandidateSpec(BaseModel):
+    """A single candidate, a model routed via the orq.ai gateway.
 
     Display name defaults to the model's short name (owner decision 22:
-    model names only on the leaderboard). A custom ``orc_name`` is still
-    allowed but never generated.
+    model names only on the leaderboard). A custom ``name`` is still
+    allowed but never generated. ``orc_name`` is accepted as a deprecated
+    YAML alias from the project's arena-theatre era.
     """
 
     model_id: str = Field(description="orq.ai gateway model slug, e.g. 'anthropic/claude-opus-4-8'")
-    orc_name: str = ""
+    name: str = Field(default="", validation_alias=AliasChoices("name", "orc_name"))
     emblem: str = Field(default="", description="Optional glyph shown before the name")
     # Raw router reasoning controls, forwarded verbatim as extra_body.
     reasoning: dict[str, Any] | None = None
-    # Per-warrior output cap; None = gateway.warrior_max_tokens.
+    # Per-candidate output cap; None = gateway.candidate_max_tokens.
     max_tokens: int | None = None
 
     @model_validator(mode="after")
-    def _default_name(self) -> "WarriorSpec":
-        if not self.orc_name:
-            self.orc_name = self.short_model
+    def _default_name(self) -> "CandidateSpec":
+        if not self.name:
+            self.name = self.short_model
         return self
 
     @property
@@ -36,7 +37,7 @@ class WarriorSpec(BaseModel):
 
     @property
     def thinking_enabled(self) -> bool:
-        """True if this warrior has any reasoning control switched on."""
+        """True if this candidate has any reasoning control switched on."""
         r = self.reasoning or {}
         thinking = r.get("thinking") or {}
         if thinking.get("type") == "enabled" or thinking.get("thinking_level"):
@@ -45,11 +46,11 @@ class WarriorSpec(BaseModel):
         return bool(effort and effort != "none")
 
 
-def assign_warriors(model_ids: list[str], existing: list[WarriorSpec]) -> list[WarriorSpec]:
-    """Build WarriorSpecs for picked models.
+def assign_candidates(model_ids: list[str], existing: list[CandidateSpec]) -> list[CandidateSpec]:
+    """Build CandidateSpecs for picked models.
 
     Models already configured keep their spec (incl. reasoning blocks);
     new models display as their model name (decision 22).
     """
-    by_model = {w.model_id: w for w in existing}
-    return [by_model.get(mid) or WarriorSpec(model_id=mid) for mid in model_ids]
+    by_model = {c.model_id: c for c in existing}
+    return [by_model.get(mid) or CandidateSpec(model_id=mid) for mid in model_ids]

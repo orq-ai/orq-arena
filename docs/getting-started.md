@@ -36,7 +36,7 @@ live, you need:
 
 - A workspace **API key** (`ORQ_API_KEY`) from [my.orq.ai](https://my.orq.ai) > workspace
   settings > API keys (per `.env.example`). It's the only secret orq-arena needs, every
-  warrior, judge, analyzer, and preflight-probe call goes through the orq.ai router gateway
+  candidate, judge, analyzer, and preflight-probe call goes through the orq.ai router gateway
   with this one key.
 
 ---
@@ -92,7 +92,7 @@ called once at the top of every CLI invocation. It uses `os.environ.setdefault`,
 variable already set in your shell always wins**, `.env` only fills in what the shell hasn't
 already set. `.env` is git-ignored; only `.env.example` is committed.
 
-`ORQ_API_KEY` is **not** required for `orq-arena demo` or `orq-arena list-warriors`, only for
+`ORQ_API_KEY` is **not** required for `orq-arena demo` or `orq-arena list-models`, only for
 `run` and `rejudge`, which construct a gateway client. `refresh-models` wants it too, but
 degrades instead of failing: without a key the catalog fetch quietly falls back to any
 existing cache, else an empty list (the YAML-roster fallback belongs to `run`'s picker only). Full variable reference:
@@ -114,13 +114,13 @@ Without `--config`, this opens the roster picker over your workspace-enabled mod
    (`N matches × R rounds → X streams + Y judge calls`, never a dollar estimate). Pick any pool
    of 2 or more, then press `S` to lock it in (`F` fills to 8 at random, `X` clears, `/`
    searches, `Q` quits).
-2. **Preflight probe.** orq-arena automatically sends one tiny call per warrior ("Reply with
+2. **Preflight probe.** orq-arena automatically sends one tiny call per candidate ("Reply with
    the single word: ok") to catch vendor-default thinking that contradicts your config. If a
    model reasons despite being configured off, you'll see a toast:
    `🧠 thinks despite config: ..., ranking will be footnoted`.
-3. **The fight.** Every pair of warriors meets once (round-robin up to 8 warriors; Swiss
+3. **The fight.** Every pair of candidates meets once (round-robin up to 8 candidates; Swiss
    pairing engages automatically above that, never a flag you set). For each prompt, both
-   warriors stream side by side, the jury votes in both seat orders, HP drops, and the round
+   candidates stream side by side, the jury votes in both seat orders, HP drops, and the round
    is logged.
 4. **The leaderboard.** Once every match finishes, the final Bradley-Terry ELO leaderboard
    opens with bootstrap 95% CIs. Press `B` to browse every judged round (prompt, both
@@ -148,11 +148,11 @@ uv run orq-arena run --config orq_arena.yaml
 With `--config`, the CLI prints the same call counts up front, runs the same thinking probe,
 then asks `Proceed?` before spending anything (`click.confirm(..., abort=True)`), pass
 `--yes`/`-y` to skip the prompt for CI or scripts. For the shipped `orq_arena.yaml` (8
-warriors) against the default `prompts/starter.jsonl` (30 prompts, capped at `match.max_rounds`
+candidates) against the default `prompts/starter.jsonl` (30 prompts, capped at `match.max_rounds`
 = 5 per match), that preflight line reads exactly:
 
 ```
-preflight: 28 matches × 5 rounds → 280 warrior streams + 840 judge calls + 8 probe calls
+preflight: 28 matches × 5 rounds → 280 model streams + 840 judge calls + 8 probe calls
 ```
 
 The prompt set is swappable: `--prompts your_prompts.jsonl` for a local file (format:
@@ -164,7 +164,7 @@ With `--config` the run is headless by default: matches run in parallel under
 `headless_concurrency` (default 4) through a Rich one-liner printer, and the HTML report
 opens in your browser when the run ends (`--no-open` to skip; it never opens in CI). Pass
 `--tui` to watch the live Textual show instead. Without `--config` the roster picker opens,
-which needs the TUI. Full flag reference for `run` and every other subcommand (`demo`, `rejudge`, `jury-compare`, `report`, `annotate`, `anchor`, `list-warriors`,
+which needs the TUI. Full flag reference for `run` and every other subcommand (`demo`, `rejudge`, `jury-compare`, `report`, `annotate`, `anchor`, `list-models`,
 `refresh-models`): **[cli.md](cli.md)**.
 
 ---
@@ -194,7 +194,7 @@ page on demand.
 **`RuntimeError: ORQ_API_KEY is not set. Export it before running orq-arena.`**
 `.env` is missing, empty, or still the blank template. Run `cp .env.example .env`, fill in a
 real key from [my.orq.ai](https://my.orq.ai) > workspace settings > API keys, and re-run. This
-only fires on `run` or `rejudge`, `demo`, `list-warriors`, and `refresh-models` never
+only fires on `run` or `rejudge`, `demo`, `list-models`, and `refresh-models` never
 construct a gateway client, so they run with no key at all (`refresh-models` just falls back
 to cached results, or an empty list).
 
@@ -212,9 +212,9 @@ from (live, cache, or fallback, it does not print the underlying HTTP error), an
 skips the picker altogether.
 
 **A response panel shows `✂ truncated`**
-The warrior hit its output cap (`gateway.warrior_max_tokens`, default `2048`) before
-finishing, judges tend to penalize a cut-off answer. Raise `gateway.warrior_max_tokens` in
-your YAML, or set a higher per-warrior `max_tokens` on that one entry. See
+The candidate hit its output cap (`gateway.candidate_max_tokens`, default `2048`) before
+finishing, judges tend to penalize a cut-off answer. Raise `gateway.candidate_max_tokens` in
+your YAML, or set a higher per-candidate `max_tokens` on that one entry. See
 [configuration.md](configuration.md#gateway-gatewayconfig).
 
 **A model you expected in the default pool isn't there**

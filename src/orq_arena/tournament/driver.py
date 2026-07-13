@@ -23,7 +23,7 @@ from ..data.log import BattleLog
 from ..data.prompts import PromptItem
 from ..data.schemas import BattleRecord
 from ..events import ArenaEvent, StandingsUpdated, TournamentEnded
-from ..orcs.roster import WarriorSpec
+from ..roster import CandidateSpec
 from ..providers.orq_gateway import OrqGateway
 from .elo import (bootstrap_ci, bradley_terry_mle, build_wins_matrix,
                   style_controlled_elo)
@@ -32,10 +32,10 @@ Outcome = tuple[str, str, str, str]  # (name, name, 'winner' | 'tie', category)
 
 
 def round_robin_schedule(
-    warriors: list[WarriorSpec], seed: int = 42
-) -> list[tuple[WarriorSpec, WarriorSpec]]:
+    candidates: list[CandidateSpec], seed: int = 42
+) -> list[tuple[CandidateSpec, CandidateSpec]]:
     """Every pair once, in a seeded shuffled order."""
-    schedule = list(combinations(warriors, 2))
+    schedule = list(combinations(candidates, 2))
     random.Random(seed).shuffle(schedule)
     return schedule
 
@@ -91,7 +91,7 @@ def _final_report(
     cfg: ArenaConfig, records: list[BattleRecord], outcomes: list[Outcome], names: list[str],
     preflight: dict | None = None,
 ) -> dict:
-    # A warrior "thinks" if its config says so OR the preflight probe saw it
+    # A candidate "thinks" if its config says so OR the preflight probe saw it
     # thinking anyway (vendor defaults the router can't disable).
     probed = {
         name: bool(r.get("thinks"))
@@ -124,8 +124,8 @@ def _final_report(
             grid[a][b] += 0.5
             grid[b][a] += 0.5
 
-    warrior_in = sum(r.tokens_a_in + r.tokens_b_in for r in records)
-    warrior_out = sum(r.tokens_a_out + r.tokens_b_out for r in records)
+    model_in = sum(r.tokens_a_in + r.tokens_b_in for r in records)
+    model_out = sum(r.tokens_a_out + r.tokens_b_out for r in records)
     judge_in = sum(r.judge_tokens_in for r in records)
     judge_out = sum(r.judge_tokens_out for r in records)
 
@@ -133,8 +133,8 @@ def _final_report(
     for o in outcomes:
         cat_counts[o[3]] = cat_counts.get(o[3], 0) + 1
 
-    by_model = {w.short_model: w for w in cfg.warriors}
-    orc_by_model = {w.short_model: w.orc_name for w in cfg.warriors}
+    by_model = {w.short_model: w for w in cfg.candidates}
+    orc_by_model = {w.short_model: w.name for w in cfg.candidates}
     y_by_verdict = {"A": 1.0, "B": 0.0, "tie": 0.5}
     style_rows = [
         (
@@ -155,7 +155,7 @@ def _final_report(
         "elo_by_category": elo_by_category(outcomes, names),
         "category_counts": cat_counts,
         "tokens": {
-            "warriors_in": warrior_in, "warriors_out": warrior_out,
+            "models_in": model_in, "models_out": model_out,
             "judges_in": judge_in, "judges_out": judge_out,
         },
         "jury": jury.model_dump() if jury else None,
@@ -166,15 +166,15 @@ def _final_report(
         "reasoning_tokens": {orc_by_model.get(m, m): sum(v) / len(v) for m, v in reasoning.items() if v},
         "win_grid": grid,
         "thinking": {
-            w.orc_name: (w.thinking_enabled or probed.get(w.orc_name, False))
-            for w in cfg.warriors
+            w.name: (w.thinking_enabled or probed.get(w.name, False))
+            for w in cfg.candidates
         },
         "mixed_pool": len({
-            w.thinking_enabled or probed.get(w.orc_name, False) for w in cfg.warriors
+            w.thinking_enabled or probed.get(w.name, False) for w in cfg.candidates
         }) > 1,
         "error_rounds": sum(1 for r in records if r.error is not None),
         "rated_rounds": len(outcomes),
-        "by_model_names": {w.short_model: w.orc_name for w in by_model.values()},
+        "by_model_names": {w.short_model: w.name for w in by_model.values()},
     }
 
 
@@ -185,7 +185,7 @@ def rebuild_from_log(
     live run (display names), so a regenerated report page matches the one
     the run wrote. The single rebuild path for ``orq-arena report``.
     """
-    alias = {w.short_model: w.orc_name for w in cfg.warriors}
+    alias = {w.short_model: w.name for w in cfg.candidates}
     outcomes: list[Outcome] = []
     for rec in records:
         if rec.error is not None:
@@ -222,7 +222,7 @@ def _write_manifest(
             "\n".join(p.text for p in prompts).encode("utf-8")
         ).hexdigest()[:16],
         "prompt_count": len(prompts),
-        "warriors": {w.orc_name: {"model": w.model_id, "reasoning": w.reasoning or "vendor-default"} for w in cfg.warriors},
+        "candidates": {c.name: {"model": c.model_id, "reasoning": c.reasoning or "vendor-default"} for c in cfg.candidates},
         "judges": list(cfg.judges),
         "replacement_judges": list(cfg.replacement_judges),
         "min_successful_judges": cfg.min_successful_judges,
@@ -261,8 +261,8 @@ async def run_tournament(
     ``concurrency`` > 1 runs matches in parallel under a semaphore, headless
     runs only; the TUI passes 1 so the show stays one fight at a time.
     """
-    if len(cfg.warriors) < 2:
-        raise ValueError(f"Need at least 2 warriors, got {len(cfg.warriors)}")
+    if len(cfg.candidates) < 2:
+        raise ValueError(f"Need at least 2 candidates, got {len(cfg.candidates)}")
     if not prompts:
         raise ValueError("Prompt set is empty")
 
@@ -270,10 +270,10 @@ async def run_tournament(
     log = BattleLog(battle_log_path)
     manifest_path = Path(battle_log_path).with_suffix(".run.json")
 
-    names = [w.orc_name for w in cfg.warriors]
-    warrior_by_name = {w.orc_name: w for w in cfg.warriors}
-    use_swiss = len(cfg.warriors) > 8
-    schedule = [] if use_swiss else round_robin_schedule(cfg.warriors, seed)
+    names = [w.name for w in cfg.candidates]
+    candidate_by_name = {w.name: w for w in cfg.candidates}
+    use_swiss = len(cfg.candidates) > 8
+    schedule = [] if use_swiss else round_robin_schedule(cfg.candidates, seed)
     matches_total = (
         cfg.swiss_rounds * (len(names) // 2) if use_swiss else len(schedule)
     )
@@ -305,8 +305,8 @@ async def run_tournament(
             battle = Battle(
                 cfg=cfg,
                 gateway=gateway,
-                warrior_a=w_a,
-                warrior_b=w_b,
+                candidate_a=w_a,
+                candidate_b=w_b,
                 prompts=fight_prompts,
                 match_id=f"M{i}",
                 round_name=f"match {i}/{matches_total}",
@@ -318,7 +318,7 @@ async def run_tournament(
                 log.append_many(result.battles)
                 all_records.extend(result.battles)
                 outcomes.extend(
-                    outcomes_from_records(result.battles, w_a.orc_name, w_b.orc_name)
+                    outcomes_from_records(result.battles, w_a.name, w_b.name)
                 )
                 if outcomes:
                     elo = bradley_terry_mle(build_wins_matrix(_triples(outcomes)), names)
@@ -357,14 +357,14 @@ async def run_tournament(
             for a, b in pairs:
                 match_no += 1
                 tasks.append(_run_match(
-                    match_no, warrior_by_name[a], warrior_by_name[b], _draw_slice()
+                    match_no, candidate_by_name[a], candidate_by_name[b], _draw_slice()
                 ))
             results = await asyncio.gather(*tasks)
             for res in results:
                 if res.by == "draw":
-                    scheduler.record_outcome(res.winner.orc_name, res.loser.orc_name, tie=True)
+                    scheduler.record_outcome(res.winner.name, res.loser.name, tie=True)
                 else:
-                    scheduler.record_outcome(res.winner.orc_name, res.loser.orc_name)
+                    scheduler.record_outcome(res.winner.name, res.loser.name)
 
     report = _final_report(cfg, all_records, outcomes, names, preflight=preflight)
     _write_manifest(

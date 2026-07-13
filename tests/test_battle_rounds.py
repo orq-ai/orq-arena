@@ -19,8 +19,8 @@ def _cfg() -> ArenaConfig:
     return ArenaConfig.model_validate(
         {
             "warriors": [
-                {"orc_name": "Alpha", "model_id": "x/alpha"},
-                {"orc_name": "Beta", "model_id": "x/beta"},
+                {"name": "Alpha", "model_id": "x/alpha"},
+                {"name": "Beta", "model_id": "x/beta"},
             ],
             "judges": ["x/j1", "x/j2", "x/j3"],
             "match": {"verdict_hold_s": 0},
@@ -65,7 +65,7 @@ def _build_battle(monkeypatch, gateway, jury) -> tuple[Battle, asyncio.Queue]:
     events: asyncio.Queue = asyncio.Queue()
     b = Battle(
         cfg=cfg, gateway=gateway,
-        warrior_a=cfg.warriors[0], warrior_b=cfg.warriors[1],
+        candidate_a=cfg.candidates[0], candidate_b=cfg.candidates[1],
         prompts=[PromptItem("What is 2+2?")], match_id="M1", round_name="round",
         tournament_id="t", events=events,
     )
@@ -128,8 +128,8 @@ async def test_all_judges_contestants_raises(monkeypatch):
     cfg = ArenaConfig.model_validate(
         {
             "warriors": [
-                {"orc_name": "Alpha", "model_id": "x/j1"},
-                {"orc_name": "Beta", "model_id": "x/j2"},
+                {"name": "Alpha", "model_id": "x/j1"},
+                {"name": "Beta", "model_id": "x/j2"},
             ],
             "judges": ["x/j1", "x/j2"],
         }
@@ -137,7 +137,7 @@ async def test_all_judges_contestants_raises(monkeypatch):
     with pytest.raises(ValueError, match="neutral judge"):
         Battle(
             cfg=cfg, gateway=FakeGateway(),
-            warrior_a=cfg.warriors[0], warrior_b=cfg.warriors[1],
+            candidate_a=cfg.candidates[0], candidate_b=cfg.candidates[1],
             prompts=[PromptItem("p")], match_id="M1", round_name="round",
             tournament_id="t", events=asyncio.Queue(),
         )
@@ -159,7 +159,7 @@ async def test_ko_does_not_stop_the_judging(monkeypatch):
     events: asyncio.Queue = asyncio.Queue()
     b = Battle(
         cfg=cfg, gateway=FakeGateway(),
-        warrior_a=cfg.warriors[0], warrior_b=cfg.warriors[1],
+        candidate_a=cfg.candidates[0], candidate_b=cfg.candidates[1],
         prompts=[PromptItem("p1"), PromptItem("p2"), PromptItem("p3")], match_id="M1", round_name="round",
         tournament_id="t", events=events,
     )

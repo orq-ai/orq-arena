@@ -6,7 +6,7 @@ from textual.app import App
 from textual.widgets import SelectionList
 
 from orq_arena.config import ArenaConfig
-from orq_arena.orcs.roster import WarriorSpec, assign_warriors
+from orq_arena.roster import CandidateSpec, assign_candidates
 from orq_arena.providers.models_list import ModelEntry, _parse_payload, _filter_by_type
 from orq_arena.tui.screens.roster_select import RosterSelectScreen
 
@@ -29,17 +29,17 @@ def test_type_map_filter_keeps_chat_and_unknown():
     assert [m.id for m in kept] == ["a/chatty", "a/alias"]
 
 
-def test_assign_warriors_keeps_configured_specs_and_names_new_ones():
-    existing = [WarriorSpec(
-        orc_name="Azog Deepmind", model_id="google/gemini-3.1-pro-preview",
+def test_assign_candidates_keeps_configured_specs_and_names_new_ones():
+    existing = [CandidateSpec(
+        name="Azog Deepmind", model_id="google/gemini-3.1-pro-preview",
         reasoning={"thinking": {"type": "disabled"}},
     )]
-    out = assign_warriors(
+    out = assign_candidates(
         ["google/gemini-3.1-pro-preview", "moonshotai/kimi-k2.6"], existing
     )
     assert out[0] is existing[0]                      # spec (incl. reasoning) preserved
     assert out[1].model_id == "moonshotai/kimi-k2.6"
-    assert out[1].orc_name == "kimi-k2.6"             # model names only (decision 22)
+    assert out[1].name == "kimi-k2.6"             # model names only (decision 22)
     assert out[1].reasoning is None                   # probe is the safety net
 
 
@@ -50,8 +50,8 @@ class _Host(App):
 async def test_picker_mounts_and_counts_update():
     cfg = ArenaConfig.model_validate({
         "warriors": [
-            {"orc_name": "A", "model_id": "x/a"},
-            {"orc_name": "B", "model_id": "x/b"},
+            {"name": "A", "model_id": "x/a"},
+            {"name": "B", "model_id": "x/b"},
         ],
         "judges": ["x/j1", "x/j2", "x/j3"],
     })

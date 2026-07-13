@@ -1,4 +1,4 @@
-"""orq.ai router gateway client, single provider for all warrior calls.
+"""orq.ai router gateway client, single provider for all model calls.
 
 Uses ``AsyncOpenAI`` pointed at ``api.orq.ai/v3/router``; the gateway is
 OpenAI-compatible. Judge calls share ``.client`` via evaluatorq.
@@ -57,7 +57,7 @@ class OrqGateway:
         stream = await self._client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=max_tokens or self._cfg.warrior_max_tokens,
+            max_tokens=max_tokens or self._cfg.candidate_max_tokens,
             stream=True,
             stream_options={"include_usage": True},
             extra_body=extra_body or None,

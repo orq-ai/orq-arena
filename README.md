@@ -87,7 +87,7 @@ Everything lives in `orq_arena.yaml`, no flags to remember. The default pool is 
 **Not locked to orq.ai.** The engine speaks plain OpenAI-compatible chat: point `gateway.base_url` at any endpoint that speaks that format and set `api_key_env` to match. The orq.ai router is the default because one key covers every provider (and powers the roster picker); it is the recommended path, not the only one. Details: [docs/configuration.md](docs/configuration.md#bring-your-own-endpoint).
 
 ```yaml
-warriors:
+candidates:
   - model_id: anthropic/claude-opus-4-8
   - model_id: google/gemini-3.1-pro-preview
     reasoning: { thinking: { type: disabled } }   # raw router fields, verbatim
@@ -113,7 +113,7 @@ Full guides live in [`docs/`](docs/); start with the [docs index](docs/README.md
 | Guide | Description |
 |-------|-------------|
 | [Getting Started](docs/getting-started.md) | Prerequisites, install, first live run, common setup issues |
-| [CLI Reference](docs/cli.md) | Every command and flag, `run`, `demo`, `rejudge`, `jury-compare`, `report`, `annotate`, `anchor`, `list-warriors`, `refresh-models` |
+| [CLI Reference](docs/cli.md) | Every command and flag, `run`, `demo`, `rejudge`, `jury-compare`, `report`, `annotate`, `anchor`, `list-models`, `refresh-models` |
 | [Configuration](docs/configuration.md) | Every `orq_arena.yaml` key, reasoning recipes, defaults |
 | [Methodology](docs/methodology.md) | Bradley-Terry scoring, bias controls, confidence intervals, reproducibility |
 | [Architecture](docs/architecture.md) | Component overview, data flow, key abstractions |

@@ -1,7 +1,7 @@
 """Warrior card, name, model, HP bar with damage flashes, ELO.
 
 Child widget references are stored directly on the card instance so we never
-query by ID, two WarriorCards can be mounted on the same screen without
+query by ID, two ModelCards can be mounted on the same screen without
 colliding on shared IDs.
 """
 
@@ -12,32 +12,32 @@ from textual.containers import Vertical
 from textual.widgets import ProgressBar, Static
 
 
-class WarriorCard(Static):
-    """A single warrior's status card."""
+class ModelCard(Static):
+    """A single model's status card."""
 
     DEFAULT_CSS = """
-    WarriorCard {
+    ModelCard {
         height: 9;
         padding: 1 2;
         border: round $accent;
         background: $panel;
     }
-    WarriorCard.side-a { border: round $accent; }
-    WarriorCard.side-b { border: round $primary; }
-    WarriorCard .name { text-style: bold; }
-    WarriorCard.side-a .name { color: $accent; }
-    WarriorCard.side-b .name { color: $primary; }
-    WarriorCard .model { color: $text-muted; }
-    WarriorCard .hp-line { color: $text; }
-    WarriorCard .elo { color: $text-muted; }
-    WarriorCard.hit { background: $error-darken-1; }
-    WarriorCard.ko { opacity: 0.5; border: round $error; }
+    ModelCard.side-a { border: round $accent; }
+    ModelCard.side-b { border: round $primary; }
+    ModelCard .name { text-style: bold; }
+    ModelCard.side-a .name { color: $accent; }
+    ModelCard.side-b .name { color: $primary; }
+    ModelCard .model { color: $text-muted; }
+    ModelCard .hp-line { color: $text; }
+    ModelCard .elo { color: $text-muted; }
+    ModelCard.hit { background: $error-darken-1; }
+    ModelCard.ko { opacity: 0.5; border: round $error; }
     """
 
     def __init__(self, side: str = "a", **kwargs) -> None:
         super().__init__(**kwargs)
         self.add_class(f"side-{side}")
-        self._orc_name = ""
+        self._display_name = ""
         self._model_id = ""
         self._emblem = ""
         self._thinking = False
@@ -70,7 +70,7 @@ class WarriorCard(Static):
         if self._name_w:
             badge = "  🧠" if self._thinking else ""
             prefix = f"{self._emblem}  " if self._emblem else ""
-            self._name_w.update(f"{prefix}{self._orc_name}{badge}")
+            self._name_w.update(f"{prefix}{self._display_name}{badge}")
         if self._model_w:
             self._model_w.update(self._model_id)
         if self._hp_bar:
@@ -84,16 +84,16 @@ class WarriorCard(Static):
         color = "green" if share > 0.5 else "yellow" if share > 0.25 else "red"
         self._hp_line.update(f"[{color}]HP {self._hp}/{self._max_hp}[/{color}]{flash}")
 
-    def set_warrior(
+    def set_model(
         self,
         *,
-        orc_name: str,
+        name: str,
         model_id: str,
         emblem: str,
         max_hp: int,
         thinking: bool = False,
     ) -> None:
-        self._orc_name = orc_name
+        self._display_name = name
         self._model_id = model_id
         self._emblem = emblem
         self._thinking = thinking

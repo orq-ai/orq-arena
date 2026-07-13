@@ -26,12 +26,12 @@ def test_ceiling_is_exact_arithmetic():
     prices = {"a/one": (1.0, 2.0), "b/two": (4.0, 8.0), "c/judge": (10.0, 20.0)}
     c = cost_ceiling(cfg, PROMPTS, counts, prices)
 
-    cap_default = cfg.gateway.warrior_max_tokens  # 2048
+    cap_default = cfg.gateway.candidate_max_tokens  # 2048
     # a/one: 2 streams x (1*100 + 2*2048) / 1e6; b/two: 2 x (4*100 + 8*1000) / 1e6
     warriors = 2 * (100 + 2 * cap_default) / 1e6 + 2 * (400 + 8000) / 1e6
     judge_in = 100 + 2 * cap_default + _JUDGE_WRAPPER_TOKENS
     judges = 4 * (10 * judge_in + 20 * cfg.gateway.judge_max_tokens) / 1e6  # 1x2x1x2 calls
-    assert abs(c.warriors_usd - warriors) < 1e-12
+    assert abs(c.models_usd - warriors) < 1e-12
     assert abs(c.judges_usd - judges) < 1e-12
     assert c.probe_usd == 0
     assert abs(c.total_usd - (warriors + judges)) < 1e-12
@@ -44,7 +44,7 @@ def test_unpriced_models_are_excluded_and_reported():
     c = cost_ceiling(cfg, PROMPTS, counts, {"a/one": (1.0, 2.0)})
     assert c.unpriced == ["b/two", "c/judge"]
     assert c.judges_usd == 0
-    assert c.warriors_usd > 0
+    assert c.models_usd > 0
 
 
 def test_probe_priced_only_when_enabled():

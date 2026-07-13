@@ -122,10 +122,10 @@ def run(config_path: str | None, prompts_path: str, output_path: str, rounds: in
     counts = call_counts(cfg, prompts)
     click.echo(
         f"preflight: {counts.matches} matches × {counts.rounds_per_match} rounds → "
-        f"{counts.warrior_streams} warrior streams + {counts.judge_calls} judge calls"
+        f"{counts.model_streams} model streams + {counts.judge_calls} judge calls"
         + (f" + {counts.probe_calls} probe calls" if counts.probe_calls else "")
     )
-    overlap = judge_family_overlaps(list(cfg.judges), cfg.warriors)
+    overlap = judge_family_overlaps(list(cfg.judges), cfg.candidates)
     if overlap:
         click.echo(
             f"  ⚖ judge/contestant family overlap: {', '.join(overlap)}. "
@@ -138,7 +138,7 @@ def run(config_path: str | None, prompts_path: str, output_path: str, rounds: in
     if ceiling.total_usd > 0:
         click.echo(
             f"  spend ceiling ≈ ${ceiling.total_usd:.2f} "
-            f"(warriors ${ceiling.warriors_usd:.2f} + judges ${ceiling.judges_usd:.2f}"
+            f"(models ${ceiling.models_usd:.2f} + judges ${ceiling.judges_usd:.2f}"
             + (f" + probe ${ceiling.probe_usd:.2f}" if ceiling.probe_usd else "")
             + "; every output cap fully hit, live runs land under)"
         )
@@ -210,15 +210,15 @@ def demo(fixture_path: str, config_path: str) -> None:
     app.run()
 
 
-@cli.command("list-warriors")
+@cli.command("list-models")
 @click.option("--config", "config_path", default=DEFAULT_CONFIG, show_default=True)
-def list_warriors(config_path: str) -> None:
-    """Print the warrior roster."""
+def list_models(config_path: str) -> None:
+    """Print the configured candidate roster."""
     cfg = load_config(config_path)
     click.echo(f"{'Seed':<5} {'Name':<26} Model ID")
     click.echo("-" * 70)
-    for i, w in enumerate(cfg.warriors, 1):
-        click.echo(f"{i:<5} {w.orc_name:<26} {w.model_id}")
+    for i, w in enumerate(cfg.candidates, 1):
+        click.echo(f"{i:<5} {w.name:<26} {w.model_id}")
 
 
 
@@ -444,6 +444,15 @@ def anchor(battle_log: str, vote_files: tuple[str, ...]) -> None:
     render_anchor_result(
         anchor_result(load_records(battle_log), load_votes(list(vote_files)))
     )
+
+@cli.command("list-warriors", hidden=True)
+@click.option("--config", "config_path", default=DEFAULT_CONFIG, show_default=True)
+@click.pass_context
+def list_warriors(ctx: click.Context, config_path: str) -> None:
+    """Deprecated alias for list-models."""
+    click.echo("list-warriors is deprecated; use list-models", err=True)
+    ctx.invoke(list_models, config_path=config_path)
+
 
 if __name__ == "__main__":
     cli()

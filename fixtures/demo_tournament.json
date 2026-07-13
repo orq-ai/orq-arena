@@ -3,8 +3,8 @@
   "type": "match_started",
   "match_id": "M1",
   "round_name": "match 1/3",
-  "warrior_a": "gpt-5.4-mini",
-  "warrior_b": "mistral-medium-2604",
+  "model_a": "gpt-5.4-mini",
+  "model_b": "mistral-medium-2604",
   "_delay": 0.35
  },
  {
@@ -1807,8 +1807,8 @@
   "type": "match_started",
   "match_id": "M2",
   "round_name": "match 2/3",
-  "warrior_a": "gpt-5.4-mini",
-  "warrior_b": "gemini-2.5-flash",
+  "model_a": "gpt-5.4-mini",
+  "model_b": "gemini-2.5-flash",
   "_delay": 0.35
  },
  {
@@ -2911,8 +2911,8 @@
   "type": "match_started",
   "match_id": "M3",
   "round_name": "match 3/3",
-  "warrior_a": "gemini-2.5-flash",
-  "warrior_b": "mistral-medium-2604",
+  "model_a": "gemini-2.5-flash",
+  "model_b": "mistral-medium-2604",
   "_delay": 0.35
  },
  {

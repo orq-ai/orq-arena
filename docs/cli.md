@@ -9,7 +9,7 @@ every flag, default, and behavior documented below is read directly from it (plu
 [`providers/models_list.py`](../src/orq_arena/providers/models_list.py) for the two commands
 that delegate to them).
 
-It exposes nine subcommands: [`run`](#run), [`demo`](#demo), [`list-warriors`](#list-warriors),
+It exposes nine subcommands: [`run`](#run), [`demo`](#demo), [`list-models`](#list-models),
 [`rejudge`](#rejudge), [`jury-compare`](#jury-compare), [`report`](#report),
 [`annotate`](#annotate), [`anchor`](#anchor), and [`refresh-models`](#refresh-models). The `cli` group itself defines
 no flags beyond Click's built-in `--help`; there is no `--version` option. Every flag below
@@ -29,7 +29,7 @@ full `orq_arena.yaml` key reference, see [configuration.md](configuration.md).
 |---|---|
 | [`run`](#run) | Round-robin (or Swiss, >8 models) benchmark via the orq.ai router: headless by default, HTML report opens at the end, `--tui` for the live show. |
 | [`demo`](#demo) | Replay a recorded tournament fixture, zero API calls, zero key. |
-| [`list-warriors`](#list-warriors) | Print the configured roster (seed, orc name, model id). |
+| [`list-models`](#list-models) | Print the configured roster (seed, name, model id). |
 | [`rejudge`](#rejudge) | Re-score a recorded `battles.jsonl` with a different judge panel, zero regeneration. |
 | [`report`](#report) | Render the single-file HTML report page from a recorded run; no model calls, one optional catalog read for prices. |
 | [`jury-compare`](#jury-compare) | Tabulate candidate juries from saved rejudge reports, side by side; no API calls. |
@@ -49,9 +49,9 @@ A few things apply across every subcommand and are only documented once, here:
   over `.env`.** `ORQ_API_KEY` is the only variable read anywhere in the codebase. Full loader
   behavior (quoting, comments, missing-file handling): [configuration.md](configuration.md#environment-variables).
 - **Config validation is all-or-nothing**: `load_config()` parses `--config` (or the default
-  `orq_arena.yaml`) and validates the *entire* file into an `ArenaConfig` (≥2 `warriors`,
+  `orq_arena.yaml`) and validates the *entire* file into an `ArenaConfig` (≥2 `candidates`,
   non-empty `judges`, thinking-budget cross-checks, etc.) regardless of which fields a given
-  subcommand actually uses. An invalid config file fails the same way for `list-warriors` or
+  subcommand actually uses. An invalid config file fails the same way for `list-models` or
   `refresh-models` as it does for `run`, see
   [Required vs Optional Settings](configuration.md#required-vs-optional-settings).
 - **Default paths**: four constants in `cli.py` supply every default in the tables below:
@@ -66,15 +66,15 @@ A few things apply across every subcommand and are only documented once, here:
   All are relative to the current working directory, not the package install location.
 - **Log quieting**: `run`, `demo`, and `rejudge` redirect evaluatorq's `loguru` output to
   stderr at `ERROR` level only (`_quiet_logs()`), so library logging never corrupts the TUI or
-  interleaves with `rejudge`'s Rich tables. `list-warriors` and `refresh-models` don't touch
+  interleaves with `rejudge`'s Rich tables. `list-models` and `refresh-models` don't touch
   logging config.
 - **Which commands need `ORQ_API_KEY`:**
 
   | Command | Needs a live API key? |
   |---|---|
-  | `run` | Yes, warrior streams, judge calls, and (if enabled) the thinking probe all call the gateway. |
+  | `run` | Yes, model streams, judge calls, and (if enabled) the thinking probe all call the gateway. |
   | `demo` | No, replays a JSON fixture, zero network calls. |
-  | `list-warriors` | No, prints the parsed config only. |
+  | `list-models` | No, prints the parsed config only. |
   | `rejudge` | Yes, re-scores recorded responses with a live judge panel. |
   | `refresh-models` | Effectively yes, without it, falls back to any existing cache, then an empty result. See [`refresh-models`](#refresh-models). |
 
@@ -112,7 +112,7 @@ orq-arena run [--config PATH] [--prompts PATH] [--output PATH] [--rounds N]
   but the interactive TUI roster picker opens before anything runs, letting you choose any pool
   of ≥2 models from your workspace-enabled catalog (the same fetch `refresh-models` uses). In
   this path, the preflight (call counts + optional thinking probe) runs **in-app**, after the
-  picker closes, right before the fight starts. With `--config`, the YAML's `warriors` list is
+  picker closes, right before the fight starts. With `--config`, the YAML's `candidates` list is
   used exactly as written and the picker is skipped entirely; preflight and the confirmation
   prompt happen up front in the terminal, before the TUI (or headless run) even starts.
 - **Flag conflicts.** `--tui --headless` raises immediately (a clean `click.ClickException`,
@@ -121,30 +121,30 @@ orq-arena run [--config PATH] [--prompts PATH] [--output PATH] [--rounds N]
   information in-app instead of via these `click.echo` lines). First, exact call counts:
 
   ```text
-  preflight: {matches} matches × {rounds_per_match} rounds → {warrior_streams} warrior streams + {judge_calls} judge calls[ + {probe_calls} probe calls]
+  preflight: {matches} matches × {rounds_per_match} rounds → {model_streams} model streams + {judge_calls} judge calls[ + {probe_calls} probe calls]
   ```
 
-  computed by `preflight.call_counts`: `matches = C(len(warriors), 2)`,
-  `rounds_per_match = min(match.max_rounds, len(prompts))`, `warrior_streams = matches ×
+  computed by `preflight.call_counts`: `matches = C(len(candidates), 2)`,
+  `rounds_per_match = min(match.max_rounds, len(prompts))`, `model_streams = matches ×
   rounds × 2`, `judge_calls = matches × rounds × len(judges) × 2`. Next, a spend ceiling:
 
   ```text
-  spend ceiling ≈ ${total} (warriors ${w} + judges ${j}[ + probe ${p}]; every output cap fully hit, live runs land under)
+  spend ceiling ≈ ${total} (candidates ${w} + judges ${j}[ + probe ${p}]; every output cap fully hit, live runs land under)
   ```
 
   computed by `preflight.cost_ceiling` from those exact counts, the config's output caps
-  (`warrior_max_tokens` / per-warrior `max_tokens`, `judge_max_tokens`), and per-model prices
+  (`candidate_max_tokens` / per-candidate `max_tokens`, `judge_max_tokens`), and per-model prices
   fetched live from the router's Model Garden catalog (`providers.models_list.fetch_price_map`).
   It is an upper bound, the number the run cannot exceed, not a prediction; the judge-input
-  term assumes both responses hit the warrior cap. Models missing from the catalog are
+  term assumes both responses hit the model output cap. Models missing from the catalog are
   excluded and listed on a `⚠ no catalog price for: …` line; if pricing is entirely
   unreachable that warning lists the whole roster and the spend-ceiling line is the one
   skipped (pricing never blocks the run). The ceiling is also recorded in the run
   manifest under `preflight.cost_ceiling`. If `preflight.thinking_probe`
-  is enabled (default `true`), a `thinking probe…` line follows, then one line per warrior that
-  either failed the probe (`⚠ {orc_name} ({model}): probe failed, {error}`) or thinks despite
-  being configured off (`🧠 {orc_name} ({model}): thinks despite config ({reasoning_tokens}
-  reasoning tok), ranking will be footnoted`). If no warrior thinks despite being configured
+  is enabled (default `true`), a `thinking probe…` line follows, then one line per candidate that
+  either failed the probe (`⚠ {name} ({model}): probe failed, {error}`) or thinks despite
+  being configured off (`🧠 {name} ({model}): thinks despite config ({reasoning_tokens}
+  reasoning tok), ranking will be footnoted`). If no candidate thinks despite being configured
   off, a `pool is thinking-clean ✓` line prints (probe-failure warnings, if any, still appear
   above it).
 - **Confirmation.** Unless `--yes`/`-y` is given, the CLI prompts `Proceed?`
@@ -169,7 +169,7 @@ uv run orq-arena run --headless --config orq_arena.yaml --yes
 uv run orq-arena run --config configs/reasoning_arena.yaml --prompts prompts/starter.jsonl --output reasoning_battles.jsonl
 ```
 
-See [Match rules, gateway, warriors, and judges](configuration.md) for every YAML key this
+See [Match rules, gateway, candidates, and judges](configuration.md) for every YAML key this
 command reads, and [architecture.md](architecture.md#data-flow) for how the tournament engine
 schedules and scores matches.
 
@@ -205,12 +205,12 @@ uv run orq-arena demo --fixture fixtures/demo_tournament.json --config orq_arena
 
 ---
 
-## `list-warriors`
+## `list-models`
 
 Print the configured roster, no API calls, no key required.
 
 ```text
-orq-arena list-warriors [--config PATH]
+orq-arena list-models [--config PATH]
 ```
 
 | Flag | Default | Effect |
@@ -219,15 +219,15 @@ orq-arena list-warriors [--config PATH]
 
 **Behavior notes:**
 
-- Prints a fixed-width table, seed number, `orc_name` (falls back to the model's short name,
-  see [configuration.md](configuration.md#warriors-the-roster)), and the full `model_id`, in
+- Prints a fixed-width table, seed number, `name` (falls back to the model's short name,
+  see [configuration.md](configuration.md#candidates-the-roster)), and the full `model_id`, in
   roster order, 1-indexed. Format string: `f"{'Seed':<5} {'Name':<26} Model ID"` for the
-  header, `f"{i:<5} {w.orc_name:<26} {w.model_id}"` per row.
+  header, `f"{i:<5} {w.name:<26} {w.model_id}"` per row.
 
-**Example**, against the shipped `orq_arena.yaml` (8 warriors, none with a custom `orc_name`):
+**Example**, against the shipped `orq_arena.yaml` (8 candidates, none with a custom `name`):
 
 ```bash
-uv run orq-arena list-warriors
+uv run orq-arena list-models
 ```
 
 ```text
@@ -244,7 +244,7 @@ Seed  Name                       Model ID
 ```
 
 ```bash
-uv run orq-arena list-warriors --config configs/reasoning_arena.yaml
+uv run orq-arena list-models --config configs/reasoning_arena.yaml
 ```
 
 ---
@@ -380,7 +380,7 @@ orq-arena report [LOG_PATH] [--config PATH] [--output PATH]
 The page is self-contained (inline CSS, no external assets, works from `file://`): verdict
 headline with a CI-overlap caveat, the ELO ladder with confidence-interval bars and the
 len-ctrl column, the win grid, per-judge behaviour, token and cost accounting (catalog
-rates when a key is present: warrior spend exact, jury spend estimated at the panel mean;
+rates when a key is present: candidate spend exact, jury spend estimated at the panel mean;
 one catalog read, never completion spend), and the
 manifest hashes for reproducibility.
 

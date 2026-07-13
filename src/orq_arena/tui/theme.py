@@ -41,15 +41,3 @@ CRT_THEME = Theme(
     panel=INK_RAISED,
     foreground=CHROME,
 )
-
-
-def hp_color(hp: int, max_hp: int) -> str:
-    """Green above ~60%, orange above ~30%, red below."""
-    if max_hp <= 0:
-        return RED
-    ratio = hp / max_hp
-    if ratio > 0.6:
-        return GREEN
-    if ratio > 0.3:
-        return ORANGE
-    return RED

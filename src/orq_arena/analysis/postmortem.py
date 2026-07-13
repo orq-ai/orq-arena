@@ -1,6 +1,6 @@
 """Per-model post-mortems, "why did I win, why did I lose?".
 
-One analyzer call per warrior: its battles, its own responses (trimmed), and
+One analyzer call per model: its battles, its own responses (trimmed), and
 the judges' reconciled explanations go to a cheap analyzer model that returns
 a structured summary. Cached in ``analysis.jsonl`` next to the battle log,
 re-running the leaderboard doesn't re-spend tokens.

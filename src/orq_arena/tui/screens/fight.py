@@ -4,7 +4,7 @@ Layout:
   ┌─────────────────────────────────────────────┐
   │ Ticker strip (match progress)               │
   ├──────────────────────┬──────────────────────┤
-  │ WarriorCard A        │ WarriorCard B        │
+  │ ModelCard A        │ ModelCard B        │
   ├──────────────────────┴──────────────────────┤
   │ PromptPanel                                 │
   ├──────────────────────┬──────────────────────┤
@@ -13,7 +13,7 @@ Layout:
   │ Judge cards (3 across)                      │
   └─────────────────────────────────────────────┘
 
-Side identity: A is magenta, B is cyan (CRT theme), on the warrior cards,
+Side identity: A is magenta, B is cyan (CRT theme), on the model cards,
 the response panels, and the judge verdict cues.
 """
 
@@ -27,7 +27,7 @@ from textual.widgets import Static
 from ..widgets.judge_card import JudgeCard
 from ..widgets.prompt_panel import PromptPanel
 from ..widgets.response_panel import ResponsePanel
-from ..widgets.warrior_card import WarriorCard
+from ..widgets.model_card import ModelCard
 
 
 class FightScreen(Screen):
@@ -44,7 +44,7 @@ class FightScreen(Screen):
         background: $panel-darken-2;
         border-bottom: solid $accent;
     }
-    FightScreen #warriors {
+    FightScreen #models {
         height: 11;
         layout: grid;
         grid-size: 2 1;
@@ -80,8 +80,8 @@ class FightScreen(Screen):
     def __init__(self, judge_names: list[str], **kwargs) -> None:
         super().__init__(**kwargs)
         self._judge_names = judge_names
-        self._card_a = WarriorCard(side="a")
-        self._card_b = WarriorCard(side="b")
+        self._card_a = ModelCard(side="a")
+        self._card_b = ModelCard(side="b")
         self._prompt = PromptPanel("[dim]waiting for next round...[/dim]")
         self._resp_a = ResponsePanel(side="a")
         self._resp_b = ResponsePanel(side="b")
@@ -96,7 +96,7 @@ class FightScreen(Screen):
 
     def compose(self) -> ComposeResult:
         yield self._ticker
-        with Horizontal(id="warriors"):
+        with Horizontal(id="models"):
             yield self._card_a
             yield self._card_b
         with Vertical(id="prompt-area"):
@@ -110,9 +110,6 @@ class FightScreen(Screen):
         yield self._status
 
     # --- called by the App from the event loop ---
-
-    def set_ticker(self, text: str) -> None:
-        self._ticker.update(text)
 
     def set_standings(self, elo: dict[str, float], done: int, total: int) -> None:
         top = sorted(elo.items(), key=lambda kv: kv[1], reverse=True)[:5]
@@ -129,12 +126,12 @@ class FightScreen(Screen):
         starting_hp: int,
     ) -> None:
         self._orc_a, self._orc_b = orc_a, orc_b
-        self._card_a.set_warrior(
-            orc_name=orc_a, model_id=model_a, emblem=emblem_a,
+        self._card_a.set_model(
+            name=orc_a, model_id=model_a, emblem=emblem_a,
             max_hp=starting_hp, thinking=thinking_a,
         )
-        self._card_b.set_warrior(
-            orc_name=orc_b, model_id=model_b, emblem=emblem_b,
+        self._card_b.set_model(
+            name=orc_b, model_id=model_b, emblem=emblem_b,
             max_hp=starting_hp, thinking=thinking_b,
         )
         self._resp_a.reset()

@@ -48,7 +48,7 @@ just expand on what `uv sync` pulls in.
 ### Configure credentials
 
 Only needed for commands that call the real orq.ai gateway (`run`, `rejudge`,
-`refresh-models`: not `demo` or `list-warriors`):
+`refresh-models`: not `demo` or `list-models`):
 
 ```bash
 cp .env.example .env
@@ -97,7 +97,7 @@ for every command lives in [docs/cli.md](cli.md).
 | Command | What it does | Hits orq.ai? |
 |---|---|---|
 | `uv run orq-arena demo` | Replays `fixtures/demo_tournament.json` through the TUI | No, no network, no key |
-| `uv run orq-arena list-warriors` | Prints the roster from `orq_arena.yaml` (or `--config`) | No |
+| `uv run orq-arena list-models` | Prints the roster from `orq_arena.yaml` (or `--config`) | No |
 | `uv run orq-arena run` | Opens the roster picker over your live model catalog, then runs live in the TUI | Yes |
 | `uv run orq-arena run --config orq_arena.yaml` | Runs that YAML's roster as-is, TUI, no picker | Yes |
 | `uv run orq-arena run --config orq_arena.yaml --headless --yes` | Same live run, no TUI, matches run in parallel, no confirmation pause, the closest thing to a CI smoke run | Yes |
@@ -106,7 +106,7 @@ for every command lives in [docs/cli.md](cli.md).
 
 Note that `run` still shows the preflight confirmation prompt even with `--headless` unless you
 also pass `--yes`, pair both flags for a non-interactive invocation. For local iteration with no
-API key and no cost, `demo` and `list-warriors` are the two commands safe to run repeatedly;
+API key and no cost, `demo` and `list-models` are the two commands safe to run repeatedly;
 everything else needs `ORQ_API_KEY` in `.env` and spends real tokens.
 
 ---
@@ -199,7 +199,7 @@ builds a `BattleBrowserScreen` from real (or synthetic, if no fixture log is on 
   the top of most modules, `@dataclass` for lightweight internal data (`preflight.py`,
   `arena/battle.py`, `arena/damage.py`, `tournament/swiss.py`, `providers/models_list.py`,
   `data/prompts.py`), pydantic `BaseModel` for anything validated at a boundary, config, events,
-  schemas, roster (`config.py`, `events.py`, `data/schemas.py`, `orcs/roster.py`,
+  schemas, roster (`config.py`, `events.py`, `data/schemas.py`, `roster.py`,
   `analysis/postmortem.py`), and `async`/`await` through the tournament/battle/gateway path.
 - **Signed commits are required** by the repo's branch ruleset. See
   ["Making changes" in CONTRIBUTING.md](../CONTRIBUTING.md#making-changes) for the signing setup

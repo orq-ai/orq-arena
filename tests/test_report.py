@@ -121,13 +121,13 @@ def test_report_links_orq_dataset():
 
 
 def test_report_with_custom_display_names():
-    """Records store short model names; a roster with custom orc_names must
+    """Records store short model names; a roster with custom display names must
     still price, rank, and render (regression: KeyError / blank cost column)."""
     from orq_arena.tournament.driver import rebuild_from_log
 
     cfg = ArenaConfig.model_validate({
-        "warriors": [{"model_id": "prov/model-a", "orc_name": "Alpha"},
-                     {"model_id": "prov/model-b", "orc_name": "Beta"}],
+        "warriors": [{"model_id": "prov/model-a", "name": "Alpha"},
+                     {"model_id": "prov/model-b", "name": "Beta"}],
         "judges": ["prov/judge-1", "prov/judge-2"],
     })
     records = [_record("A"), _record("B"), _record("A")]

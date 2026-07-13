@@ -102,7 +102,7 @@ class RosterSelectScreen(Screen):
         super().__init__(**kwargs)
         self._cfg = cfg
         self._prompt_count = prompt_count
-        self._chosen: list[str] = [w.model_id for w in cfg.warriors]
+        self._chosen: list[str] = [w.model_id for w in cfg.candidates]
         self._all_models: list[ModelEntry] = []
         self._source = "loading"
         self._active_provider: str | None = None
@@ -145,7 +145,7 @@ class RosterSelectScreen(Screen):
         self.run_worker(self._load_models(), exclusive=True)
 
     async def _load_models(self) -> None:
-        fallback = [w.model_id for w in self._cfg.warriors]
+        fallback = [c.model_id for c in self._cfg.candidates]
         try:
             ml = await fetch_chat_models(self._cfg.gateway, fallback_ids=fallback)
         except Exception as exc:

@@ -29,8 +29,8 @@ class MatchStarted(BaseModel):
     type: Literal["match_started"] = "match_started"
     match_id: str
     round_name: str
-    warrior_a: str
-    warrior_b: str
+    model_a: str
+    model_b: str
 
 
 class TurnPrompt(BaseModel):
@@ -101,7 +101,7 @@ class TurnResolved(BaseModel):
 class MatchResolved(BaseModel):
     type: Literal["match_resolved"] = "match_resolved"
     match_id: str
-    winner: str  # orc_name ('' on a draw)
+    winner: str  # name ('' on a draw)
     loser: str
     by: Literal["ko", "round_cap", "draw"]
     final_hp_a: int
@@ -110,7 +110,7 @@ class MatchResolved(BaseModel):
 
 class TournamentEnded(BaseModel):
     type: Literal["tournament_ended"] = "tournament_ended"
-    champion: str  # orc_name (ELO leader)
+    champion: str  # name (ELO leader)
     elo: dict[str, float]
     battle_log_path: str
     # Statistical rollup for the leaderboard: elo_ci, jury (PairwiseReport

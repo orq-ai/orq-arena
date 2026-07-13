@@ -7,12 +7,12 @@ file format. The tool is configured by two layers:
 1. A `.env` file holding the single secret orq-arena needs (`ORQ_API_KEY`), loaded at CLI
    startup.
 2. A YAML file (`orq_arena.yaml` by default) describing match rules, the gateway client, the
-   warrior roster, and the judge panel, parsed and validated into an `ArenaConfig` Pydantic
+   candidate roster, and the judge panel, parsed and validated into an `ArenaConfig` Pydantic
    model.
 
 The source of truth for every key below is `src/orq_arena/config.py` (models `MatchRules`,
-`GatewayConfig`, `PreflightConfig`, `ArenaConfig`) and `src/orq_arena/orcs/roster.py`
-(`WarriorSpec`). All file paths in this document are relative to the project root.
+`GatewayConfig`, `PreflightConfig`, `ArenaConfig`) and `src/orq_arena/roster.py`
+(`CandidateSpec`). All file paths in this document are relative to the project root.
 
 ---
 
@@ -26,7 +26,7 @@ cp .env.example .env
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `ORQ_API_KEY` | Required for live runs |, | The only secret orq-arena needs. Every warrior, judge, analyzer, and preflight-probe call goes through the orq.ai router gateway with this one key. Read via `os.environ.get(cfg.api_key_env, "")` in `OrqGateway.__init__` (`src/orq_arena/providers/orq_gateway.py`); the gateway raises `RuntimeError("ORQ_API_KEY is not set. Export it before running orq-arena.")` at construction time if it is empty. Get one at [my.orq.ai](https://my.orq.ai) > workspace settings > API keys (per `.env.example`). |
+| `ORQ_API_KEY` | Required for live runs |, | The only secret orq-arena needs. Every candidate, judge, analyzer, and preflight-probe call goes through the orq.ai router gateway with this one key. Read via `os.environ.get(cfg.api_key_env, "")` in `OrqGateway.__init__` (`src/orq_arena/providers/orq_gateway.py`); the gateway raises `RuntimeError("ORQ_API_KEY is not set. Export it before running orq-arena.")` at construction time if it is empty. Get one at [my.orq.ai](https://my.orq.ai) > workspace settings > API keys (per `.env.example`). |
 
 Notes:
 
@@ -35,7 +35,7 @@ Notes:
   below). Changing `api_key_env` changes which environment variable orq-arena reads; it does not
   set a key.
 - `ORQ_API_KEY` is **not** required for `orq-arena demo` (replays a recorded fixture, no API
-  calls) or `orq-arena list-warriors` (prints the roster, never constructs a gateway).
+  calls) or `orq-arena list-models` (prints the roster, never constructs a gateway).
 
 ### `.env` loading
 
@@ -77,7 +77,7 @@ Behavior worth knowing:
 
 | File | Purpose |
 |---|---|
-| `orq_arena.yaml` | The default roster + rules, shipped at the project root. Loaded whenever `--config` is omitted or points here, `DEFAULT_CONFIG = "orq_arena.yaml"` in `src/orq_arena/cli.py`. Ships 8 warriors, uniform thinking-**OFF**, so the ELO compares models rather than vendor default reasoning settings. |
+| `orq_arena.yaml` | The default roster + rules, shipped at the project root. Loaded whenever `--config` is omitted or points here, `DEFAULT_CONFIG = "orq_arena.yaml"` in `src/orq_arena/cli.py`. Ships 8 candidates, uniform thinking-**OFF**, so the ELO compares models rather than vendor default reasoning settings. |
 | `configs/reasoning_arena.yaml` | Uniform thinking-**ON** counterpart of the default file, the "does thinking help?" benchmark. Not loaded automatically; run it explicitly with `--config configs/reasoning_arena.yaml`. |
 
 Any YAML path can be passed to `--config`; `load_config()` (`src/orq_arena/config.py`) reads it
@@ -89,9 +89,9 @@ the YAML, every value is literal.
 
 | Command | `--config` behavior |
 |---|---|
-| `orq-arena run` | Optional. If omitted, `orq_arena.yaml` is still loaded (for `judges`, `match`, `gateway`, etc.) but the interactive roster picker replaces `warriors` at runtime, see the [`warriors`](#warriors-the-roster) section. If given, the YAML roster is used as-is, the picker is skipped, and the run is headless by default (`--tui` opts into the live show). |
+| `orq-arena run` | Optional. If omitted, `orq_arena.yaml` is still loaded (for `judges`, `match`, `gateway`, etc.) but the interactive roster picker replaces `candidates` at runtime, see the [`candidates`](#candidates-the-roster) section. If given, the YAML roster is used as-is, the picker is skipped, and the run is headless by default (`--tui` opts into the live show). |
 | `orq-arena demo` | Defaults to `orq_arena.yaml`. Only used for its rules/roster labels, the fixture replay makes no API calls. |
-| `orq-arena list-warriors` | Defaults to `orq_arena.yaml`. Prints the configured roster. |
+| `orq-arena list-models` | Defaults to `orq_arena.yaml`. Prints the configured roster. |
 | `orq-arena rejudge` | Defaults to `orq_arena.yaml`. Supplies `gateway` and (unless `--criteria` overrides it) `criteria`. |
 | `orq-arena refresh-models` | Defaults to `orq_arena.yaml`. Only `gateway` is used, to re-fetch the workspace model catalog. |
 
@@ -99,7 +99,7 @@ the YAML, every value is literal.
 
 ## `orq_arena.yaml` field reference
 
-A minimal example, drawn from the real shipped file (some `warriors` entries and all-default
+A minimal example, drawn from the real shipped file (some `candidates` entries and all-default
 sections omitted for brevity, the code default is noted inline where a key isn't set in the
 shipped file):
 
@@ -115,7 +115,7 @@ match:
 gateway:
   base_url: https://api.orq.ai/v3/router
   api_key_env: ORQ_API_KEY
-  warrior_max_tokens: 2048
+  candidate_max_tokens: 2048
   judge_max_tokens: 2048
   stream_read_timeout_s: 1200
   judge_timeout_ms: 90000
@@ -123,12 +123,12 @@ gateway:
 # preflight, headless_concurrency, swiss_rounds, analyzer_model not set
 # in the shipped file - all four take their code defaults (see tables below).
 
-warriors:
+candidates:
   - model_id: anthropic/claude-opus-4-8
   - model_id: openai/gpt-5.4
   - model_id: google/gemini-3.1-pro-preview
     reasoning: { thinking: { type: disabled } }
-  # ...5 more warriors in the shipped orq_arena.yaml
+  # ...5 more candidates in the shipped orq_arena.yaml
 
 judges:
   - anthropic/claude-haiku-4-5-20251001
@@ -149,7 +149,7 @@ min_successful_judges: 2
 
 | Key | Type | Default | Effect |
 |---|---|---|---|
-| `starting_hp` | `int` | `100` | HP each warrior starts a match with. |
+| `starting_hp` | `int` | `100` | HP each candidate starts a match with. |
 | `max_rounds` | `int` | `5` | Prompt cap per match. The actual number of rounds run is `min(max_rounds, len(prompts))` (`preflight.call_counts`), a smaller prompts file also shortens matches. |
 | `damage_unanimous` | `int` | `30` | HP dealt to the loser when a round's decisive votes agree unanimously. "Unanimous" requires **at least 2 decisive votes** (`A`/`B`/`tie`) that all agree with the panel's reconciled winner (`compute_damage`, `src/orq_arena/arena/damage.py`), a single surviving vote can never trigger this tier, even if evaluatorq reports it as the consensus. |
 | `damage_majority` | `int` | `15` | HP dealt to the loser on a decisive but non-unanimous (split) verdict. |
@@ -164,9 +164,9 @@ whether HP already reached 0, the rating never depends on when the HP bar happen
 
 | Key | Type | Default | Effect |
 |---|---|---|---|
-| `base_url` | `str` | `"https://api.orq.ai/v3/router"` | Base URL for the `AsyncOpenAI` client (`OrqGateway.__init__`, `src/orq_arena/providers/orq_gateway.py`). One OpenAI-compatible endpoint fronts every provider, warriors, judges, the analyzer, and the preflight probe all share it. |
+| `base_url` | `str` | `"https://api.orq.ai/v3/router"` | Base URL for the `AsyncOpenAI` client (`OrqGateway.__init__`, `src/orq_arena/providers/orq_gateway.py`). One OpenAI-compatible endpoint fronts every provider, models, judges, the analyzer, and the preflight probe all share it. |
 | `api_key_env` | `str` | `"ORQ_API_KEY"` | Name of the environment variable read for the API key. Changing this changes which env var orq-arena looks for; see [Environment Variables](#environment-variables) above. |
-| `warrior_max_tokens` | `int` | `2048` | Default per-response output cap for warrior completions (`stream_completion`'s `max_tokens=max_tokens or self._cfg.warrior_max_tokens`). Too low truncates long or creative answers, a cut response is flagged `✂ truncated` in the TUI response panel (`src/orq_arena/tui/widgets/response_panel.py`) and judges tend to penalize it. Overridden per-warrior by `warriors[].max_tokens`. |
+| `candidate_max_tokens` | `int` | `2048` | Default per-response output cap for candidate completions (`stream_completion`'s `max_tokens=max_tokens or self._cfg.candidate_max_tokens`). Too low truncates long or creative answers, a cut response is flagged `✂ truncated` in the TUI response panel (`src/orq_arena/tui/widgets/response_panel.py`) and judges tend to penalize it. Overridden per-candidate by `candidates[].max_tokens`. |
 | `judge_max_tokens` | `int` | `2048` | Output cap for judge calls, passed to evaluatorq's `llm_jury_pairwise(max_tokens=...)`. A **cap, not a target**: it costs nothing extra on frugal judges. Thinking-by-default judges (e.g. `gemini-2.5-flash`) burn reasoning tokens before writing a verdict; a low cap starves the verdict entirely and fails the vote (the codebase's own regression case: `512` produced a `LengthFinishReasonError` on every one of that judge's votes). `2048` leaves headroom without materially raising cost on the cheap default panel. |
 | `stream_read_timeout_s` | `int` | `1200` | Max **silence** between stream chunks, in seconds, before the client treats the connection as dead (`httpx.Timeout(read=float(stream_read_timeout_s), ...)` in `OrqGateway.__init__`). This is a read-gap timeout, not a total-duration cap, a thinking model that pauses for minutes before its first token is fine as long as chunks keep arriving within this gap. A stream that goes silent longer than this is retried once, then the round is voided (logged, shown, excluded from scoring). `1200s` = 20 minutes, deliberately generous. |
 | `judge_timeout_ms` | `int` | `90000` | Per-judge-call timeout in milliseconds, passed to evaluatorq's `llm_jury_pairwise(timeout_ms=...)` (`Battle.__init__`, `src/orq_arena/arena/battle.py`). `90000` (90s) is also evaluatorq's own library default for this parameter. |
@@ -174,7 +174,7 @@ whether HP already reached 0, the rating never depends on when the HP bar happen
 Not configurable via YAML: `connect=10.0`, `write=60.0`, and `pool=60.0` second timeouts are
 hardcoded in `OrqGateway.__init__` alongside `stream_read_timeout_s`, only the read-gap timeout
 is exposed as a config key. The preflight probe call (see below) also uses a hardcoded
-`max_tokens=1000`, independent of `warrior_max_tokens`/`judge_max_tokens`.
+`max_tokens=1000`, independent of `candidate_max_tokens`/`judge_max_tokens`.
 
 #### Bring your own endpoint
 
@@ -184,9 +184,9 @@ to whatever variable holds that endpoint's key.
 Two features do depend on the orq.ai router and degrade cleanly without it:
 
 - **The roster picker and `refresh-models`** read the workspace model catalog from the router.
-  On another endpoint, declare `warriors` in the YAML and run with `--config` so the picker is
+  On another endpoint, declare `candidates` in the YAML and run with `--config` so the picker is
   skipped.
-- **Reasoning controls** (`warriors[].reasoning`) are forwarded verbatim as `extra_body`; the
+- **Reasoning controls** (`candidates[].reasoning`) are forwarded verbatim as `extra_body`; the
   router normalizes them per provider. Other endpoints receive them as-is and may ignore or
   reject unknown fields, so on a non-router endpoint only include fields your server accepts.
 
@@ -197,32 +197,34 @@ pool a one-command run. It is the recommended path, not the only one.
 
 | Key | Type | Default | Effect |
 |---|---|---|---|
-| `thinking_probe` | `bool` | `True` | Before a live, non-picker run (`orq-arena run --config ...`), sends one tiny probe call (`"Reply with the single word: ok"`) per warrior to detect vendor-default thinking that contradicts its `reasoning` config (`thinking_probe`, `src/orq_arena/preflight.py`). Surfaces as `🧠 … thinks despite config` in the CLI preflight output and footnotes the leaderboard for that warrior. Adds one extra call per warrior (`probe_calls` in `preflight.CallCounts`). Set `false` to skip those extra calls. |
+| `thinking_probe` | `bool` | `True` | Before a live, non-picker run (`orq-arena run --config ...`), sends one tiny probe call (`"Reply with the single word: ok"`) per candidate to detect vendor-default thinking that contradicts its `reasoning` config (`thinking_probe`, `src/orq_arena/preflight.py`). Surfaces as `🧠 … thinks despite config` in the CLI preflight output and footnotes the leaderboard for that candidate. Adds one extra call per candidate (`probe_calls` in `preflight.CallCounts`). Set `false` to skip those extra calls. |
 
 ### Top-level run settings (`ArenaConfig`)
 
 | Key | Type | Default | Effect |
 |---|---|---|---|
 | `headless_concurrency` | `int` | `4` | Matches run in parallel under an `asyncio.Semaphore(max(1, headless_concurrency))`, for `orq-arena run --headless` only (`run_headless` → `run_tournament(concurrency=...)`, `src/orq_arena/headless.py`). The TUI always passes `concurrency=1` internally so the live show stays one fight at a time, this key has no effect on non-headless runs. |
-| `swiss_rounds` | `int` | `6` | Number of **Swiss pairing rounds**, used only when the roster exceeds 8 warriors (`use_swiss = len(cfg.warriors) > 8`, `src/orq_arena/tournament/driver.py`). This is distinct from `match.max_rounds` (prompts per match), `swiss_rounds` is how many times the whole pool gets re-paired by score group. Pools of 8 or fewer warriors ignore this key and run a full round-robin instead. |
+| `swiss_rounds` | `int` | `6` | Number of **Swiss pairing rounds**, used only when the roster exceeds 8 candidates (`use_swiss = len(cfg.candidates) > 8`, `src/orq_arena/tournament/driver.py`). This is distinct from `match.max_rounds` (prompts per match), `swiss_rounds` is how many times the whole pool gets re-paired by score group. Pools of 8 or fewer candidates ignore this key and run a full round-robin instead. |
 | `analyzer_model` | `str` | `"openai/gpt-5.4-mini"` | Router model id used to generate the per-model post-mortem ("coach notes": strengths, weaknesses, judge patterns) when `M` is pressed on the final leaderboard (`src/orq_arena/tui/screens/postmortem.py` → `src/orq_arena/analysis/postmortem.py`). Output is cached in `analysis.jsonl` next to the battle log, so re-opening the post-mortem screen doesn't re-spend tokens. |
 
-### `warriors` (the roster)
+### `candidates` (the roster)
 
-`warriors: list[WarriorSpec]`: required at the top level, and the parsed list must contain at
-least 2 entries (`ArenaConfig._validate`: `"Need at least 2 warriors, got {n}"`). This holds
+`candidates: list[CandidateSpec]`: required at the top level, and the parsed list must contain at
+least 2 entries (`ArenaConfig._validate`: `"Need at least 2 candidates, got {n}"`). Configs from
+before the rename keep working: `warriors:` is accepted as a deprecated alias for `candidates:`,
+`warrior_max_tokens` for `gateway.candidate_max_tokens`, and `orc_name` for a candidate's `name`. This holds
 true even for `orq-arena run` with **no** `--config`: `orq_arena.yaml` is still loaded first (for
-`judges`, `match`, `gateway`, etc.) before the interactive picker overwrites `cfg.warriors` at
-runtime via `assign_warriors` (`src/orq_arena/tui/app.py`), so the shipped file's `warriors` list must always
+`judges`, `match`, `gateway`, etc.) before the interactive picker overwrites `cfg.candidates` at
+runtime via `assign_candidates` (`src/orq_arena/tui/app.py`), so the shipped file's `candidates` list must always
 validate on its own.
 
 | Key | Type | Default | Effect |
 |---|---|---|---|
-| `model_id` | `str` |, (required) | orq.ai router gateway model slug, e.g. `anthropic/claude-opus-4-8`. The only required field per warrior entry. |
-| `orc_name` | `str` | `""` → falls back to `short_model` | Display name used on the leaderboard, TUI cards, and arena events (`MatchStarted`/`MatchResolved`). Defaults to `model_id` with the provider prefix stripped (`"anthropic/claude-opus-4-8"` → `"claude-opus-4-8"`) and is **never auto-generated beyond that**: a custom name is allowed but not invented (`src/orq_arena/orcs/roster.py` docstring: "Display name defaults to the model's short name... A custom `orc_name` is still allowed but never generated."). Note: `battles.jsonl` records (`BattleRecord.model_a`/`model_b`) always store `short_model`, not `orc_name`; `orc_name` is presentation-only. |
-| `emblem` | `str` | `""` | Optional glyph/emoji shown before the orc name on the TUI warrior card (`src/orq_arena/tui/widgets/warrior_card.py`). Purely cosmetic. |
+| `model_id` | `str` |, (required) | orq.ai router gateway model slug, e.g. `anthropic/claude-opus-4-8`. The only required field per candidate entry. |
+| `name` | `str` | `""` → falls back to `short_model` | Display name used on the leaderboard, TUI cards, and arena events (`MatchStarted`/`MatchResolved`). Defaults to `model_id` with the provider prefix stripped (`"anthropic/claude-opus-4-8"` → `"claude-opus-4-8"`) and is **never auto-generated beyond that**: a custom name is allowed but not invented (`src/orq_arena/roster.py` docstring: "Display name defaults to the model's short name... A custom `name` is still allowed but never generated."). Note: `battles.jsonl` records (`BattleRecord.model_a`/`model_b`) always store `short_model`, not `name`; `name` is presentation-only. |
+| `emblem` | `str` | `""` | Optional glyph/emoji shown before the orc name on the TUI candidate card (`src/orq_arena/tui/widgets/model_card.py`). Purely cosmetic. |
 | `reasoning` | `dict \| null` | `None` | Raw router reasoning-control object, forwarded verbatim as `extra_body` on the completion request (`stream_completion`, `src/orq_arena/providers/orq_gateway.py`). Not interpreted beyond the `budget_tokens` cross-check below, the router normalizes it per provider. |
-| `max_tokens` | `int \| null` | `None` → falls back to `gateway.warrior_max_tokens` | Per-warrior override of the response output cap. |
+| `max_tokens` | `int \| null` | `None` → falls back to `gateway.candidate_max_tokens` | Per-candidate override of the response output cap. |
 
 **Reasoning passthrough recipes** (forwarded untouched; the router normalizes per provider,
 comment block in `orq_arena.yaml`):
@@ -241,13 +243,13 @@ reasoning: { thinking: { type: disabled } }
 ```
 
 Cross-field validation: if `reasoning.thinking.budget_tokens` is set, it must be strictly less
-than the warrior's effective cap (`max_tokens` if set, else `gateway.warrior_max_tokens`), a
+than the candidate's effective cap (`max_tokens` if set, else `gateway.candidate_max_tokens`), a
 config where the thinking budget meets or exceeds the output cap fails to load with
-`ValueError: {orc_name}: thinking budget_tokens ({budget}) must be < max_tokens ({cap})`
+`ValueError: {name}: thinking budget_tokens ({budget}) must be < max_tokens ({cap})`
 (`ArenaConfig._validate`, `src/orq_arena/config.py`).
 
 The shipped `orq_arena.yaml` also documents which models it deliberately excludes from the
-default pool because the router can't disable their thinking (see the comment below the `warriors` list
+default pool because the router can't disable their thinking (see the comment below the `candidates` list
 in that file), those belong in `configs/reasoning_arena.yaml` instead.
 
 ### `judges`, `replacement_judges`, `criteria`, `min_successful_judges`
@@ -263,7 +265,7 @@ in that file), those belong in `configs/reasoning_arena.yaml` instead.
 `model_id` is filtered out of that match's panel (`panel = [m for m in cfg.judges if m not in
 contestants]`, `Battle.__init__`). If that empties the panel entirely, `Battle.__init__` raises
 `ValueError("Every judge is a contestant in ..., add a neutral judge to the config.")`: a
-small `judges` list can strand a specific pairing if both warriors in that match are also
+small `judges` list can strand a specific pairing if both models in that match are also
 configured as judges elsewhere in the roster.
 
 ---
@@ -315,16 +317,16 @@ is not read by `load_prompts()` today and has no effect on the run.
 
 Settings that cause a hard failure (config load or first live call) if absent or invalid:
 
-- `warriors`: required top-level key, must parse to at least 2 `WarriorSpec` entries, and each
+- `candidates`: required top-level key, must parse to at least 2 `CandidateSpec` entries, and each
   entry requires `model_id`. Missing/short lists fail `ArenaConfig` validation immediately,
   independent of whether the interactive picker will replace the roster afterward.
 - `judges`: required top-level key, must be a non-empty list.
-- Any `warriors[].reasoning.thinking.budget_tokens` must be strictly less than that warrior's
-  effective `max_tokens` (own override or `gateway.warrior_max_tokens`), or config loading fails.
+- Any `candidates[].reasoning.thinking.budget_tokens` must be strictly less than that candidate's
+  effective `max_tokens` (own override or `gateway.candidate_max_tokens`), or config loading fails.
 - `ORQ_API_KEY` (or whatever `gateway.api_key_env` names) must be set in the real environment,
   not required to *load* the YAML, but the gateway raises `RuntimeError` the moment any live
   call is attempted (`orq-arena run`, `rejudge`, `refresh-models`). Not needed for `orq-arena
-  demo` or `list-warriors`.
+  demo` or `list-models`.
 - At least one configured judge must not be a contestant in a given match, or that match raises
   `ValueError` at battle start.
 
@@ -340,7 +342,7 @@ Everything else is a Pydantic default and safe to omit from the YAML entirely:
 | `match.verdict_hold_s` | `2.5` |
 | `gateway.base_url` | `https://api.orq.ai/v3/router` |
 | `gateway.api_key_env` | `ORQ_API_KEY` |
-| `gateway.warrior_max_tokens` | `2048` |
+| `gateway.candidate_max_tokens` | `2048` |
 | `gateway.judge_max_tokens` | `2048` |
 | `gateway.stream_read_timeout_s` | `1200` |
 | `gateway.judge_timeout_ms` | `90000` |
@@ -351,10 +353,10 @@ Everything else is a Pydantic default and safe to omit from the YAML entirely:
 | `criteria` | `"Accuracy and correctness, helpfulness and completeness, clarity, and relevance to the prompt."` |
 | `min_successful_judges` | `2` |
 | `analyzer_model` | `openai/gpt-5.4-mini` |
-| `warriors[].orc_name` | short model id |
-| `warriors[].emblem` | `""` |
-| `warriors[].reasoning` | `null` |
-| `warriors[].max_tokens` | `null` (→ `gateway.warrior_max_tokens`) |
+| `candidates[].name` | short model id |
+| `candidates[].emblem` | `""` |
+| `candidates[].reasoning` | `null` |
+| `candidates[].max_tokens` | `null` (→ `gateway.candidate_max_tokens`) |
 
 ---
 
@@ -370,7 +372,7 @@ document. The equivalent axes for changing behavior between runs are:
   `orq-arena run --config configs/reasoning_arena.yaml`. `load_config()` accepts any path.
 - **Ad hoc pool without editing YAML:** run `orq-arena run` with no `--config` at all, the
   interactive roster picker opens over your workspace-enabled model catalog and replaces
-  `warriors` at runtime; `judges`, `match`, and `gateway` still come from `orq_arena.yaml`.
+  `candidates` at runtime; `judges`, `match`, and `gateway` still come from `orq_arena.yaml`.
 - **Different jury on an already-recorded run, no regeneration:** `orq-arena rejudge
   <log_path> --judge <id> [--judge <id> ...] [--criteria "..."]` re-scores the responses
   already in `battles.jsonl` with a new panel and/or criteria, without touching the YAML file.

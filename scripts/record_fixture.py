@@ -19,8 +19,8 @@ from orq_arena.tournament.driver import run_tournament
 CFG = ArenaConfig.model_validate(
     {
         "match": {"starting_hp": 100, "max_rounds": 2},
-        "gateway": {"warrior_max_tokens": 400},
-        "warriors": [
+        "gateway": {"candidate_max_tokens": 400},
+        "candidates": [
             {"model_id": "openai/gpt-5.4-mini"},
             {"model_id": "google/gemini-2.5-flash",
              "reasoning": {"thinking": {"type": "disabled"}}},

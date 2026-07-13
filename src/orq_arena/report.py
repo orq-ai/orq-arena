@@ -125,9 +125,9 @@ def _ci_bar(lo: float, hi: float, point: float, floor: float, span: float) -> st
 
 
 def _cost_lines(records, manifest, prices, alias=None):
-    """(warrior_usd, jury_usd_estimate, unpriced_names) or None without prices.
+    """(models_usd, jury_usd_estimate, unpriced_names) or None without prices.
 
-    Warrior spend is exact (per-record model attribution); jury spend is an
+    Model spend is exact (per-record attribution); jury spend is an
     estimate at the panel's mean catalog rate, because records store the
     panel's token total, not per-judge splits. ``alias`` maps the short model
     names stored in records to the display names the manifest is keyed by.
@@ -137,9 +137,9 @@ def _cost_lines(records, manifest, prices, alias=None):
     alias = alias or {}
     id_by_name = {
         n: (w.get("model") if isinstance(w, dict) else "")
-        for n, w in (manifest.get("warriors") or {}).items()
+        for n, w in (manifest.get("candidates") or manifest.get("warriors") or {}).items()
     }
-    warriors_usd, unpriced = 0.0, set()
+    models_usd, unpriced = 0.0, set()
     j_in = j_out = 0
     for r in records:
         if r.error is not None:
@@ -155,7 +155,7 @@ def _cost_lines(records, manifest, prices, alias=None):
             if pr is None:
                 unpriced.add(name)
             else:
-                warriors_usd += tin * pr[0] / 1e6 + tout * pr[1] / 1e6
+                models_usd += tin * pr[0] / 1e6 + tout * pr[1] / 1e6
     panel = [prices[j] for j in manifest.get("judges", []) if j in prices]
     unpriced.update(j for j in manifest.get("judges", []) if j not in prices)
     jury_usd = None
@@ -163,7 +163,7 @@ def _cost_lines(records, manifest, prices, alias=None):
         mean_in = sum(x[0] for x in panel) / len(panel)
         mean_out = sum(x[1] for x in panel) / len(panel)
         jury_usd = j_in * mean_in / 1e6 + j_out * mean_out / 1e6
-    return warriors_usd, jury_usd, sorted(unpriced)
+    return models_usd, jury_usd, sorted(unpriced)
 
 
 
@@ -181,7 +181,7 @@ def _per_model_cost(records, manifest, prices, alias=None) -> dict[str, float]:
     alias = alias or {}
     id_by_name = {
         n: (w.get("model") if isinstance(w, dict) else "")
-        for n, w in (manifest.get("warriors") or {}).items()
+        for n, w in (manifest.get("candidates") or manifest.get("warriors") or {}).items()
     }
     out: dict[str, float] = {}
     for r in records:
@@ -540,7 +540,8 @@ def build_report_html(
 
     # Rounds and category accounting.
     tok = report.get("tokens") or {}
-    w_in, w_out = tok.get("warriors_in", 0), tok.get("warriors_out", 0)
+    w_in = tok.get("models_in", tok.get("warriors_in", 0))
+    w_out = tok.get("models_out", tok.get("warriors_out", 0))
     j_in, j_out = tok.get("judges_in", 0), tok.get("judges_out", 0)
     total_tok = w_in + w_out + j_in + j_out
     jury_share = f"{(j_in + j_out) / total_tok:.0%}" if total_tok else "n/a"
@@ -548,8 +549,8 @@ def build_report_html(
     panel = ", ".join(str(j).split("/")[-1] for j in manifest.get("judges", cfg.judges))
 
     # Records store short model names; elo/manifest/report are keyed by display
-    # name (orc_name). Identical unless the roster sets custom names.
-    alias = report.get("by_model_names") or {w.short_model: w.orc_name for w in cfg.warriors}
+    # name (name). Identical unless the roster sets custom names.
+    alias = report.get("by_model_names") or {w.short_model: w.name for w in cfg.candidates}
     stats_all = _speed_stats(records, alias)
     speed = _speed_svg(stats_all)
     dur_by = {n: d for n, _t, _f, _o, d in stats_all}

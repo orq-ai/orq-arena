@@ -36,7 +36,7 @@ from ..events import (
     TurnPrompt,
     TurnResolved,
 )
-from ..orcs.roster import WarriorSpec, assign_warriors
+from ..roster import CandidateSpec, assign_candidates
 from ..tournament.driver import run_tournament
 from .screens.cta_modal import CTAModalScreen
 from .screens.fight import FightScreen
@@ -83,7 +83,7 @@ class ArenaApp(App):
         self._events: asyncio.Queue[ArenaEvent] = asyncio.Queue()
         self._engine_task: asyncio.Task | None = None
         self._dispatcher_task: asyncio.Task | None = None
-        self._by_name = {w.orc_name: w for w in cfg.warriors}
+        self._by_name = {w.name: w for w in cfg.candidates}
         self._fight_screen: FightScreen | None = None
 
     # ----- lifecycle -----
@@ -101,8 +101,8 @@ class ArenaApp(App):
     def on_roster_select_screen_roster_selected(
         self, message: RosterSelectScreen.RosterSelected
     ) -> None:
-        self.cfg.warriors = assign_warriors(message.model_ids, self.cfg.warriors)
-        self._by_name = {w.orc_name: w for w in self.cfg.warriors}
+        self.cfg.candidates = assign_candidates(message.model_ids, self.cfg.candidates)
+        self._by_name = {w.name: w for w in self.cfg.candidates}
         self.pop_screen()
         self.run_worker(self._probe_then_begin(), exclusive=True)
 
@@ -118,7 +118,7 @@ class ArenaApp(App):
         from ..preflight import call_counts, cost_ceiling, judge_family_overlaps
         from ..providers.models_list import fetch_price_map
 
-        overlap = judge_family_overlaps(list(self.cfg.judges), self.cfg.warriors)
+        overlap = judge_family_overlaps(list(self.cfg.judges), self.cfg.candidates)
         if overlap:
             self.notify(
                 f"⚖ judge/contestant family overlap: {', '.join(overlap)}. "
@@ -137,7 +137,7 @@ class ArenaApp(App):
         if ceiling and ceiling.total_usd > 0:
             self._preflight["cost_ceiling"] = ceiling.__dict__
             self.notify(
-                f"{counts.warrior_streams} streams + {counts.judge_calls} judge "
+                f"{counts.model_streams} streams + {counts.judge_calls} judge "
                 f"calls; spend ceiling ≈ ${ceiling.total_usd:.2f} (caps fully hit)",
                 timeout=8,
             )
@@ -227,11 +227,11 @@ class ArenaApp(App):
             # Fall back to a bare spec so a name the roster doesn't know
             # (e.g. a fixture recorded with another pool) still renders
             # instead of silently blanking the cards.
-            w_a = self._by_name.get(ev.warrior_a) or WarriorSpec(model_id=ev.warrior_a)
-            w_b = self._by_name.get(ev.warrior_b) or WarriorSpec(model_id=ev.warrior_b)
+            w_a = self._by_name.get(ev.model_a) or CandidateSpec(model_id=ev.model_a)
+            w_b = self._by_name.get(ev.model_b) or CandidateSpec(model_id=ev.model_b)
             fs.start_match(
-                w_a.orc_name, w_a.model_id, w_a.emblem, w_a.thinking_enabled,
-                w_b.orc_name, w_b.model_id, w_b.emblem, w_b.thinking_enabled,
+                w_a.name, w_a.model_id, w_a.emblem, w_a.thinking_enabled,
+                w_b.name, w_b.model_id, w_b.emblem, w_b.thinking_enabled,
                 self.cfg.match.starting_hp,
             )
         elif isinstance(ev, TurnPrompt):

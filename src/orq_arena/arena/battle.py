@@ -36,15 +36,15 @@ from ..events import (
     TurnPrompt,
     TurnResolved,
 )
-from ..orcs.roster import WarriorSpec
+from ..roster import CandidateSpec
 from ..providers.orq_gateway import OrqGateway
 from .damage import compute_damage
 
 
 @dataclass
 class MatchResult:
-    winner: WarriorSpec
-    loser: WarriorSpec
+    winner: CandidateSpec
+    loser: CandidateSpec
     by: str  # 'ko' | 'round_cap'
     final_hp_a: int
     final_hp_b: int
@@ -67,14 +67,14 @@ def _prompt_hash(text: str) -> str:
 async def _generate_side(
     *,
     gateway: OrqGateway,
-    warrior: WarriorSpec,
+    candidate: CandidateSpec,
     prompt: str,
     default_max_tokens: int,
     events: asyncio.Queue[ArenaEvent],
     match_id: str,
     side: str,  # 'a' | 'b'
 ) -> SideResult:
-    """Stream one warrior's response; one silent-ish retry, then error out."""
+    """Stream one model's response; one silent-ish retry, then error out."""
     last_error = ""
     for attempt in (1, 2):
         chunks: list[str] = []
@@ -83,10 +83,10 @@ async def _generate_side(
         ttft_ms = 0
         try:
             async for kind, piece in gateway.stream_completion(
-                model=warrior.model_id,
+                model=candidate.model_id,
                 prompt=prompt,
-                max_tokens=warrior.max_tokens or default_max_tokens,
-                extra_body=warrior.reasoning,
+                max_tokens=candidate.max_tokens or default_max_tokens,
+                extra_body=candidate.reasoning,
                 usage_out=usage,
             ):
                 if kind == "think":
@@ -142,8 +142,8 @@ class Battle:
         *,
         cfg: ArenaConfig,
         gateway: OrqGateway,
-        warrior_a: WarriorSpec,
-        warrior_b: WarriorSpec,
+        candidate_a: CandidateSpec,
+        candidate_b: CandidateSpec,
         prompts: Iterable[PromptItem],
         match_id: str,
         round_name: str,
@@ -152,20 +152,20 @@ class Battle:
     ) -> None:
         self.cfg = cfg
         self.gateway = gateway
-        self.a = warrior_a
-        self.b = warrior_b
+        self.a = candidate_a
+        self.b = candidate_b
         self.prompts = list(prompts)
         self.match_id = match_id
         self.round_name = round_name
         self.tournament_id = tournament_id
         self.events = events
 
-        contestants = {warrior_a.model_id, warrior_b.model_id}
+        contestants = {candidate_a.model_id, candidate_b.model_id}
         panel = [m for m in cfg.judges if m not in contestants]
         if not panel:
             raise ValueError(
-                f"Every judge is a contestant in {warrior_a.orc_name} vs "
-                f"{warrior_b.orc_name}, add a neutral judge to the config."
+                f"Every judge is a contestant in {candidate_a.name} vs "
+                f"{candidate_b.name}, add a neutral judge to the config."
             )
         replacements = [m for m in cfg.replacement_judges if m not in contestants]
         self._jury = llm_jury_pairwise(
@@ -212,8 +212,8 @@ class Battle:
             MatchStarted(
                 match_id=self.match_id,
                 round_name=self.round_name,
-                warrior_a=self.a.orc_name,
-                warrior_b=self.b.orc_name,
+                model_a=self.a.name,
+                model_b=self.b.name,
             )
         )
 
@@ -234,19 +234,19 @@ class Battle:
 
             res_a, res_b = await asyncio.gather(
                 _generate_side(
-                    gateway=self.gateway, warrior=self.a, prompt=prompt,
-                    default_max_tokens=self.cfg.gateway.warrior_max_tokens,
+                    gateway=self.gateway, candidate=self.a, prompt=prompt,
+                    default_max_tokens=self.cfg.gateway.candidate_max_tokens,
                     events=self.events, match_id=self.match_id, side="a",
                 ),
                 _generate_side(
-                    gateway=self.gateway, warrior=self.b, prompt=prompt,
-                    default_max_tokens=self.cfg.gateway.warrior_max_tokens,
+                    gateway=self.gateway, candidate=self.b, prompt=prompt,
+                    default_max_tokens=self.cfg.gateway.candidate_max_tokens,
                     events=self.events, match_id=self.match_id, side="b",
                 ),
             )
 
             if res_a.error or res_b.error:
-                failed = self.a.orc_name if res_a.error else self.b.orc_name
+                failed = self.a.name if res_a.error else self.b.name
                 reason = f"{failed}: stream failed after retry, {res_a.error or res_b.error}"
                 battles.append(await self._void_round(
                     round_number=round_number, item=item, reason=reason,
@@ -357,8 +357,8 @@ class Battle:
         await self.events.put(
             MatchResolved(
                 match_id=self.match_id,
-                winner="" if by == "draw" else winner.orc_name,
-                loser="" if by == "draw" else loser.orc_name,
+                winner="" if by == "draw" else winner.name,
+                loser="" if by == "draw" else loser.name,
                 by=by,
                 final_hp_a=hp_a,
                 final_hp_b=hp_b,

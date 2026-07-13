@@ -65,7 +65,7 @@ class LeaderboardScreen(Screen):
                 )
             if r.get("mixed_pool"):
                 yield Static(
-                    "⚠ mixed pool: thinking-enabled (🧠) and disabled warriors share "
+                    "⚠ mixed pool: thinking-enabled (🧠) and disabled models share "
                     "this ranking, cost/latency differ by design",
                     classes="warn",
                 )
@@ -89,14 +89,13 @@ class LeaderboardScreen(Screen):
 
             tok = r.get("tokens") or {}
             if tok:
-                total_in = tok["warriors_in"] + tok["judges_in"]
-                total_out = tok["warriors_out"] + tok["judges_out"]
-                jury_share = (
-                    (tok["judges_in"] + tok["judges_out"]) / max(1, total_in + total_out)
-                )
+                wi = tok.get("models_in", tok.get("warriors_in", 0))
+                wo = tok.get("models_out", tok.get("warriors_out", 0))
+                ji, jo = tok.get("judges_in", 0), tok.get("judges_out", 0)
+                jury_share = (ji + jo) / max(1, wi + wo + ji + jo)
                 yield Static(
-                    f"tokens, warriors {tok['warriors_in']:,} in / {tok['warriors_out']:,} out"
-                    f"   ·   jury {tok['judges_in']:,} in / {tok['judges_out']:,} out"
+                    f"tokens, models {wi:,} in / {wo:,} out"
+                    f"   ·   jury {ji:,} in / {jo:,} out"
                     f"   ({jury_share:.0%} of all tokens went to judging)",
                     classes="section",
                 )

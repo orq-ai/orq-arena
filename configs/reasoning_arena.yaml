@@ -13,12 +13,12 @@ gateway:
   base_url: https://api.orq.ai/v3/router
   api_key_env: ORQ_API_KEY
   # Thinking eats output budget on some providers; give answers headroom.
-  warrior_max_tokens: 16000
+  candidate_max_tokens: 16000
   judge_max_tokens: 2048
   stream_read_timeout_s: 1200
   judge_timeout_ms: 90000
 
-warriors:
+candidates:
   - model_id: anthropic/claude-opus-4-8
     reasoning: { thinking: { type: enabled, budget_tokens: 4096 } }
   - model_id: anthropic/claude-sonnet-4-6
