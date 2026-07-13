@@ -57,6 +57,16 @@ h2 { font-size: 17px; margin: 40px 0 10px; padding-bottom: 6px; border-bottom: 1
 .badge b { font-weight: 600; }
 .badge.good { border-color: #b5cba3; background: #eef4e6; color: var(--good); }
 .badge.warn { border-color: #e0c98d; background: #f8efd9; color: var(--warn); }
+.podium { display: flex; gap: 12px; margin: 18px 0 6px; flex-wrap: wrap; }
+.pod { flex: 1; min-width: 180px; background: var(--card); border: 1px solid var(--line);
+       border-radius: 10px; padding: 12px 14px; text-align: center; }
+.pod .medal { font-size: 20px; } .pod .pname { font-weight: 700; font-size: 14px; margin: 2px 0; }
+.pod .pscore { font-size: 26px; font-weight: 700; color: var(--teal-soft);
+               font-variant-numeric: tabular-nums; }
+.pod .psub { font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
+.pod .pchip { display: inline-block; font-family: var(--mono); font-size: 10.5px;
+              border: 1px solid var(--line); border-radius: 12px; padding: 0 8px;
+              margin: 4px 2px 0; color: var(--muted); }
 table { border-collapse: collapse; width: 100%; font-size: 13.5px;
         font-variant-numeric: tabular-nums; }
 th { text-align: left; font-family: var(--mono); font-size: 10.5px; text-transform: uppercase;
@@ -173,7 +183,7 @@ def _fmt_usd(v: float) -> str:
     return f"${v:.2f}" if v >= 0.1 else f"${v:.3f}"
 
 
-def _value_map_svg(points, champion: str) -> str:
+def _value_map_svg(points, champion: str, size_label: str = "average response length") -> str:
     """Win rate vs cost (log x), dashed best-value frontier, size = avg out tokens."""
     import math
 
@@ -238,14 +248,17 @@ def _value_map_svg(points, champion: str) -> str:
 </svg></div>
 {key}
 <p class="note">Dashed line: the best-value frontier (&#9733; in the key; no cheaper model wins
-more often). Dot size is average response length; the champion is magenta; hover any dot for
+more often). Dot size is {size_label}; the champion is magenta; hover any dot for
 exact figures. Win rate counts rated rounds only.</p>
 """
 
 
 
-def _speed_stats(records) -> list[tuple[str, float, float, float]]:
-    """Per model: (avg tok/s where duration known, avg ttft s, avg out tokens)."""
+def _speed_stats(records) -> list[tuple[str, float, float, float, float]]:
+    """Per model: (avg tok/s, avg ttft s, avg out tokens, avg duration s).
+
+    tok/s and duration are 0.0 on logs that predate duration capture.
+    """
     agg: dict[str, list] = {}
     for r in records:
         if r.error is not None:
@@ -254,19 +267,24 @@ def _speed_stats(records) -> list[tuple[str, float, float, float]]:
             (r.model_a, r.tokens_a_out, r.ttft_a_ms, getattr(r, "duration_a_ms", 0)),
             (r.model_b, r.tokens_b_out, r.ttft_b_ms, getattr(r, "duration_b_ms", 0)),
         ):
-            a = agg.setdefault(name, [0.0, 0, 0.0, 0, 0.0, 0])
+            a = agg.setdefault(name, [0.0, 0, 0.0, 0, 0.0, 0, 0.0])
             if dur > 0 and tout:
-                a[0] += tout / (dur / 1000); a[1] += 1
+                a[0] += tout / (dur / 1000)
+                a[1] += 1
+                a[6] += dur / 1000
             if ttft > 0:
-                a[2] += ttft / 1000; a[3] += 1
-            a[4] += tout; a[5] += 1
+                a[2] += ttft / 1000
+                a[3] += 1
+            a[4] += tout
+            a[5] += 1
     out = []
-    for name, (ts, tn, ft, fn, ot, on) in agg.items():
+    for name, (ts, tn, ft, fn, ot, on, ds) in agg.items():
         out.append((
             name,
             ts / tn if tn else 0.0,
             ft / fn if fn else 0.0,
             ot / on if on else 0.0,
+            ds / tn if tn else 0.0,
         ))
     return out
 
@@ -276,21 +294,21 @@ def _speed_svg(stats) -> str:
     rows = [x for x in stats if x[1] > 0 or x[2] > 0]
     if len(rows) < 2:
         return ""
-    has_tps = any(t > 0 for _, t, _, _ in rows)
+    has_tps = any(x[1] > 0 for x in rows)
     if has_tps:
         rows.sort(key=lambda x: -x[1])
-        vmax = max(t for _, t, _, _ in rows) or 1.0
+        vmax = max(x[1] for x in rows) or 1.0
         title, note = "Speed", ("Average tokens per second over the run's streamed responses; "
                                 "time to first token annotated.")
     else:
         rows.sort(key=lambda x: x[2])
-        vmax = max(f for _, _, f, _ in rows) or 1.0
+        vmax = max(x[2] for x in rows) or 1.0
         title, note = "Responsiveness", ("This log predates duration capture, so bars show average "
                                          "time to first token (shorter is better).")
     W, L, RH = 720, 170, 26
     H = 24 + RH * len(rows) + 8
     parts = []
-    for i, (name, tps, ttft, _ot) in enumerate(rows):
+    for i, (name, tps, ttft, _ot, _dur) in enumerate(rows):
         y = 18 + i * RH
         val = tps if has_tps else ttft
         width = max((val / vmax) * (W - L - 190), 3)
@@ -456,11 +474,38 @@ def build_report_html(
     if prices:
         per_cost = _per_model_cost(records, manifest, prices)
         rates = _win_rates(grid, order)
+        use_dur = any(dur_by.get(n, 0.0) > 0 for n in order)
         pts = [
-            (n, per_cost[n], rates.get(n, 0.0), verbosity.get(n) or 0.0)
+            (n, per_cost[n], rates.get(n, 0.0),
+             dur_by.get(n, 0.0) if use_dur else (verbosity.get(n) or 0.0))
             for n in order if n in per_cost and per_cost[n] > 0
         ]
-        value_map = _value_map_svg(pts, champion)
+        value_map = _value_map_svg(pts, champion, size_label=(
+            "average time to answer" if use_dur else "average response length"))
+
+    rates_all = _win_rates(grid, order)
+    per_cost_all = _per_model_cost(records, manifest, prices) if prices else {}
+    stats_all = _speed_stats(records)
+    speed_by = {n: (tps, ttft) for n, tps, ttft, _o, _d in stats_all}
+    dur_by = {n: d for n, _t, _f, _o, d in stats_all}
+    medals = ["&#129351;", "&#129352;", "&#129353;"]
+    pods = []
+    for i, (name, e0) in enumerate(ranked[:3]):
+        chips = ""
+        if name in per_cost_all:
+            chips += f"<span class='pchip'>{_fmt_usd(per_cost_all[name])}</span>"
+        tps, ttft = speed_by.get(name, (0.0, 0.0))
+        if tps > 0:
+            chips += f"<span class='pchip'>{tps:.0f} tok/s</span>"
+        elif ttft > 0:
+            chips += f"<span class='pchip'>ttft {ttft:.1f}s</span>"
+        pods.append(
+            f"<div class='pod'><div class='medal'>{medals[i]}</div>"
+            f"<div class='pname'>{_e(name)}</div>"
+            f"<div class='pscore'>{rates_all.get(name, 0.0):.0%}</div>"
+            f"<div class='psub'>win rate &middot; ELO {e0:.0f}</div>{chips}</div>"
+        )
+    podium = f"<div class='podium'>{''.join(pods)}</div>" if len(pods) >= 2 else ""
 
     cost = _cost_lines(records, manifest, prices)
     w_usd_cell = j_usd_cell = t_usd_cell = ""
@@ -505,6 +550,7 @@ def build_report_html(
   <span class="badge">jury share of tokens <b>{jury_share}</b></span>
 </div>
 
+{podium}
 <h2>Leaderboard</h2>
 <div class="tablewrap"><table>
 <thead><tr><th class="n">#</th><th>Model</th><th class="n">ELO</th><th class="n">95% CI</th>
