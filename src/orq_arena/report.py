@@ -34,18 +34,25 @@ _MARK = (
 
 _CSS = """
 :root {
-  --ink: #141319; --paper: #faf8f3; --card: #ffffff; --line: #e6e1d6;
-  --teal: #00342d; --teal-soft: #0a7b63; --muted: #7a766c;
-  --a: #c8189e; --b: #0092ab; --good: #3f6b2f; --warn: #8a6510;
-  --mono: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, monospace;
-  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  color-scheme: light;
+  /* orq.ai brand palette (Brand Guidelines v1.0), same tokens as the
+     Model-Router-Auto-Evaluation dashboard: warm beige neutrals, Pulse
+     Orange accent, Incognito Black ink. A/B side colors stay functional. */
+  --brand: #DF5325;
+  --paper: oklch(0.966 0.008 83); --card: oklch(0.992 0.005 83);
+  --line: oklch(0.885 0.011 83); --ink: #141319;
+  --teal: #141319; --teal-soft: oklch(0.50 0.13 158); --muted: oklch(0.535 0.013 83);
+  --a: #c8189e; --b: #0092ab; --good: oklch(0.50 0.13 158); --warn: oklch(0.55 0.12 75);
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--sans);
        line-height: 1.55; -webkit-font-smoothing: antialiased; }
 .wrap { max-width: 960px; margin: 0 auto; padding: 0 24px 72px; }
 header { display: flex; align-items: center; gap: 10px; padding: 26px 0 14px;
-         border-bottom: 2px solid var(--teal); color: var(--teal); }
+         border-bottom: 2px solid var(--ink); color: var(--ink); }
 header .brand { font-weight: 700; font-size: 17px; letter-spacing: -0.3px; }
 header .kind { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--muted); }
 h1 { font-size: 30px; line-height: 1.15; margin: 26px 0 4px; letter-spacing: -0.5px; }
@@ -226,7 +233,7 @@ def _value_map_svg(points, champion: str, size_label: str = "average response le
         x, y = px(c), py(r)
         rad = max(9.0, 5 + 9 * (t / tmax))
         on_frontier = round(x) in fx
-        fill = "var(--a)" if name == champion else ("var(--teal-soft)" if on_frontier else "#9aa89b")
+        fill = "var(--brand)" if name == champion else ("var(--teal-soft)" if on_frontier else "#b5b1a4")
         rk = rank_of[name]
         dots.append(
             f"<circle cx='{x:.0f}' cy='{y:.0f}' r='{rad:.0f}' fill='{fill}' opacity='.88'>"
@@ -269,7 +276,7 @@ def _value_map_svg(points, champion: str, size_label: str = "average response le
 <text x="{L - 8}" y="{T + 6}" font-size="10" fill="var(--muted)" text-anchor="end">100%</text>
 <text x="{L - 8}" y="{H - B}" font-size="10" fill="var(--muted)" text-anchor="end">0%</text>
 <text x="{(L + W - R) // 2}" y="{H - 14}" font-size="11" fill="var(--muted)" text-anchor="middle">cost per model over the whole run (log scale)</text>
-<polyline points="{poly}" fill="none" stroke="var(--warn)" stroke-width="1.5" stroke-dasharray="5 4"/>
+<polyline points="{poly}" fill="none" stroke="var(--brand)" stroke-width="1.5" stroke-dasharray="5 4"/>
 {"".join(dots)}
 </svg></div>
 {key}
@@ -462,7 +469,7 @@ def build_report_html(
                 v = (grid.get(a) or {}).get(b, 0.0)
                 # Heat: single-hue intensity so the dominance triangle reads at a glance.
                 alpha = 0.0 if not v or not vmax else 0.10 + 0.45 * (v / vmax)
-                style = f" style='background:rgba(10,123,99,{alpha:.2f})'" if alpha else ""
+                style = f" style='background:rgba(223,83,37,{alpha:.2f})'" if alpha else ""
                 cells.append(f"<td{style}>{v:g}</td>")
         grid_rows.append(f"<tr><td class='rowname'>{i}. {_e(a)}</td>{''.join(cells)}</tr>")
 
