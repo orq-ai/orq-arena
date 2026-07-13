@@ -139,6 +139,171 @@ def _cost_lines(records, manifest, prices):
     return warriors_usd, jury_usd, sorted(unpriced)
 
 
+
+def _win_rates(grid: dict, names: list[str]) -> dict[str, float]:
+    """Rated-round win share per model from the win grid (ties are 0.5 in it)."""
+    rates = {}
+    for n in names:
+        won = sum((grid.get(n) or {}).values())
+        lost = sum((grid.get(m) or {}).get(n, 0.0) for m in names if m != n)
+        rates[n] = won / (won + lost) if won + lost else 0.0
+    return rates
+
+
+def _per_model_cost(records, manifest, prices) -> dict[str, float]:
+    id_by_name = {
+        n: (w.get("model") if isinstance(w, dict) else "")
+        for n, w in (manifest.get("warriors") or {}).items()
+    }
+    out: dict[str, float] = {}
+    for r in records:
+        if r.error is not None:
+            continue
+        for name, tin, tout in (
+            (r.model_a, r.tokens_a_in, r.tokens_a_out),
+            (r.model_b, r.tokens_b_in, r.tokens_b_out),
+        ):
+            pr = prices.get(id_by_name.get(name, ""))
+            if pr is not None:
+                out[name] = out.get(name, 0.0) + tin * pr[0] / 1e6 + tout * pr[1] / 1e6
+    return out
+
+
+def _fmt_usd(v: float) -> str:
+    return f"${v:.2f}" if v >= 0.1 else f"${v:.3f}"
+
+
+def _value_map_svg(points, champion: str) -> str:
+    """Win rate vs cost (log x), dashed best-value frontier, size = avg out tokens."""
+    import math
+
+    if len(points) < 2:
+        return ""
+    xs = [math.log10(max(c, 1e-4)) for _, c, _, _ in points]
+    x0, x1 = min(xs), max(xs)
+    span = (x1 - x0) or 1.0
+    tmax = max(t for *_, t in points) or 1.0
+    W, H, L, R, T, B = 720, 310, 70, 40, 30, 60
+
+    def px(c):
+        return L + (math.log10(max(c, 1e-4)) - x0) / span * (W - L - R)
+
+    def py(r):
+        return T + (1 - r) * (H - T - B)
+
+    frontier, best = [], -1.0
+    for name, c, r, _t in sorted(points, key=lambda p: p[1]):
+        if r > best:
+            frontier.append((px(c), py(r)))
+            best = r
+    poly = " ".join(f"{x:.0f},{y:.0f}" for x, y in frontier)
+    fx = {round(x) for x, _ in frontier}
+
+    dots = []
+    for i, (name, c, r, t) in enumerate(sorted(points, key=lambda p: p[1])):
+        x, y = px(c), py(r)
+        rad = 5 + 9 * (t / tmax)
+        on_frontier = round(x) in fx
+        fill = "var(--a)" if name == champion else ("var(--teal-soft)" if on_frontier else "#9aa89b")
+        # Alternate labels above/below by cost order so near neighbours don't collide;
+        # clamp anchor at the plot edges so nothing clips.
+        ly = y - rad - 5 if i % 2 == 0 else y + rad + 13
+        anchor_x = "middle"
+        if x > W - R - 90:
+            anchor_x = "end"
+        elif x < L + 90:
+            anchor_x = "start"
+        dots.append(
+            f"<circle cx='{x:.0f}' cy='{y:.0f}' r='{rad:.0f}' fill='{fill}' opacity='.85'>"
+            f"<title>{_e(name)}: {_fmt_usd(c)}, {r:.0%} win rate</title></circle>"
+            f"<text x='{x:.0f}' y='{ly:.0f}' font-size='10' fill='var(--muted)' "
+            f"text-anchor='{anchor_x}'>{_e(name)} {_fmt_usd(c)} &middot; {r:.0%}</text>"
+        )
+    return f"""
+<h2>Value map</h2>
+<div class="tablewrap">
+<svg viewBox="0 0 {W} {H}" width="100%" role="img" aria-label="Win rate vs cost">
+<line x1="{L}" y1="{H - B}" x2="{W - R}" y2="{H - B}" stroke="var(--line)"/>
+<line x1="{L}" y1="{T}" x2="{L}" y2="{H - B}" stroke="var(--line)"/>
+<text x="{L - 8}" y="{T + 6}" font-size="10" fill="var(--muted)" text-anchor="end">100%</text>
+<text x="{L - 8}" y="{H - B}" font-size="10" fill="var(--muted)" text-anchor="end">0%</text>
+<text x="{(L + W - R) // 2}" y="{H - 14}" font-size="11" fill="var(--muted)" text-anchor="middle">cost per model over the whole run (log scale)</text>
+<polyline points="{poly}" fill="none" stroke="var(--warn)" stroke-width="1.5" stroke-dasharray="5 4"/>
+{"".join(dots)}
+</svg></div>
+<p class="note">Dashed line: the best-value frontier (no cheaper model wins more often). Dot size
+is average response length; the champion is magenta. Win rate counts rated rounds only.</p>
+"""
+
+
+
+def _speed_stats(records) -> list[tuple[str, float, float, float]]:
+    """Per model: (avg tok/s where duration known, avg ttft s, avg out tokens)."""
+    agg: dict[str, list] = {}
+    for r in records:
+        if r.error is not None:
+            continue
+        for name, tout, ttft, dur in (
+            (r.model_a, r.tokens_a_out, r.ttft_a_ms, getattr(r, "duration_a_ms", 0)),
+            (r.model_b, r.tokens_b_out, r.ttft_b_ms, getattr(r, "duration_b_ms", 0)),
+        ):
+            a = agg.setdefault(name, [0.0, 0, 0.0, 0, 0.0, 0])
+            if dur > 0 and tout:
+                a[0] += tout / (dur / 1000); a[1] += 1
+            if ttft > 0:
+                a[2] += ttft / 1000; a[3] += 1
+            a[4] += tout; a[5] += 1
+    out = []
+    for name, (ts, tn, ft, fn, ot, on) in agg.items():
+        out.append((
+            name,
+            ts / tn if tn else 0.0,
+            ft / fn if fn else 0.0,
+            ot / on if on else 0.0,
+        ))
+    return out
+
+
+def _speed_svg(stats) -> str:
+    """Horizontal bars: tok/s when the log has durations, else time to first token."""
+    rows = [x for x in stats if x[1] > 0 or x[2] > 0]
+    if len(rows) < 2:
+        return ""
+    has_tps = any(t > 0 for _, t, _, _ in rows)
+    if has_tps:
+        rows.sort(key=lambda x: -x[1])
+        vmax = max(t for _, t, _, _ in rows) or 1.0
+        title, note = "Speed", ("Average tokens per second over the run's streamed responses; "
+                                "time to first token annotated.")
+    else:
+        rows.sort(key=lambda x: x[2])
+        vmax = max(f for _, _, f, _ in rows) or 1.0
+        title, note = "Responsiveness", ("This log predates duration capture, so bars show average "
+                                         "time to first token (shorter is better).")
+    W, L, RH = 720, 170, 26
+    H = 24 + RH * len(rows) + 8
+    parts = []
+    for i, (name, tps, ttft, _ot) in enumerate(rows):
+        y = 18 + i * RH
+        val = tps if has_tps else ttft
+        width = max((val / vmax) * (W - L - 190), 3)
+        label = (f"{tps:.0f} tok/s &middot; ttft {ttft:.1f}s" if has_tps else f"ttft {ttft:.1f}s")
+        op = 0.85 - 0.5 * (i / max(len(rows) - 1, 1))
+        parts.append(
+            f"<text x='{L - 8}' y='{y + 12}' font-size='10.5' fill='var(--muted)' text-anchor='end'>{_e(name)}</text>"
+            f"<rect x='{L}' y='{y}' width='{width:.0f}' height='14' rx='4' fill='var(--teal-soft)' opacity='{op:.2f}'/>"
+            f"<text x='{L + width + 8:.0f}' y='{y + 12}' font-size='10.5' fill='var(--muted)'>{label}</text>"
+        )
+    return f"""
+<h2>{title}</h2>
+<div class="tablewrap">
+<svg viewBox="0 0 {W} {H}" width="100%" role="img" aria-label="{title} per model">
+{"".join(parts)}
+</svg></div>
+<p class="note">{note}</p>
+"""
+
+
 def build_report_html(
     *,
     cfg: ArenaConfig,
@@ -278,6 +443,18 @@ def build_report_html(
 
     panel = ", ".join(str(j).split("/")[-1] for j in manifest.get("judges", cfg.judges))
 
+    speed = _speed_svg(_speed_stats(records))
+
+    value_map = ""
+    if prices:
+        per_cost = _per_model_cost(records, manifest, prices)
+        rates = _win_rates(grid, order)
+        pts = [
+            (n, per_cost[n], rates.get(n, 0.0), verbosity.get(n) or 0.0)
+            for n in order if n in per_cost and per_cost[n] > 0
+        ]
+        value_map = _value_map_svg(pts, champion)
+
     cost = _cost_lines(records, manifest, prices)
     w_usd_cell = j_usd_cell = t_usd_cell = ""
     cost_note = ""
@@ -330,6 +507,8 @@ def build_report_html(
 1000-point mean; intervals are 200-iteration bootstrap percentiles. Overlapping intervals are
 the honest output on a run this size.{" The len-ctrl column refits the rating with the jury&#39;s length preference priced out; a large raw-vs-len-ctrl gap means verbosity, not quality, is doing the separating." if elo_sc else ""}</p>
 
+{value_map}
+{speed}
 <h2>Win grid</h2>
 <div class="tablewrap"><table class="grid">
 <thead><tr><th>row beats column (ties count &frac12;)</th>{head}</tr></thead>

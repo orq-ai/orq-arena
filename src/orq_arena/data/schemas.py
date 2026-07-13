@@ -42,7 +42,9 @@ class BattleRecord(BaseModel):
     finish_reason_a: str = ""
     finish_reason_b: str = ""
     ttft_a_ms: int = 0
+    duration_a_ms: int = 0
     ttft_b_ms: int = 0
+    duration_b_ms: int = 0
     judge_tokens_in: int = 0
     judge_tokens_out: int = 0
 

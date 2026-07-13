@@ -57,6 +57,7 @@ class SideResult:
     error: str | None
     usage: dict[str, Any]
     ttft_ms: int
+    duration_ms: int = 0
 
 
 def _prompt_hash(text: str) -> str:
@@ -113,7 +114,7 @@ async def _generate_side(
                     match_id=match_id, side=side, full_text="".join(chunks), error=last_error
                 )
             )
-            return SideResult(text="", error=last_error, usage=usage, ttft_ms=0)
+            return SideResult(text="", error=last_error, usage=usage, ttft_ms=0, duration_ms=0)
 
         full = "".join(chunks)
         await events.put(
@@ -128,7 +129,8 @@ async def _generate_side(
                 error=None,
             )
         )
-        return SideResult(text=full, error=None, usage=usage, ttft_ms=ttft_ms)
+        return SideResult(text=full, error=None, usage=usage, ttft_ms=ttft_ms,
+                          duration_ms=int((time.monotonic() - t0) * 1000))
     raise AssertionError("unreachable")
 
 
@@ -313,6 +315,8 @@ class Battle:
                     finish_reason_b=res_b.usage.get("finish_reason", ""),
                     ttft_a_ms=res_a.ttft_ms,
                     ttft_b_ms=res_b.ttft_ms,
+                    duration_a_ms=res_a.duration_ms,
+                    duration_b_ms=res_b.duration_ms,
                     judge_tokens_in=judge_usage.input_tokens if judge_usage else 0,
                     judge_tokens_out=judge_usage.output_tokens if judge_usage else 0,
                     tournament_id=self.tournament_id,
