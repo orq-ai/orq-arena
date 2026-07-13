@@ -27,7 +27,7 @@ full `orq_arena.yaml` key reference, see [configuration.md](configuration.md).
 
 | Command | Purpose |
 |---|---|
-| [`run`](#run) | Live round-robin (or Swiss, >8 warriors) tournament against real models via the orq.ai router. |
+| [`run`](#run) | Round-robin (or Swiss, >8 models) benchmark via the orq.ai router: headless by default, HTML report opens at the end, `--tui` for the live show. |
 | [`demo`](#demo) | Replay a recorded tournament fixture, zero API calls, zero key. |
 | [`list-warriors`](#list-warriors) | Print the configured roster (seed, orc name, model id). |
 | [`rejudge`](#rejudge) | Re-score a recorded `battles.jsonl` with a different judge panel, zero regeneration. |
@@ -82,10 +82,15 @@ A few things apply across every subcommand and are only documented once, here:
 
 ## `run`
 
-Run the full round-robin (or Swiss, above 8 warriors) arena live, hits orq.ai.
+Run the benchmark (round-robin, or Swiss above 8 models), hits orq.ai. With
+`--config` the run is headless: matches in parallel, plain log lines on pipes, a
+progress bar on terminals, and the HTML report opens in your browser at the end.
+`--tui` runs the same tournament as the live show instead. Without `--config`
+the interactive roster picker opens first, which needs (and implies) the TUI.
 
 ```text
-orq-arena run [--config PATH] [--prompts PATH] [--output PATH] [--headless] [--yes|-y]
+orq-arena run [--config PATH] [--prompts PATH] [--output PATH] [--rounds N]
+              [--overwrite] [--tui] [--no-open] [--yes|-y]
 ```
 
 | Flag | Default | Effect |
@@ -93,7 +98,11 @@ orq-arena run [--config PATH] [--prompts PATH] [--output PATH] [--headless] [--y
 | `--config PATH` | none, triggers the roster picker (see Behavior below) | Use this YAML roster as-is and skip the interactive picker. |
 | `--prompts PATH` | `prompts/starter.jsonl` | JSONL prompt file, see [Prompts file format](configuration.md#prompts-file-format), or `orq:<dataset_id>` to pull an [orq.ai Dataset](https://docs.orq.ai/docs/ai-studio/optimize/datasets): each datapoint's last user message becomes a prompt, `{{var}}` placeholders filled from its `inputs`; datapoints without a user message are skipped. Uses the same API key as the gateway. Always honored, whether or not `--config` is given. When the prompts come from a Dataset, the run manifest records its id, display name, and studio URL, and the HTML report links the dataset by name. |
 | `--output PATH` | `battles.jsonl` | Where the battle log (schema v2) is written as rounds complete. |
-| `--headless` | off | No TUI; matches run in parallel under `headless_concurrency` (default `4`, see [configuration.md](configuration.md)). **Requires `--config`**: there is no picker without a TUI to render it in. |
+| `--rounds N` | `match.max_rounds` from the YAML | Rounds per match. The preflight warns when this samples a subset of your prompts. |
+| `--overwrite` | off | Allow replacing an existing non-empty battle log at `--output`; without it the run refuses rather than erase a recorded run. |
+| `--tui` | off | Watch the live TUI show instead of headless logs. Headless runs use `headless_concurrency` (default `4`, see [configuration.md](configuration.md)) to parallelize matches. |
+| `--no-open` | off | Do not open the HTML report in a browser when the run ends (it never opens on non-TTY stdout or when `CI` is set). |
+| `--headless` | off | Deprecated no-op: headless is already the default with `--config`. |
 | `--yes`, `-y` | off | Skip the preflight confirmation pause. |
 
 **Behavior notes:**
@@ -106,9 +115,8 @@ orq-arena run [--config PATH] [--prompts PATH] [--output PATH] [--headless] [--y
   picker closes, right before the fight starts. With `--config`, the YAML's `warriors` list is
   used exactly as written and the picker is skipped entirely; preflight and the confirmation
   prompt happen up front in the terminal, before the TUI (or headless run) even starts.
-- **The `--headless` guard.** `--headless` without `--config` raises immediately:
-  `--headless needs --config (no picker without a TUI)` (a clean `click.ClickException`, exit
-  code 1, not a traceback).
+- **Flag conflicts.** `--tui --headless` raises immediately (a clean `click.ClickException`,
+  exit code 1, not a traceback). Without `--config` the picker path always runs the TUI.
 - **Preflight output** (config-supplied path only, the picker path renders the same
   information in-app instead of via these `click.echo` lines). First, exact call counts:
 

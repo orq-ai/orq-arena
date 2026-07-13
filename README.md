@@ -6,11 +6,11 @@
 
 [![CI](https://github.com/orq-ai/orq-arena/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/orq-ai/orq-arena/actions/workflows/ci.yml) [![Python](https://img.shields.io/badge/python-%3E%3D3.10-blue.svg)](pyproject.toml) [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-A terminal arena where LLMs fight, and the fight is a real benchmark. It answers the question every model pool raises: **"which of these models actually wins on *my* prompts, and can I trust the ranking?"**
+An arena benchmark for LLMs on **your own prompts**. It answers the question every model pool raises: **"which of these models actually wins on *my* prompts, and can I trust the ranking?"**
 
-Models stream answers side by side, an LLM jury judges every round from both seat orders, HP bars drop, and a **Bradley-Terry ELO leaderboard** comes out the other end with confidence intervals attached. The arena is the show; the data is the point.
+One headless command runs a round-robin over your pool: an LLM jury judges every round from both seat orders, a **Bradley-Terry ELO leaderboard** with confidence intervals comes out the other end, and the run finishes by opening a self-contained **HTML report** you can hand to anyone. A live terminal show ships too, as the bonus.
 
-![Final leaderboard: ELO with bootstrap CIs, token split, per-category ratings, jury behaviour, win grid](media/leaderboard.svg)
+![HTML report page: verdict banner with the top three models, badges, ELO leaderboard with CI bars, and the ELO-vs-cost value map](media/report-page.png)
 
 ## Why orq-arena?
 
@@ -28,12 +28,12 @@ orq-arena is that missing layer. It runs a round-robin over any pool of models r
 ## What you get
 
 - **A defensible ranking**: pairwise judging in both seat orders, per-round Bradley-Terry with ties, bootstrap 95% CIs, Fleiss'/Cohen's κ, and a seeded manifest per run.
-- **Zero-friction start**: `orq-arena demo` replays a recorded tournament with no API key.
-- **A live show worth projecting**: a CRT-neon TUI with streaming responses, judge cards that call out position-biased votes in public, HP drama, live standings.
-- **Real benchmark data out the back**: every round lands in `battles.jsonl` (schema v2) with both responses, reconciled per-judge votes, exact token/reasoning-token usage, TTFT.
+- **A report you can forward**: every run ends with a self-contained HTML page: a plain-words verdict, the ELO ladder with error bars, an ELO-vs-cost value map, speed, token and dollar accounting.
+- **Real benchmark data out the back**: every round lands in `battles.jsonl` (schema v2) with both responses, reconciled per-judge votes, exact token/reasoning-token usage, per-response timing.
+- **Headless by default**: plain log lines on pipes, a progress bar on terminals, matches in parallel; drop it in CI or cron as-is.
 - **Jury swaps without regeneration**: re-judge any recorded run with a different panel and get a rank-stability answer (Spearman).
 - **A human anchor in one file**: `annotate` renders any recorded run into a blind browser page (no names, no jury votes, seeded side swaps); send it to raters, feed their `votes.json` to `anchor`, and get panel-vs-human κ plus rank correlation.
-- **Headless for CI/cron**: same benchmark, parallel matches, no TUI.
+- **A live show when you want one**: `--tui` streams the same run as a CRT-neon arena: side-by-side responses, judge cards calling out position-biased votes, HP drama. `orq-arena demo` replays one with no API key.
 
 ## Installation
 
@@ -47,35 +47,38 @@ uv sync
 
 ## Quick start
 
-The fastest way to see everything, with **no API key needed**:
+1. Get an API key from your [orq.ai](https://my.orq.ai) workspace: `cp .env.example .env`, then fill in `ORQ_API_KEY` (loaded automatically).
+2. Point the roster at your pool (or keep the shipped 8-model `orq_arena.yaml`) and run:
 
 ```bash
-uv run orq-arena demo
+uv run orq-arena run --config orq_arena.yaml --prompts your_prompts.jsonl
 ```
 
-![orq-arena demo: a replayed match streaming side by side, judge cards calling out flipped votes, and the final leaderboard](media/demo.gif)
+The preflight prints exact call counts and a spend ceiling, asks once, then matches run in parallel with plain log lines. When the last round lands, the **HTML report opens in your browser** (`--no-open` to skip, `--yes` to skip the pause; both make it CI-ready).
 
-When you are ready for a live run against real models:
+`--prompts` takes a local JSONL or `orq:<dataset_id>` to benchmark over a [Dataset](https://docs.orq.ai/docs/ai-studio/optimize/datasets) straight from your workspace. If each match should see every prompt, pass `--rounds <n>`; the preflight warns when it samples a subset.
 
-1. Get an API key from your [orq.ai](https://my.orq.ai) workspace: `cp .env.example .env`, then fill in `ORQ_API_KEY` (loaded automatically).
-2. Start a tournament: a roster picker opens over your workspace-enabled model catalog; choose any pool ≥ 2: `uv run orq-arena run`
-3. Confirm the preflight (exact match/stream/judge-call counts, thinking probe) and the arena begins. In the TUI: `s` saves an SVG screenshot, `q` quits.
+No key yet? Watch a recorded tournament first: `uv run orq-arena demo` (zero API calls).
 
 ## Usage
 
-**Run a tournament**: `uv run orq-arena run` opens the interactive roster picker; add `--config orq_arena.yaml` to run the YAML roster as-is, or `--headless --yes` for CI/cron (no TUI, matches run in parallel). `--prompts` takes a local JSONL or `orq:<dataset_id>` to fight over a [Dataset](https://docs.orq.ai/docs/ai-studio/optimize/datasets) straight from your workspace. Full flag reference: **[docs/cli.md](docs/cli.md)**.
+**Run the benchmark**: `uv run orq-arena run --config orq_arena.yaml` (headless, parallel, report at the end). Without `--config` the interactive roster picker opens over your workspace-enabled catalog, which runs the live TUI. Full flag reference: **[docs/cli.md](docs/cli.md)**.
 
-**Browse the results**: from the final leaderboard, `B` pages through every judged round (prompt, both responses, per-judge votes with flip badges); `M` generates per-model coach notes from an analyzer model.
+**Share the result**: the report (`<log>.report.html`) is one self-contained file: a verdict banner naming the top three models with win rate, ELO score, and total cost, the ELO ladder with CI bars, len-ctrl column, an ELO-vs-cost value map, a Speed section (tok/s, time-to-first-token), win grid, jury behaviour, and a link back to the source Dataset on Dataset-backed runs. Regenerate any time with `uv run orq-arena report battles.jsonl`; no model calls (one catalog read prices the cost section when a key is present).
+
+**Re-judge with a different jury**: the responses are already in `battles.jsonl`, so swapping the panel costs judge tokens only: `uv run orq-arena rejudge battles.jsonl --judge mistral/mistral-small-2603`. Prints the new jury's behaviour and the Spearman correlation against the recorded ranking. Multi-judge example: **[docs/cli.md](docs/cli.md)**.
+
+## The live show (bonus)
+
+The same run, projected: `uv run orq-arena run --config orq_arena.yaml --tui` streams both models side by side with judge cards that call out position-biased votes in public. `s` saves an SVG screenshot, `q` quits. Try it with no API key: `uv run orq-arena demo`.
+
+![orq-arena demo: a replayed match streaming side by side, judge cards calling out flipped votes, and the final leaderboard](media/demo.gif)
+
+From the final leaderboard, `B` pages through every judged round (prompt, both responses, per-judge votes with flip badges); `M` generates per-model coach notes from an analyzer model.
 
 ![Battle browser: prompt, both responses, per-judge votes with flip badges](media/battle-browser.svg)
 
 ![Post-mortems: per-model strengths, weaknesses, and judge patterns](media/postmortem.svg)
-
-**Share the result**: every run also writes a self-contained HTML report page (`<log>.report.html`): a verdict banner naming the top three models with win rate, ELO score, and total cost, ELO ladder with CI bars, len-ctrl column, a Speed section (tok/s, time-to-first-token) when the log has per-response timing, win grid, jury behaviour, and a link back to the source Dataset on Dataset-backed runs. Regenerate any time with `uv run orq-arena report battles.jsonl`; no model calls (one catalog read prices the cost section when a key is present).
-
-![HTML report page: verdict banner with the top three models, badges, ELO leaderboard with CI bars, and the ELO-vs-cost value map](media/report-page.png)
-
-**Re-judge with a different jury**: the responses are already in `battles.jsonl`, so swapping the panel costs judge tokens only: `uv run orq-arena rejudge battles.jsonl --judge mistral/mistral-small-2603`. Prints the new jury's behaviour and the Spearman correlation against the recorded ranking. Multi-judge example: **[docs/cli.md](docs/cli.md)**.
 
 ## Configuration
 

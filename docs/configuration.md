@@ -89,7 +89,7 @@ the YAML, every value is literal.
 
 | Command | `--config` behavior |
 |---|---|
-| `orq-arena run` | Optional. If omitted, `orq_arena.yaml` is still loaded (for `judges`, `match`, `gateway`, etc.) but the interactive roster picker replaces `warriors` at runtime, see the [`warriors`](#warriors-the-roster) section. If given, the YAML roster is used as-is and the picker is skipped. `--headless` requires `--config` (no picker without a TUI). |
+| `orq-arena run` | Optional. If omitted, `orq_arena.yaml` is still loaded (for `judges`, `match`, `gateway`, etc.) but the interactive roster picker replaces `warriors` at runtime, see the [`warriors`](#warriors-the-roster) section. If given, the YAML roster is used as-is, the picker is skipped, and the run is headless by default (`--tui` opts into the live show). |
 | `orq-arena demo` | Defaults to `orq_arena.yaml`. Only used for its rules/roster labels, the fixture replay makes no API calls. |
 | `orq-arena list-warriors` | Defaults to `orq_arena.yaml`. Prints the configured roster. |
 | `orq-arena rejudge` | Defaults to `orq_arena.yaml`. Supplies `gateway` and (unless `--criteria` overrides it) `criteria`. |

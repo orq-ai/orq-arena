@@ -54,17 +54,23 @@ def cli() -> None:
               help="Rounds per match (overrides match.max_rounds). Use len(prompts) to see every prompt.")
 @click.option("--overwrite", is_flag=True, default=False,
               help="Allow replacing an existing non-empty battle log at --output.")
+@click.option("--tui", "tui", is_flag=True, default=False,
+              help="Watch the live TUI show instead of the default headless logs.")
 @click.option("--headless", is_flag=True, default=False,
-              help="No TUI; matches run in parallel (headless_concurrency). Requires --config.")
+              help="Deprecated: headless is already the default with --config.")
+@click.option("--no-open", "no_open", is_flag=True, default=False,
+              help="Do not open the HTML report in a browser when the run ends.")
 @click.option("--yes", "-y", "assume_yes", is_flag=True, default=False,
               help="Skip the preflight confirmation pause.")
 def run(config_path: str | None, prompts_path: str, output_path: str, rounds: int | None,
-        overwrite: bool, headless: bool, assume_yes: bool) -> None:
-    """Run the full round-robin arena live (hits orq.ai).
+        overwrite: bool, tui: bool, headless: bool, no_open: bool, assume_yes: bool) -> None:
+    """Run the arena benchmark (hits orq.ai): headless logs by default,
+    then the HTML report opens in your browser.
 
-    Without --config the roster picker opens first: choose any >=2 models
-    from your workspace-enabled catalog. The YAML still supplies judges,
-    rules, and gateway settings.
+    With --config the run is headless (matches in parallel); pass --tui to
+    watch the live show instead. Without --config the interactive roster
+    picker opens first, which needs the TUI. The YAML still supplies
+    judges, rules, and gateway settings.
     """
     import asyncio
     from pathlib import Path
@@ -101,15 +107,16 @@ def run(config_path: str | None, prompts_path: str, output_path: str, rounds: in
             prompts_path[len("orq:"):], api_key_env=cfg.gateway.api_key_env
         )
 
+    if tui and headless:
+        raise click.ClickException("--tui and --headless contradict each other")
     if pick_roster:
-        if headless:
-            raise click.ClickException("--headless needs --config (no picker without a TUI)")
-        # Preflight (probe + counts) runs in-app after the roster is picked.
+        # The picker is a TUI screen, so this path always runs the live show.
         app = ArenaApp(
             cfg=cfg, prompts=prompts, battle_log_path=output_path, live=True,
             pick_roster=True, dataset=dataset,
         )
         app.run()
+        _open_report(output_path, no_open)
         return
 
     counts = call_counts(cfg, prompts)
@@ -159,20 +166,37 @@ def run(config_path: str | None, prompts_path: str, output_path: str, rounds: in
     if not assume_yes:
         click.confirm("Proceed?", abort=True)
 
-    if headless:
+    if tui:
+        app = ArenaApp(
+            cfg=cfg, prompts=prompts, battle_log_path=output_path, live=True,
+            preflight=preflight_data, dataset=dataset,
+        )
+        app.run()
+    else:
         from .headless import run_headless
 
         asyncio.run(run_headless(
             cfg=cfg, prompts=prompts, battle_log_path=output_path,
             preflight=preflight_data, dataset=dataset,
         ))
-        return
+    _open_report(output_path, no_open)
 
-    app = ArenaApp(
-        cfg=cfg, prompts=prompts, battle_log_path=output_path, live=True,
-        preflight=preflight_data, dataset=dataset,
-    )
-    app.run()
+
+def _open_report(battle_log_path: str, no_open: bool) -> None:
+    """Point the user at the finished report; open it when a human is watching."""
+    import os
+    import sys
+    import webbrowser
+    from pathlib import Path
+
+    from .report import report_path_for
+
+    page = report_path_for(Path(battle_log_path))
+    if not page.exists():
+        return
+    click.echo(f"report page -> {page}")
+    if not no_open and sys.stdout.isatty() and not os.environ.get("CI"):
+        webbrowser.open(page.resolve().as_uri())
 
 
 @cli.command()

@@ -160,10 +160,11 @@ The prompt set is swappable: `--prompts your_prompts.jsonl` for a local file (fo
 fight over an [orq.ai Dataset](https://docs.orq.ai/docs/ai-studio/optimize/datasets) straight
 from your workspace, same API key.
 
-Add `--headless` for CI/cron, no TUI; matches run in parallel under `headless_concurrency`
-(default 4) through a Rich one-liner printer instead of the Textual show. `--headless`
-**requires** `--config`, there's no roster picker without a TUI. Full flag reference for
-`run` and every other subcommand (`demo`, `rejudge`, `jury-compare`, `report`, `annotate`, `anchor`, `list-warriors`,
+With `--config` the run is headless by default: matches run in parallel under
+`headless_concurrency` (default 4) through a Rich one-liner printer, and the HTML report
+opens in your browser when the run ends (`--no-open` to skip; it never opens in CI). Pass
+`--tui` to watch the live Textual show instead. Without `--config` the roster picker opens,
+which needs the TUI. Full flag reference for `run` and every other subcommand (`demo`, `rejudge`, `jury-compare`, `report`, `annotate`, `anchor`, `list-warriors`,
 `refresh-models`): **[cli.md](cli.md)**.
 
 ---
@@ -197,10 +198,9 @@ only fires on `run` or `rejudge`, `demo`, `list-warriors`, and `refresh-models` 
 construct a gateway client, so they run with no key at all (`refresh-models` just falls back
 to cached results, or an empty list).
 
-**`Error: --headless needs --config (no picker without a TUI)`**
-`orq-arena run --headless` was run without `--config`. Headless mode has no roster picker, so
-it always needs an explicit YAML roster:
-`orq-arena run --headless --config orq_arena.yaml --yes`.
+**`Error: --tui and --headless contradict each other`**
+Both flags were passed to `orq-arena run`; drop one. `--headless` is a deprecated no-op
+(headless is already the default with `--config`); `--tui` opts into the live show.
 
 **`catalog load failed: ...` toast, then dropped back to the title screen**
 The picker's catalog load raised an unexpected error. Note this is rare by design: HTTP
