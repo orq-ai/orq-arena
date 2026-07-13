@@ -58,6 +58,8 @@ header .kind { margin-left: auto; font-family: var(--mono); font-size: 12px; col
 h1 { font-size: 30px; line-height: 1.15; margin: 26px 0 4px; letter-spacing: -0.5px; }
 h2 { font-size: 17px; margin: 40px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
 .sub { color: var(--muted); font-family: var(--mono); font-size: 12.5px; }
+.sub a { color: var(--brand); text-decoration: none; }
+.sub a:hover { text-decoration: underline; }
 .badges { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 4px; }
 .badge { font-family: var(--mono); font-size: 12px; padding: 3px 10px; border-radius: 20px;
          border: 1px solid var(--line); background: var(--card); }
@@ -73,11 +75,12 @@ h2 { font-size: 17px; margin: 40px 0 10px; padding-bottom: 6px; border-bottom: 1
 .verdict h1 { margin: 0 0 10px; font-size: 27px; line-height: 1.25; letter-spacing: -0.02em; }
 .verdict .expl { color: var(--muted); font-size: 13.5px; max-width: 64ch; margin: 0 0 18px; }
 .verdict .kpis { display: flex; gap: 44px; border-top: 1px solid var(--line); padding-top: 16px; }
-.verdict .kpi b { display: block; font-size: 34px; font-weight: 700; letter-spacing: -0.03em;
+.verdict .kpi > b { display: block; font-size: 34px; font-weight: 700; letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums; color: var(--ink); }
-.verdict .kpi.state b { color: var(--state); }
+.verdict .kpi.state > b { color: var(--state); }
 .verdict .kpi span { font-size: 12px; color: var(--muted); }
-.verdict .kpi b.name-kpi { font-size: 26px; line-height: 1.15; padding-top: 5px; }
+.verdict .kpi span b { font-size: 13px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.verdict .kpi > b.name-kpi { font-size: 26px; line-height: 1.15; padding-top: 5px; }
 .podium { display: flex; gap: 12px; margin: 18px 0 6px; flex-wrap: wrap; }
 .pod { flex: 1; min-width: 180px; background: var(--card); border: 1px solid var(--line);
        border-radius: 10px; padding: 12px 14px; text-align: center; }
@@ -635,7 +638,7 @@ def build_report_html(
         cls = " state" if i == 0 else ""
         top3.append(
             f"<div class='kpi{cls}'><b class='name-kpi'>{medals[i]} {_e(nm)}</b>"
-            f"<span><b style='font-size:15px'>{rates_all.get(nm, 0.0):.0%}</b> win rate"
+            f"<span><b>{rates_all.get(nm, 0.0):.0%}</b> win rate"
             f" &middot; {chips}</span></div>"
         )
     kpi3 = (
@@ -649,6 +652,15 @@ def build_report_html(
         f"{''.join(top3)}</div></div>"
     )
 
+    ds = manifest.get("dataset") or {}
+    dataset_frag = ""
+    if ds.get("id"):
+        label = _e(ds.get("name") or ds["id"])
+        dataset_frag = (
+            f"dataset <a href='{_e(ds['url'])}'>{label}</a> &middot; "
+            if ds.get("url") else f"dataset {label} &middot; "
+        )
+
 
     return f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
@@ -659,7 +671,7 @@ def build_report_html(
 <header>{_MARK}<span class="brand">orq.ai</span><span class="kind">{len(ranked)} MODELS &middot; {len(records)} ROUNDS{" &middot; " + duration.upper() if duration else ""} &middot; ORQ-ARENA RUN</span></header>
 
 {verdict_banner}
-<p class="sub">{len(ranked)} models &middot; {_e(manifest.get("tournament_id", ""))} &middot; {datestr}
+<p class="sub">{dataset_frag}{len(ranked)} models &middot; {_e(manifest.get("tournament_id", ""))} &middot; {datestr}
 {" &middot; " + duration if duration else ""} &middot; {len(records)} rounds
 ({rated} rated &middot; {verdicts["inconclusive"]} inconclusive &middot; {voids} voided)</p>
 

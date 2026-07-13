@@ -144,6 +144,7 @@ async def run_headless(
     prompts: list[PromptItem],
     battle_log_path: str,
     preflight: dict | None = None,
+    dataset: dict | None = None,
 ) -> dict[str, float]:
     console = Console(file=sys.stdout)
     cfg.match.verdict_hold_s = 0.0  # no screen to hold a beat for
@@ -164,6 +165,7 @@ async def run_headless(
         events=events,
         concurrency=max(1, cfg.headless_concurrency),
         preflight=preflight,
+        dataset=dataset,
     )
     await printer_task
     return elo

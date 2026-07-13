@@ -86,3 +86,30 @@ def test_report_no_cost_without_prices():
         report=REPORT, manifest=MANIFEST,
     )
     assert "est. cost" not in html
+    assert "dataset" not in html  # no dataset in manifest, no dataset line
+
+
+def test_report_links_orq_dataset():
+    manifest = MANIFEST | {"dataset": {
+        "id": "ds_01", "name": "Support prompts",
+        "url": "https://my.orq.ai/datasets/ds_01",
+    }}
+    html = build_report_html(
+        cfg=CFG, records=[_record("A")], elo={"model-a": 1050.0, "model-b": 950.0},
+        report=REPORT, manifest=manifest,
+    )
+    assert "dataset <a href='https://my.orq.ai/datasets/ds_01'>Support prompts</a>" in html
+
+
+def test_orq_dataset_meta_offline_fallback(monkeypatch):
+    import orq_ai_sdk
+
+    from orq_arena.data.prompts import orq_dataset_meta
+
+    def _boom(*a, **k):
+        raise RuntimeError("no network in tests")
+
+    monkeypatch.setattr(orq_ai_sdk, "Orq", _boom)
+    meta = orq_dataset_meta("ds_42", api_key_env="ORQ_API_KEY")
+    assert meta == {"id": "ds_42", "name": "ds_42",
+                    "url": "https://my.orq.ai/datasets/ds_42"}

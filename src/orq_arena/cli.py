@@ -72,6 +72,13 @@ def run(config_path: str | None, prompts_path: str, output_path: str,
     pick_roster = config_path is None
     cfg = load_config(config_path or DEFAULT_CONFIG)
     prompts = load_prompts(prompts_path, api_key_env=cfg.gateway.api_key_env)
+    dataset = None
+    if prompts_path.startswith("orq:"):
+        from .data.prompts import orq_dataset_meta
+
+        dataset = orq_dataset_meta(
+            prompts_path[len("orq:"):], api_key_env=cfg.gateway.api_key_env
+        )
 
     if pick_roster:
         if headless:
@@ -79,7 +86,7 @@ def run(config_path: str | None, prompts_path: str, output_path: str,
         # Preflight (probe + counts) runs in-app after the roster is picked.
         app = ArenaApp(
             cfg=cfg, prompts=prompts, battle_log_path=output_path, live=True,
-            pick_roster=True,
+            pick_roster=True, dataset=dataset,
         )
         app.run()
         return
@@ -136,13 +143,13 @@ def run(config_path: str | None, prompts_path: str, output_path: str,
 
         asyncio.run(run_headless(
             cfg=cfg, prompts=prompts, battle_log_path=output_path,
-            preflight=preflight_data,
+            preflight=preflight_data, dataset=dataset,
         ))
         return
 
     app = ArenaApp(
         cfg=cfg, prompts=prompts, battle_log_path=output_path, live=True,
-        preflight=preflight_data,
+        preflight=preflight_data, dataset=dataset,
     )
     app.run()
 

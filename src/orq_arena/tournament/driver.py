@@ -182,6 +182,7 @@ def _write_manifest(
     path: Path, *, cfg: ArenaConfig, prompts: list[PromptItem], seed: int,
     tournament_id: str, started_at: float, finished_at: float | None = None,
     report: dict | None = None, preflight: dict | None = None,
+    dataset: dict | None = None,
 ) -> None:
     try:
         from importlib.metadata import version
@@ -208,6 +209,8 @@ def _write_manifest(
     }
     if finished_at is not None:
         manifest["finished_at"] = finished_at
+    if dataset is not None:
+        manifest["dataset"] = dataset
     if preflight is not None:
         manifest["preflight"] = preflight
     if report is not None:
@@ -230,6 +233,7 @@ async def run_tournament(
     seed: int = 42,
     concurrency: int = 1,
     preflight: dict | None = None,
+    dataset: dict | None = None,
 ) -> dict[str, float]:
     """Run the full round-robin; return final ELO ratings by orc name.
 
@@ -257,6 +261,7 @@ async def run_tournament(
     _write_manifest(
         manifest_path, cfg=cfg, prompts=prompts, seed=seed,
         tournament_id=tournament_id, started_at=started_at, preflight=preflight,
+        dataset=dataset,
     )
 
     rng = random.Random(seed)
@@ -345,6 +350,7 @@ async def run_tournament(
         manifest_path, cfg=cfg, prompts=prompts, seed=seed,
         tournament_id=tournament_id, started_at=started_at,
         finished_at=time.time(), report=report, preflight=preflight,
+        dataset=dataset,
     )
 
     try:

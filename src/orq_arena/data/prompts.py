@@ -77,6 +77,29 @@ def datapoint_to_prompt(inputs: dict | None, messages: list | None) -> PromptIte
     return PromptItem(text=text)
 
 
+def orq_dataset_meta(dataset_id: str, api_key_env: str = "ORQ_API_KEY") -> dict:
+    """Report metadata for an orq.ai Dataset: id, display name, studio URL.
+
+    The name fetch is best-effort; on any failure the id doubles as the name
+    so the report never blocks on this call.
+    """
+    import os
+
+    name = None
+    try:
+        from orq_ai_sdk import Orq
+
+        with Orq(api_key=os.environ.get(api_key_env, "")) as client:
+            name = client.datasets.retrieve(dataset_id=dataset_id).display_name
+    except Exception:
+        pass
+    return {
+        "id": dataset_id,
+        "name": name or dataset_id,
+        "url": f"https://my.orq.ai/datasets/{dataset_id}",
+    }
+
+
 def _load_orq_dataset(dataset_id: str, api_key_env: str) -> list[PromptItem]:
     import os
 

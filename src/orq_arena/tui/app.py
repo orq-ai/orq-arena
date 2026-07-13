@@ -69,10 +69,12 @@ class ArenaApp(App):
         fixture: str | None = None,
         preflight: dict | None = None,
         pick_roster: bool = False,
+        dataset: dict | None = None,
     ) -> None:
         super().__init__()
         self.cfg = cfg
         self._preflight = preflight
+        self._dataset = dataset
         self._pick_roster = pick_roster
         self._prompts = prompts
         self._battle_log_path = battle_log_path
@@ -176,6 +178,7 @@ class ArenaApp(App):
                 battle_log_path=self._battle_log_path,
                 events=self._events,
                 preflight=self._preflight,
+                dataset=self._dataset,
             )
         except Exception as exc:
             await self._events.put(
