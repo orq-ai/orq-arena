@@ -79,8 +79,10 @@ h2 { font-size: 17px; margin: 40px 0 10px; padding-bottom: 6px; border-bottom: 1
   font-variant-numeric: tabular-nums; color: var(--ink); }
 .verdict .kpi.state > b { color: var(--state); }
 .verdict .kpi span { font-size: 12px; color: var(--muted); }
-.verdict .kpi span.stat { display: block; margin-top: 3px; }
-.verdict .kpi span b { font-size: 13px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.verdict .kpi span.stat { display: block; margin-top: 4px; }
+.verdict .kpi span b { font-size: 16px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.verdict .kpi span.lead b { font-size: 23px; letter-spacing: -0.02em; }
+.verdict .kpi.state span.lead b { color: var(--state); }
 .verdict .kpi > b.name-kpi { font-size: 26px; line-height: 1.15; padding-top: 5px; }
 .podium { display: flex; gap: 12px; margin: 18px 0 6px; flex-wrap: wrap; }
 .pod { flex: 1; min-width: 180px; background: var(--card); border: 1px solid var(--line);
@@ -635,7 +637,7 @@ def build_report_html(
     for i, (nm, e0) in enumerate(ranked[:3]):
         cls = " state" if i == 0 else ""
         stats = (
-            f"<span class='stat'><b>{rates_all.get(nm, 0.0):.0%}</b> win rate</span>"
+            f"<span class='stat lead'><b>{rates_all.get(nm, 0.0):.0%}</b> win rate</span>"
             f"<span class='stat'><b>{e0:.0f}</b> ELO score</span>"
         )
         if nm in per_cost_all:
