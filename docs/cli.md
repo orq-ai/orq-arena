@@ -355,6 +355,8 @@ Render the single-file HTML report page from a recorded run. Reads `battles.json
 `*.run.json` manifest; makes no API calls. The same page is written automatically at the end
 of every run (`<log>.report.html` next to the log).
 
+![HTML report page: verdict banner with the top three models, badges, ELO leaderboard with CI bars, and the cost-vs-win-rate value map](../media/report-page.png)
+
 ```text
 orq-arena report [LOG_PATH] [--config PATH] [--output PATH]
 ```

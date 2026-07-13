@@ -74,6 +74,8 @@ When you are ready for a live run against real models:
 
 **Share the result**: every run also writes a self-contained HTML report page (`<log>.report.html`): verdict headline, ELO ladder with CI bars, len-ctrl column, win grid, jury behaviour. Regenerate any time with `uv run orq-arena report battles.jsonl`; no API calls.
 
+![HTML report page: verdict banner with the top three models, badges, ELO leaderboard with CI bars, and the cost-vs-win-rate value map](media/report-page.png)
+
 **Re-judge with a different jury**: the responses are already in `battles.jsonl`, so swapping the panel costs judge tokens only: `uv run orq-arena rejudge battles.jsonl --judge mistral/mistral-small-2603`. Prints the new jury's behaviour and the Spearman correlation against the recorded ranking. Multi-judge example: **[docs/cli.md](docs/cli.md)**.
 
 ## Configuration
