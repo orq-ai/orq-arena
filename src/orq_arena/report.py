@@ -81,16 +81,6 @@ h2 { font-size: 17px; margin: 40px 0 10px; padding-bottom: 6px; border-bottom: 1
 .verdict .kpi span.lead b { font-size: 23px; letter-spacing: -0.02em; }
 .verdict .kpi.state span.lead b { color: var(--state); }
 .verdict .kpi > b.name-kpi { font-size: 26px; line-height: 1.15; padding-top: 5px; }
-.podium { display: flex; gap: 12px; margin: 18px 0 6px; flex-wrap: wrap; }
-.pod { flex: 1; min-width: 180px; background: var(--card); border: 1px solid var(--line);
-       border-radius: 10px; padding: 12px 14px; text-align: center; }
-.pod .medal { font-size: 20px; } .pod .pname { font-weight: 700; font-size: 14px; margin: 2px 0; }
-.pod .pscore { font-size: 26px; font-weight: 700; color: var(--teal-soft);
-               font-variant-numeric: tabular-nums; }
-.pod .psub { font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
-.pod .pchip { display: inline-block; font-family: var(--mono); font-size: 10.5px;
-              border: 1px solid var(--line); border-radius: 12px; padding: 0 8px;
-              margin: 4px 2px 0; color: var(--muted); }
 table { border-collapse: collapse; width: 100%; font-size: 13.5px;
         font-variant-numeric: tabular-nums; }
 th { text-align: left; font-family: var(--mono); font-size: 10.5px; text-transform: uppercase;
@@ -134,15 +124,17 @@ def _ci_bar(lo: float, hi: float, point: float, floor: float, span: float) -> st
     )
 
 
-def _cost_lines(records, manifest, prices):
+def _cost_lines(records, manifest, prices, alias=None):
     """(warrior_usd, jury_usd_estimate, unpriced_names) or None without prices.
 
     Warrior spend is exact (per-record model attribution); jury spend is an
     estimate at the panel's mean catalog rate, because records store the
-    panel's token total, not per-judge splits.
+    panel's token total, not per-judge splits. ``alias`` maps the short model
+    names stored in records to the display names the manifest is keyed by.
     """
     if not prices:
         return None
+    alias = alias or {}
     id_by_name = {
         n: (w.get("model") if isinstance(w, dict) else "")
         for n, w in (manifest.get("warriors") or {}).items()
@@ -158,6 +150,7 @@ def _cost_lines(records, manifest, prices):
             (r.model_a, r.tokens_a_in, r.tokens_a_out),
             (r.model_b, r.tokens_b_in, r.tokens_b_out),
         ):
+            name = alias.get(name, name)
             pr = prices.get(id_by_name.get(name, ""))
             if pr is None:
                 unpriced.add(name)
@@ -184,7 +177,8 @@ def _win_rates(grid: dict, names: list[str]) -> dict[str, float]:
     return rates
 
 
-def _per_model_cost(records, manifest, prices) -> dict[str, float]:
+def _per_model_cost(records, manifest, prices, alias=None) -> dict[str, float]:
+    alias = alias or {}
     id_by_name = {
         n: (w.get("model") if isinstance(w, dict) else "")
         for n, w in (manifest.get("warriors") or {}).items()
@@ -197,6 +191,7 @@ def _per_model_cost(records, manifest, prices) -> dict[str, float]:
             (r.model_a, r.tokens_a_in, r.tokens_a_out),
             (r.model_b, r.tokens_b_in, r.tokens_b_out),
         ):
+            name = alias.get(name, name)
             pr = prices.get(id_by_name.get(name, ""))
             if pr is not None:
                 out[name] = out.get(name, 0.0) + tin * pr[0] / 1e6 + tout * pr[1] / 1e6
@@ -224,8 +219,8 @@ def _value_map_svg(points, champion: str, size_label: str = "average response le
     tmax = max(t for *_, t in points) or 1.0
     elos = [e for _, _, e, _, _ in points]
     # Pad the ELO range, then snap the axis to tick multiples.
-    step = next(s for s in (50, 100, 200, 500, 1000)
-                if (max(elos) - min(elos)) / s <= 6)
+    step = next((s for s in (50, 100, 200, 500, 1000)
+                 if (max(elos) - min(elos)) / s <= 6), 2000)
     e_lo = math.floor((min(elos) - step * 0.4) / step) * step
     e_hi = math.ceil((max(elos) + step * 0.4) / step) * step
     W, H, L, R, T, B = 720, 310, 70, 40, 30, 60
@@ -304,9 +299,8 @@ def _value_map_svg(points, champion: str, size_label: str = "average response le
         f"text-anchor='end'>{v:.0f}</text>"
         for v in range(e_lo, e_hi + 1, step)
     )
-    import math as _m
-    lo_dec = _m.floor(x0)
-    hi_dec = _m.ceil(x1)
+    lo_dec = math.floor(x0)
+    hi_dec = math.ceil(x1)
     x_ticks = ""
     for d in range(lo_dec, hi_dec + 1):
         if d < x0 - 0.05 or d > x1 + 0.05:
@@ -340,18 +334,19 @@ and win rate. Win rate counts rated rounds only.</p>
 
 
 
-def _speed_stats(records) -> list[tuple[str, float, float, float, float]]:
+def _speed_stats(records, alias=None) -> list[tuple[str, float, float, float, float]]:
     """Per model: (avg tok/s, avg ttft s, avg out tokens, avg duration s).
 
     tok/s and duration are 0.0 on logs that predate duration capture.
     """
+    alias = alias or {}
     agg: dict[str, list] = {}
     for r in records:
         if r.error is not None:
             continue
         for name, tout, ttft, dur in (
-            (r.model_a, r.tokens_a_out, r.ttft_a_ms, getattr(r, "duration_a_ms", 0)),
-            (r.model_b, r.tokens_b_out, r.ttft_b_ms, getattr(r, "duration_b_ms", 0)),
+            (alias.get(r.model_a, r.model_a), r.tokens_a_out, r.ttft_a_ms, r.duration_a_ms),
+            (alias.get(r.model_b, r.model_b), r.tokens_b_out, r.ttft_b_ms, r.duration_b_ms),
         ):
             a = agg.setdefault(name, [0.0, 0, 0.0, 0, 0.0, 0, 0.0])
             if dur > 0 and tout:
@@ -386,17 +381,17 @@ def _speed_svg(stats) -> str:
         return ""
     rows.sort(key=lambda x: -x[1])
     vmax = max(x[1] for x in rows) or 1.0
-    title, note = "Speed", ("Average tokens per second over the run's streamed responses; "
-                            "time to first token annotated.")
-    has_tps = True
+    title = "Speed"
+    note = ("Average tokens per second over the run's streamed responses; "
+            "time to first token annotated.")
     W, L, RH = 720, 170, 26
     H = 24 + RH * len(rows) + 8
     parts = []
     for i, (name, tps, ttft, _ot, _dur) in enumerate(rows):
         y = 18 + i * RH
-        val = tps if has_tps else ttft
+        val = tps
         width = max((val / vmax) * (W - L - 190), 3)
-        label = (f"{tps:.0f} tok/s &middot; ttft {ttft:.1f}s" if has_tps else f"ttft {ttft:.1f}s")
+        label = f"{tps:.0f} tok/s &middot; ttft {ttft:.1f}s"
         op = 0.85 - 0.5 * (i / max(len(rows) - 1, 1))
         parts.append(
             f"<text x='{L - 8}' y='{y + 12}' font-size='10.5' fill='var(--muted)' text-anchor='end'>{_e(name)}</text>"
@@ -552,14 +547,16 @@ def build_report_html(
 
     panel = ", ".join(str(j).split("/")[-1] for j in manifest.get("judges", cfg.judges))
 
-    stats_all = _speed_stats(records)
+    # Records store short model names; elo/manifest/report are keyed by display
+    # name (orc_name). Identical unless the roster sets custom names.
+    alias = report.get("by_model_names") or {w.short_model: w.orc_name for w in cfg.warriors}
+    stats_all = _speed_stats(records, alias)
     speed = _speed_svg(stats_all)
-    speed_by = {n: (tps, ttft) for n, tps, ttft, _o, _d in stats_all}
     dur_by = {n: d for n, _t, _f, _o, d in stats_all}
 
     value_map = ""
     if prices:
-        per_cost = _per_model_cost(records, manifest, prices)
+        per_cost = _per_model_cost(records, manifest, prices, alias)
         rates = _win_rates(grid, order)
         use_dur = any(dur_by.get(n, 0.0) > 0 for n in order)
         pts = [
@@ -571,27 +568,9 @@ def build_report_html(
             "average time to answer" if use_dur else "average response length"))
 
     rates_all = _win_rates(grid, order)
-    per_cost_all = _per_model_cost(records, manifest, prices) if prices else {}
-    medals = ["&#129351;", "&#129352;", "&#129353;"]
-    pods = []
-    for i, (name, e0) in enumerate(ranked[:3]):
-        chips = ""
-        if name in per_cost_all:
-            chips += f"<span class='pchip'>{_fmt_usd(per_cost_all[name])}</span>"
-        tps, ttft = speed_by.get(name, (0.0, 0.0))
-        if tps > 0:
-            chips += f"<span class='pchip'>{tps:.0f} tok/s</span>"
-        elif ttft > 0:
-            chips += f"<span class='pchip'>ttft {ttft:.1f}s</span>"
-        pods.append(
-            f"<div class='pod'><div class='medal'>{medals[i]}</div>"
-            f"<div class='pname'>{_e(name)}</div>"
-            f"<div class='pscore'>{rates_all.get(name, 0.0):.0%}</div>"
-            f"<div class='psub'>win rate &middot; ELO {e0:.0f}</div>{chips}</div>"
-        )
-    podium = ""  # top-3 lives in the verdict banner now
+    per_cost_all = _per_model_cost(records, manifest, prices, alias) if prices else {}
 
-    cost = _cost_lines(records, manifest, prices)
+    cost = _cost_lines(records, manifest, prices, alias)
     w_usd_cell = j_usd_cell = t_usd_cell = ""
     cost_note = ""
     cost_head = ""
@@ -618,10 +597,6 @@ def build_report_html(
     champ_rate = rates_all.get(champion, 0.0)
     runner_name = ranked[1][0] if len(ranked) > 1 else ""
     separated = "top spot separated" in overlap_caveat
-    total_usd = ""
-    if cost:
-        _w, _j, _u = cost
-        total_usd = f"${_w + (_j or 0.0):,.2f}"
     if separated:
         vclass, headline = "", (
             f"Adopt {_e(champion)}: wins {champ_rate:.0%} of rated rounds, "
@@ -641,12 +616,6 @@ def build_report_html(
             f"{_e(runner_name)} is inside the error bars. The value map below is the "
             f"tie-breaker; more rounds would separate them."
         )
-    champ_usd = per_cost_all.get(champion)
-    kpi2 = (
-        f"<div class='kpi'><b>{_fmt_usd(champ_usd)}</b><span>{_e(champion)} spend this run</span></div>"
-        if champ_usd else
-        f"<div class='kpi'><b>{len(records)}</b><span>Rounds judged</span></div>"
-    )
     status = ("&#10003; TOP SPOT SEPARATED" if separated
               else "&#9888; STATISTICAL TIE AT THE TOP")
     medals = ["&#129351;", "&#129352;", "&#129353;"]
@@ -662,10 +631,6 @@ def build_report_html(
         top3.append(
             f"<div class='kpi{cls}'><b class='name-kpi'>{medals[i]} {_e(nm)}</b>{stats}</div>"
         )
-    kpi3 = (
-        f"<div class='kpi'><b>{_pct(agreement)}</b><span>Judge agreement</span></div>"
-        if agreement is not None else ""
-    )
     verdict_banner = (
         f"<div class='verdict{vclass}'><p class='eyebrow'>{status}</p>"
         f"<h1>{headline}</h1>"
@@ -704,7 +669,6 @@ def build_report_html(
   <span class="badge">jury share of tokens <b>{jury_share}</b></span>
 </div>
 
-{podium}
 <h2>Leaderboard</h2>
 <div class="tablewrap"><table>
 <thead><tr><th class="n">#</th><th>Model</th><th class="n">ELO</th><th class="n">95% CI</th>
@@ -785,5 +749,5 @@ def write_report(
     out = report_path_for(log_path)
     out.write_text(build_report_html(
         cfg=cfg, records=records, elo=elo, report=report, manifest=manifest, prices=prices,
-    ))
+    ), encoding="utf-8")
     return out

@@ -1,4 +1,3 @@
-<!-- generated-by: gsd-doc-writer -->
 # Getting Started
 
 This guide takes you from a fresh clone to a live tournament, a round-robin of LLMs

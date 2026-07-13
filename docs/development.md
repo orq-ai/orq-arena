@@ -1,4 +1,3 @@
-<!-- generated-by: gsd-doc-writer -->
 # Development
 
 Contributor reference for orq-arena: local setup, what `uv sync` actually installs, the module

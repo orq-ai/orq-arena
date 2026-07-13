@@ -24,7 +24,7 @@ Outcome = tuple[str, str, str]
 
 def load_records(path: str | Path) -> list[BattleRecord]:
     records: list[BattleRecord] = []
-    with Path(path).open() as fh:
+    with Path(path).open(encoding="utf-8") as fh:
         for line in fh:
             line = line.strip()
             if line:
@@ -132,7 +132,7 @@ async def rejudge_run(
 
 def write_rejudged(path: str | Path, records: list[BattleRecord],
                    comparisons: list[PairwiseComparison]) -> None:
-    with Path(path).open("w") as fh:
+    with Path(path).open("w", encoding="utf-8") as fh:
         for rec, c in zip(records, comparisons):
             row = rec.model_copy(
                 update={
@@ -191,14 +191,14 @@ def save_report_json(path: str | Path, result: dict) -> None:
         "new_ranking": result["new_ranking"],
         "jury": result["report"].model_dump(),
     }
-    Path(path).write_text(json.dumps(payload, indent=2, default=str))
+    Path(path).write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
 
 
 def compare_reports(paths: list[str | Path]) -> list[dict]:
     """Rows for the jury-selection table, one per saved rejudge report JSON."""
     rows: list[dict] = []
     for path in paths:
-        data = json.loads(Path(path).read_text())
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
         jury = data.get("jury") or {}
         per_judge = jury.get("per_judge") or []
         panel = ", ".join(str(j.get("model", "?")).split("/")[-1] for j in per_judge)

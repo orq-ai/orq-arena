@@ -162,8 +162,8 @@ def _final_report(
         "mean_agreement": jury.mean_agreement if jury else None,
         "fleiss": fleiss,
         "cohen": cohen,
-        "verbosity": {m: sum(v) / len(v) for m, v in tokens.items() if v},
-        "reasoning_tokens": {m: sum(v) / len(v) for m, v in reasoning.items() if v},
+        "verbosity": {orc_by_model.get(m, m): sum(v) / len(v) for m, v in tokens.items() if v},
+        "reasoning_tokens": {orc_by_model.get(m, m): sum(v) / len(v) for m, v in reasoning.items() if v},
         "win_grid": grid,
         "thinking": {
             w.orc_name: (w.thinking_enabled or probed.get(w.orc_name, False))
@@ -176,6 +176,27 @@ def _final_report(
         "rated_rounds": len(outcomes),
         "by_model_names": {w.short_model: w.orc_name for w in by_model.values()},
     }
+
+
+def rebuild_from_log(
+    cfg: ArenaConfig, records: list[BattleRecord], preflight: dict | None = None,
+) -> tuple[dict[str, float], dict]:
+    """Recompute (elo, report) from a recorded log, keyed exactly like the
+    live run (display names), so a regenerated report page matches the one
+    the run wrote. The single rebuild path for ``orq-arena report``.
+    """
+    alias = {w.short_model: w.orc_name for w in cfg.warriors}
+    outcomes: list[Outcome] = []
+    for rec in records:
+        if rec.error is not None:
+            continue
+        outcomes.extend(outcomes_from_records(
+            [rec], alias.get(rec.model_a, rec.model_a), alias.get(rec.model_b, rec.model_b)
+        ))
+    names = sorted({alias.get(m, m) for r in records for m in (r.model_a, r.model_b)})
+    elo = bradley_terry_mle(build_wins_matrix(_triples(outcomes)), names)
+    report = _final_report(cfg, records, outcomes, names, preflight=preflight)
+    return elo, report
 
 
 def _write_manifest(
@@ -221,7 +242,7 @@ def _write_manifest(
         manifest["fleiss"] = report.get("fleiss")
         manifest["tokens"] = report.get("tokens")
         manifest["length_coef"] = report.get("length_coef")
-    path.write_text(json.dumps(manifest, indent=2, default=str))
+    path.write_text(json.dumps(manifest, indent=2, default=str), encoding="utf-8")
 
 
 async def run_tournament(
@@ -364,7 +385,7 @@ async def run_tournament(
         write_report(
             prices=prices or None,
             cfg=cfg, records=all_records, elo=elo, report=report,
-            manifest=json.loads(manifest_path.read_text()), log_path=battle_log_path,
+            manifest=json.loads(manifest_path.read_text(encoding="utf-8")), log_path=battle_log_path,
         )
     except Exception as exc:  # a finished run must never die on its report page
         from loguru import logger

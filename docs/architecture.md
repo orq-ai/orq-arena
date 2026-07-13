@@ -1,4 +1,3 @@
-<!-- generated-by: gsd-doc-writer -->
 # Architecture
 
 Technical design, component diagram, data flow, and key abstractions for orq-arena, a

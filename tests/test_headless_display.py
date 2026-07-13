@@ -4,13 +4,13 @@ import asyncio
 import io
 import re
 
-ANSI = re.compile(r"\x1b\[[0-9;?]*[a-zA-Z]")
-
 from rich.console import Console
 
 from orq_arena.events import (MatchResolved, StandingsUpdated, TournamentEnded,
                               TurnResolved)
 from orq_arena.headless import consume_events
+
+ANSI = re.compile(r"\x1b\[[0-9;?]*[a-zA-Z]")
 
 
 def _events():

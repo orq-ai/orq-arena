@@ -1,4 +1,3 @@
-<!-- generated-by: gsd-doc-writer -->
 # orq-arena documentation
 
 Guides for running, configuring, trusting, and extending the arena. The

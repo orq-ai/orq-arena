@@ -1,4 +1,3 @@
-<!-- generated-by: gsd-doc-writer -->
 # Configuration Reference
 
 Complete reference for every configuration surface in orq-arena: the one environment variable

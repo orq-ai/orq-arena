@@ -123,7 +123,7 @@ def load_records(log_path: str | Path) -> list[BattleRecord]:
     p = Path(log_path)
     if not p.exists():
         return records
-    with p.open() as fh:
+    with p.open(encoding="utf-8") as fh:
         for line in fh:
             line = line.strip()
             if line:
@@ -140,7 +140,7 @@ def read_cache(log_path: str | Path) -> dict[str, Postmortem]:
     p = cache_path(log_path)
     if not p.exists():
         return out
-    for line in p.read_text().splitlines():
+    for line in p.read_text(encoding="utf-8").splitlines():
         if line.strip():
             pm = Postmortem.model_validate_json(line)
             out[pm.model] = pm
@@ -148,5 +148,5 @@ def read_cache(log_path: str | Path) -> dict[str, Postmortem]:
 
 
 def append_cache(log_path: str | Path, pm: Postmortem) -> None:
-    with cache_path(log_path).open("a") as fh:
+    with cache_path(log_path).open("a", encoding="utf-8") as fh:
         fh.write(pm.model_dump_json() + "\n")

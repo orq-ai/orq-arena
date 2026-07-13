@@ -15,8 +15,8 @@ def test_winners_meet_winners_and_no_rematch():
     names = ["a", "b", "c", "d"]
     s = SwissScheduler(names)
     r1 = s.next_round_pairs()
-    for w, l in r1:
-        s.record_outcome(w, l)  # first name wins
+    for w, loser in r1:
+        s.record_outcome(w, loser)  # first name wins
     winners = {w for w, _ in r1}
     r2 = s.next_round_pairs()
     assert all(frozenset(p) not in {frozenset(q) for q in r1} for p in r2)

@@ -31,7 +31,7 @@ def _load_dotenv() -> None:
     env = Path(".env")
     if not env.is_file():
         return
-    for line in env.read_text().splitlines():
+    for line in env.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if line and not line.startswith("#") and "=" in line:
             key, _, value = line.partition("=")
@@ -50,12 +50,16 @@ def cli() -> None:
 @click.option("--prompts", "prompts_path", default=DEFAULT_PROMPTS, show_default=True,
               help="JSONL file, or orq:<dataset_id> to pull an orq.ai Dataset.")
 @click.option("--output", "output_path", default=DEFAULT_OUTPUT, show_default=True)
+@click.option("--rounds", "rounds", type=int, default=None,
+              help="Rounds per match (overrides match.max_rounds). Use len(prompts) to see every prompt.")
+@click.option("--overwrite", is_flag=True, default=False,
+              help="Allow replacing an existing non-empty battle log at --output.")
 @click.option("--headless", is_flag=True, default=False,
               help="No TUI; matches run in parallel (headless_concurrency). Requires --config.")
 @click.option("--yes", "-y", "assume_yes", is_flag=True, default=False,
               help="Skip the preflight confirmation pause.")
-def run(config_path: str | None, prompts_path: str, output_path: str,
-        headless: bool, assume_yes: bool) -> None:
+def run(config_path: str | None, prompts_path: str, output_path: str, rounds: int | None,
+        overwrite: bool, headless: bool, assume_yes: bool) -> None:
     """Run the full round-robin arena live (hits orq.ai).
 
     Without --config the roster picker opens first: choose any >=2 models
@@ -63,15 +67,32 @@ def run(config_path: str | None, prompts_path: str, output_path: str,
     rules, and gateway settings.
     """
     import asyncio
+    from pathlib import Path
 
     from .preflight import (call_counts, cost_ceiling, judge_family_overlaps,
                             surprises, thinking_probe)
     from .providers.models_list import fetch_price_map
 
     _quiet_logs()
+    out = Path(output_path)
+    if out.exists() and out.stat().st_size > 0 and not overwrite:
+        raise click.ClickException(
+            f"{output_path} already holds a recorded run; a new run would erase it. "
+            "Pass a fresh --output, or --overwrite to replace it."
+        )
     pick_roster = config_path is None
     cfg = load_config(config_path or DEFAULT_CONFIG)
     prompts = load_prompts(prompts_path, api_key_env=cfg.gateway.api_key_env)
+    if rounds is not None:
+        if rounds < 1:
+            raise click.ClickException("--rounds must be >= 1")
+        cfg.match.max_rounds = rounds
+    if cfg.match.max_rounds < len(prompts):
+        click.echo(
+            f"  ⚠ each match samples {cfg.match.max_rounds} of your {len(prompts)} prompts "
+            f"(a seeded random slice per match). Pass --rounds {len(prompts)} to use every "
+            "prompt each match, or raise match.max_rounds in the YAML."
+        )
     dataset = None
     if prompts_path.startswith("orq:"):
         from .data.prompts import orq_dataset_meta
@@ -176,9 +197,6 @@ def list_warriors(config_path: str) -> None:
         click.echo(f"{i:<5} {w.orc_name:<26} {w.model_id}")
 
 
-if __name__ == "__main__":
-    cli()
-
 
 @cli.command()
 @click.argument("log_path", default=DEFAULT_OUTPUT)
@@ -245,7 +263,8 @@ def jury_compare(report_jsons: tuple[str, ...]) -> None:
 def report_cmd(log_path: str, config_path: str, output_path: str | None) -> None:
     """Render the single-file HTML report page from a recorded run.
 
-    Reads battles.jsonl and its *.run.json manifest; makes no API calls.
+    Reads battles.jsonl and its *.run.json manifest; makes no model calls
+    (one catalog read prices the cost section when a key is present).
     The same page is written automatically at the end of every run.
     """
     import asyncio
@@ -254,8 +273,7 @@ def report_cmd(log_path: str, config_path: str, output_path: str | None) -> None
 
     from .data.schemas import BattleRecord
     from .report import build_report_html, report_path_for
-    from .tournament.driver import Outcome, _final_report, _triples
-    from .tournament.elo import bradley_terry_mle, build_wins_matrix
+    from .tournament.driver import rebuild_from_log
 
     cfg = load_config(config_path)
     log = Path(log_path)
@@ -263,27 +281,14 @@ def report_cmd(log_path: str, config_path: str, output_path: str | None) -> None
         raise click.ClickException(f"{log_path} not found")
     records = [
         BattleRecord.model_validate_json(line)
-        for line in log.read_text().splitlines() if line.strip()
+        for line in log.read_text(encoding="utf-8").splitlines() if line.strip()
     ]
     if not records:
         raise click.ClickException(f"no rounds in {log_path}")
     manifest_path = log.with_suffix(".run.json")
-    manifest = _json.loads(manifest_path.read_text()) if manifest_path.exists() else {}
+    manifest = _json.loads(manifest_path.read_text(encoding="utf-8")) if manifest_path.exists() else {}
 
-    names = sorted({m for r in records for m in (r.model_a, r.model_b)})
-    outcomes: list[Outcome] = []
-    for r in records:
-        if r.error is not None:
-            continue
-        cat = r.prompt_category or "general"
-        if r.majority_verdict == "A":
-            outcomes.append((r.model_a, r.model_b, "winner", cat))
-        elif r.majority_verdict == "B":
-            outcomes.append((r.model_b, r.model_a, "winner", cat))
-        elif r.majority_verdict == "tie":
-            outcomes.append((r.model_a, r.model_b, "tie", cat))
-    elo = bradley_terry_mle(build_wins_matrix(_triples(outcomes)), names)
-    rep = _final_report(cfg, records, outcomes, names, preflight=manifest.get("preflight"))
+    elo, rep = rebuild_from_log(cfg, records, preflight=manifest.get("preflight"))
 
     from .providers.models_list import fetch_price_map
 
@@ -296,7 +301,7 @@ def report_cmd(log_path: str, config_path: str, output_path: str | None) -> None
     out.write_text(build_report_html(
         cfg=cfg, records=records, elo=elo, report=rep, manifest=manifest,
         prices=prices or None,
-    ))
+    ), encoding="utf-8")
     click.echo(f"report page -> {out}")
 
 
@@ -392,7 +397,7 @@ def annotate(battle_log: str, out_path: str, sample: int | None, seed: int,
         click.echo(f"\nvotes: {', '.join(str(f) for f in files)}")
         render_anchor_result(anchor_result(records, load_votes(files)))
         return
-    Path(out_path).write_text(page)
+    Path(out_path).write_text(page, encoding="utf-8")
     click.echo(
         f"{len(items)} rounds -> {out_path} (blind; votes export as votes.json)"
         + (f", {len(excluded)} already-voted excluded" if excluded else "")
@@ -415,3 +420,6 @@ def anchor(battle_log: str, vote_files: tuple[str, ...]) -> None:
     render_anchor_result(
         anchor_result(load_records(battle_log), load_votes(list(vote_files)))
     )
+
+if __name__ == "__main__":
+    cli()

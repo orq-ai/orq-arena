@@ -384,7 +384,7 @@ class VoteSet:
 def load_votes(paths: list[str | Path]) -> list[VoteSet]:
     sets: list[VoteSet] = []
     for p in paths:
-        data = json.loads(Path(p).read_text())
+        data = json.loads(Path(p).read_text(encoding="utf-8"))
         votes = {
             k: v for k, v in (data.get("votes") or {}).items() if v in _DECISIVE
         }
@@ -521,7 +521,7 @@ def make_annotation_server(
             payload["votes"] = votes
             path = votes_dir / f"votes-{slug}.json"
             tmp = path.with_suffix(".tmp")
-            tmp.write_text(json.dumps(payload, indent=1))
+            tmp.write_text(json.dumps(payload, indent=1), encoding="utf-8")
             tmp.replace(path)
             written.add(path)
             self.send_response(204)

@@ -20,3 +20,7 @@ orc-arena_*.svg
 .planning/tmp/
 annotate.html
 votes*.json
+
+# Internal planning stays local
+.planning/
+REFACTOR_PLAN.md

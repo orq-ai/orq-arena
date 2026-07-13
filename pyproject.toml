@@ -24,6 +24,9 @@ dependencies = [
     # pairwise jury (llm_jury_pairwise landed in 1.3.x)
     "evaluatorq>=1.8.0",
     "orq-ai-sdk>=4.11.7",
+    # imported directly (cli.py, headless.py); do not ride on transitive deps
+    "loguru>=0.7",
+    "rich>=13.7",
 ]
 
 [project.urls]
@@ -41,6 +44,10 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/orq_arena"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

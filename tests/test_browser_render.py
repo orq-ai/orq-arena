@@ -1,6 +1,5 @@
 """Battle browser renders real schema-v2 records headlessly."""
 
-import json
 from pathlib import Path
 
 from textual.app import App
@@ -13,7 +12,7 @@ LOG = Path(__file__).resolve().parent.parent / "outputs" / "smoke" / "pr5.jsonl"
 
 def _records():
     if LOG.exists():
-        return [BattleRecord.model_validate_json(l) for l in LOG.read_text().splitlines() if l.strip()]
+        return [BattleRecord.model_validate_json(ln) for ln in LOG.read_text().splitlines() if ln.strip()]
     return [BattleRecord(
         prompt_hash="h", prompt_text="p?", model_a="ma", model_b="mb",
         response_a="ra", response_b="rb", majority_verdict="A", winner="ma",

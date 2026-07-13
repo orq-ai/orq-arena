@@ -31,7 +31,7 @@ def load_prompts(path: str | Path, api_key_env: str = "ORQ_API_KEY") -> list[Pro
         return _load_orq_dataset(str(path)[len("orq:"):], api_key_env)
     p = Path(path)
     out: list[PromptItem] = []
-    with p.open() as fh:
+    with p.open(encoding="utf-8") as fh:
         for line in fh:
             line = line.strip()
             if not line:
@@ -73,7 +73,10 @@ def datapoint_to_prompt(inputs: dict | None, messages: list | None) -> PromptIte
     if not text:
         return None
     for key, value in (inputs or {}).items():
-        text = re.sub(r"\{\{\s*" + re.escape(str(key)) + r"\s*\}\}", str(value), text)
+        # lambda replacement: dataset values are literals, not regex templates
+        # (a backslash in code/LaTeX inputs must not become a group reference)
+        text = re.sub(r"\{\{\s*" + re.escape(str(key)) + r"\s*\}\}",
+                      lambda _m, v=str(value): v, text)
     return PromptItem(text=text)
 
 

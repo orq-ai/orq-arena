@@ -187,7 +187,7 @@ class ArenaApp(App):
 
     async def _replay_fixture(self) -> None:
         assert self._fixture is not None
-        events = json.loads(Path(self._fixture).read_text())
+        events = json.loads(Path(self._fixture).read_text(encoding="utf-8"))
         for raw in events:
             delay = raw.pop("_delay", 0.02)
             await asyncio.sleep(delay)

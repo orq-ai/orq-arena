@@ -1,4 +1,3 @@
-<!-- generated-by: gsd-doc-writer -->
 # Methodology
 
 How orq-arena turns judged pairwise rounds into a Bradley-Terry ELO rating, the judging

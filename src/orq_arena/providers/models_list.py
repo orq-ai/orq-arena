@@ -96,7 +96,7 @@ def _write_cache(models: list[ModelEntry]) -> None:
         CACHE_FILE.write_text(json.dumps({
             "fetched_at": time.time(),
             "data": [{"id": m.id, "owned_by": m.provider, "created": m.created} for m in models],
-        }))
+        }), encoding="utf-8")
     except OSError:
         pass  # cache is advisory
 
@@ -105,7 +105,7 @@ def _read_cache() -> tuple[list[ModelEntry], float] | None:
     if not CACHE_FILE.exists():
         return None
     try:
-        raw = json.loads(CACHE_FILE.read_text())
+        raw = json.loads(CACHE_FILE.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
     return _parse_payload(raw), float(raw.get("fetched_at") or 0.0)

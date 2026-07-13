@@ -1,4 +1,3 @@
-<!-- generated-by: gsd-doc-writer -->
 # Testing
 
 Test suite reference for orq-arena, how to run it, what each of the 21 test files covers, the

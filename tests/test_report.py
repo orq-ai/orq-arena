@@ -120,6 +120,31 @@ def test_report_links_orq_dataset():
     assert "dataset <a href='https://my.orq.ai/datasets/ds_01'>Support prompts</a>" in html
 
 
+def test_report_with_custom_display_names():
+    """Records store short model names; a roster with custom orc_names must
+    still price, rank, and render (regression: KeyError / blank cost column)."""
+    from orq_arena.tournament.driver import rebuild_from_log
+
+    cfg = ArenaConfig.model_validate({
+        "warriors": [{"model_id": "prov/model-a", "orc_name": "Alpha"},
+                     {"model_id": "prov/model-b", "orc_name": "Beta"}],
+        "judges": ["prov/judge-1", "prov/judge-2"],
+    })
+    records = [_record("A"), _record("B"), _record("A")]
+    elo, rep = rebuild_from_log(cfg, records)
+    assert set(elo) == {"Alpha", "Beta"}
+    assert set(rep["verbosity"]) == {"Alpha", "Beta"}
+    manifest = MANIFEST | {"warriors": {
+        "Alpha": {"model": "prov/model-a"}, "Beta": {"model": "prov/model-b"}}}
+    prices = {"prov/model-a": (1.0, 2.0), "prov/model-b": (1.0, 2.0),
+              "prov/judge-1": (0.5, 1.0), "prov/judge-2": (0.5, 1.0)}
+    html = build_report_html(
+        cfg=cfg, records=records, elo=elo, report=rep, manifest=manifest, prices=prices,
+    )
+    assert "Alpha" in html and "est. cost" in html
+    assert "total cost" in html  # per-model cost resolved through the alias
+
+
 def test_orq_dataset_meta_offline_fallback(monkeypatch):
     import orq_ai_sdk
 

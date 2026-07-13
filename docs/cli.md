@@ -1,4 +1,3 @@
-<!-- generated-by: gsd-doc-writer -->
 # CLI Reference
 
 `orq-arena` is the single console-script entry point for this project, a `click.group()`
