@@ -124,7 +124,7 @@ uv run python scripts/record_fixture.py
 
 Per its own header, this is dev-only, not product surface: run it when the `ArenaEvent` schema or
 vocabulary changes, "roughly once a quarter." It needs `ORQ_API_KEY` and costs a few cents: it
-runs a real 3-warrior / 3-judge / 2-round tournament (`openai/gpt-5.4-mini`,
+runs a real 3-model / 3-judge / 2-round tournament (`openai/gpt-5.4-mini`,
 `google/gemini-2.5-flash` with thinking disabled, and `mistral/mistral-medium-2604`, judged by the
 same panel `orq_arena.yaml` ships) through the real `run_tournament` engine, drains every event,
 tags each with a `_delay` for replay pacing (fast for text/thinking chunks, a readable 0.35s pause

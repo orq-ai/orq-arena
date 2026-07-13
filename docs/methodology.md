@@ -156,7 +156,7 @@ fit over every round judged so far, not a value frozen at tournament design time
 percentile rating across the 200 refits as its 95% CI. On a small pool this produces **wide,
 overlapping intervals**, that is not hidden, it is the honest statistical output of a benchmark
 built on a limited number of comparisons; the module's own comment says as much: "Small pools +
-few comparisons ⇒ wide intervals, which is the honest output." Read overlapping CIs on the
+few comparisons => wide intervals, which is the honest output." Read overlapping CIs on the
 leaderboard as "not statistically distinguishable at this sample size," not as a tie.
 
 ### Style control: the length confound, priced out
@@ -228,7 +228,7 @@ inflates whenever most rounds have an obvious winner:
   reported alongside as `rounds_used` / `rounds_total` coverage.
 - **Cohen's κ (1960)** (`cohen_kappa_pairs`) is computed per judge pair, over just that pair's
   co-decisive rounds, a looser bar that tolerates one judge abstaining while another decides.
-- Both map onto **Landis & Koch (1977)** labels: ≤0 poor, ≤0.20 slight, ≤0.40 fair, ≤0.60
+- Both map onto **Landis & Koch (1977)** labels: <0 poor, ≤0.20 slight, ≤0.40 fair, ≤0.60
   moderate, ≤0.80 substantial, >0.80 almost perfect.
 
 ### Per-judge flip rates, position bias, made public
@@ -278,8 +278,9 @@ Every run is seeded and manifested so its rating can be audited or re-derived af
 
 - **Seeded schedule and prompt slices**: `round_robin_schedule` shuffles the pairing order with
   `random.Random(seed)` (default `seed=42`), and every match's prompt slice is drawn the same
-  way, pre-drawn before any match starts so the schedule stays stable regardless of completion
-  order under concurrency.
+  way. In round-robin runs every slice is pre-drawn before any match starts, so the schedule
+  stays stable regardless of completion order under concurrency; Swiss runs (above 8 models)
+  draw each round's slices when that round is scheduled.
 - **A run manifest, written twice**: `src/orq_arena/tournament/driver.py::_write_manifest` writes
   `<output>.run.json` immediately at tournament start (config hash, prompt hash, roster, judge
   panel, replacement judges, quorum, the installed `evaluatorq` version, `started_at`) and
@@ -361,7 +362,7 @@ round-robin run over 8 warriors measured against the shipped default config and 
   the Landis-Koch scale), when the panel did reach a decisive verdict, it was highly consistent.
 - **48.6% of rounds (68/140) came back inconclusive**: a strikingly high number at first read.
   Broken down, **59 of those 68 were flip-abstentions** (a judge disagreed with itself across
-  seat orders and correctly sat out) and only **6 were true judge splits** (multiple judges
+  seat orders and correctly sat out) and **9 were true judge splits** (multiple judges
   decisively disagreeing with each other). Per-judge flip rates on that panel: haiku **30%**,
   flash-lite **45%**, nano **45%**: with two of three judges flipping on roughly half their
   rounds, the default `min_successful_judges=2` quorum frequently couldn't be met.

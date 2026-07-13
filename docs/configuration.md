@@ -284,6 +284,13 @@ are filled from the datapoint's `inputs`, multi-part content is joined, and data
 a user message are skipped (the count is reported if the dataset yields nothing usable).
 Dataset prompts all land in the `general` category; `expected_output` is not read today.
 
+When `--prompts orq:<dataset_id>` is used, the run also captures the dataset's identity:
+`orq_dataset_meta()` (`src/orq_arena/data/prompts.py`) returns `{id, name, url}`, an orq.ai
+studio link plus a display name fetched via the SDK's `datasets.retrieve` on a best-effort
+basis (any failure, offline included, leaves the id standing in as the name, so a run is
+never blocked on this call). This lands under a `dataset` key in `battles.run.json`, present
+only for dataset-sourced runs, and `battles.report.html` links the dataset by that name.
+
 | Field | Type | Required | Effect |
 |---|---|---|---|
 | `prompt` | `str` | Required (or `text`, see below) | The prompt text, becomes `PromptItem.text`. |
@@ -380,6 +387,6 @@ git-ignored (`.gitignore`):
 | File | Written by |
 |---|---|
 | `.env` | Hand-authored from `.env.example`; never committed. |
-| `battles.jsonl` | `orq-arena run`, one row per judged round (`BattleRecord`, schema v2). |
-| `battles.run.json` | `orq-arena run`, the run manifest (config + prompt hashes, panel, seed, agreement stats). |
+| `battles.jsonl` | `orq-arena run`, one row per judged round (`BattleRecord`, schema v2; includes per-model `ttft_a_ms`/`ttft_b_ms` and `duration_a_ms`/`duration_b_ms` timing fields). |
+| `battles.run.json` | `orq-arena run`, the run manifest (config + prompt hashes, panel, seed, agreement stats; also a `dataset` key with id, name, and studio URL for dataset-sourced runs). |
 | `analysis.jsonl` | The post-mortem screen (`M` on the leaderboard), cached analyzer output, written next to the battle log. |

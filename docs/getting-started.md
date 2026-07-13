@@ -171,18 +171,21 @@ Add `--headless` for CI/cron, no TUI; matches run in parallel under `headless_co
 
 ## Where results land
 
-Every live run, TUI or headless, writes to the same two files, both in the current working
+Every live run, TUI or headless, writes to the same three files, all in the current working
 directory by default:
 
 | File | Contents |
 |---|---|
 | `battles.jsonl` | One JSON line per judged (or voided) round, `BattleRecord`, schema v2: both responses, reconciled per-judge votes, token/TTFT accounting, HP before/after. |
 | `battles.run.json` | The run manifest, written next to the log, config/prompt hashes, roster, judge panel, seed, and (once finished) agreement stats. |
+| `battles.report.html` | A single-file HTML report, no server, no external assets. The verdict banner leads with the top 3 models (win rate, ELO score, total cost); a value map plots ELO against cost per model on a log scale; a Speed section (tokens per second, time to first token) appears whenever the log carries per-side durations. Runs sourced from an orq.ai Dataset (`--prompts orq:<dataset_id>`) link the dataset by name in the report. |
 
-Pass `--output path/to/file.jsonl` to move both, the manifest always sits next to whatever
-`--output` you choose (`Path(battle_log_path).with_suffix(".run.json")`). Both files are
-git-ignored; `orq-arena rejudge` (see [cli.md](cli.md)) reads `battles.jsonl` straight back off
-disk to re-score a run with a different jury, at no regeneration cost.
+Pass `--output path/to/file.jsonl` to move all three, the manifest and report page always sit
+next to whatever `--output` you choose (`Path(battle_log_path).with_suffix(".run.json")` and
+`.with_suffix(".report.html")`). All three files are git-ignored; `orq-arena rejudge` (see
+[cli.md](cli.md)) reads `battles.jsonl` straight back off disk to re-score a run with a
+different jury, at no regeneration cost, and `orq-arena report <log>` regenerates the report
+page on demand.
 
 ---
 

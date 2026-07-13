@@ -101,9 +101,10 @@ A full tournament, triggered by `orq-arena run` (`cli.py` → `run_tournament` i
    overrides an already-set variable), parses `orq_arena.yaml` into an `ArenaConfig`
    (`config.py::load_config`), and loads the prompt set (`data/prompts.py::load_prompts`,
    default `prompts/starter.jsonl`; `--prompts orq:<dataset_id>` pulls an orq.ai Dataset via
-   the orq-python SDK instead). Without `--config`, the TUI's roster picker opens first
-   (backed by `providers/models_list.py::fetch_chat_models`); picked model ids become
-   `WarriorSpec`s via `orcs/roster.py::assign_warriors`.
+   the orq-python SDK instead, and `orq_dataset_meta` resolves its id, display name, and
+   studio URL, best-effort, for the run manifest and report). Without `--config`, the TUI's
+   roster picker opens first (backed by `providers/models_list.py::fetch_chat_models`);
+   picked model ids become `WarriorSpec`s via `orcs/roster.py::assign_warriors`.
 2. **Preflight**: `preflight.py::call_counts` prints exact match/stream/judge-call totals
    before anything is spent; if `preflight.thinking_probe` is on, `thinking_probe` sends one
    tiny call per warrior and `surprises` flags any model that reasons despite being configured
@@ -113,7 +114,8 @@ A full tournament, triggered by `orq-arena run` (`cli.py` → `run_tournament` i
    `tournament/swiss.py::SwissScheduler` (score-group pairing, `swiss_rounds` rounds, default
    6) takes over above that, selected automatically by warrior count, never a user-facing
    flag. A run manifest is written immediately (`_write_manifest`, `<output>.run.json`) with
-   config/prompt hashes and the roster.
+   config/prompt hashes, the roster, and (when prompts came from an orq.ai
+   Dataset) its id/name/url.
 4. **Per match**: each pairing becomes one `arena/battle.py::Battle`. For every prompt (up to
    `match.max_rounds`), `Battle.run` streams both warriors concurrently (`asyncio.gather`)
    through `providers/orq_gateway.py::OrqGateway.stream_completion`, one `AsyncOpenAI` client
@@ -196,14 +198,14 @@ TurnResolved / JudgeVerdictEvent ──▶ asyncio.Queue[ArenaEvent] ──▶ T
 | `Battle` / `Battle.run` | class | [`arena/battle.py`](../src/orq_arena/arena/battle.py) | Drives one match: turn loop over prompts, streams both sides concurrently, invokes the jury, applies damage, appends `BattleRecord`s. |
 | `OrqGateway` | class | [`providers/orq_gateway.py`](../src/orq_arena/providers/orq_gateway.py) | Single `AsyncOpenAI` client pointed at `api.orq.ai/v3/router`; every warrior stream and every judge call (via evaluatorq's shared `.client`) rides this one instance. |
 | `compute_damage` / `DamageResult` | function + dataclass | [`arena/damage.py`](../src/orq_arena/arena/damage.py) | Maps a `PairwiseComparison`'s consensus to HP damage and loser side; tie/inconclusive rounds deal 0 damage and don't count toward the round cap. |
-| `BattleRecord` | pydantic model, schema v2 | [`data/schemas.py`](../src/orq_arena/data/schemas.py) | One judged-or-voided round: prompt, both responses, reconciled per-judge votes, token/TTFT/finish-reason accounting, HP before/after. |
+| `BattleRecord` | pydantic model, schema v2 | [`data/schemas.py`](../src/orq_arena/data/schemas.py) | One judged-or-voided round: prompt, both responses, reconciled per-judge votes, token/TTFT/duration/finish-reason accounting, HP before/after. |
 | `BattleLog` | class | [`data/log.py`](../src/orq_arena/data/log.py) | Append-only JSONL sink for `BattleRecord`; truncates on open (one tournament per output file). |
 | `bradley_terry_mle` / `bootstrap_ci` / `style_controlled_elo` | functions | [`tournament/elo.py`](../src/orq_arena/tournament/elo.py) | Iterative MLE Bradley-Terry ratings (pure Python, no numpy) anchored to a 1000 mean, a percentile bootstrap for 95% CIs, and a logistic BT refit with a length-difference covariate that yields the len-ctrl rating plus the jury's length coefficient. Ties split 0.5/0.5. |
 | `SwissScheduler` | class | [`tournament/swiss.py`](../src/orq_arena/tournament/swiss.py) | Score-group pairing that avoids rematches; auto-engaged by the driver for pools >8 warriors, never a user-facing mode switch. |
 | `fleiss_kappa` / `cohen_kappa_pairs` / `landis_koch` | functions | [`analysis/kappa.py`](../src/orq_arena/analysis/kappa.py) | Chance-corrected inter-judge agreement, Fleiss' over the full panel, pairwise Cohen's between judge pairs, computed only over rounds where every counted panelist voted decisively. |
 | `rejudge_run` / `spearman` | async function + function | [`rejudge.py`](../src/orq_arena/rejudge.py) | Re-scores every recorded round in a `battles.jsonl` with a new panel, zero regeneration, and reports the Spearman correlation between the old and new Bradley-Terry rankings. |
 | `call_counts` / `thinking_probe` / `judge_family_overlaps` | functions | [`preflight.py`](../src/orq_arena/preflight.py) | Exact pre-run call accounting, a one-call-per-warrior probe that flags vendor-default thinking the config didn't ask for, and a self-preference check that warns when a judge shares a provider family with a contestant. |
-| `build_report_html` / `write_report` | functions | [`report.py`](../src/orq_arena/report.py) | Self-contained HTML report page (verdict headline, ELO ladder with CI bars, len-ctrl column, win grid, jury behaviour) written next to the log at run end and on `orq-arena report`. |
+| `build_report_html` / `write_report` | functions | [`report.py`](../src/orq_arena/report.py) | Self-contained HTML report page (verdict banner with top-3 win rate/ELO/cost, ELO ladder with CI bars, len-ctrl column, value map, Speed section when duration data is present, win grid, jury behaviour) written next to the log at run end and on `orq-arena report`. |
 | `fetch_chat_models` | async function | [`providers/models_list.py`](../src/orq_arena/providers/models_list.py) | Workspace-enabled chat model catalog, cached 24h at `~/.cache/orq-arena/models.json`, feeding the roster picker and `refresh-models`. |
 | `analyze_model` / `Postmortem` | function + pydantic model | [`analysis/postmortem.py`](../src/orq_arena/analysis/postmortem.py) | Per-model coach notes (strengths/weaknesses/judge patterns) from a cheap analyzer model (`cfg.analyzer_model`), cached in `analysis.jsonl` next to the log. |
 | `ArenaConfig` / `WarriorSpec` | pydantic models | [`config.py`](../src/orq_arena/config.py), [`orcs/roster.py`](../src/orq_arena/orcs/roster.py) | Validated `orq_arena.yaml`, match rules, gateway settings, warrior roster (raw reasoning controls forwarded verbatim), judge panel, quorum. Validates ≥2 warriors, a non-empty judge panel, and that each warrior's thinking `budget_tokens` stays under its token cap. |
@@ -237,8 +239,9 @@ TurnResolved / JudgeVerdictEvent ──▶ asyncio.Queue[ArenaEvent] ──▶ T
   calls back into the driver, the battle loop, or the ELO feed.
 - **Reproducible by construction.** Every run seeds `round_robin_schedule` and each match's
   prompt slice (`random.Random(seed)`), and writes a `<output>.run.json` manifest, config
-  hash, prompt hash, roster, judge panel, evaluatorq version, and (once finished) agreement
-  stats, next to the JSONL it describes.
+  hash, prompt hash, roster, judge panel, evaluatorq version, dataset id/name/url
+  when prompts came from an orq.ai Dataset, and (once finished) agreement stats,
+  next to the JSONL it describes.
 
 ## Directory structure rationale
 

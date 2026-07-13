@@ -32,7 +32,7 @@ full `orq_arena.yaml` key reference, see [configuration.md](configuration.md).
 | [`demo`](#demo) | Replay a recorded tournament fixture, zero API calls, zero key. |
 | [`list-warriors`](#list-warriors) | Print the configured roster (seed, orc name, model id). |
 | [`rejudge`](#rejudge) | Re-score a recorded `battles.jsonl` with a different judge panel, zero regeneration. |
-| [`report`](#report) | Render the single-file HTML report page from a recorded run; no API calls. |
+| [`report`](#report) | Render the single-file HTML report page from a recorded run; no model calls, one optional catalog read for prices. |
 | [`jury-compare`](#jury-compare) | Tabulate candidate juries from saved rejudge reports, side by side; no API calls. |
 | [`annotate`](#annotate) | Render a blinded human-annotation page from a recorded run; no API calls. |
 | [`anchor`](#anchor) | Merge human vote files back against a run: panel↔human κ + rank correlation; no API calls. |
@@ -130,8 +130,9 @@ orq-arena run [--config PATH] [--prompts PATH] [--output PATH] [--headless] [--y
   fetched live from the router's Model Garden catalog (`providers.models_list.fetch_price_map`).
   It is an upper bound, the number the run cannot exceed, not a prediction; the judge-input
   term assumes both responses hit the warrior cap. Models missing from the catalog are
-  excluded and listed on a `⚠ no catalog price for: …` line; if pricing is unreachable the
-  line is skipped entirely (never blocks the run). The ceiling is also recorded in the run
+  excluded and listed on a `⚠ no catalog price for: …` line; if pricing is entirely
+  unreachable that warning lists the whole roster and the spend-ceiling line is the one
+  skipped (pricing never blocks the run). The ceiling is also recorded in the run
   manifest under `preflight.cost_ceiling`. If `preflight.thinking_probe`
   is enabled (default `true`), a `thinking probe…` line follows, then one line per warrior that
   either failed the probe (`⚠ {orc_name} ({model}): probe failed, {error}`) or thinks despite
@@ -140,7 +141,8 @@ orq-arena run [--config PATH] [--prompts PATH] [--output PATH] [--headless] [--y
   off, a `pool is thinking-clean ✓` line prints (probe-failure warnings, if any, still appear
   above it).
 - **Confirmation.** Unless `--yes`/`-y` is given, the CLI prompts `Proceed?`
-  (`click.confirm(..., abort=True)`); declining aborts the run with no calls made.
+  (`click.confirm(..., abort=True)`); declining aborts before any battle or judge calls
+  (the thinking probe, when enabled, has already made its one probe stream per model).
 - **Output.** Every judged round is appended to `--output` (`battles.jsonl`, schema v2) as the
   run proceeds, live-run or headless alike.
 
@@ -222,14 +224,14 @@ uv run orq-arena list-warriors
 ```
 
 ```text
-Seed  Name                   Model ID
+Seed  Name                       Model ID
 ----------------------------------------------------------------------
-1     claude-opus-4-8             anthropic/claude-opus-4-8
-2     claude-sonnet-4-6           anthropic/claude-sonnet-4-6
-3     gpt-5.4                     openai/gpt-5.4
-4     gpt-5.4-mini                openai/gpt-5.4-mini
-5     gemini-3.1-pro-preview      google/gemini-3.1-pro-preview
-6     gemini-3.5-flash            google/gemini-3.5-flash
+1     claude-opus-4-8            anthropic/claude-opus-4-8
+2     claude-sonnet-4-6          anthropic/claude-sonnet-4-6
+3     gpt-5.4                    openai/gpt-5.4
+4     gpt-5.4-mini               openai/gpt-5.4-mini
+5     gemini-3.1-pro-preview     google/gemini-3.1-pro-preview
+6     gemini-3.5-flash           google/gemini-3.5-flash
 7     deepseek-chat               deepseek/deepseek-chat
 8     mistral-medium-2604         mistral/mistral-medium-2604
 ```
@@ -340,7 +342,7 @@ orq-arena jury-compare REPORT_JSON [REPORT_JSON ...]
 Columns per candidate: Spearman vs the recorded ranking (does the ranking depend on this
 jury?), inconclusive rate (decisiveness), mean agreement, worst per-judge flip rate
 (self-consistency), tie rate, changed verdicts. These measure reliability, not accuracy;
-which jury is *right* needs gold pairs or a human anchor (planned).
+which jury is *right* needs gold pairs or a human anchor (see [`annotate`](#annotate) and [`anchor`](#anchor)).
 
 ```bash
 uv run orq-arena rejudge battles.jsonl --judge openai/gpt-5.1 --report-json solo.json
@@ -352,10 +354,11 @@ uv run orq-arena jury-compare solo.json panel.json
 ## `report`
 
 Render the single-file HTML report page from a recorded run. Reads `battles.jsonl` and its
-`*.run.json` manifest; makes no API calls. The same page is written automatically at the end
+`*.run.json` manifest; makes no model calls (one catalog read prices the cost section when a
+key is present). The same page is written automatically at the end
 of every run (`<log>.report.html` next to the log).
 
-![HTML report page: verdict banner with the top three models, badges, ELO leaderboard with CI bars, and the cost-vs-win-rate value map](../media/report-page.png)
+![HTML report page: verdict banner with the top three models, badges, ELO leaderboard with CI bars, and the ELO-vs-cost value map](../media/report-page.png)
 
 ```text
 orq-arena report [LOG_PATH] [--config PATH] [--output PATH]
@@ -364,7 +367,7 @@ orq-arena report [LOG_PATH] [--config PATH] [--output PATH]
 | Flag / arg | Default | Effect |
 |---|---|---|
 | `LOG_PATH` (positional) | `battles.jsonl` | The recorded run to render. |
-| `--config PATH` | `orq_arena.yaml` | Supplies judges and rules for the report's statistics rebuild. |
+| `--config PATH` | `orq_arena.yaml` | Supplies the judge panel and the model-name mapping for the report's statistics rebuild; match rules are not consulted. |
 | `--output PATH` | `<log>.report.html` | Destination HTML file. |
 
 The page is self-contained (inline CSS, no external assets, works from `file://`): verdict
@@ -388,7 +391,7 @@ API calls. This is the front half of the human-anchor workflow (the back half is
 [Methodology → Human anchor](methodology.md#human-anchor-does-the-panel-agree-with-people)).
 
 ```text
-orq-arena annotate BATTLE_LOG [--out PATH] [--sample N] [--seed N]
+orq-arena annotate BATTLE_LOG [--out PATH] [--sample N] [--seed N] [--criteria TEXT]
 ```
 
 | Flag / arg | Default | Effect |
@@ -396,6 +399,7 @@ orq-arena annotate BATTLE_LOG [--out PATH] [--sample N] [--seed N]
 | `BATTLE_LOG` (positional) | required | The recorded run to annotate. |
 | `--out PATH` | `annotate.html` | Destination HTML file. |
 | `--sample N` | all rounds | Annotate a seeded random subset instead of every round. |
+| `--criteria TEXT` | the jury's default rubric | Judging guidelines shown to the rater. |
 | `--seed N` | `42` | Drives round order and per-round side flips; keep it if you want two raters on identical pages. |
 | `--exclude PATH` | none | votes.json file(s), repeatable: rounds already voted there are dropped, producing a resume page with only the remaining rounds (or a top-up page when growing a study). |
 | `--serve` | off | Prodigy-style local mode: serve the page at `http://127.0.0.1:<port>` instead of writing a file. Every vote saves automatically as `votes-<annotator>.json` next to the log (no download step); Ctrl-C stops the server and prints the anchor table for whatever was voted. Localhost-only by construction; for remote raters use the default file mode. |

@@ -21,7 +21,7 @@ cd orq-arena
 uv sync
 
 # 3. Verify
-uv run pytest            # 84 tests, no network
+uv run pytest            # full suite, no network
 uv run orq-arena demo    # replay a recorded tournament, no API key
 ```
 
@@ -50,7 +50,7 @@ template. If you add a new credential, wire it through an environment variable a
 
 1. Create a topic branch off `master` (`feat/...` or `fix/...`, CI runs on both).
 2. Keep the diff small and the vocabulary local: match the surrounding code's style; the
-   methodology invariants in the README ("What makes the number defensible") are load-bearing;
+   methodology invariants in the README ("How the number is made") are load-bearing;
    changes to judging, rating, or void policy need a plan-level discussion first.
 3. Add or update a test when behaviour changes. Textual widgets get a headless render test
    (that pattern has caught real bugs twice).
