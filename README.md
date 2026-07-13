@@ -72,7 +72,7 @@ When you are ready for a live run against real models:
 
 ![Post-mortems: per-model strengths, weaknesses, and judge patterns](media/postmortem.svg)
 
-**Share the result**: every run also writes a self-contained HTML report page (`<log>.report.html`): verdict headline, ELO ladder with CI bars, len-ctrl column, win grid, jury behaviour. Regenerate any time with `uv run orq-arena report battles.jsonl`; no API calls.
+**Share the result**: every run also writes a self-contained HTML report page (`<log>.report.html`): a verdict banner naming the top three models with win rate, ELO score, and total cost, ELO ladder with CI bars, len-ctrl column, a Speed section (tok/s, time-to-first-token) when the log has per-response timing, win grid, jury behaviour, and a link back to the source Dataset on Dataset-backed runs. Regenerate any time with `uv run orq-arena report battles.jsonl`; no API calls.
 
 ![HTML report page: verdict banner with the top three models, badges, ELO leaderboard with CI bars, and the cost-vs-win-rate value map](media/report-page.png)
 

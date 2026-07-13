@@ -211,45 +211,55 @@ def _fmt_usd(v: float) -> str:
 
 
 def _value_map_svg(points, champion: str, size_label: str = "average response length") -> str:
-    """Win rate vs cost (log x), dashed best-value frontier, size = avg out tokens."""
+    """ELO vs cost (log x), dashed best-value frontier, size = avg out tokens.
+
+    ELO on y (not win rate) so dot height agrees with the leaderboard rank in
+    the dot: raw win rate ignores opponent strength and inverts rank order.
+    points: (name, cost_usd, elo, win_rate, size) in leaderboard order.
+    """
     import math
 
     if len(points) < 2:
         return ""
-    xs = [math.log10(max(c, 1e-4)) for _, c, _, _ in points]
+    xs = [math.log10(max(c, 1e-4)) for _, c, *_ in points]
     x0, x1 = min(xs), max(xs)
     span = (x1 - x0) or 1.0
     tmax = max(t for *_, t in points) or 1.0
+    elos = [e for _, _, e, _, _ in points]
+    # Pad the ELO range, then snap the axis to tick multiples.
+    step = next(s for s in (50, 100, 200, 500, 1000)
+                if (max(elos) - min(elos)) / s <= 6)
+    e_lo = math.floor((min(elos) - step * 0.4) / step) * step
+    e_hi = math.ceil((max(elos) + step * 0.4) / step) * step
     W, H, L, R, T, B = 720, 310, 70, 40, 30, 60
 
     def px(c):
         return L + (math.log10(max(c, 1e-4)) - x0) / span * (W - L - R)
 
-    def py(r):
-        return T + (1 - r) * (H - T - B)
+    def py(e):
+        return T + (1 - (e - e_lo) / (e_hi - e_lo)) * (H - T - B)
 
-    frontier, best = [], -1.0
-    for name, c, r, _t in sorted(points, key=lambda p: p[1]):
-        if r > best:
-            frontier.append((px(c), py(r)))
-            best = r
+    frontier, best = [], float("-inf")
+    for name, c, e, _r, _t in sorted(points, key=lambda p: p[1]):
+        if e > best:
+            frontier.append((px(c), py(e)))
+            best = e
     poly = " ".join(f"{x:.0f},{y:.0f}" for x, y in frontier)
     fx = {round(x) for x, _ in frontier}
 
     # Rank-in-dot labeling: numbers match the leaderboard, full detail on hover
     # and in the key below. Inline text labels collide at any interesting density.
-    # Numbers match the leaderboard (points arrive ELO-ordered), not win-rate order.
     rank_of = {pt[0]: i for i, pt in enumerate(points, 1)}
     dots, key_rows = [], []
-    for name, c, r, t in points:
-        x, y = px(c), py(r)
+    for name, c, e, r, t in points:
+        x, y = px(c), py(e)
         rad = max(9.0, 5 + 9 * (t / tmax))
         on_frontier = round(x) in fx
         fill = "var(--brand)" if name == champion else ("var(--teal-soft)" if on_frontier else "#b5b1a4")
         rk = rank_of[name]
         dots.append(
             f"<circle cx='{x:.0f}' cy='{y:.0f}' r='{rad:.0f}' fill='{fill}' opacity='.88'>"
-            f"<title>{_e(name)}: {_fmt_usd(c)}, {r:.0%} win rate</title></circle>"
+            f"<title>{_e(name)}: {_fmt_usd(c)}, ELO {e:.0f}, {r:.0%} win rate</title></circle>"
             f"<text x='{x:.0f}' y='{y + 3.5:.0f}' font-size='10' font-weight='700' fill='#fff' "
             f"text-anchor='middle' pointer-events='none'>{rk}</text>"
         )
@@ -269,24 +279,24 @@ def _value_map_svg(points, champion: str, size_label: str = "average response le
                 leader
                 + f"<text x='{lx:.0f}' y='{ly:.0f}' font-size='11' font-weight='700' "
                 f"fill='var(--ink)' text-anchor='middle'>{_e(name)} "
-                f"<tspan fill='var(--muted)' font-weight='400'>{_fmt_usd(c)} &middot; {r:.0%}</tspan></text>"
+                f"<tspan fill='var(--muted)' font-weight='400'>{_fmt_usd(c)} &middot; ELO {e:.0f}</tspan></text>"
             )
         star = " &#9733;" if on_frontier else ""
         key_rows.append(
             f"<span style='white-space:nowrap'><b>{rk}</b> {_e(name)} "
-            f"<span style='color:var(--muted)'>{_fmt_usd(c)} &middot; {r:.0%}{star}</span></span>"
+            f"<span style='color:var(--muted)'>{_fmt_usd(c)} &middot; ELO {e:.0f} &middot; {r:.0%}{star}</span></span>"
         )
     key = ("<p class='note' style='display:flex;flex-wrap:wrap;gap:4px 18px'>"
            + "".join(key_rows) + "</p>")
 
-    # Axis ticks: y every 25% with faint gridlines; x at powers of ten (log scale).
+    # Axis ticks: y at round ELO steps with faint gridlines; x at $ decades (log scale).
     y_ticks = "".join(
         f"<line x1='{L}' y1='{py(v):.0f}' x2='{W - R}' y2='{py(v):.0f}' "
-        f"stroke='var(--line)' stroke-width='{1 if v in (0.0, 1.0) else 0.5}' "
-        f"{'stroke-dasharray=2 3' if v not in (0.0, 1.0) else ''}/>"
+        f"stroke='var(--line)' stroke-width='{1 if v in (e_lo, e_hi) else 0.5}' "
+        f"{'stroke-dasharray=2 3' if v not in (e_lo, e_hi) else ''}/>"
         f"<text x='{L - 8}' y='{py(v) + 4:.0f}' font-size='10' fill='var(--muted)' "
-        f"text-anchor='end'>{v:.0%}</text>"
-        for v in (0.0, 0.25, 0.5, 0.75, 1.0)
+        f"text-anchor='end'>{v:.0f}</text>"
+        for v in range(e_lo, e_hi + 1, step)
     )
     import math as _m
     lo_dec = _m.floor(x0)
@@ -306,9 +316,10 @@ def _value_map_svg(points, champion: str, size_label: str = "average response le
     return f"""
 <h2>Value map</h2>
 <div class="tablewrap">
-<svg viewBox="0 0 {W} {H}" width="100%" role="img" aria-label="Win rate vs cost">
+<svg viewBox="0 0 {W} {H}" width="100%" role="img" aria-label="ELO vs cost">
 <line x1="{L}" y1="{H - B}" x2="{W - R}" y2="{H - B}" stroke="var(--line)"/>
 <line x1="{L}" y1="{T}" x2="{L}" y2="{H - B}" stroke="var(--line)"/>
+<text x="{L - 8}" y="{T - 10}" font-size="10" fill="var(--muted)" text-anchor="end">ELO</text>
 {y_ticks}
 {x_ticks}
 <text x="{(L + W - R) // 2}" y="{H - 14}" font-size="11" fill="var(--muted)" text-anchor="middle">cost per model over the whole run (log scale)</text>
@@ -316,9 +327,9 @@ def _value_map_svg(points, champion: str, size_label: str = "average response le
 {"".join(dots)}
 </svg></div>
 {key}
-<p class="note">Dashed line: the best-value frontier (&#9733; in the key; no cheaper model wins
-more often). Dot size is {size_label}; the champion is magenta; hover any dot for
-exact figures. Win rate counts rated rounds only.</p>
+<p class="note">Dashed line: the best-value frontier (&#9733; in the key; no cheaper model rates
+higher). Dot size is {size_label}; the champion is magenta; hover any dot for cost, ELO,
+and win rate. Win rate counts rated rounds only.</p>
 """
 
 
@@ -546,7 +557,7 @@ def build_report_html(
         rates = _win_rates(grid, order)
         use_dur = any(dur_by.get(n, 0.0) > 0 for n in order)
         pts = [
-            (n, per_cost[n], rates.get(n, 0.0),
+            (n, per_cost[n], elo.get(n, 0.0), rates.get(n, 0.0),
              dur_by.get(n, 0.0) if use_dur else (verbosity.get(n) or 0.0))
             for n in order if n in per_cost and per_cost[n] > 0
         ]
