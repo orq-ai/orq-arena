@@ -89,6 +89,25 @@ def test_report_no_cost_without_prices():
     assert "dataset" not in html  # no dataset in manifest, no dataset line
 
 
+def test_report_speed_section_from_durations():
+    fast, slow = _record("A"), _record("A")
+    fast.ttft_a_ms, fast.duration_a_ms = 400, 2000   # 20 out tok / 2s = 10 tok/s
+    fast.ttft_b_ms, fast.duration_b_ms = 900, 5000
+    slow.ttft_a_ms, slow.duration_a_ms = 400, 2500
+    slow.ttft_b_ms, slow.duration_b_ms = 800, 6000
+    html = build_report_html(
+        cfg=CFG, records=[fast, slow], elo={"model-a": 1050.0, "model-b": 950.0},
+        report=REPORT, manifest=MANIFEST,
+    )
+    assert "Speed" in html and "tok/s" in html and "ttft 0.4s" in html
+    # logs that predate duration capture skip the section entirely
+    html_old = build_report_html(
+        cfg=CFG, records=[_record("A"), _record("A")],
+        elo={"model-a": 1050.0, "model-b": 950.0}, report=REPORT, manifest=MANIFEST,
+    )
+    assert "tok/s" not in html_old
+
+
 def test_report_links_orq_dataset():
     manifest = MANIFEST | {"dataset": {
         "id": "ds_01", "name": "Support prompts",
