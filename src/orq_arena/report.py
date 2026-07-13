@@ -100,6 +100,45 @@ def _ci_bar(lo: float, hi: float, point: float, floor: float, span: float) -> st
     )
 
 
+def _cost_lines(records, manifest, prices):
+    """(warrior_usd, jury_usd_estimate, unpriced_names) or None without prices.
+
+    Warrior spend is exact (per-record model attribution); jury spend is an
+    estimate at the panel's mean catalog rate, because records store the
+    panel's token total, not per-judge splits.
+    """
+    if not prices:
+        return None
+    id_by_name = {
+        n: (w.get("model") if isinstance(w, dict) else "")
+        for n, w in (manifest.get("warriors") or {}).items()
+    }
+    warriors_usd, unpriced = 0.0, set()
+    j_in = j_out = 0
+    for r in records:
+        if r.error is not None:
+            continue
+        j_in += r.judge_tokens_in
+        j_out += r.judge_tokens_out
+        for name, tin, tout in (
+            (r.model_a, r.tokens_a_in, r.tokens_a_out),
+            (r.model_b, r.tokens_b_in, r.tokens_b_out),
+        ):
+            pr = prices.get(id_by_name.get(name, ""))
+            if pr is None:
+                unpriced.add(name)
+            else:
+                warriors_usd += tin * pr[0] / 1e6 + tout * pr[1] / 1e6
+    panel = [prices[j] for j in manifest.get("judges", []) if j in prices]
+    unpriced.update(j for j in manifest.get("judges", []) if j not in prices)
+    jury_usd = None
+    if panel:
+        mean_in = sum(x[0] for x in panel) / len(panel)
+        mean_out = sum(x[1] for x in panel) / len(panel)
+        jury_usd = j_in * mean_in / 1e6 + j_out * mean_out / 1e6
+    return warriors_usd, jury_usd, sorted(unpriced)
+
+
 def build_report_html(
     *,
     cfg: ArenaConfig,
@@ -107,6 +146,7 @@ def build_report_html(
     elo: dict[str, float],
     report: dict[str, Any],
     manifest: dict[str, Any],
+    prices: dict[str, tuple[float, float]] | None = None,
 ) -> str:
     """Render the run report page as a self-contained HTML string."""
     judged = [r for r in records if r.error is None]
@@ -230,19 +270,6 @@ def build_report_html(
     )
 
     # Rounds and category accounting.
-    cat_counts = report.get("category_counts") or {}
-    cat_elo = report.get("elo_by_category") or {}
-    cat_rows = []
-    for cat in sorted(cat_counts):
-        by_cat = cat_elo.get(cat)
-        leader = (
-            _e(max(by_cat, key=by_cat.get)) if by_cat
-            else "<span class='note'>below the 20-comparison floor</span>"
-        )
-        cat_rows.append(
-            f"<tr><td>{_e(cat)}</td><td class='n'>{cat_counts[cat]}</td><td>{leader}</td></tr>"
-        )
-
     tok = report.get("tokens") or {}
     w_in, w_out = tok.get("warriors_in", 0), tok.get("warriors_out", 0)
     j_in, j_out = tok.get("judges_in", 0), tok.get("judges_out", 0)
@@ -250,6 +277,28 @@ def build_report_html(
     jury_share = f"{(j_in + j_out) / total_tok:.0%}" if total_tok else "n/a"
 
     panel = ", ".join(str(j).split("/")[-1] for j in manifest.get("judges", cfg.judges))
+
+    cost = _cost_lines(records, manifest, prices)
+    w_usd_cell = j_usd_cell = t_usd_cell = ""
+    cost_note = ""
+    cost_head = ""
+    if cost:
+        w_usd, j_usd, unpriced = cost
+        cost_head = "<th class='n'>est. cost</th>"
+        w_usd_cell = f"<td class='n'>${w_usd:,.2f}</td>"
+        j_usd_cell = f"<td class='n'>{'&asymp; $' + format(j_usd, ',.2f') if j_usd is not None else 'n/a'}</td>"
+        total = w_usd + (j_usd or 0.0)
+        t_usd_cell = (
+            f"<tr><td class='name'>total</td><td class='n'></td><td class='n'></td>"
+            f"<td class='n'><b>&asymp; ${total:,.2f}</b></td></tr>"
+        )
+        cost_note = (
+            "<p class='note'>Warrior spend is exact (per-model catalog rates); jury spend is "
+            "estimated at the panel's mean rate because the log stores the panel's token total, "
+            "not per-judge splits." + (
+                " Unpriced in the catalog and excluded: " + ", ".join(unpriced) + "." if unpriced else ""
+            ) + "</p>"
+        )
 
     return f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
@@ -297,7 +346,7 @@ the honest output on a run this size.{" The len-ctrl column refits the rating wi
 itself abstains (the flip rate) and abstentions never become verdicts. Pairwise Cohen&#39;s
 &kappa;: {cohen_bits or "n/a"}.</p>
 
-<h2>Rounds and categories</h2>
+<h2>Rounds</h2>
 <div class="badges">
   <span class="badge"><span class="sideA">A</span> wins <b>{verdicts["A"]}</b></span>
   <span class="badge"><span class="sideB">B</span> wins <b>{verdicts["B"]}</b></span>
@@ -305,20 +354,19 @@ itself abstains (the flip rate) and abstentions never become verdicts. Pairwise 
   <span class="badge">inconclusive <b>{verdicts["inconclusive"]}</b></span>
   <span class="badge">{"voided <b>" + str(voids) + "</b>" if voids else "voided <b>0</b>"}</span>
 </div>
-<div class="tablewrap"><table>
-<thead><tr><th>Category</th><th class="n">rated rounds</th><th>leader (where rated &ge; 20)</th></tr></thead>
-<tbody>{"".join(cat_rows) or "<tr><td colspan='3'>no category data</td></tr>"}</tbody></table></div>
 <p class="note">Inconclusive rounds carry no signal and are dropped from the rating, never
 counted as ties. A voided round is a network failure, not a model failure; it is logged and
 excluded.</p>
 
-<h2>Tokens</h2>
+<h2>Tokens and cost</h2>
 <div class="tablewrap"><table>
-<thead><tr><th></th><th class="n">input</th><th class="n">output</th></tr></thead>
+<thead><tr><th></th><th class="n">input</th><th class="n">output</th>{cost_head}</tr></thead>
 <tbody>
-<tr><td class="name">warriors</td><td class="n">{w_in:,}</td><td class="n">{w_out:,}</td></tr>
-<tr><td class="name">jury</td><td class="n">{j_in:,}</td><td class="n">{j_out:,}</td></tr>
+<tr><td class="name">warriors</td><td class="n">{w_in:,}</td><td class="n">{w_out:,}</td>{w_usd_cell}</tr>
+<tr><td class="name">jury</td><td class="n">{j_in:,}</td><td class="n">{j_out:,}</td>{j_usd_cell}</tr>
+{t_usd_cell}
 </tbody></table></div>
+{cost_note}
 
 <div class="foot">
 config <code>{_e(manifest.get("config_sha256", "?"))}</code> &middot;
@@ -346,9 +394,10 @@ def write_report(
     report: dict[str, Any],
     manifest: dict[str, Any],
     log_path: str | Path,
+    prices: dict[str, tuple[float, float]] | None = None,
 ) -> Path:
     out = report_path_for(log_path)
-    out.write_text(
-        build_report_html(cfg=cfg, records=records, elo=elo, report=report, manifest=manifest)
-    )
+    out.write_text(build_report_html(
+        cfg=cfg, records=records, elo=elo, report=report, manifest=manifest, prices=prices,
+    ))
     return out

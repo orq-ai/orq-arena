@@ -367,7 +367,9 @@ orq-arena report [LOG_PATH] [--config PATH] [--output PATH]
 
 The page is self-contained (inline CSS, no external assets, works from `file://`): verdict
 headline with a CI-overlap caveat, the ELO ladder with confidence-interval bars and the
-len-ctrl column, the win grid, per-judge behaviour, category and token accounting, and the
+len-ctrl column, the win grid, per-judge behaviour, token and cost accounting (catalog
+rates when a key is present: warrior spend exact, jury spend estimated at the panel mean;
+one catalog read, never completion spend), and the
 manifest hashes for reproducibility.
 
 ```bash

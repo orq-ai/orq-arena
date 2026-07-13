@@ -348,9 +348,15 @@ async def run_tournament(
     )
 
     try:
+        from ..providers.models_list import fetch_price_map
         from ..report import write_report
 
+        try:
+            prices = await fetch_price_map(cfg.gateway)
+        except Exception:
+            prices = {}
         write_report(
+            prices=prices or None,
             cfg=cfg, records=all_records, elo=elo, report=report,
             manifest=json.loads(manifest_path.read_text()), log_path=battle_log_path,
         )

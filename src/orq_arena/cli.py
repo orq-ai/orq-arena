@@ -241,6 +241,7 @@ def report_cmd(log_path: str, config_path: str, output_path: str | None) -> None
     Reads battles.jsonl and its *.run.json manifest; makes no API calls.
     The same page is written automatically at the end of every run.
     """
+    import asyncio
     import json as _json
     from pathlib import Path
 
@@ -277,9 +278,17 @@ def report_cmd(log_path: str, config_path: str, output_path: str | None) -> None
     elo = bradley_terry_mle(build_wins_matrix(_triples(outcomes)), names)
     rep = _final_report(cfg, records, outcomes, names, preflight=manifest.get("preflight"))
 
+    from .providers.models_list import fetch_price_map
+
+    try:
+        prices = asyncio.run(fetch_price_map(cfg.gateway))
+    except Exception:
+        prices = {}
+
     out = Path(output_path) if output_path else report_path_for(log)
     out.write_text(build_report_html(
         cfg=cfg, records=records, elo=elo, report=rep, manifest=manifest,
+        prices=prices or None,
     ))
     click.echo(f"report page -> {out}")
 

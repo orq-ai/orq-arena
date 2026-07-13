@@ -53,8 +53,9 @@ def test_report_renders_every_section():
         report=REPORT, manifest=MANIFEST,
     )
     assert "leads the 2-model pool" in html and "model-a" in html
-    for section in ("Leaderboard", "Win grid", "The jury", "Rounds and categories", "Tokens"):
+    for section in ("Leaderboard", "Win grid", "The jury", "Rounds", "Tokens and cost"):
         assert section in html
+    assert "Category" not in html  # category table removed: not universal across datasets
     assert "10.0 min" in html
     assert "CI overlap" in html  # runner-up hi (1100) >= champion lo (900)
     assert "thinking" in html  # model-b badge
@@ -63,3 +64,25 @@ def test_report_renders_every_section():
 
 def test_report_path_convention(tmp_path):
     assert report_path_for(tmp_path / "battles.jsonl").name == "battles.report.html"
+
+
+def test_report_cost_column_with_prices():
+    records = [_record("A"), _record("B")]
+    prices = {"prov/model-a": (1.0, 2.0), "prov/model-b": (1.0, 2.0),
+              "prov/judge-1": (0.5, 1.0), "prov/judge-2": (0.5, 1.0)}
+    html = build_report_html(
+        cfg=CFG, records=records, elo={"model-a": 1050.0, "model-b": 950.0},
+        report=REPORT, manifest=MANIFEST, prices=prices,
+    )
+    # warriors: in 2*(10+10)=40 @ $1/M + out 2*(20+25)=90 @ $2/M
+    assert "est. cost" in html and "total" in html
+    # jury estimated at panel mean rate, marked approximate
+    assert "&asymp;" in html
+
+
+def test_report_no_cost_without_prices():
+    html = build_report_html(
+        cfg=CFG, records=[_record("A")], elo={"model-a": 1050.0, "model-b": 950.0},
+        report=REPORT, manifest=MANIFEST,
+    )
+    assert "est. cost" not in html
