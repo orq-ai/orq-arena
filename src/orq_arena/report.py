@@ -199,26 +199,31 @@ def _value_map_svg(points, champion: str) -> str:
     poly = " ".join(f"{x:.0f},{y:.0f}" for x, y in frontier)
     fx = {round(x) for x, _ in frontier}
 
-    dots = []
-    for i, (name, c, r, t) in enumerate(sorted(points, key=lambda p: p[1])):
+    # Rank-in-dot labeling: numbers match the leaderboard, full detail on hover
+    # and in the key below. Inline text labels collide at any interesting density.
+    # Numbers match the leaderboard (points arrive ELO-ordered), not win-rate order.
+    rank_of = {pt[0]: i for i, pt in enumerate(points, 1)}
+    dots, key_rows = [], []
+    for name, c, r, t in points:
         x, y = px(c), py(r)
-        rad = 5 + 9 * (t / tmax)
+        rad = max(9.0, 5 + 9 * (t / tmax))
         on_frontier = round(x) in fx
         fill = "var(--a)" if name == champion else ("var(--teal-soft)" if on_frontier else "#9aa89b")
-        # Alternate labels above/below by cost order so near neighbours don't collide;
-        # clamp anchor at the plot edges so nothing clips.
-        ly = y - rad - 5 if i % 2 == 0 else y + rad + 13
-        anchor_x = "middle"
-        if x > W - R - 90:
-            anchor_x = "end"
-        elif x < L + 90:
-            anchor_x = "start"
+        rk = rank_of[name]
         dots.append(
-            f"<circle cx='{x:.0f}' cy='{y:.0f}' r='{rad:.0f}' fill='{fill}' opacity='.85'>"
+            f"<circle cx='{x:.0f}' cy='{y:.0f}' r='{rad:.0f}' fill='{fill}' opacity='.88'>"
             f"<title>{_e(name)}: {_fmt_usd(c)}, {r:.0%} win rate</title></circle>"
-            f"<text x='{x:.0f}' y='{ly:.0f}' font-size='10' fill='var(--muted)' "
-            f"text-anchor='{anchor_x}'>{_e(name)} {_fmt_usd(c)} &middot; {r:.0%}</text>"
+            f"<text x='{x:.0f}' y='{y + 3.5:.0f}' font-size='10' font-weight='700' fill='#fff' "
+            f"text-anchor='middle' pointer-events='none'>{rk}</text>"
         )
+        star = " &#9733;" if on_frontier else ""
+        key_rows.append(
+            f"<span style='white-space:nowrap'><b>{rk}</b> {_e(name)} "
+            f"<span style='color:var(--muted)'>{_fmt_usd(c)} &middot; {r:.0%}{star}</span></span>"
+        )
+    key = ("<p class='note' style='display:flex;flex-wrap:wrap;gap:4px 18px'>"
+           + "".join(key_rows) + "</p>")
+
     return f"""
 <h2>Value map</h2>
 <div class="tablewrap">
@@ -231,8 +236,10 @@ def _value_map_svg(points, champion: str) -> str:
 <polyline points="{poly}" fill="none" stroke="var(--warn)" stroke-width="1.5" stroke-dasharray="5 4"/>
 {"".join(dots)}
 </svg></div>
-<p class="note">Dashed line: the best-value frontier (no cheaper model wins more often). Dot size
-is average response length; the champion is magenta. Win rate counts rated rounds only.</p>
+{key}
+<p class="note">Dashed line: the best-value frontier (&#9733; in the key; no cheaper model wins
+more often). Dot size is average response length; the champion is magenta; hover any dot for
+exact figures. Win rate counts rated rounds only.</p>
 """
 
 
