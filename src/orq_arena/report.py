@@ -77,6 +77,7 @@ h2 { font-size: 17px; margin: 40px 0 10px; padding-bottom: 6px; border-bottom: 1
   font-variant-numeric: tabular-nums; color: var(--ink); }
 .verdict .kpi.state b { color: var(--state); }
 .verdict .kpi span { font-size: 12px; color: var(--muted); }
+.verdict .kpi b.name-kpi { font-size: 26px; line-height: 1.15; padding-top: 5px; }
 .podium { display: flex; gap: 12px; margin: 18px 0 6px; flex-wrap: wrap; }
 .pod { flex: 1; min-width: 180px; background: var(--card); border: 1px solid var(--line);
        border-radius: 10px; padding: 12px 14px; text-align: center; }
@@ -631,7 +632,9 @@ def build_report_html(
         f"<div class='verdict{vclass}'><p class='eyebrow'>{status}</p>"
         f"<h1>{headline}</h1>"
         f"<p class='expl'>{expl}</p><div class='kpis'>"
-        f"<div class='kpi state'><b>{champ_rate:.0%}</b><span>{_e(champion)} win rate</span></div>"
+        f"<div class='kpi state'><b class='name-kpi'>{_e(champion)}</b>"
+        f"<span>{'Winner' if separated else 'Leads, not separated'}</span></div>"
+        f"<div class='kpi'><b>{champ_rate:.0%}</b><span>Win rate</span></div>"
         f"{kpi2}{kpi3}</div></div>"
     )
 
