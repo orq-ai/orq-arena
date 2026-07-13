@@ -52,7 +52,7 @@ def test_report_renders_every_section():
         cfg=CFG, records=records, elo={"model-a": 1100.0, "model-b": 900.0},
         report=REPORT, manifest=MANIFEST,
     )
-    assert "leads the 2-model pool" in html and "model-a" in html
+    assert "model-a" in html and ("statistically" in html)  # verdict banner headline
     for section in ("Leaderboard", "Win grid", "The jury", "Rounds", "Tokens and cost"):
         assert section in html
     assert "Category" not in html  # category table removed: not universal across datasets

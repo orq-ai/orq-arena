@@ -57,6 +57,14 @@ h2 { font-size: 17px; margin: 40px 0 10px; padding-bottom: 6px; border-bottom: 1
 .badge b { font-weight: 600; }
 .badge.good { border-color: #b5cba3; background: #eef4e6; color: var(--good); }
 .badge.warn { border-color: #e0c98d; background: #f8efd9; color: var(--warn); }
+.verdict { background: var(--card); border: 1px solid var(--line); border-left: 5px solid var(--state, var(--teal-soft));
+  border-radius: 10px; padding: 18px 22px 16px; margin: 22px 0 10px; }
+.verdict.tied { --state: var(--warn); }
+.verdict h1 { margin: 0 0 6px; font-size: 26px; }
+.verdict .expl { color: var(--muted); font-size: 13.5px; max-width: 72ch; margin: 0 0 12px; }
+.verdict .kpis { display: flex; gap: 34px; border-top: 1px solid var(--line); padding-top: 12px; }
+.verdict .kpi b { display: block; font-size: 30px; font-variant-numeric: tabular-nums; color: var(--state, var(--teal-soft)); }
+.verdict .kpi span { font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
 .podium { display: flex; gap: 12px; margin: 18px 0 6px; flex-wrap: wrap; }
 .pod { flex: 1; min-width: 180px; background: var(--card); border: 1px solid var(--line);
        border-radius: 10px; padding: 12px 14px; text-align: center; }
@@ -545,6 +553,46 @@ def build_report_html(
             ) + "</p>"
         )
 
+    # Pragmatic verdict banner (the auto-router dashboard treatment): one
+    # actionable sentence, a plain-words explainer, two large KPIs.
+    champ_rate = rates_all.get(champion, 0.0)
+    runner_name = ranked[1][0] if len(ranked) > 1 else ""
+    separated = "top spot separated" in overlap_caveat
+    total_usd = ""
+    if cost:
+        _w, _j, _u = cost
+        total_usd = f"${_w + (_j or 0.0):,.2f}"
+    if separated:
+        vclass, headline = "", (
+            f"Adopt {_e(champion)}: wins {champ_rate:.0%} of rated rounds, "
+            f"statistically ahead at 95% confidence."
+        )
+        expl = (
+            f"{_e(champion)} beat every other model in this pool on your prompts and its lead "
+            f"over {_e(runner_name)} exceeds the uncertainty of a run this size."
+        )
+    else:
+        vclass, headline = " tied", (
+            f"{_e(champion)} leads, but {_e(runner_name)} is statistically tied: "
+            f"decide on cost and speed."
+        )
+        expl = (
+            f"{_e(champion)} has the best rating, but at {len(records)} rounds the gap to "
+            f"{_e(runner_name)} is inside the error bars. The value map below is the "
+            f"tie-breaker; more rounds would separate them."
+        )
+    kpi2 = (
+        f"<div class='kpi'><b>{total_usd}</b><span>total run cost</span></div>" if total_usd else
+        f"<div class='kpi'><b>{len(records)}</b><span>rounds judged</span></div>"
+    )
+    verdict_banner = (
+        f"<div class='verdict{vclass}'><h1>{headline}</h1>"
+        f"<p class='expl'>{expl}</p><div class='kpis'>"
+        f"<div class='kpi'><b>{champ_rate:.0%}</b><span>{_e(champion)} win rate</span></div>"
+        f"{kpi2}</div></div>"
+    )
+
+
     return f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -553,8 +601,8 @@ def build_report_html(
 
 <header>{_MARK}<span class="brand">orq.ai</span><span class="kind">orq-arena run report</span></header>
 
-<h1>{_e(champion)} leads the {len(ranked)}-model pool at ELO {champ_elo:.0f}</h1>
-<p class="sub">{_e(manifest.get("tournament_id", ""))} &middot; {datestr}
+{verdict_banner}
+<p class="sub">{len(ranked)} models &middot; {_e(manifest.get("tournament_id", ""))} &middot; {datestr}
 {" &middot; " + duration if duration else ""} &middot; {len(records)} rounds
 ({rated} rated &middot; {verdicts["inconclusive"]} inconclusive &middot; {voids} voided)</p>
 
