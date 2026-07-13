@@ -632,11 +632,6 @@ def build_report_html(
         chips = f"ELO {e0:.0f}"
         if nm in per_cost_all:
             chips += f" &middot; {_fmt_usd(per_cost_all[nm])}"
-        tps, ttft = speed_by.get(nm, (0.0, 0.0))
-        if tps > 0:
-            chips += f" &middot; {tps:.0f} tok/s"
-        elif ttft > 0:
-            chips += f" &middot; ttft {ttft:.1f}s"
         cls = " state" if i == 0 else ""
         top3.append(
             f"<div class='kpi{cls}'><b class='name-kpi'>{medals[i]} {_e(nm)}</b>"
