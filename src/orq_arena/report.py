@@ -79,6 +79,7 @@ h2 { font-size: 17px; margin: 40px 0 10px; padding-bottom: 6px; border-bottom: 1
   font-variant-numeric: tabular-nums; color: var(--ink); }
 .verdict .kpi.state > b { color: var(--state); }
 .verdict .kpi span { font-size: 12px; color: var(--muted); }
+.verdict .kpi span.stat { display: block; margin-top: 3px; }
 .verdict .kpi span b { font-size: 13px; color: var(--ink); font-variant-numeric: tabular-nums; }
 .verdict .kpi > b.name-kpi { font-size: 26px; line-height: 1.15; padding-top: 5px; }
 .podium { display: flex; gap: 12px; margin: 18px 0 6px; flex-wrap: wrap; }
@@ -632,14 +633,15 @@ def build_report_html(
     medals = ["&#129351;", "&#129352;", "&#129353;"]
     top3 = []
     for i, (nm, e0) in enumerate(ranked[:3]):
-        chips = f"ELO {e0:.0f}"
-        if nm in per_cost_all:
-            chips += f" &middot; {_fmt_usd(per_cost_all[nm])}"
         cls = " state" if i == 0 else ""
+        stats = (
+            f"<span class='stat'><b>{rates_all.get(nm, 0.0):.0%}</b> win rate</span>"
+            f"<span class='stat'><b>{e0:.0f}</b> ELO score</span>"
+        )
+        if nm in per_cost_all:
+            stats += f"<span class='stat'><b>{_fmt_usd(per_cost_all[nm])}</b> total cost</span>"
         top3.append(
-            f"<div class='kpi{cls}'><b class='name-kpi'>{medals[i]} {_e(nm)}</b>"
-            f"<span><b>{rates_all.get(nm, 0.0):.0%}</b> win rate"
-            f" &middot; {chips}</span></div>"
+            f"<div class='kpi{cls}'><b class='name-kpi'>{medals[i]} {_e(nm)}</b>{stats}</div>"
         )
     kpi3 = (
         f"<div class='kpi'><b>{_pct(agreement)}</b><span>Judge agreement</span></div>"
