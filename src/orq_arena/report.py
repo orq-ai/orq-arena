@@ -468,7 +468,10 @@ def build_report_html(
 
     panel = ", ".join(str(j).split("/")[-1] for j in manifest.get("judges", cfg.judges))
 
-    speed = _speed_svg(_speed_stats(records))
+    stats_all = _speed_stats(records)
+    speed = _speed_svg(stats_all)
+    speed_by = {n: (tps, ttft) for n, tps, ttft, _o, _d in stats_all}
+    dur_by = {n: d for n, _t, _f, _o, d in stats_all}
 
     value_map = ""
     if prices:
@@ -485,9 +488,6 @@ def build_report_html(
 
     rates_all = _win_rates(grid, order)
     per_cost_all = _per_model_cost(records, manifest, prices) if prices else {}
-    stats_all = _speed_stats(records)
-    speed_by = {n: (tps, ttft) for n, tps, ttft, _o, _d in stats_all}
-    dur_by = {n: d for n, _t, _f, _o, d in stats_all}
     medals = ["&#129351;", "&#129352;", "&#129353;"]
     pods = []
     for i, (name, e0) in enumerate(ranked[:3]):
