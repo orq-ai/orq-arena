@@ -566,7 +566,7 @@ def build_report_html(
             f"<div class='pscore'>{rates_all.get(name, 0.0):.0%}</div>"
             f"<div class='psub'>win rate &middot; ELO {e0:.0f}</div>{chips}</div>"
         )
-    podium = f"<div class='podium'>{''.join(pods)}</div>" if len(pods) >= 2 else ""
+    podium = ""  # top-3 lives in the verdict banner now
 
     cost = _cost_lines(records, manifest, prices)
     w_usd_cell = j_usd_cell = t_usd_cell = ""
@@ -626,6 +626,23 @@ def build_report_html(
     )
     status = ("&#10003; TOP SPOT SEPARATED" if separated
               else "&#9888; STATISTICAL TIE AT THE TOP")
+    medals = ["&#129351;", "&#129352;", "&#129353;"]
+    top3 = []
+    for i, (nm, e0) in enumerate(ranked[:3]):
+        chips = f"ELO {e0:.0f}"
+        if nm in per_cost_all:
+            chips += f" &middot; {_fmt_usd(per_cost_all[nm])}"
+        tps, ttft = speed_by.get(nm, (0.0, 0.0))
+        if tps > 0:
+            chips += f" &middot; {tps:.0f} tok/s"
+        elif ttft > 0:
+            chips += f" &middot; ttft {ttft:.1f}s"
+        cls = " state" if i == 0 else ""
+        top3.append(
+            f"<div class='kpi{cls}'><b class='name-kpi'>{medals[i]} {_e(nm)}</b>"
+            f"<span><b style='font-size:15px'>{rates_all.get(nm, 0.0):.0%}</b> win rate"
+            f" &middot; {chips}</span></div>"
+        )
     kpi3 = (
         f"<div class='kpi'><b>{_pct(agreement)}</b><span>Judge agreement</span></div>"
         if agreement is not None else ""
@@ -634,10 +651,7 @@ def build_report_html(
         f"<div class='verdict{vclass}'><p class='eyebrow'>{status}</p>"
         f"<h1>{headline}</h1>"
         f"<p class='expl'>{expl}</p><div class='kpis'>"
-        f"<div class='kpi state'><b class='name-kpi'>{_e(champion)}</b>"
-        f"<span>{'Winner' if separated else 'Leads, not separated'}</span></div>"
-        f"<div class='kpi'><b>{champ_rate:.0%}</b><span>Win rate</span></div>"
-        f"{kpi2}{kpi3}</div></div>"
+        f"{''.join(top3)}</div></div>"
     )
 
 
