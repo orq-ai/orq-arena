@@ -618,8 +618,10 @@ def build_report_html(
             f"{_e(runner_name)} is inside the error bars. The value map below is the "
             f"tie-breaker; more rounds would separate them."
         )
+    champ_usd = per_cost_all.get(champion)
     kpi2 = (
-        f"<div class='kpi'><b>{total_usd}</b><span>Total run cost</span></div>" if total_usd else
+        f"<div class='kpi'><b>{_fmt_usd(champ_usd)}</b><span>{_e(champion)} spend this run</span></div>"
+        if champ_usd else
         f"<div class='kpi'><b>{len(records)}</b><span>Rounds judged</span></div>"
     )
     status = ("&#10003; TOP SPOT SEPARATED" if separated
