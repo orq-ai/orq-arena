@@ -56,7 +56,22 @@ uv run orq-arena run --config orq_arena.yaml --prompts your_prompts.jsonl
 
 The preflight prints exact call counts and a spend ceiling, asks once, then matches run in parallel with plain log lines. When the last round lands, the **HTML report opens in your browser** (`--no-open` to skip, `--yes` to skip the pause; both make it CI-ready).
 
-`--prompts` takes a local JSONL or `orq:<dataset_id>` to benchmark over a [Dataset](https://docs.orq.ai/docs/ai-studio/optimize/datasets) straight from your workspace. If each match should see every prompt, pass `--rounds <n>`; the preflight warns when it samples a subset.
+Bring your prompts either way:
+
+```bash
+# a local JSONL, one prompt per line ("category" is optional)
+uv run orq-arena run --config orq_arena.yaml --prompts your_prompts.jsonl
+
+# or an orq.ai Dataset, straight from your workspace
+uv run orq-arena run --config orq_arena.yaml --prompts orq:<dataset_id>
+```
+
+```jsonl
+{"prompt": "Summarize this incident report for a customer email.", "category": "support"}
+{"prompt": "Draft the SQL for monthly active users by plan.", "category": "analytics"}
+```
+
+Dataset-backed runs record the [Dataset](https://docs.orq.ai/docs/ai-studio/optimize/datasets)'s id, name, and studio URL in the manifest, and the report links it by name. If each match should see every prompt, pass `--rounds <n>`; the preflight warns when it samples a subset.
 
 No key yet? Watch a recorded tournament first: `uv run orq-arena demo` (zero API calls).
 
