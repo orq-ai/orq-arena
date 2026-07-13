@@ -226,6 +226,20 @@ def _value_map_svg(points, champion: str, size_label: str = "average response le
             f"<text x='{x:.0f}' y='{y + 3.5:.0f}' font-size='10' font-weight='700' fill='#fff' "
             f"text-anchor='middle' pointer-events='none'>{rk}</text>"
         )
+        if rk <= 3:
+            # The podium three get readable name labels; placement flips at the
+            # edges and staggers by rank so three labels can never collide.
+            lx, anch = x, "middle"
+            if x > W - R - 120:
+                lx, anch = x - rad - 6, "end"
+            elif x < L + 120:
+                lx, anch = x + rad + 6, "start"
+            ly = y - rad - 8 - (rk - 1) * 13
+            dots.append(
+                f"<text x='{lx:.0f}' y='{ly:.0f}' font-size='11' font-weight='700' "
+                f"fill='var(--ink)' text-anchor='{anch}'>{_e(name)} "
+                f"<tspan fill='var(--muted)' font-weight='400'>{_fmt_usd(c)} &middot; {r:.0%}</tspan></text>"
+            )
         star = " &#9733;" if on_frontier else ""
         key_rows.append(
             f"<span style='white-space:nowrap'><b>{rk}</b> {_e(name)} "
@@ -522,7 +536,7 @@ def build_report_html(
             f"<td class='n'><b>&asymp; ${total:,.2f}</b></td></tr>"
         )
         cost_note = (
-            "<p class='note'>Warrior spend is exact (per-model catalog rates); jury spend is "
+            "<p class='note'>Model spend is exact (per-model catalog rates); jury spend is "
             "estimated at the panel's mean rate because the log stores the panel's token total, "
             "not per-judge splits." + (
                 " Unpriced in the catalog and excluded: " + ", ".join(unpriced) + "." if unpriced else ""
@@ -594,7 +608,7 @@ excluded.</p>
 <div class="tablewrap"><table>
 <thead><tr><th></th><th class="n">input</th><th class="n">output</th>{cost_head}</tr></thead>
 <tbody>
-<tr><td class="name">warriors</td><td class="n">{w_in:,}</td><td class="n">{w_out:,}</td>{w_usd_cell}</tr>
+<tr><td class="name">models</td><td class="n">{w_in:,}</td><td class="n">{w_out:,}</td>{w_usd_cell}</tr>
 <tr><td class="name">jury</td><td class="n">{j_in:,}</td><td class="n">{j_out:,}</td>{j_usd_cell}</tr>
 {t_usd_cell}
 </tbody></table></div>
