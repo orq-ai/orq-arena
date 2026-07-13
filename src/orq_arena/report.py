@@ -227,17 +227,21 @@ def _value_map_svg(points, champion: str, size_label: str = "average response le
             f"text-anchor='middle' pointer-events='none'>{rk}</text>"
         )
         if rk <= 3:
-            # The podium three get readable name labels; placement flips at the
-            # edges and staggers by rank so three labels can never collide.
-            lx, anch = x, "middle"
-            if x > W - R - 120:
-                lx, anch = x - rad - 6, "end"
-            elif x < L + 120:
-                lx, anch = x + rad + 6, "start"
-            ly = y - rad - 8 - (rk - 1) * 13
+            # Podium labels: centered over their own dot, staggered upward by
+            # rank, clamped inside the frame, with a leader line back to the
+            # dot whenever the label had to move. No ambiguity about ownership.
+            lx = min(max(x, L + 115), W - 120)
+            ly = y - rad - 10 - (rk - 1) * 15
+            leader = ""
+            if abs(lx - x) > 4 or (y - rad - ly) > 20:
+                leader = (
+                    f"<line x1='{lx:.0f}' y1='{ly + 3:.0f}' x2='{x:.0f}' y2='{y - rad - 1:.0f}' "
+                    f"stroke='var(--muted)' stroke-width='0.75' opacity='0.6'/>"
+                )
             dots.append(
-                f"<text x='{lx:.0f}' y='{ly:.0f}' font-size='11' font-weight='700' "
-                f"fill='var(--ink)' text-anchor='{anch}'>{_e(name)} "
+                leader
+                + f"<text x='{lx:.0f}' y='{ly:.0f}' font-size='11' font-weight='700' "
+                f"fill='var(--ink)' text-anchor='middle'>{_e(name)} "
                 f"<tspan fill='var(--muted)' font-weight='400'>{_fmt_usd(c)} &middot; {r:.0%}</tspan></text>"
             )
         star = " &#9733;" if on_frontier else ""
@@ -308,17 +312,15 @@ def _speed_svg(stats) -> str:
     rows = [x for x in stats if x[1] > 0 or x[2] > 0]
     if len(rows) < 2:
         return ""
-    has_tps = any(x[1] > 0 for x in rows)
-    if has_tps:
-        rows.sort(key=lambda x: -x[1])
-        vmax = max(x[1] for x in rows) or 1.0
-        title, note = "Speed", ("Average tokens per second over the run's streamed responses; "
-                                "time to first token annotated.")
-    else:
-        rows.sort(key=lambda x: x[2])
-        vmax = max(x[2] for x in rows) or 1.0
-        title, note = "Responsiveness", ("This log predates duration capture, so bars show average "
-                                         "time to first token (shorter is better).")
+    # Only rendered when the log carries durations (owner call: a TTFT-only
+    # fallback chart earned its deletion). Older logs simply skip the section.
+    if not any(x[1] > 0 for x in rows):
+        return ""
+    rows.sort(key=lambda x: -x[1])
+    vmax = max(x[1] for x in rows) or 1.0
+    title, note = "Speed", ("Average tokens per second over the run's streamed responses; "
+                            "time to first token annotated.")
+    has_tps = True
     W, L, RH = 720, 170, 26
     H = 24 + RH * len(rows) + 8
     parts = []
