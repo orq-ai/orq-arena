@@ -267,14 +267,38 @@ def _value_map_svg(points, champion: str, size_label: str = "average response le
     key = ("<p class='note' style='display:flex;flex-wrap:wrap;gap:4px 18px'>"
            + "".join(key_rows) + "</p>")
 
+    # Axis ticks: y every 25% with faint gridlines; x at powers of ten (log scale).
+    y_ticks = "".join(
+        f"<line x1='{L}' y1='{py(v):.0f}' x2='{W - R}' y2='{py(v):.0f}' "
+        f"stroke='var(--line)' stroke-width='{1 if v in (0.0, 1.0) else 0.5}' "
+        f"{'stroke-dasharray=2 3' if v not in (0.0, 1.0) else ''}/>"
+        f"<text x='{L - 8}' y='{py(v) + 4:.0f}' font-size='10' fill='var(--muted)' "
+        f"text-anchor='end'>{v:.0%}</text>"
+        for v in (0.0, 0.25, 0.5, 0.75, 1.0)
+    )
+    import math as _m
+    lo_dec = _m.floor(x0)
+    hi_dec = _m.ceil(x1)
+    x_ticks = ""
+    for d in range(lo_dec, hi_dec + 1):
+        if d < x0 - 0.05 or d > x1 + 0.05:
+            continue
+        tx = L + (d - x0) / span * (W - L - R)
+        val = 10 ** d
+        x_ticks += (
+            f"<line x1='{tx:.0f}' y1='{H - B}' x2='{tx:.0f}' y2='{H - B + 5}' stroke='var(--muted)'/>"
+            f"<text x='{tx:.0f}' y='{H - B + 17}' font-size='10' fill='var(--muted)' "
+            f"text-anchor='middle'>{_fmt_usd(val)}</text>"
+        )
+
     return f"""
 <h2>Value map</h2>
 <div class="tablewrap">
 <svg viewBox="0 0 {W} {H}" width="100%" role="img" aria-label="Win rate vs cost">
 <line x1="{L}" y1="{H - B}" x2="{W - R}" y2="{H - B}" stroke="var(--line)"/>
 <line x1="{L}" y1="{T}" x2="{L}" y2="{H - B}" stroke="var(--line)"/>
-<text x="{L - 8}" y="{T + 6}" font-size="10" fill="var(--muted)" text-anchor="end">100%</text>
-<text x="{L - 8}" y="{H - B}" font-size="10" fill="var(--muted)" text-anchor="end">0%</text>
+{y_ticks}
+{x_ticks}
 <text x="{(L + W - R) // 2}" y="{H - 14}" font-size="11" fill="var(--muted)" text-anchor="middle">cost per model over the whole run (log scale)</text>
 <polyline points="{poly}" fill="none" stroke="var(--brand)" stroke-width="1.5" stroke-dasharray="5 4"/>
 {"".join(dots)}
