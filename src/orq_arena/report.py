@@ -64,14 +64,19 @@ h2 { font-size: 17px; margin: 40px 0 10px; padding-bottom: 6px; border-bottom: 1
 .badge b { font-weight: 600; }
 .badge.good { border-color: #b5cba3; background: #eef4e6; color: var(--good); }
 .badge.warn { border-color: #e0c98d; background: #f8efd9; color: var(--warn); }
-.verdict { background: var(--card); border: 1px solid var(--line); border-left: 5px solid var(--state, var(--teal-soft));
-  border-radius: 10px; padding: 18px 22px 16px; margin: 22px 0 10px; }
+.verdict { background: oklch(0.945 0.012 83); border: 1px solid var(--line);
+  border-radius: 14px; padding: 26px 30px 22px; margin: 26px 0 12px;
+  --state: var(--good); }
 .verdict.tied { --state: var(--warn); }
-.verdict h1 { margin: 0 0 6px; font-size: 26px; }
-.verdict .expl { color: var(--muted); font-size: 13.5px; max-width: 72ch; margin: 0 0 12px; }
-.verdict .kpis { display: flex; gap: 34px; border-top: 1px solid var(--line); padding-top: 12px; }
-.verdict .kpi b { display: block; font-size: 30px; font-variant-numeric: tabular-nums; color: var(--state, var(--teal-soft)); }
-.verdict .kpi span { font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
+.verdict .eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--state); font-weight: 600; margin: 0 0 10px; }
+.verdict h1 { margin: 0 0 10px; font-size: 27px; line-height: 1.25; letter-spacing: -0.02em; }
+.verdict .expl { color: var(--muted); font-size: 13.5px; max-width: 64ch; margin: 0 0 18px; }
+.verdict .kpis { display: flex; gap: 44px; border-top: 1px solid var(--line); padding-top: 16px; }
+.verdict .kpi b { display: block; font-size: 34px; font-weight: 700; letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums; color: var(--ink); }
+.verdict .kpi.state b { color: var(--state); }
+.verdict .kpi span { font-size: 12px; color: var(--muted); }
 .podium { display: flex; gap: 12px; margin: 18px 0 6px; flex-wrap: wrap; }
 .pod { flex: 1; min-width: 180px; background: var(--card); border: 1px solid var(--line);
        border-radius: 10px; padding: 12px 14px; text-align: center; }
@@ -613,14 +618,21 @@ def build_report_html(
             f"tie-breaker; more rounds would separate them."
         )
     kpi2 = (
-        f"<div class='kpi'><b>{total_usd}</b><span>total run cost</span></div>" if total_usd else
-        f"<div class='kpi'><b>{len(records)}</b><span>rounds judged</span></div>"
+        f"<div class='kpi'><b>{total_usd}</b><span>Total run cost</span></div>" if total_usd else
+        f"<div class='kpi'><b>{len(records)}</b><span>Rounds judged</span></div>"
+    )
+    status = ("&#10003; TOP SPOT SEPARATED" if separated
+              else "&#9888; STATISTICAL TIE AT THE TOP")
+    kpi3 = (
+        f"<div class='kpi'><b>{_pct(agreement)}</b><span>Judge agreement</span></div>"
+        if agreement is not None else ""
     )
     verdict_banner = (
-        f"<div class='verdict{vclass}'><h1>{headline}</h1>"
+        f"<div class='verdict{vclass}'><p class='eyebrow'>{status}</p>"
+        f"<h1>{headline}</h1>"
         f"<p class='expl'>{expl}</p><div class='kpis'>"
-        f"<div class='kpi'><b>{champ_rate:.0%}</b><span>{_e(champion)} win rate</span></div>"
-        f"{kpi2}</div></div>"
+        f"<div class='kpi state'><b>{champ_rate:.0%}</b><span>{_e(champion)} win rate</span></div>"
+        f"{kpi2}{kpi3}</div></div>"
     )
 
 
@@ -630,7 +642,7 @@ def build_report_html(
 <title>orq-arena report &middot; {_e(manifest.get("tournament_id", ""))}</title>
 <style>{_CSS}</style></head><body><div class="wrap">
 
-<header>{_MARK}<span class="brand">orq.ai</span><span class="kind">orq-arena run report</span></header>
+<header>{_MARK}<span class="brand">orq.ai</span><span class="kind">{len(ranked)} MODELS &middot; {len(records)} ROUNDS{" &middot; " + duration.upper() if duration else ""} &middot; ORQ-ARENA RUN</span></header>
 
 {verdict_banner}
 <p class="sub">{len(ranked)} models &middot; {_e(manifest.get("tournament_id", ""))} &middot; {datestr}
