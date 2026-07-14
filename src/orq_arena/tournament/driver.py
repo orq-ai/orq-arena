@@ -278,7 +278,7 @@ async def run_tournament(
         cfg.swiss_rounds * (len(names) // 2) if use_swiss else len(schedule)
     )
     started_at = time.time()
-    tournament_id = f"tour-{int(started_at)}"
+    tournament_id = f"bench-{int(started_at)}"
     _write_manifest(
         manifest_path, cfg=cfg, prompts=prompts, seed=seed,
         tournament_id=tournament_id, started_at=started_at, preflight=preflight,

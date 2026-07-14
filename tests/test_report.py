@@ -53,11 +53,13 @@ def test_report_renders_every_section():
         report=REPORT, manifest=MANIFEST,
     )
     assert "model-a" in html and ("statistically" in html)  # verdict banner headline
-    for section in ("Leaderboard", "Win grid", "The jury", "Rounds", "Tokens and cost"):
+    for section in ("Leaderboard", "Win grid", "The jury", "Panel verdicts",
+                    "Tokens and cost", "Confidence stats", "Methodology in detail"):
         assert section in html
     assert "Category" not in html  # category table removed: not universal across datasets
-    assert "10.0 min" in html
-    assert "CI overlap" in html  # runner-up hi (1100) >= champion lo (900)
+    assert "10.0 MIN" in html  # duration rides in the header metadata strip (uppercased)
+    # runner-up hi (1100) >= champion lo (900): top spot not separated
+    assert "indistinguishable at this sample size" in html
     assert "thinking" in html  # model-b badge
     assert "—" not in html  # house style: no em-dashes anywhere
 
@@ -75,7 +77,7 @@ def test_report_cost_column_with_prices():
         report=REPORT, manifest=MANIFEST, prices=prices,
     )
     # warriors: in 2*(10+10)=40 @ $1/M + out 2*(20+25)=90 @ $2/M
-    assert "est. cost" in html and "total" in html
+    assert "Estimated total" in html and "costcard" in html
     # jury estimated at panel mean rate, marked approximate
     assert "&asymp;" in html
 
@@ -141,7 +143,7 @@ def test_report_with_custom_display_names():
     html = build_report_html(
         cfg=cfg, records=records, elo=elo, report=rep, manifest=manifest, prices=prices,
     )
-    assert "Alpha" in html and "est. cost" in html
+    assert "Alpha" in html and "Estimated total" in html
     assert "total cost" in html  # per-model cost resolved through the alias
 
 

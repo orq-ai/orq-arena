@@ -38,8 +38,8 @@ _CSS = """
   --brand: #DF5325;
   --paper: oklch(0.966 0.008 83); --card: oklch(0.992 0.005 83);
   --line: oklch(0.885 0.011 83); --ink: #141319;
-  --teal: #141319; --teal-soft: oklch(0.50 0.13 158); --muted: oklch(0.535 0.013 83);
-  --a: #c8189e; --b: #0092ab; --good: oklch(0.50 0.13 158); --warn: oklch(0.55 0.12 75);
+  --teal: #141319; --teal-soft: oklch(0.50 0.13 158); --muted: oklch(0.50 0.013 83);
+  --a: #c8189e; --b: #0092ab; --good: oklch(0.50 0.13 158); --warn: oklch(0.50 0.12 75);
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   --sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
           "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -51,7 +51,8 @@ body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(
 header { display: flex; align-items: center; gap: 10px; padding: 26px 0 14px;
          border-bottom: 2px solid var(--ink); color: var(--ink); }
 header .brand { font-weight: 700; font-size: 17px; letter-spacing: -0.3px; }
-header .kind { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+header .kind { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--muted); text-align: right; }
+header .kind a { color: var(--brand); text-decoration: none; }
 h1 { font-size: 30px; line-height: 1.15; margin: 26px 0 4px; letter-spacing: -0.5px; }
 h2 { font-size: 17px; margin: 40px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
 .sub { color: var(--muted); font-family: var(--mono); font-size: 12.5px; }
@@ -83,8 +84,8 @@ h2 { font-size: 17px; margin: 40px 0 10px; padding-bottom: 6px; border-bottom: 1
 .verdict .kpi > b.name-kpi { font-size: 26px; line-height: 1.15; padding-top: 5px; }
 table { border-collapse: collapse; width: 100%; font-size: 13.5px;
         font-variant-numeric: tabular-nums; }
-th { text-align: left; font-family: var(--mono); font-size: 10.5px; text-transform: uppercase;
-     letter-spacing: 0.08em; color: var(--muted); padding: 6px 10px;
+th { text-align: left; font-family: var(--mono); font-size: 12px; text-transform: uppercase;
+     letter-spacing: 0.02em; color: var(--muted); padding: 6px 10px;
      border-bottom: 1.5px solid var(--line); }
 td { padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
 td.n, th.n { text-align: right; font-family: var(--mono); white-space: nowrap; }
@@ -98,10 +99,31 @@ td.n, th.n { text-align: right; font-family: var(--mono); white-space: nowrap; }
 .grid td, .grid th { text-align: center; padding: 6px 6px; }
 .grid td.rowname { text-align: left; font-weight: 600; white-space: nowrap; }
 .foot { margin-top: 48px; padding-top: 14px; border-top: 2px solid var(--line);
-        font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+        font-family: var(--mono); font-size: 12px; color: var(--muted); }
 .foot code { background: #f0ede4; padding: 1px 5px; border-radius: 3px; }
 .note { font-size: 12.5px; color: var(--muted); margin: 8px 2px; }
+.subhead { font-family: var(--mono); font-size: 12px; color: var(--muted);
+           margin: 22px 2px 8px; }
+details.method { margin: 40px 0 0; }
+details.method > summary { font-size: 17px; font-weight: 600; cursor: pointer;
+  padding-bottom: 6px; border-bottom: 1px solid var(--line); list-style: none; }
+details.method > summary::-webkit-details-marker { display: none; }
+details.method > summary::after { content: " +"; color: var(--muted); font-family: var(--mono); }
+details.method[open] > summary::after { content: " \2212"; }
+details.method h3 { font-family: var(--mono); font-size: 11px; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--muted); margin: 18px 0 4px; }
+details.method p { font-size: 13px; color: var(--muted); margin: 4px 2px; max-width: 74ch; }
+.costcards { display: flex; gap: 14px; flex-wrap: wrap; margin: 4px 0; }
+.costcard { flex: 1; min-width: 175px; background: var(--card); border: 1px solid var(--line);
+            border-radius: 12px; padding: 15px 18px; }
+.costcard.total { border-color: var(--ink); }
+.costcard .lbl { font-family: var(--mono); font-size: 12px; letter-spacing: .04em;
+                 text-transform: uppercase; color: var(--muted); }
+.costcard .big { font-size: 27px; font-weight: 700; letter-spacing: -0.02em;
+                 font-variant-numeric: tabular-nums; margin-top: 6px; }
+.costcard .cap { font-size: 12px; color: var(--muted); margin-top: 5px; }
 .sideA { color: var(--a); font-weight: 600; } .sideB { color: var(--b); font-weight: 600; }
+.sig.warn { color: var(--warn); } .sig.good { color: var(--good); }
 @media (max-width: 640px) { h1 { font-size: 24px; } }
 """
 
@@ -328,7 +350,7 @@ def _value_map_svg(points, champion: str, size_label: str = "average response le
 </svg></div>
 {key}
 <p class="note">Dashed line: the best-value frontier (&#9733; in the key; no cheaper model rates
-higher). Dot size is {size_label}; the champion is magenta; hover any dot for cost, ELO,
+higher). Dot size is {size_label}; the champion is orange; hover any dot for cost, ELO,
 and win rate. Win rate counts rated rounds only.</p>
 """
 
@@ -408,6 +430,23 @@ def _speed_svg(stats) -> str:
 """
 
 
+def _empty_report_html(manifest: dict[str, Any], n_records: int) -> str:
+    """Minimal valid page when no models were rated (empty pool / all voided)."""
+    bench_id = _e(manifest.get("tournament_id", "").replace("tour-", "bench-", 1))
+    return f"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>orq-arena report &middot; {bench_id}</title>
+<style>{_CSS}</style></head><body><div class="wrap">
+<header>{_MARK}<span class="brand">orq.ai</span><span class="kind">{bench_id} &middot; ORQ-ARENA RUN</span></header>
+<div class="verdict tied"><p class="eyebrow">&#9888; NO RATED MODELS</p>
+<h1>Nothing to rank.</h1>
+<p class="expl">This run produced no rated models: all {n_records} rounds were voided, or no
+candidates were configured. Check the roster and the run log, then re-run.</p></div>
+</div></body></html>
+"""
+
+
 def build_report_html(
     *,
     cfg: ArenaConfig,
@@ -427,6 +466,8 @@ def build_report_html(
     rated = report.get("rated_rounds", decisive + verdicts["tie"])
 
     ranked = sorted(elo.items(), key=lambda kv: kv[1], reverse=True)
+    if not ranked:
+        return _empty_report_html(manifest, len(records))
     champion, champ_elo = ranked[0]
     ci: dict[str, tuple[float, float]] = {
         k: tuple(v) for k, v in (report.get("elo_ci") or {}).items()
@@ -437,35 +478,16 @@ def build_report_html(
     length_coef = report.get("length_coef")
 
     # Verdict hero: is the top spot statistically separated from the runner-up?
-    overlap_caveat = ""
+    # None when there's no runner-up or no CI to compare.
+    top_separated: bool | None = None
     if len(ranked) > 1 and ci:
         runner, _ = ranked[1]
         c_lo = ci.get(champion, (champ_elo, champ_elo))[0]
         r_hi = ci.get(runner, (0.0, 0.0))[1]
-        if r_hi >= c_lo:
-            overlap_caveat = (
-                f'<span class="badge warn">CI overlap: {_e(runner)} is statistically '
-                f"indistinguishable at this sample size</span>"
-            )
-        else:
-            overlap_caveat = '<span class="badge good">top spot separated at 95% CI</span>'
+        top_separated = r_hi < c_lo
 
     fleiss = report.get("fleiss") or {}
-    kappa_badge = ""
-    if fleiss.get("kappa") is not None:
-        kappa_badge = (
-            f'<span class="badge">Fleiss&#39; &kappa; <b>{fleiss["kappa"]}</b> '
-            f'({_e(fleiss.get("label", ""))}) over {fleiss.get("rounds_used", "?")}/'
-            f'{fleiss.get("rounds_total", "?")} full-panel rounds</span>'
-        )
     agreement = report.get("mean_agreement")
-    length_badge = ""
-    if length_coef is not None:
-        lean = "longer" if length_coef > 0 else "shorter"
-        length_badge = (
-            f'<span class="badge">jury length coefficient <b>{length_coef:+.2f}</b> '
-            f"(leaned {lean}; len-ctrl column prices it out)</span>"
-        )
 
     started = manifest.get("started_at")
     finished = manifest.get("finished_at") or (
@@ -485,6 +507,7 @@ def build_report_html(
     all_hi = [min(ci.get(n, (e0, e0))[1], max(points) + 350) for n, e0 in ranked]
     floor, ceil = min(all_lo), max(all_hi)
     span = max(ceil - floor, 1.0)
+    medals = ("&#129351;", "&#129352;", "&#129353;")  # gold/silver/bronze, reused by the hero
     ladder_rows = []
     for i, (name, e0) in enumerate(ranked, 1):
         lo, hi = ci.get(name, (e0, e0))
@@ -492,9 +515,13 @@ def build_report_html(
         think = ' <span class="think">thinking</span>' if thinking.get(name) else ""
         tok = verbosity.get(name)
         sc_cell = f"<td class='n'>{elo_sc[name]:.0f}</td>" if name in elo_sc else ""
+        rank = medals[i - 1] if i <= 3 else str(i)
+        # BT strength -> 0 floors the rating at 400*log10(1e-10)+1000 = -3000; that
+        # bound is really -inf (model won ~nothing), so show it as such, not the artifact.
+        lo_txt = "&minus;&infin;" if lo <= -2900 else f"{lo:.0f}"
         ladder_rows.append(
-            f"<tr><td class='n'>{i}</td><td class='name'>{_e(name)}{think}</td>"
-            f"<td class='n'>{e0:.0f}</td><td class='n'>{lo:.0f}&ndash;{hi:.0f}</td>"
+            f"<tr><td class='n'>{rank}</td><td class='name'>{_e(name)}{think}</td>"
+            f"<td class='n'>{e0:.0f}</td><td class='n'>{lo_txt}&ndash;{hi:.0f}</td>"
             f"<td title='{lo:.0f} to {hi:.0f}'>{_ci_bar(dlo, dhi, e0, floor, span)}</td>"
             f"{sc_cell}"
             f"<td class='n'>{'' if tok is None else f'{tok:.0f}'}</td></tr>"
@@ -546,6 +573,39 @@ def build_report_html(
     total_tok = w_in + w_out + j_in + j_out
     jury_share = f"{(j_in + j_out) / total_tok:.0%}" if total_tok else "n/a"
 
+    # Flag a high inconclusive share: those rounds carried no signal, so a run
+    # that's mostly inconclusive is weak evidence and shouldn't read as neutral.
+    inc = verdicts["inconclusive"]
+    inc_cls = " warn" if len(records) and inc / len(records) > 0.30 else ""
+
+    # Confidence & methodology: one aligned row per run-confidence signal
+    # (reads far better than ragged pills). (label, reading html, td class).
+    signal_rows: list[tuple[str, str, str]] = []
+    if top_separated is not None:
+        runner_name = ranked[1][0]
+        if top_separated:
+            signal_rows.append(("Top-spot separation",
+                "top spot clears the runner-up at 95% CI", " good"))
+        else:
+            signal_rows.append(("Top-spot separation",
+                f"{_e(runner_name)} is statistically indistinguishable at this sample size",
+                " warn"))
+    if fleiss.get("kappa") is not None:
+        signal_rows.append(("Jury agreement (Fleiss&#39; &kappa;)",
+            f"<b>{fleiss['kappa']}</b> {_e(fleiss.get('label', ''))}, over "
+            f"{fleiss.get('rounds_used', '?')}/{fleiss.get('rounds_total', '?')} "
+            f"full-panel rounds", ""))
+    if length_coef is not None:
+        lean = "longer" if length_coef > 0 else "shorter"
+        signal_rows.append(("Jury length bias",
+            f"<b>{length_coef:+.2f}</b> leaned {lean}; the len-ctrl column prices it out", ""))
+    signal_rows.append(("Decisive-vote agreement", f"<b>{_pct(agreement)}</b>", ""))
+    signal_rows.append(("Jury share of tokens", f"<b>{jury_share}</b>", ""))
+    meth_rows = "".join(
+        f"<tr><td class='name'>{lbl}</td><td class='sig{c}'>{txt}</td></tr>"
+        for lbl, txt, c in signal_rows
+    )
+
     panel = ", ".join(str(j).split("/")[-1] for j in manifest.get("judges", cfg.judges))
 
     # Records store short model names; elo/manifest/report are keyed by display
@@ -571,20 +631,25 @@ def build_report_html(
     rates_all = _win_rates(grid, order)
     per_cost_all = _per_model_cost(records, manifest, prices, alias) if prices else {}
 
+    # Tokens & cost as three cards: models spend, jury spend, aggregated total.
+    # Without catalog prices there's no cost story, so cards fall back to tokens.
     cost = _cost_lines(records, manifest, prices, alias)
-    w_usd_cell = j_usd_cell = t_usd_cell = ""
     cost_note = ""
-    cost_head = ""
+
+    def _card(lbl, big, cap, extra=""):
+        return (f"<div class='costcard{extra}'><div class='lbl'>{lbl}</div>"
+                f"<div class='big'>{big}</div><div class='cap'>{cap}</div></div>")
+
     if cost:
         w_usd, j_usd, unpriced = cost
-        cost_head = "<th class='n'>est. cost</th>"
-        w_usd_cell = f"<td class='n'>${w_usd:,.2f}</td>"
-        j_usd_cell = f"<td class='n'>{'&asymp; $' + format(j_usd, ',.2f') if j_usd is not None else 'n/a'}</td>"
         total = w_usd + (j_usd or 0.0)
-        t_usd_cell = (
-            f"<tr><td class='name'>total</td><td class='n'></td><td class='n'></td>"
-            f"<td class='n'><b>&asymp; ${total:,.2f}</b></td></tr>"
-        )
+        j_big = f"&asymp; ${j_usd:,.2f}" if j_usd is not None else "n/a"
+        cost_cards = "<div class='costcards'>" + (
+            _card("Models", f"${w_usd:,.2f}", f"{w_in:,} in &middot; {w_out:,} out &middot; exact")
+            + _card("Jury", j_big, f"{j_in:,} in &middot; {j_out:,} out &middot; estimated")
+            + _card("Estimated total", f"&asymp; ${total:,.2f}",
+                    f"jury {jury_share} of tokens", extra=" total")
+        ) + "</div>"
         cost_note = (
             "<p class='note'>Model spend is exact (per-model catalog rates); jury spend is "
             "estimated at the panel's mean rate because the log stores the panel's token total, "
@@ -592,13 +657,30 @@ def build_report_html(
                 " Unpriced in the catalog and excluded: " + ", ".join(unpriced) + "." if unpriced else ""
             ) + "</p>"
         )
+    else:
+        cost_cards = "<div class='costcards'>" + (
+            _card("Models", f"{w_in + w_out:,}", f"{w_in:,} in &middot; {w_out:,} out &middot; tokens")
+            + _card("Jury", f"{j_in + j_out:,}", f"{j_in:,} in &middot; {j_out:,} out &middot; tokens")
+        ) + "</div>"
 
     # Pragmatic verdict banner (the auto-router dashboard treatment): one
     # actionable sentence, a plain-words explainer, two large KPIs.
     champ_rate = rates_all.get(champion, 0.0)
     runner_name = ranked[1][0] if len(ranked) > 1 else ""
-    separated = "top spot separated" in overlap_caveat
-    if separated:
+    separated = top_separated is True
+    if len(ranked) == 1:
+        vclass, headline = " tied", f"{_e(champion)} ran unopposed: nothing to rank."
+        expl = (
+            "A benchmark needs at least two candidates to produce a ranking. Add "
+            "competitors to get a verdict."
+        )
+    elif rated == 0:
+        vclass, headline = " tied", "No decisive rounds: nothing to rank yet."
+        expl = (
+            f"All {len(records)} rounds were inconclusive or voided, so no model earned a "
+            f"rated win. Re-run with more prompts or a decisive jury to separate the field."
+        )
+    elif separated:
         vclass, headline = "", (
             f"Adopt {_e(champion)}: wins {champ_rate:.0%} of rated rounds, "
             f"statistically ahead at 95% confidence."
@@ -619,13 +701,14 @@ def build_report_html(
         )
     status = ("&#10003; TOP SPOT SEPARATED" if separated
               else "&#9888; STATISTICAL TIE AT THE TOP")
-    medals = ["&#129351;", "&#129352;", "&#129353;"]
     top3 = []
     for i, (nm, e0) in enumerate(ranked[:3]):
         cls = " state" if i == 0 else ""
+        # ELO leads (it's the ranking axis); win rate is secondary and labelled as
+        # a share, not a rank -- it can invert the order (opponent strength ignored).
         stats = (
-            f"<span class='stat lead'><b>{rates_all.get(nm, 0.0):.0%}</b> win rate</span>"
-            f"<span class='stat'><b>{e0:.0f}</b> ELO score</span>"
+            f"<span class='stat lead'><b>{e0:.0f}</b> ELO score</span>"
+            f"<span class='stat'><b>{rates_all.get(nm, 0.0):.0%}</b> rated-round win share</span>"
         )
         if nm in per_cost_all:
             stats += f"<span class='stat'><b>{_fmt_usd(per_cost_all[nm])}</b> total cost</span>"
@@ -638,6 +721,9 @@ def build_report_html(
         f"<p class='expl'>{expl}</p><div class='kpis'>"
         f"{''.join(top3)}</div></div>"
     )
+
+    # Legacy runs minted "tour-…"; display them under the current "bench-" term.
+    bench_id = _e(manifest.get("tournament_id", "").replace("tour-", "bench-", 1))
 
     ds = manifest.get("dataset") or {}
     dataset_frag = ""
@@ -652,23 +738,12 @@ def build_report_html(
     return f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>orq-arena report &middot; {_e(manifest.get("tournament_id", ""))}</title>
+<title>orq-arena report &middot; {bench_id}</title>
 <style>{_CSS}</style></head><body><div class="wrap">
 
-<header>{_MARK}<span class="brand">orq.ai</span><span class="kind">{len(ranked)} MODELS &middot; {len(records)} ROUNDS{" &middot; " + duration.upper() if duration else ""} &middot; ORQ-ARENA RUN</span></header>
+<header>{_MARK}<span class="brand">orq.ai</span><span class="kind">{dataset_frag}{bench_id} &middot; {datestr} &middot; {len(ranked)} MODELS &middot; {len(records)} ROUNDS{" &middot; " + duration.upper() if duration else ""} &middot; ORQ-ARENA RUN</span></header>
 
 {verdict_banner}
-<p class="sub">{dataset_frag}{len(ranked)} models &middot; {_e(manifest.get("tournament_id", ""))} &middot; {datestr}
-{" &middot; " + duration if duration else ""} &middot; {len(records)} rounds
-({rated} rated &middot; {verdicts["inconclusive"]} inconclusive &middot; {voids} voided)</p>
-
-<div class="badges">
-  {overlap_caveat}
-  {kappa_badge}
-  {length_badge}
-  <span class="badge">decisive-vote agreement <b>{_pct(agreement)}</b></span>
-  <span class="badge">jury share of tokens <b>{jury_share}</b></span>
-</div>
 
 <h2>Leaderboard</h2>
 <div class="tablewrap"><table>
@@ -677,14 +752,19 @@ def build_report_html(
 <tbody>{"".join(ladder_rows)}</tbody></table></div>
 <p class="note">Bradley-Terry MLE over every rated round (wins and ties), anchored at a
 1000-point mean; intervals are 200-iteration bootstrap percentiles. Overlapping intervals are
-the honest output on a run this size.{" The len-ctrl column refits the rating with the jury&#39;s length preference priced out; a large raw-vs-len-ctrl gap means verbosity, not quality, is doing the separating." if elo_sc else ""}</p>
+the honest output on a run this size. A &minus;&infin; lower bound means the model won so few
+rounds its rating is unidentifiable below.{" The len-ctrl column refits the rating with the jury&#39;s length preference priced out; a large raw-vs-len-ctrl gap means verbosity, not quality, is doing the separating." if elo_sc else ""}</p>
 
 {value_map}
 {speed}
 <h2>Win grid</h2>
 <div class="tablewrap"><table class="grid">
-<thead><tr><th>row beats column (ties count &frac12;)</th>{head}</tr></thead>
+<thead><tr><th style="text-transform:none">row beats column (ties count &frac12;)</th>{head}</tr></thead>
 <tbody>{"".join(grid_rows)}</tbody></table></div>
+
+<h2>Tokens and cost</h2>
+{cost_cards}
+{cost_note}
 
 <h2>The jury</h2>
 <div class="tablewrap"><table>
@@ -697,27 +777,49 @@ the honest output on a run this size.{" The len-ctrl column refits the rating wi
 itself abstains (the flip rate) and abstentions never become verdicts. Pairwise Cohen&#39;s
 &kappa;: {cohen_bits or "n/a"}.</p>
 
-<h2>Rounds</h2>
+<p class="subhead">Panel verdicts across all {len(records)} rounds</p>
 <div class="badges">
   <span class="badge"><span class="sideA">A</span> wins <b>{verdicts["A"]}</b></span>
   <span class="badge"><span class="sideB">B</span> wins <b>{verdicts["B"]}</b></span>
   <span class="badge">ties <b>{verdicts["tie"]}</b></span>
-  <span class="badge">inconclusive <b>{verdicts["inconclusive"]}</b></span>
+  <span class="badge{inc_cls}">inconclusive <b>{verdicts["inconclusive"]}</b></span>
   <span class="badge">{"voided <b>" + str(voids) + "</b>" if voids else "voided <b>0</b>"}</span>
 </div>
-<p class="note">Inconclusive rounds carry no signal and are dropped from the rating, never
-counted as ties. A voided round is a network failure, not a model failure; it is logged and
-excluded.</p>
+<p class="note">The A-vs-B split is panel-level seat lean (compare the per-judge leans above).
+Inconclusive rounds carry no signal and are dropped from the rating, never counted as ties.
+A voided round is a network failure, not a model failure; it is logged and excluded.</p>
 
-<h2>Tokens and cost</h2>
+<h2>Confidence stats</h2>
 <div class="tablewrap"><table>
-<thead><tr><th></th><th class="n">input</th><th class="n">output</th>{cost_head}</tr></thead>
-<tbody>
-<tr><td class="name">models</td><td class="n">{w_in:,}</td><td class="n">{w_out:,}</td>{w_usd_cell}</tr>
-<tr><td class="name">jury</td><td class="n">{j_in:,}</td><td class="n">{j_out:,}</td>{j_usd_cell}</tr>
-{t_usd_cell}
-</tbody></table></div>
-{cost_note}
+<thead><tr><th>Signal</th><th>Reading</th></tr></thead>
+<tbody>{meth_rows}</tbody></table></div>
+<p class="note">These are run-confidence signals, not model scores: whether the top spot
+clears the noise floor, how tightly the jury agreed, and whether length rather than quality
+did the separating.</p>
+
+<details class="method"><summary>Methodology in detail</summary>
+<h3>Ratings</h3>
+<p>Bradley-Terry MLE over every rated round (wins and ties), anchored at a 1000-point mean.
+95% intervals are 200-iteration bootstrap percentiles; small pools give wide, overlapping
+intervals, which is the honest output at this size. A &minus;&infin; lower bound means a model
+won so few rounds its rating is unidentifiable below. The len-ctrl column refits the rating
+with the jury&#39;s length preference priced out; a large raw-vs-len-ctrl gap means verbosity,
+not quality, is doing the separating.</p>
+<h3>The jury</h3>
+<p>Every judge scores each pair in both seat orders; a judge that contradicts itself between
+orders abstains (the flip rate), and abstentions never become verdicts. Fleiss&#39; &kappa;
+measures panel agreement across full-panel rounds; pairwise Cohen&#39;s &kappa; measures
+judge-vs-judge agreement. Decisive-vote agreement is the share of decisive rounds the panel
+agreed on. The A-vs-B split is panel-level seat lean.</p>
+<h3>Rounds</h3>
+<p>A- and B-wins plus ties are decisive and feed the rating (rated = decisive + ties).
+Inconclusive rounds carry no signal and are dropped, never counted as ties. A voided round is
+a network failure, not a model failure; it is logged and excluded.</p>
+<h3>Cost</h3>
+<p>Model spend is exact (per-model catalog rates). Jury spend is estimated (&asymp;) at the
+panel&#39;s mean rate, because the log stores the panel&#39;s token total, not per-judge splits.
+Models unpriced in the catalog are excluded from the estimate.</p>
+</details>
 
 <div class="foot">
 config <code>{_e(manifest.get("config_sha256", "?"))}</code> &middot;
