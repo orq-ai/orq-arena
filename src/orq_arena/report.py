@@ -31,57 +31,72 @@ _MARK = (
 
 _CSS = """
 :root {
-  color-scheme: light;
-  /* orq.ai brand palette (Brand Guidelines v1.0), same tokens as the
-     Model-Router-Auto-Evaluation dashboard: warm beige neutrals, Pulse
-     Orange accent, Incognito Black ink. A/B side colors stay functional. */
-  --brand: #DF5325;
-  --paper: oklch(0.966 0.008 83); --card: oklch(0.992 0.005 83);
-  --line: oklch(0.885 0.011 83); --ink: #141319;
-  --teal: #141319; --teal-soft: oklch(0.50 0.13 158); --muted: oklch(0.50 0.013 83);
-  --a: #c8189e; --b: #0092ab; --good: oklch(0.50 0.13 158); --warn: oklch(0.50 0.12 75);
+  color-scheme: light dark;
+  /* orq v2 design language (shadcn "Neutral" base, mirrors orquesta-web
+     _spartan.css + _orq.css): neutral white/gray surfaces, Inter, indigo
+     brand with Pulse Orange as a reserved accent, subtle elevation, full
+     light+dark. A/B side colors stay functional. */
+  --radius: 10px; --r-sm: 6px; --r-md: 8px; --r-lg: 10px; --r-xl: 12px;
+  --paper: oklch(0.985 0 0); --surface: oklch(0.97 0 0); --card: oklch(1 0 0);
+  --line: oklch(0.922 0 0); --ink: #141319; --muted: oklch(0.50 0 0);
+  --brand: #df5325; --indigo: #24059d; --teal: #141319; --teal-soft: #259e6e;
+  --a: #7e22ce; --b: #0092ab; --good: #259e6e; --warn: #a67800; --danger: #b72118;
+  --dot-mute: oklch(0.60 0.008 83); --heat: 223 83 37;
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / .06), 0 1px 3px 0 rgb(0 0 0 / .04);
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / .05);
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   --sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
           "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
+@media (prefers-color-scheme: dark) { :root {
+  --paper: oklch(0.145 0 0); --surface: oklch(0.24 0 0); --card: oklch(0.205 0 0);
+  --line: oklch(1 0 0 / 12%); --ink: oklch(0.985 0 0); --muted: oklch(0.70 0 0);
+  --brand: #ff8f34; --indigo: #8a8dff; --teal: oklch(0.985 0 0); --teal-soft: #4bbe8e;
+  --good: #4bbe8e; --warn: #e0b64a; --danger: #f28a8a;
+  --a: #c084fc; --b: #4dd0e1; --dot-mute: oklch(0.5 0 0); --heat: 255 143 52;
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / .5); --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / .4);
+}}
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--sans);
        line-height: 1.55; -webkit-font-smoothing: antialiased; }
 .wrap { max-width: 960px; margin: 0 auto; padding: 0 24px 72px; }
 header { display: flex; align-items: center; gap: 10px; padding: 26px 0 14px;
-         border-bottom: 2px solid var(--ink); color: var(--ink); }
-header .brand { font-weight: 700; font-size: 17px; letter-spacing: -0.3px; }
+         border-bottom: 1px solid var(--line); color: var(--ink); }
+header .brand { font-weight: 600; font-size: 17px; letter-spacing: -0.3px; }
 header .kind { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--muted); text-align: right; }
-header .kind a { color: var(--brand); text-decoration: none; }
-h1 { font-size: 30px; line-height: 1.15; margin: 26px 0 4px; letter-spacing: -0.5px; }
-h2 { font-size: 17px; margin: 40px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+header .kind a { color: var(--indigo); text-decoration: none; }
+h1 { font-size: 30px; font-weight: 500; line-height: 1.15; margin: 26px 0 4px; letter-spacing: -0.5px; }
+h2 { font-size: 17px; font-weight: 500; margin: 40px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
 .sub { color: var(--muted); font-family: var(--mono); font-size: 12.5px; }
-.sub a { color: var(--brand); text-decoration: none; }
+.sub a { color: var(--indigo); text-decoration: none; }
 .sub a:hover { text-decoration: underline; }
 .badges { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 4px; }
-.badge { font-family: var(--mono); font-size: 12px; padding: 3px 10px; border-radius: 20px;
-         border: 1px solid var(--line); background: var(--card); }
+.badge { font-family: var(--mono); font-size: 12px; padding: 3px 10px; border-radius: var(--r-sm);
+         border: 1px solid var(--line); background: var(--surface); }
 .badge b { font-weight: 600; }
-.badge.good { border-color: #b5cba3; background: #eef4e6; color: var(--good); }
-.badge.warn { border-color: #e0c98d; background: #f8efd9; color: var(--warn); }
-.verdict { background: oklch(0.945 0.012 83); border: 1px solid var(--line);
-  border-radius: 14px; padding: 26px 30px 22px; margin: 26px 0 12px;
+.badge.good { border-color: color-mix(in srgb, var(--good) 30%, transparent);
+              background: color-mix(in srgb, var(--good) 12%, var(--card)); color: var(--good); }
+.badge.warn { border-color: color-mix(in srgb, var(--warn) 30%, transparent);
+              background: color-mix(in srgb, var(--warn) 14%, var(--card)); color: var(--warn); }
+.verdict { background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow-sm);
+  border-radius: var(--r-xl); padding: 26px 30px 22px; margin: 26px 0 12px;
   --state: var(--good); }
 .verdict.tied { --state: var(--warn); }
 .verdict .eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: .12em;
   text-transform: uppercase; color: var(--state); font-weight: 600; margin: 0 0 10px; }
-.verdict h1 { margin: 0 0 10px; font-size: 27px; line-height: 1.25; letter-spacing: -0.02em; }
+.verdict h1 { margin: 0 0 10px; font-size: 27px; font-weight: 500; line-height: 1.25; letter-spacing: -0.02em; }
 .verdict .expl { color: var(--muted); font-size: 13.5px; max-width: 64ch; margin: 0 0 18px; }
-.verdict .kpis { display: flex; gap: 44px; border-top: 1px solid var(--line); padding-top: 16px; }
-.verdict .kpi > b { display: block; font-size: 34px; font-weight: 700; letter-spacing: -0.03em;
-  font-variant-numeric: tabular-nums; color: var(--ink); }
-.verdict .kpi.state > b { color: var(--state); }
+.verdict .kpis { display: flex; gap: 14px; margin-top: 20px; align-items: stretch; }
+.verdict .kpi { flex: 1; min-width: 0; background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r-lg); padding: 16px 18px; }
+.verdict .kpi > b.name-kpi { display: block; font-size: 17px; font-weight: 500; line-height: 1.2;
+  letter-spacing: -0.01em; margin-bottom: 12px; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; }
 .verdict .kpi span { font-size: 12px; color: var(--muted); }
-.verdict .kpi span.stat { display: block; margin-top: 4px; }
-.verdict .kpi span b { font-size: 16px; color: var(--ink); font-variant-numeric: tabular-nums; }
-.verdict .kpi span.lead b { font-size: 23px; letter-spacing: -0.02em; }
+.verdict .kpi span.stat { display: block; margin-top: 6px; }
+.verdict .kpi span b { font-size: 15px; color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.verdict .kpi span.lead b { font-size: 27px; font-weight: 700; letter-spacing: -0.02em; }
 .verdict .kpi.state span.lead b { color: var(--state); }
-.verdict .kpi > b.name-kpi { font-size: 26px; line-height: 1.15; padding-top: 5px; }
 table { border-collapse: collapse; width: 100%; font-size: 13.5px;
         font-variant-numeric: tabular-nums; }
 th { text-align: left; font-family: var(--mono); font-size: 12px; text-transform: uppercase;
@@ -90,33 +105,35 @@ th { text-align: left; font-family: var(--mono); font-size: 12px; text-transform
 td { padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
 td.n, th.n { text-align: right; font-family: var(--mono); white-space: nowrap; }
 .tablewrap { overflow-x: auto; background: var(--card); border: 1px solid var(--line);
-             border-radius: 10px; padding: 4px 8px 8px; }
-.ci-track { position: relative; height: 8px; background: #efece3; border-radius: 4px; min-width: 160px; }
-.ci-range { position: absolute; top: 0; height: 8px; background: #cfe3da; border-radius: 4px; }
-.ci-dot { position: absolute; top: -2px; width: 4px; height: 12px; border-radius: 2px; background: var(--teal-soft); }
+             border-radius: var(--r-lg); padding: 4px 8px 8px; box-shadow: var(--shadow-xs); }
+.ci-track { position: relative; height: 8px; border-radius: 4px; min-width: 160px;
+            background: color-mix(in srgb, var(--ink) 8%, transparent); }
+.ci-range { position: absolute; top: 0; height: 8px; border-radius: 4px;
+            background: color-mix(in srgb, var(--indigo) 28%, transparent); }
+.ci-dot { position: absolute; top: -2px; width: 4px; height: 12px; border-radius: 2px; background: var(--indigo); }
 .name { font-weight: 600; white-space: nowrap; }
 .think { font-size: 11px; color: var(--muted); }
 .grid td, .grid th { text-align: center; padding: 6px 6px; }
 .grid td.rowname { text-align: left; font-weight: 600; white-space: nowrap; }
-.foot { margin-top: 48px; padding-top: 14px; border-top: 2px solid var(--line);
+.foot { margin-top: 48px; padding-top: 14px; border-top: 1px solid var(--line);
         font-family: var(--mono); font-size: 12px; color: var(--muted); }
-.foot code { background: #f0ede4; padding: 1px 5px; border-radius: 3px; }
+.foot code { background: var(--surface); padding: 1px 5px; border-radius: 4px; }
 .note { font-size: 12.5px; color: var(--muted); margin: 8px 2px; }
 .subhead { font-family: var(--mono); font-size: 12px; color: var(--muted);
            margin: 22px 2px 8px; }
 details.method { margin: 40px 0 0; }
-details.method > summary { font-size: 17px; font-weight: 600; cursor: pointer;
+details.method > summary { font-size: 17px; font-weight: 500; cursor: pointer;
   padding-bottom: 6px; border-bottom: 1px solid var(--line); list-style: none; }
 details.method > summary::-webkit-details-marker { display: none; }
-details.method > summary::after { content: " +"; color: var(--muted); font-family: var(--mono); }
-details.method[open] > summary::after { content: " \2212"; }
+details.method > summary::after { content: " ▸"; color: var(--muted); }
+details.method[open] > summary::after { content: " ▾"; }
 details.method h3 { font-family: var(--mono); font-size: 11px; letter-spacing: .04em;
   text-transform: uppercase; color: var(--muted); margin: 18px 0 4px; }
 details.method p { font-size: 13px; color: var(--muted); margin: 4px 2px; max-width: 74ch; }
 .costcards { display: flex; gap: 14px; flex-wrap: wrap; margin: 4px 0; }
 .costcard { flex: 1; min-width: 175px; background: var(--card); border: 1px solid var(--line);
-            border-radius: 12px; padding: 15px 18px; }
-.costcard.total { border-color: var(--ink); }
+            border-radius: var(--r-lg); padding: 15px 18px; box-shadow: var(--shadow-xs); }
+.costcard.total { border-color: color-mix(in srgb, var(--indigo) 45%, var(--line)); }
 .costcard .lbl { font-family: var(--mono); font-size: 12px; letter-spacing: .04em;
                  text-transform: uppercase; color: var(--muted); }
 .costcard .big { font-size: 27px; font-weight: 700; letter-spacing: -0.02em;
@@ -124,7 +141,7 @@ details.method p { font-size: 13px; color: var(--muted); margin: 4px 2px; max-wi
 .costcard .cap { font-size: 12px; color: var(--muted); margin-top: 5px; }
 .sideA { color: var(--a); font-weight: 600; } .sideB { color: var(--b); font-weight: 600; }
 .sig.warn { color: var(--warn); } .sig.good { color: var(--good); }
-@media (max-width: 640px) { h1 { font-size: 24px; } }
+@media (max-width: 640px) { h1 { font-size: 24px; } .verdict .kpis { flex-direction: column; } }
 """
 
 
@@ -269,10 +286,13 @@ def _value_map_svg(points, champion: str, size_label: str = "average response le
         x, y = px(c), py(e)
         rad = max(9.0, 5 + 9 * (t / tmax))
         on_frontier = round(x) in fx
-        fill = "var(--brand)" if name == champion else ("var(--teal-soft)" if on_frontier else "#b5b1a4")
+        fill = "var(--brand)" if name == champion else ("var(--teal-soft)" if on_frontier else "var(--dot-mute)")
         rk = rank_of[name]
+        # Surface ring separates overlapping dots; dot fills are dark enough for
+        # plain white digits (no outline) in both light and dark.
         dots.append(
-            f"<circle cx='{x:.0f}' cy='{y:.0f}' r='{rad:.0f}' fill='{fill}' opacity='.88'>"
+            f"<circle cx='{x:.0f}' cy='{y:.0f}' r='{rad:.0f}' fill='{fill}' opacity='.9' "
+            f"stroke='var(--card)' stroke-width='1.5'>"
             f"<title>{_e(name)}: {_fmt_usd(c)}, ELO {e:.0f}, {r:.0%} win rate</title></circle>"
             f"<text x='{x:.0f}' y='{y + 3.5:.0f}' font-size='10' font-weight='700' fill='#fff' "
             f"text-anchor='middle' pointer-events='none'>{rk}</text>"
@@ -441,7 +461,7 @@ def _empty_report_html(manifest: dict[str, Any], n_records: int) -> str:
 <header>{_MARK}<span class="brand">orq.ai</span><span class="kind">{bench_id} &middot; ORQ-ARENA RUN</span></header>
 <div class="verdict tied"><p class="eyebrow">&#9888; NO RATED MODELS</p>
 <h1>Nothing to rank.</h1>
-<p class="expl">This run produced no rated models: all {n_records} rounds were voided, or no
+<p class="expl">This run produced no rated models: all {n_records} rounds errored, or no
 candidates were configured. Check the roster and the run log, then re-run.</p></div>
 </div></body></html>
 """
@@ -543,9 +563,10 @@ def build_report_html(
             else:
                 v = (grid.get(a) or {}).get(b, 0.0)
                 # Heat: single-hue intensity so the dominance triangle reads at a glance.
+                # Token-driven rgb so the heat re-tunes on the dark surface.
                 alpha = 0.0 if not v or not vmax else 0.10 + 0.45 * (v / vmax)
-                style = f" style='background:rgba(223,83,37,{alpha:.2f})'" if alpha else ""
-                cells.append(f"<td{style}>{v:g}</td>")
+                style = f" style='background:rgb(var(--heat) / {alpha:.2f})'" if alpha else ""
+                cells.append(f"<td{style} title='{_e(a)} beat {_e(b)} {v:g}&times;'>{v:g}</td>")
         grid_rows.append(f"<tr><td class='rowname'>{i}. {_e(a)}</td>{''.join(cells)}</tr>")
 
     # Jury room.
@@ -554,8 +575,6 @@ def build_report_html(
     for j in jury.get("per_judge", []):
         jury_rows.append(
             f"<tr><td class='name'>{_e(str(j.get('model', '')).split('/')[-1])}</td>"
-            f"<td class='n'>{_pct(j.get('a_rate'))}</td>"
-            f"<td class='n'>{_pct(j.get('b_rate'))}</td>"
             f"<td class='n'>{_pct(j.get('position_bias'))}</td>"
             f"<td class='n'>{_pct(j.get('tie_rate'))}</td></tr>"
         )
@@ -677,7 +696,7 @@ def build_report_html(
     elif rated == 0:
         vclass, headline = " tied", "No decisive rounds: nothing to rank yet."
         expl = (
-            f"All {len(records)} rounds were inconclusive or voided, so no model earned a "
+            f"All {len(records)} rounds were inconclusive or errored, so no model earned a "
             f"rated win. Re-run with more prompts or a decisive jury to separate the field."
         )
     elif separated:
@@ -768,14 +787,12 @@ rounds its rating is unidentifiable below.{" The len-ctrl column refits the rati
 
 <h2>The jury</h2>
 <div class="tablewrap"><table>
-<thead><tr><th>Judge</th><th class="n"><span class="sideA">A</span>-lean</th>
-<th class="n"><span class="sideB">B</span>-lean</th><th class="n">flip rate</th>
-<th class="n">tie rate</th></tr></thead>
-<tbody>{"".join(jury_rows) or "<tr><td colspan='5'>no per-judge stats recorded</td></tr>"}</tbody>
+<thead><tr><th>Judge</th><th class="n">flip rate</th><th class="n">tie rate</th></tr></thead>
+<tbody>{"".join(jury_rows) or "<tr><td colspan='3'>no per-judge stats recorded</td></tr>"}</tbody>
 </table></div>
 <p class="note">Each judge sees every pair in both seat orders; a judge that contradicts
-itself abstains (the flip rate) and abstentions never become verdicts. Pairwise Cohen&#39;s
-&kappa;: {cohen_bits or "n/a"}.</p>
+itself abstains (the flip rate) and abstentions never become verdicts &mdash; a high flip rate
+flags a judge to distrust. Pairwise Cohen&#39;s &kappa;: {cohen_bits or "n/a"}.</p>
 
 <p class="subhead">Panel verdicts across all {len(records)} rounds</p>
 <div class="badges">
@@ -783,11 +800,10 @@ itself abstains (the flip rate) and abstentions never become verdicts. Pairwise 
   <span class="badge"><span class="sideB">B</span> wins <b>{verdicts["B"]}</b></span>
   <span class="badge">ties <b>{verdicts["tie"]}</b></span>
   <span class="badge{inc_cls}">inconclusive <b>{verdicts["inconclusive"]}</b></span>
-  <span class="badge">{"voided <b>" + str(voids) + "</b>" if voids else "voided <b>0</b>"}</span>
+  {f'<span class="badge warn">errored <b>{voids}</b></span>' if voids else ''}
 </div>
-<p class="note">The A-vs-B split is panel-level seat lean (compare the per-judge leans above).
-Inconclusive rounds carry no signal and are dropped from the rating, never counted as ties.
-A voided round is a network failure, not a model failure; it is logged and excluded.</p>
+<p class="note">The A-vs-B split is panel seat lean; a large skew would flag position bias in the
+setup. Inconclusive rounds carry no signal and are dropped from the rating, never counted as ties.{" An errored round is a network or infrastructure failure, not a model failure; it is logged and excluded." if voids else ""}</p>
 
 <h2>Confidence stats</h2>
 <div class="tablewrap"><table>
@@ -813,8 +829,8 @@ judge-vs-judge agreement. Decisive-vote agreement is the share of decisive round
 agreed on. The A-vs-B split is panel-level seat lean.</p>
 <h3>Rounds</h3>
 <p>A- and B-wins plus ties are decisive and feed the rating (rated = decisive + ties).
-Inconclusive rounds carry no signal and are dropped, never counted as ties. A voided round is
-a network failure, not a model failure; it is logged and excluded.</p>
+Inconclusive rounds carry no signal and are dropped, never counted as ties. An errored round is
+a network or infrastructure failure, not a model failure; it is logged and excluded.</p>
 <h3>Cost</h3>
 <p>Model spend is exact (per-model catalog rates). Jury spend is estimated (&asymp;) at the
 panel&#39;s mean rate, because the log stores the panel&#39;s token total, not per-judge splits.
