@@ -136,7 +136,7 @@ judges:
   - openai/gpt-5.4-nano
 
 replacement_judges:
-  - mistral/mistral-small-2603
+  - mistral/mistral-large-2411
 
 criteria: >-
   Accuracy and correctness, helpfulness and completeness, clarity, and

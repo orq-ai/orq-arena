@@ -39,7 +39,7 @@ judges:
   - openai/gpt-5.4-nano
 
 replacement_judges:
-  - mistral/mistral-small-2603
+  - mistral/mistral-large-2411
 
 criteria: >-
   Accuracy and correctness, depth and soundness of reasoning, helpfulness and
