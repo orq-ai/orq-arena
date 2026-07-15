@@ -17,8 +17,8 @@ The project uses [uv](https://docs.astral.sh/uv/) for environment and dependency
 git clone https://github.com/<your-username>/orq-arena.git
 cd orq-arena
 
-# 2. Install (runtime + dev dependencies)
-uv sync
+# 2. Install (runtime + dev dependencies; the TUI extra is needed for the render tests)
+uv sync --extra tui
 
 # 3. Verify
 uv run pytest            # full suite, no network
@@ -37,14 +37,14 @@ template. If you add a new credential, wire it through an environment variable a
 ## Project shape
 
 - `src/orq_arena/`: the benchmark core. `tournament/` (scheduling, Bradley-Terry + CIs),
-  `arena/` (one battle: stream → judge → damage → record), `providers/` (orq router client,
-  model catalog), `analysis/` (κ, post-mortems), `data/` (schema-v2 records), `rejudge.py`.
-- `src/orq_arena/tui/`: the Textual show. Strictly a consumer of the event stream; nothing
-  in here may affect a verdict.
+  `arena/` (one battle: stream → judge → record), `providers/` (orq router client,
+  model catalog), `analysis/` (κ, post-mortems), `data/` (schema-v3 records), `rejudge.py`,
+  `anchor.py` (human annotation), `report.py` (the HTML report).
+- `src/orq_arena/tui/`: the Textual show, behind the optional `[tui]` extra. Strictly a
+  consumer of the event stream; nothing in here may affect a verdict (HP/damage is computed
+  here, from the judged verdicts, for display only).
 - `tests/`: plain pytest, async via `pytest-asyncio`, no network. TUI screens are tested
   headlessly with Textual's `run_test()` pilot.
-- `REFACTOR_PLAN.md`: the living plan and decision log; check it before proposing larger
-  changes (your idea may already be sequenced, rejected, or decided).
 
 ## Making changes
 

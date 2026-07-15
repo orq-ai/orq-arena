@@ -171,8 +171,7 @@ uv run orq-arena run --config configs/reasoning_arena.yaml --prompts prompts/sta
 ```
 
 See [Match rules, gateway, candidates, and judges](configuration.md) for every YAML key this
-command reads, and [architecture.md](architecture.md#data-flow) for how the tournament engine
-schedules and scores matches.
+command reads, and [methodology.md](methodology.md) for how matches are scheduled and scored.
 
 ---
 
@@ -594,6 +593,5 @@ opens with fresh data.
 |---|---|
 | [Getting Started](getting-started.md) | Prerequisites, install, first live run, common setup issues |
 | [Configuration Reference](configuration.md) | Every `orq_arena.yaml` key, `.env` loading, reasoning recipes, defaults |
-| [Architecture](architecture.md) | Component diagram, data flow, key abstractions |
-| [Methodology](methodology.md) | Bradley-Terry scoring, bias controls, confidence intervals, reproducibility |
+| [Methodology](methodology.md) | How the ranking is made, bias controls, confidence intervals, reproducibility |
 | [README](https://github.com/orq-ai/orq-arena/blob/master/README.md) | Project overview, installation, quick start |

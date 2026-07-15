@@ -141,18 +141,11 @@ Full guides live at **[orq-ai.github.io/orq-arena](https://orq-ai.github.io/orq-
 | [Getting Started](docs/getting-started.md) | Prerequisites, install, first live run, common setup issues |
 | [CLI Reference](docs/cli.md) | Every command and flag, `run`, `demo`, `rejudge` (with `--compare`), `report`, `annotate`, `anchor`, `list-models`, `refresh-models` |
 | [Configuration](docs/configuration.md) | Every `orq_arena.yaml` key, reasoning recipes, defaults |
-| [Methodology](docs/methodology.md) | Bradley-Terry scoring, bias controls, confidence intervals, reproducibility |
-| [Architecture](docs/architecture.md) | Component overview, data flow, key abstractions |
-| [Testing](docs/testing.md) | Running the suite and writing new tests |
-| [Development](docs/development.md) | Local dev setup, code style, contribution workflow |
-
-## Running tests
-
-Run the full suite with `uv run pytest`. See [docs/testing.md](docs/testing.md) for coverage requirements and how to write new tests.
+| [Methodology](docs/methodology.md) | How the ranking is made, bias controls, confidence intervals, reproducibility |
 
 ## Contributing
 
-Bug reports, feature ideas, documentation fixes, and pull requests are all welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
+Bug reports, feature ideas, documentation fixes, and pull requests are all welcome; see [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup, project shape, and conventions. Run the test suite with `uv run pytest`.
 
 ## Related projects
 

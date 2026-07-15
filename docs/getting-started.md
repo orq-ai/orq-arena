@@ -249,8 +249,6 @@ explicitly in the roster picker if a mixed pool is what you want.
 |---|---|
 | See every subcommand and flag | [cli.md](cli.md) |
 | Understand every `orq_arena.yaml` key | [configuration.md](configuration.md) |
-| See how the toolkit is structured | [architecture.md](architecture.md) |
 | Understand the scoring methodology | [methodology.md](methodology.md) |
-| Run and write tests | [testing.md](testing.md) |
-| Set up a local development environment | [development.md](development.md) |
+| Contribute to the project | [CONTRIBUTING.md](https://github.com/orq-ai/orq-arena/blob/master/CONTRIBUTING.md) |
 | Back to the project overview | [README.md](https://github.com/orq-ai/orq-arena/blob/master/README.md) |

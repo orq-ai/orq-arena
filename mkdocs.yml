@@ -55,11 +55,7 @@ plugins:
           - cli.md: Every command and flag.
           - configuration.md: Every orq_arena.yaml key, reasoning recipes, defaults.
         Trust the number:
-          - methodology.md: Bradley-Terry scoring, bias controls, confidence intervals, reproducibility.
-        Contributing:
-          - architecture.md: Component layout, event flow, design invariants.
-          - development.md: Dev environment and project conventions.
-          - testing.md: Running the suite and writing new tests.
+          - methodology.md: How the ranking is made, bias controls, confidence intervals, reproducibility.
 
 markdown_extensions:
   - tables
@@ -83,7 +79,3 @@ nav:
   - CLI Reference: cli.md
   - Configuration: configuration.md
   - Methodology: methodology.md
-  - Contributing:
-      - Architecture: architecture.md
-      - Development: development.md
-      - Testing: testing.md
