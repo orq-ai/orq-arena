@@ -2,6 +2,12 @@
 
 Uses ``AsyncOpenAI`` pointed at ``api.orq.ai/v3/router``; the gateway is
 OpenAI-compatible. Judge calls share ``.client`` via evaluatorq.
+
+At default config, credential/host resolution is delegated to evaluatorq's
+``resolve_llm_client`` (the company-wide single source of truth: honors
+``ORQ_BASE_URL`` for staging, one shared implementation). Setting ``base_url``
+or ``api_key_env`` in the YAML is a bring-your-own-endpoint opt-out: the run
+goes exactly where the config says, with no env-precedence surprises.
 """
 
 from __future__ import annotations
@@ -19,11 +25,6 @@ class OrqGateway:
     """OpenAI-compatible async client pointed at the orq.ai router gateway."""
 
     def __init__(self, cfg: GatewayConfig) -> None:
-        api_key = os.environ.get(cfg.api_key_env, "")
-        if not api_key:
-            raise RuntimeError(
-                f"{cfg.api_key_env} is not set. Export it before running orq-arena."
-            )
         self._cfg = cfg
         # read = max silence between stream chunks; generous so thinking models
         # can pause for minutes before the first token. No total-duration cap,
@@ -31,7 +32,34 @@ class OrqGateway:
         timeout = httpx.Timeout(
             connect=10.0, read=float(cfg.stream_read_timeout_s), write=60.0, pool=60.0
         )
-        self._client = AsyncOpenAI(api_key=api_key, base_url=cfg.base_url, timeout=timeout)
+        defaults = GatewayConfig()
+        at_defaults = (cfg.base_url, cfg.api_key_env) == (
+            defaults.base_url, defaults.api_key_env
+        )
+        if at_defaults:
+            # api.orq.ai is the user-facing host; require_orq stops OPENAI_API_KEY
+            # from silently capturing a run (arena ids are router ids).
+            from evaluatorq.common.llm_client import (MissingLLMCredentialsError,
+                                                      resolve_llm_client)
+
+            try:
+                resolved = resolve_llm_client(
+                    default_orq_host="https://api.orq.ai", require_orq=True
+                )
+            except MissingLLMCredentialsError as exc:
+                raise RuntimeError(
+                    f"{cfg.api_key_env} is not set. Export it before running orq-arena."
+                ) from exc
+            self._client = resolved.client.with_options(timeout=timeout)
+        else:  # BYO endpoint: the YAML named the endpoint and key explicitly.
+            api_key = os.environ.get(cfg.api_key_env, "")
+            if not api_key:
+                raise RuntimeError(
+                    f"{cfg.api_key_env} is not set. Export it before running orq-arena."
+                )
+            self._client = AsyncOpenAI(
+                api_key=api_key, base_url=cfg.base_url, timeout=timeout
+            )
 
     @property
     def client(self) -> AsyncOpenAI:
