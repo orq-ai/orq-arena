@@ -16,7 +16,7 @@ Every command below runs through the **`orq-arena`** CLI (installed by the steps
 [1. Install](#1-install)). Run `uv run orq-arena --help` to list every subcommand. The full
 subcommand and flag reference is in **[cli.md](cli.md)**.
 
-> **No API key yet?** Skip straight to [2. Try it now](#2-try-it-now--no-api-key-needed),
+> **No API key yet?** Skip straight to [2. Try it now](#2-try-it-now-no-api-key-needed),
 > `orq-arena demo` replays a full recorded tournament with no network calls. Come back to
 > step 3 when you're ready to point at real models.
 
@@ -237,4 +237,4 @@ explicitly in the roster picker if a mixed pool is what you want.
 | Understand the scoring methodology | [methodology.md](methodology.md) |
 | Run and write tests | [testing.md](testing.md) |
 | Set up a local development environment | [development.md](development.md) |
-| Back to the project overview | [README.md](../README.md) |
+| Back to the project overview | [README.md](https://github.com/orq-ai/orq-arena/blob/master/README.md) |

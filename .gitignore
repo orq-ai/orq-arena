@@ -24,3 +24,4 @@ votes*.json
 # Internal planning stays local
 .planning/
 REFACTOR_PLAN.md
+site/

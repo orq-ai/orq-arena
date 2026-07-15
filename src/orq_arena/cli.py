@@ -133,7 +133,9 @@ def run(config_path: str | None, prompts_path: str, output_path: str, rounds: in
             "prefer judges from families outside the pool."
         )
 
-    preflight_data: dict = {"counts": counts.__dict__}
+    # Persist the caveat so the manifest and forwarded report carry it, not
+    # just this console line (the report is the thing users hand to others).
+    preflight_data: dict = {"counts": counts.__dict__, "family_overlaps": overlap}
     ceiling = cost_ceiling(cfg, prompts, counts, asyncio.run(fetch_price_map(cfg.gateway)))
     if ceiling.total_usd > 0:
         click.echo(

@@ -10,9 +10,9 @@ testing and debugging notes, and the conventions this repo enforces for real.
 
 ### Prerequisites
 
-- **Python `>=3.10`**: `requires-python` in [`pyproject.toml`](../pyproject.toml). CI installs
+- **Python `>=3.10`**: `requires-python` in [`pyproject.toml`](https://github.com/orq-ai/orq-arena/blob/master/pyproject.toml). CI installs
   and tests against Python 3.12 on Ubuntu (`uv python install 3.12`,
-  [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)).
+  [`.github/workflows/ci.yml`](https://github.com/orq-ai/orq-arena/blob/master/.github/workflows/ci.yml)).
 - **[uv](https://docs.astral.sh/uv/)**: this project's only dependency/environment manager.
   There is no pip/venv/poetry workflow documented or supported here.
 
@@ -42,7 +42,7 @@ CI installs the same way with `uv sync --frozen`, which fails instead of silentl
 `uv.lock` if it's out of date.
 
 For the fork/clone/verify walkthrough (including the zero-cost sanity checks), see
-["Development setup" in CONTRIBUTING.md](../CONTRIBUTING.md#development-setup), the notes above
+["Development setup" in CONTRIBUTING.md](https://github.com/orq-ai/orq-arena/blob/master/CONTRIBUTING.md#development-setup), the notes above
 just expand on what `uv sync` pulls in.
 
 ### Configure credentials
@@ -71,11 +71,11 @@ single one-way event queue. Core packages import zero `textual` today:
 | Core | `cli.py`, `config.py`, `events.py`, `preflight.py`, `rejudge.py`, `anchor.py`, `report.py`, `headless.py`, `orcs/`, `providers/`, `tournament/`, `arena/`, `data/`, `analysis/` | Schedules matches, streams both sides, invokes the evaluatorq jury, scores damage, computes ELO/CIs/κ, the benchmark itself. |
 | Presentation | `tui/` (`app.py`, `screens/`, `widgets/`) | The only package that imports `textual`. Renders the CRT-neon show; a pure consumer. |
 
-The seam between them is [`events.py`](../src/orq_arena/events.py)`::ArenaEvent`, a pydantic
+The seam between them is [`events.py`](https://github.com/orq-ai/orq-arena/blob/master/src/orq_arena/events.py)`::ArenaEvent`, a pydantic
 `Union` pushed onto an `asyncio.Queue[ArenaEvent]`. The tournament engine
 (`tournament/driver.py`, `arena/battle.py`) is the **sole producer**;
-[`tui/app.py`](../src/orq_arena/tui/app.py)`::ArenaApp` and
-[`headless.py`](../src/orq_arena/headless.py)`::run_headless` are two interchangeable
+[`tui/app.py`](https://github.com/orq-ai/orq-arena/blob/master/src/orq_arena/tui/app.py)`::ArenaApp` and
+[`headless.py`](https://github.com/orq-ai/orq-arena/blob/master/src/orq_arena/headless.py)`::run_headless` are two interchangeable
 **consumers** draining that same queue. Both only render, **neither can push anything back into
 the engine or influence a verdict**. Keep that direction intact when touching either side: a
 screen or widget should never reach into `tournament/`, `arena/`, or a judge call directly.
@@ -83,7 +83,7 @@ screen or widget should never reach into `tournament/`, `arena/`, or a judge cal
 This map is intentionally short. For the full directory tree with rationale, the component
 diagram, and the data-flow walkthrough, see [docs/architecture.md](architecture.md); for the
 equally short authoritative version contributors are expected to internalize, see
-["Project shape" in CONTRIBUTING.md](../CONTRIBUTING.md#project-shape), this section expands on
+["Project shape" in CONTRIBUTING.md](https://github.com/orq-ai/orq-arena/blob/master/CONTRIBUTING.md#project-shape), this section expands on
 both rather than replacing either.
 
 ---
@@ -115,7 +115,7 @@ everything else needs `ORQ_API_KEY` in `.env` and spends real tokens.
 
 `fixtures/demo_tournament.json`: the file `orq-arena demo` replays, isn't hand-written; it's a
 real recorded event stream from a tiny live tournament.
-[`scripts/record_fixture.py`](../scripts/record_fixture.py) regenerates it:
+[`scripts/record_fixture.py`](https://github.com/orq-ai/orq-arena/blob/master/scripts/record_fixture.py) regenerates it:
 
 ```bash
 uv run python scripts/record_fixture.py
@@ -147,7 +147,7 @@ uv run textual console
 uv run textual run --dev "orq-arena demo"
 ```
 
-`ArenaApp` ([`src/orq_arena/tui/app.py`](../src/orq_arena/tui/app.py)) takes required constructor
+`ArenaApp` ([`src/orq_arena/tui/app.py`](https://github.com/orq-ai/orq-arena/blob/master/src/orq_arena/tui/app.py)) takes required constructor
 arguments (`cfg`, `prompts`, `battle_log_path`) that only `cli.py` assembles, so point
 `textual run --dev` at the `orq-arena` command itself, as above, rather than trying to import
 `ArenaApp` directly.
@@ -164,7 +164,7 @@ A short summary for iterating locally; the full reference lives in [docs/testing
 - **No markers, no network:** this repo has no `integration`/`unit` marker split, the whole
   suite runs offline, no API key required.
 - **Run everything:** `uv run pytest` (or `uv run pytest -q`, the exact invocation
-  [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs).
+  [`.github/workflows/ci.yml`](https://github.com/orq-ai/orq-arena/blob/master/.github/workflows/ci.yml) runs).
 - **Run one file:** `uv run pytest tests/test_battle_rounds.py -v`.
 - **No coverage gate:** `pytest-cov` isn't a dependency and CI passes no coverage flags, there's
   no threshold to hit.
@@ -174,13 +174,13 @@ A short summary for iterating locally; the full reference lives in [docs/testing
 Textual screens are tested without a real terminal, using Textual's own pilot: instantiate a bare
 `App` host, push the screen under test, drive it through
 `async with app.run_test(size=(...)) as pilot:`, then assert on screen state.
-[`tests/test_browser_render.py`](../tests/test_browser_render.py) is the clearest example, it
+[`tests/test_browser_render.py`](https://github.com/orq-ai/orq-arena/blob/master/tests/test_browser_render.py) is the clearest example, it
 builds a `BattleBrowserScreen` from real (or synthetic, if no fixture log is on disk)
 `BattleRecord`s, pushes it onto a throwaway `App`, and asserts `screen._idx` advances on
 `action_next()`. The same pattern covers the fight and leaderboard screens
-([`tests/test_fight_render.py`](../tests/test_fight_render.py),
-[`tests/test_leaderboard_render.py`](../tests/test_leaderboard_render.py)) and the roster picker
-([`tests/test_roster_picker.py`](../tests/test_roster_picker.py)).
+([`tests/test_fight_render.py`](https://github.com/orq-ai/orq-arena/blob/master/tests/test_fight_render.py),
+[`tests/test_leaderboard_render.py`](https://github.com/orq-ai/orq-arena/blob/master/tests/test_leaderboard_render.py)) and the roster picker
+([`tests/test_roster_picker.py`](https://github.com/orq-ai/orq-arena/blob/master/tests/test_roster_picker.py)).
 
 > **Textual pitfall, never name a widget method `_render`.** Textual's own `Widget`/`Static`
 > machinery uses that name internally; shadowing it with a method of your own has crashed this app
@@ -202,23 +202,23 @@ builds a `BattleBrowserScreen` from real (or synthetic, if no fixture log is on 
   schemas, roster (`config.py`, `events.py`, `data/schemas.py`, `roster.py`,
   `analysis/postmortem.py`), and `async`/`await` through the tournament/battle/gateway path.
 - **Signed commits are required** by the repo's branch ruleset. See
-  ["Making changes" in CONTRIBUTING.md](../CONTRIBUTING.md#making-changes) for the signing setup
+  ["Making changes" in CONTRIBUTING.md](https://github.com/orq-ai/orq-arena/blob/master/CONTRIBUTING.md#making-changes) for the signing setup
   link.
 - **Methodology invariants need a plan-level discussion first.** Judging, rating, or void-policy
   changes touch the numbers the README calls defensible. See
   ["Design invariants worth knowing" in docs/architecture.md](architecture.md#design-invariants-worth-knowing)
   for what's currently load-bearing (round-robin/Swiss sizing, the jury quorum, unanimous-vs-majority
   damage, the read-gap-only timeout, the one-way event queue) before changing any of it,
-  ["Making changes" in CONTRIBUTING.md](../CONTRIBUTING.md#making-changes) is the process pointer.
+  ["Making changes" in CONTRIBUTING.md](https://github.com/orq-ai/orq-arena/blob/master/CONTRIBUTING.md#making-changes) is the process pointer.
 - **No secrets in the repo.** `.env` is gitignored; `.env.example` is the committed template. See
-  ["Never commit secrets" in CONTRIBUTING.md](../CONTRIBUTING.md#never-commit-secrets).
+  ["Never commit secrets" in CONTRIBUTING.md](https://github.com/orq-ai/orq-arena/blob/master/CONTRIBUTING.md#never-commit-secrets).
 
 ---
 
 ## Branching & pull requests
 
 - The default branch is **`master`**. CI
-  ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) runs on pushes to `master`,
+  ([`.github/workflows/ci.yml`](https://github.com/orq-ai/orq-arena/blob/master/.github/workflows/ci.yml)) runs on pushes to `master`,
   `feat/**`, `fix/**`, and on every pull request.
 - Branch off `master`; the `feat/...` / `fix/...` naming used in history is the recommended (not
   enforced) convention.
@@ -228,12 +228,12 @@ builds a `BattleBrowserScreen` from real (or synthetic, if no fixture log is on 
   uv run pytest -q
   ```
 
-- Open the PR with [the template](../.github/PULL_REQUEST_TEMPLATE.md), its checklist covers
+- Open the PR with [the template](https://github.com/orq-ai/orq-arena/blob/master/.github/PULL_REQUEST_TEMPLATE.md), its checklist covers
   tests passing, doc updates for user-facing changes, and no committed secrets.
 - Commits must be signed (see Conventions above).
 
 The full contributor process, code of conduct, project shape, how to report a bug, lives in
-[CONTRIBUTING.md](../CONTRIBUTING.md).
+[CONTRIBUTING.md](https://github.com/orq-ai/orq-arena/blob/master/CONTRIBUTING.md).
 
 ---
 
@@ -244,4 +244,4 @@ The full contributor process, code of conduct, project shape, how to report a bu
 - [docs/testing.md](testing.md), full testing reference
 - [docs/getting-started.md](getting-started.md), prerequisites and first run
 - [docs/cli.md](cli.md), every command and flag
-- [CONTRIBUTING.md](../CONTRIBUTING.md), code of conduct, project shape, PR checklist, issue reporting
+- [CONTRIBUTING.md](https://github.com/orq-ai/orq-arena/blob/master/CONTRIBUTING.md), code of conduct, project shape, PR checklist, issue reporting

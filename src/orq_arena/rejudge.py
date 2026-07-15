@@ -56,6 +56,25 @@ def spearman(rank_a: list[str], rank_b: list[str]) -> float:
     return 1 - (6 * d2) / (n * (n**2 - 1))
 
 
+def panel_excluding_contestants(
+    judges: list[str], contestant_shorts: frozenset[str], short_to_full: dict[str, str]
+) -> list[str]:
+    """Judges that aren't a contestant, matched the way the live run matches.
+
+    Records carry short names; the live run (battle.py) excludes a judge by
+    full ``model_id``. Resolve each contestant short name to its full id and
+    compare there. A contestant missing from the config can't be resolved to a
+    provider, so fall back to a short-name match to keep exclusion safe.
+    """
+    contestants_full = {short_to_full.get(m, m) for m in contestant_shorts}
+    unresolved_short = {m for m in contestant_shorts if m not in short_to_full}
+
+    def is_contestant(j: str) -> bool:
+        return j in contestants_full or j.split("/")[-1] in unresolved_short
+
+    return [j for j in judges if not is_contestant(j)]
+
+
 def _ranking(outcomes: list[Outcome], models: list[str]) -> list[str]:
     if not outcomes:
         return sorted(models)
@@ -75,21 +94,25 @@ async def rejudge_run(
     gateway = OrqGateway(cfg.gateway)
     sem = asyncio.Semaphore(concurrency)
 
-    # One comparator per contestant pair (self-judge exclusion by short name).
+    # Records carry short names; resolve to full model ids so self-judge
+    # exclusion matches the live run (battle.py excludes by model_id).
+    short_to_full = {c.short_model: c.model_id for c in cfg.candidates}
+
+    # One comparator per contestant pair.
     comparators: dict[frozenset[str], object] = {}
 
     def comparator_for(rec: BattleRecord):
-        key = frozenset((rec.model_a, rec.model_b))
+        key = frozenset((rec.model_a, rec.model_b))  # short contestant names
         if key not in comparators:
-            panel = [j for j in judges if j.split("/")[-1] not in key]
+            panel = panel_excluding_contestants(judges, key, short_to_full)
             if not panel:
                 raise ValueError(f"every judge is a contestant in {sorted(key)}")
             comparators[key] = llm_jury_pairwise(
                 judges=panel,
                 criteria=criteria or cfg.criteria,
-                replacement_judges=[
-                    m for m in cfg.replacement_judges if m.split("/")[-1] not in key
-                ] or None,
+                replacement_judges=panel_excluding_contestants(
+                    list(cfg.replacement_judges), key, short_to_full
+                ) or None,
                 # A 1-judge rejudge panel is legitimate; don't let the run
                 # config's quorum (sized for its own panel) reject it.
                 min_successful_judges=min(cfg.min_successful_judges, len(panel)),

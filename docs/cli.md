@@ -1,12 +1,12 @@
 # CLI Reference
 
 `orq-arena` is the single console-script entry point for this project, a `click.group()`
-defined in [`src/orq_arena/cli.py`](../src/orq_arena/cli.py) and registered as
+defined in [`src/orq_arena/cli.py`](https://github.com/orq-ai/orq-arena/blob/master/src/orq_arena/cli.py) and registered as
 `orq-arena = "orq_arena.cli:cli"` under `[project.scripts]` in
-[`pyproject.toml`](../pyproject.toml). `cli.py` is the sole source of truth for this page;
+[`pyproject.toml`](https://github.com/orq-ai/orq-arena/blob/master/pyproject.toml). `cli.py` is the sole source of truth for this page;
 every flag, default, and behavior documented below is read directly from it (plus
-[`rejudge.py`](../src/orq_arena/rejudge.py) and
-[`providers/models_list.py`](../src/orq_arena/providers/models_list.py) for the two commands
+[`rejudge.py`](https://github.com/orq-ai/orq-arena/blob/master/src/orq_arena/rejudge.py) and
+[`providers/models_list.py`](https://github.com/orq-ai/orq-arena/blob/master/src/orq_arena/providers/models_list.py) for the two commands
 that delegate to them).
 
 It exposes nine subcommands: [`run`](#run), [`demo`](#demo), [`list-models`](#list-models),
@@ -208,9 +208,9 @@ paging through every judged round with the prompt, both responses, and per-judge
 flip badges; `M` generates per-model coach notes from the analyzer model (cached in
 `analysis.jsonl`); `s` saves an SVG screenshot; `q` quits.
 
-![Battle browser: prompt, both responses, per-judge votes with flip badges](../media/battle-browser.svg)
+![Battle browser: prompt, both responses, per-judge votes with flip badges](assets/battle-browser.svg)
 
-![Post-mortems: per-model strengths, weaknesses, and judge patterns](../media/postmortem.svg)
+![Post-mortems: per-model strengths, weaknesses, and judge patterns](assets/postmortem.svg)
 
 ---
 
@@ -374,7 +374,7 @@ Render the single-file HTML report page from a recorded run. Reads `battles.json
 key is present). The same page is written automatically at the end
 of every run (`<log>.report.html` next to the log).
 
-![HTML report page: verdict banner with the top three models, badges, ELO leaderboard with CI bars, and the ELO-vs-cost value map](../media/report-page.png)
+![HTML report page: verdict banner with the top three models, badges, ELO leaderboard with CI bars, and the ELO-vs-cost value map](assets/report-page.png)
 
 ```text
 orq-arena report [LOG_PATH] [--config PATH] [--output PATH]
@@ -588,4 +588,4 @@ opens with fresh data.
 | [Configuration Reference](configuration.md) | Every `orq_arena.yaml` key, `.env` loading, reasoning recipes, defaults |
 | [Architecture](architecture.md) | Component diagram, data flow, key abstractions |
 | [Methodology](methodology.md) | Bradley-Terry scoring, bias controls, confidence intervals, reproducibility |
-| [README](../README.md) | Project overview, installation, quick start |
+| [README](https://github.com/orq-ai/orq-arena/blob/master/README.md) | Project overview, installation, quick start |

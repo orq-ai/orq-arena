@@ -127,7 +127,11 @@ class ArenaApp(App):
                 severity="warning", timeout=10,
             )
         counts = call_counts(self.cfg, self._prompts)
-        self._preflight = {**(self._preflight or {}), "counts": counts.__dict__}
+        self._preflight = {
+            **(self._preflight or {}),
+            "counts": counts.__dict__,
+            "family_overlaps": overlap,
+        }
         try:
             ceiling = cost_ceiling(
                 self.cfg, self._prompts, counts, await fetch_price_map(self.cfg.gateway)

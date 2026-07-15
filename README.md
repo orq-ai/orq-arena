@@ -119,7 +119,7 @@ min_successful_judges: 2   # jury-of-one -> inconclusive, never a verdict
 
 ## Documentation
 
-Full guides live in [`docs/`](docs/); start with the [docs index](docs/README.md) for a reading order tailored to your goal.
+Full guides live at **[orq-ai.github.io/orq-arena](https://orq-ai.github.io/orq-arena/)** (source in [`docs/`](docs/)); start with the [docs index](docs/index.md) for a reading order tailored to your goal.
 
 | Guide | Description |
 |-------|-------------|

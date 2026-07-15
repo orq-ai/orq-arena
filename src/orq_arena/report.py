@@ -534,6 +534,11 @@ def build_report_html(
     fleiss = report.get("fleiss") or {}
     agreement = report.get("mean_agreement")
 
+    # Judge/contestant family overlap: a self-preference caveat the run recorded
+    # at preflight. Surfaced as a Confidence-stats row so the forwarded report
+    # carries it too (see signal_rows below).
+    family_overlaps = (manifest.get("preflight") or {}).get("family_overlaps") or []
+
     started = manifest.get("started_at")
     finished = manifest.get("finished_at") or (max((r.timestamp for r in records), default=None))
     duration = ""
@@ -627,6 +632,15 @@ def build_report_html(
     # Confidence & methodology: one aligned row per run-confidence signal
     # (reads far better than ragged pills). (label, reading html, td class).
     signal_rows: list[tuple[str, str, str]] = []
+    if family_overlaps:
+        signal_rows.append(
+            (
+                "Judge/contestant family overlap",
+                f"<b>{_e(', '.join(family_overlaps))}</b> share a provider family with "
+                "the pool; self-preference bias is not corrected by seat swapping",
+                " warn",
+            )
+        )
     if top_separated is not None:
         runner_name = ranked[1][0]
         if top_separated:

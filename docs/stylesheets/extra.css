@@ -1,0 +1,181 @@
+/* --- Orq brand fonts (self-hosted, vendored from orquesta-web) ----------
+   Body = Avio Sans, headings = Kurrent, code = Kurrent Mono. `theme.font:
+   false` in mkdocs.yml stops Material loading Google Fonts so these win. */
+@font-face {
+  font-family: "Avio Sans";
+  src: url("fonts/AvioSans-Regular.woff2") format("woff2");
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Avio Sans";
+  src: url("fonts/AvioSans-RegularItalic.woff2") format("woff2");
+  font-weight: 400; font-style: italic; font-display: swap;
+}
+@font-face {
+  font-family: "Avio Sans";
+  src: url("fonts/AvioSans-Medium.woff2") format("woff2");
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Avio Sans";
+  src: url("fonts/AvioSans-SemiBold.woff2") format("woff2");
+  font-weight: 600; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Avio Sans";
+  src: url("fonts/AvioSans-Bold.woff2") format("woff2");
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Kurrent";
+  src: url("fonts/ESKlarheitKurrent-Md.woff2") format("woff2");
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Kurrent";
+  src: url("fonts/ESKlarheitKurrent-Smbd.woff2") format("woff2");
+  font-weight: 600; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Kurrent Mono";
+  src: url("fonts/ESKlarheitKurrentMono-Md.woff2") format("woff2");
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+:root {
+  --md-text-font-family: "Avio Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --md-code-font-family: "Kurrent Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+/* Headings in Kurrent (brand display face); body stays Avio Sans. */
+.md-typeset h1, .md-typeset h2, .md-typeset h3,
+.md-typeset h4, .md-typeset h5, .md-typeset h6,
+.md-header__title { font-family: "Kurrent", var(--md-text-font-family); }
+
+/* Orq brand palette + design language (see /DESIGN.md).
+   Rule: teal carries the interface, orange punctuates — one accent per view. */
+:root {
+  --orq-teal: #025558;
+  --orq-teal-light: #299d8f;
+  --orq-teal-dark: #013a3c;
+  --orq-orange: #ff8f34;
+  --orq-orange-deep: #df5325; /* orange for fills/buttons (white text on top) */
+  --orq-orange-text: #c4421a; /* orange for TEXT on light surfaces — ~4.6:1 AA */
+  --orq-ink: #25232e;
+  --orq-sand: #f9f8f6;
+}
+
+/* Light scheme: teal identity, orange accent. */
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: var(--orq-teal);
+  --md-primary-fg-color--light: var(--orq-teal-light);
+  --md-primary-fg-color--dark: var(--orq-teal-dark);
+  --md-accent-fg-color: var(--orq-orange-deep); /* hover accent, AA on white */
+  --md-typeset-a-color: var(--orq-teal);
+  --md-code-bg-color: var(--orq-sand);
+}
+
+/* Dark scheme: lighten teal so it stays legible on slate. */
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: var(--orq-teal-light);
+  --md-primary-fg-color--light: #3db8a8;
+  --md-primary-bg-color: #ffffff; /* text/icons on the primary header */
+  --md-accent-fg-color: var(--orq-orange);
+  --md-typeset-a-color: var(--orq-teal-light); /* teal-light, not blinding cyan */
+}
+
+/* Headings in brand teal (light only — slate handles its own contrast). */
+[data-md-color-scheme="default"] .md-typeset h1,
+[data-md-color-scheme="default"] .md-typeset h2 {
+  color: var(--orq-teal);
+}
+
+/* Widen the content column (Material default is 61rem). */
+.md-grid { max-width: 70rem; }
+
+/* --- Typography scale -------------------------------------------------
+   Material defaults to 125% root, upscaling to 150% on wide screens —
+   reads oversized. Pin body to ~16px, gentle wide-screen bump. */
+html { font-size: 100%; }
+@media screen and (min-width: 100em) { html { font-size: 106.25%; } }
+@media screen and (min-width: 125em) { html { font-size: 112.5%; } }
+.md-typeset { font-size: 0.98rem; }           /* ~15.7px body — 15% up from 0.85rem */
+.md-typeset h1 { font-size: 1.75rem; line-height: 1.25; font-weight: 700; }
+.md-typeset h2 { font-size: 1.35rem; margin-top: 2.2rem; }
+.md-typeset h3 { font-size: 1.1rem; }
+/* Material pins admonitions/tables/footnotes to a fixed 0.64rem that ignores the
+   body bump above. Pull them to the exact body size so all prose reads uniform. */
+.md-typeset .admonition,
+.md-typeset details,
+.md-typeset table:not([class]),
+.md-typeset .footnote { font-size: 0.98rem; }
+
+/* Sidebar nav + TOC: ~content size, a touch bigger so the menu reads as chrome. */
+.md-nav { font-size: 1rem; }
+.md-nav__title { font-size: 1rem; }
+.md-nav__link { font-size: 1rem; }
+.md-tabs__link { font-size: 0.95rem; }
+
+/* --- Logo: circular mark, square aspect ------------------------------ */
+.md-header__button.md-logo img,
+.md-nav__button.md-logo img {
+  height: 1.6rem;
+  width: auto;
+}
+
+/* --- Grid cards: teal field, teal accent on hover -------------------
+   Design language: cards are neutral at rest; the brand teal appears
+   as the hover accent (uniform border + arrow). */
+.md-typeset .grid.cards > ul > li {
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.4rem;
+  padding: 1rem 1.1rem;
+  transition: border-color 120ms, box-shadow 120ms, transform 120ms;
+}
+.md-typeset .grid.cards > ul > li:hover {
+  border-color: var(--orq-teal);
+  box-shadow: 0 2px 12px rgba(2, 85, 88, 0.1);
+  transform: translateY(-2px);
+}
+[data-md-color-scheme="slate"] .md-typeset .grid.cards > ul > li:hover {
+  border-color: var(--orq-teal-light);
+}
+/* Card title icon in teal. */
+.md-typeset .grid.cards .lg.middle {
+  color: var(--orq-teal);
+}
+[data-md-color-scheme="slate"] .md-typeset .grid.cards .lg.middle {
+  color: var(--orq-teal-light);
+}
+/* The :octicons-arrow-right: "go" links — teal at REST, brightening to
+   teal-light on hover/focus so each card's accent lifts when engaged. */
+.md-typeset .grid.cards a:last-child {
+  color: var(--orq-teal);
+  font-weight: 600;
+}
+[data-md-color-scheme="slate"] .md-typeset .grid.cards a:last-child {
+  color: var(--orq-teal-light);
+}
+.md-typeset .grid.cards > ul > li:hover a:last-child,
+.md-typeset .grid.cards a:last-child:hover,
+.md-typeset .grid.cards a:last-child:focus {
+  color: var(--orq-teal-light);
+}
+
+/* --- Links: teal, orange on hover (one consistent interaction) ------- */
+.md-typeset a:hover { color: var(--md-accent-fg-color); }
+
+/* --- "Get Started" primary button: the one orange CTA --------------- */
+/* Hero buttons: Material's default is oversized — tighten. */
+.md-typeset .md-button {
+  font-size: 0.7rem;
+  padding: 0.35em 0.9em;
+}
+.md-typeset .md-button--primary {
+  background-color: var(--orq-orange-deep);
+  border-color: var(--orq-orange-deep);
+  color: #fff;
+}
+.md-typeset .md-button--primary:hover {
+  background-color: var(--orq-orange);
+  border-color: var(--orq-orange);
+}
+

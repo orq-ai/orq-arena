@@ -61,16 +61,22 @@ def _triples(outcomes: list[Outcome]) -> list[tuple[str, str, str]]:
 MIN_CATEGORY_COMPARISONS = 20
 
 
-def elo_by_category(outcomes: list[Outcome], names: list[str]) -> dict[str, dict[str, float]]:
-    """Bradley-Terry per prompt category, skipping under-sampled slices."""
+def elo_by_category(outcomes: list[Outcome]) -> dict[str, dict[str, float]]:
+    """Bradley-Terry per prompt category, skipping under-sampled slices.
+
+    Each slice rates only the models that actually appear in it; a model
+    absent from a category is left out, not seeded at 1000.
+    """
     by_cat: dict[str, list[Outcome]] = {}
     for o in outcomes:
         by_cat.setdefault(o[3], []).append(o)
-    return {
-        cat: bradley_terry_mle(build_wins_matrix(_triples(rows)), names)
-        for cat, rows in sorted(by_cat.items())
-        if len(rows) >= MIN_CATEGORY_COMPARISONS
-    }
+    out: dict[str, dict[str, float]] = {}
+    for cat, rows in sorted(by_cat.items()):
+        if len(rows) < MIN_CATEGORY_COMPARISONS:
+            continue
+        cat_names = sorted({x for a, b, _kind, _cat in rows for x in (a, b)})
+        out[cat] = bradley_terry_mle(build_wins_matrix(_triples(rows)), cat_names)
+    return out
 
 
 def _rebuild_comparisons(records: list[BattleRecord]) -> list[PairwiseComparison]:
@@ -153,7 +159,7 @@ def _final_report(
         "elo_ci": bootstrap_ci(_triples(outcomes), names),
         "elo_style_controlled": elo_sc if style_rows else None,
         "length_coef": length_coef if style_rows else None,
-        "elo_by_category": elo_by_category(outcomes, names),
+        "elo_by_category": elo_by_category(outcomes),
         "category_counts": cat_counts,
         "tokens": {
             "models_in": model_in,

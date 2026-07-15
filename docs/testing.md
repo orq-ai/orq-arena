@@ -207,7 +207,7 @@ enforces no coverage threshold. The only gate, locally and in CI, is that all 89
 
 ## CI Integration
 
-Tests run on GitHub Actions via [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)
+Tests run on GitHub Actions via [`.github/workflows/ci.yml`](https://github.com/orq-ai/orq-arena/blob/master/.github/workflows/ci.yml)
 (workflow name `CI`, job name `Unit tests`). It triggers on push to `master`, `feat/**`, or
 `fix/**` branches, and on every pull request.
 

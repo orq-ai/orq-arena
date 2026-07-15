@@ -1,7 +1,7 @@
 # orq-arena documentation
 
 Guides for running, configuring, trusting, and extending the arena. The
-[project README](../README.md) is the front door; these pages carry the detail.
+[project README](https://github.com/orq-ai/orq-arena/blob/master/README.md) is the front door; these pages carry the detail.
 
 | Guide | Read it when you want to |
 |-------|--------------------------|
@@ -17,4 +17,4 @@ Guides for running, configuring, trusting, and extending the arena. The
 
 - **Evaluating the tool?** [Getting Started](getting-started.md) → [Methodology](methodology.md)
 - **Running benchmarks?** [Getting Started](getting-started.md) → [Configuration](configuration.md) → [CLI Reference](cli.md)
-- **Contributing code?** [Architecture](architecture.md) → [Development](development.md) → [Testing](testing.md), plus [CONTRIBUTING.md](../CONTRIBUTING.md)
+- **Contributing code?** [Architecture](architecture.md) → [Development](development.md) → [Testing](testing.md), plus [CONTRIBUTING.md](https://github.com/orq-ai/orq-arena/blob/master/CONTRIBUTING.md)
