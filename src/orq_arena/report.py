@@ -26,7 +26,7 @@ _MARK = (
     '<path d="M37.2499 91.4634C37.2499 88.6198 37.2499 87.198 36.7357 86.0954C36.1905 84.9261 35.2507 83.9863 34.0814 83.441C32.9787 82.9268 31.5569 82.9268 28.7133 82.9268H26.5182C23.4448 82.9268 21.908 82.9268 20.7341 82.3287C19.7015 81.8026 18.862 80.963 18.3359 79.9304C17.7377 78.7565 17.7377 77.2198 17.7377 74.1463V72.1951C17.7377 69.1217 17.7377 67.5849 18.3359 66.411C18.862 65.3784 19.7015 64.5389 20.7341 64.0128C21.908 63.4146 23.4447 63.4146 26.5182 63.4146L28.4694 63.4146C31.5429 63.4146 33.0796 63.4146 34.2535 64.0128C35.2861 64.5389 36.1256 65.3784 36.6518 66.411C37.2499 67.5849 37.2499 69.1217 37.2499 72.1951V74.3295C37.2499 77.1731 37.2499 78.5949 37.7641 79.6975C38.3093 80.8669 39.2492 81.8067 40.4185 82.3519C41.5211 82.8661 42.9429 82.8661 45.7865 82.8661C48.6301 82.8661 50.0519 82.8661 51.1545 83.3803C52.3238 83.9255 53.2637 84.8653 53.8089 86.0347C54.3231 87.1373 54.3231 88.5692 54.3231 91.433C54.3231 94.2969 54.3231 95.7288 53.8089 96.8314C53.2637 98.0008 52.3238 98.9406 51.1545 99.4858C50.0519 100 48.6301 100 45.7865 100C42.9429 100 41.5211 100 40.4185 99.4858C39.2492 98.9406 38.3093 98.0008 37.7641 96.8315C37.2499 95.7288 37.2499 94.307 37.2499 91.4634Z"/>'
     '<path d="M72.8597 82.9268C69.7862 82.9268 68.2495 82.9268 67.0756 82.3287C66.043 81.8026 65.2035 80.963 64.6773 79.9304C64.0792 78.7565 64.0792 77.2198 64.0792 74.1463V72.1951C64.0792 69.1217 64.0792 67.5849 64.6773 66.411C65.2035 65.3784 66.043 64.5389 67.0756 64.0128C68.2495 63.4146 69.7862 63.4146 72.8597 63.4146H75.0548C77.8984 63.4146 79.3202 63.4146 80.4228 62.9005C81.5921 62.3552 82.532 61.4154 83.0772 60.2461C83.5914 59.1434 83.5914 57.7217 83.5914 54.8781C83.5914 52.0345 83.5914 50.6127 84.1055 49.51C84.6508 48.3407 85.5906 47.4009 86.7599 46.8556C87.8626 46.3415 89.2844 46.3415 92.128 46.3415C94.9716 46.3415 96.3934 46.3415 97.496 46.8556C98.6653 47.4009 99.6051 48.3407 100.15 49.51C100.665 50.6127 100.665 52.0446 100.665 54.9084C100.665 57.7723 100.665 59.2042 100.15 60.3068C99.6051 61.4761 98.6653 62.4159 97.496 62.9612C96.3934 63.4754 94.9716 63.4754 92.128 63.4754C89.2844 63.4754 87.8626 63.4754 86.7599 63.9895C85.5906 64.5348 84.6508 65.4746 84.1055 66.6439C83.5914 67.7466 83.5914 69.1684 83.5914 72.012V74.1463C83.5914 77.2198 83.5914 78.7565 82.9932 79.9304C82.4671 80.963 81.6276 81.8026 80.595 82.3287C79.4211 82.9268 77.8844 82.9268 74.8109 82.9268H72.8597Z"/>'
     '<path d="M50.6645 58.5366C48.1085 58.5366 46.8305 58.5366 45.8149 58.1403C44.3062 57.5516 43.1129 56.3583 42.5242 54.8496C42.1279 53.834 42.1279 52.556 42.1279 50C42.1279 47.444 42.1279 46.166 42.5242 45.1504C43.1129 43.6417 44.3062 42.4484 45.8149 41.8597C46.8305 41.4634 48.1085 41.4634 50.6645 41.4634C53.2205 41.4634 54.4985 41.4634 55.5141 41.8597C57.0228 42.4484 58.2161 43.6417 58.8048 45.1504C59.2011 46.166 59.2011 47.444 59.2011 50C59.2011 52.556 59.2011 53.834 58.8048 54.8496C58.2161 56.3583 57.0228 57.5516 55.5141 58.1403C54.4985 58.5366 53.2205 58.5366 50.6645 58.5366Z"/>'
-    '</g></svg>'
+    "</g></svg>"
 )
 
 _CSS = """
@@ -86,17 +86,22 @@ h2 { font-size: 17px; font-weight: 500; margin: 40px 0 10px; padding-bottom: 6px
   text-transform: uppercase; color: var(--state); font-weight: 600; margin: 0 0 10px; }
 .verdict h1 { margin: 0 0 10px; font-size: 27px; font-weight: 500; line-height: 1.25; letter-spacing: -0.02em; }
 .verdict .expl { color: var(--muted); font-size: 13.5px; max-width: 64ch; margin: 0 0 18px; }
+.verdict .vnote { color: var(--muted); font-size: 12px; max-width: 64ch; margin: 16px 0 0; }
 .verdict .kpis { display: flex; gap: 14px; margin-top: 20px; align-items: stretch; }
 .verdict .kpi { flex: 1; min-width: 0; background: var(--surface); border: 1px solid var(--line);
-  border-radius: var(--r-lg); padding: 16px 18px; }
-.verdict .kpi > b.name-kpi { display: block; font-size: 17px; font-weight: 500; line-height: 1.2;
+  border-radius: var(--r-lg); padding: 16px 18px; display: flex; justify-content: space-between;
+  align-items: flex-start; gap: 10px; }
+.verdict .kpi-body { min-width: 0; }
+.verdict .kpi .medal { font-size: 18px; line-height: 1; flex-shrink: 0; }
+.verdict .name-kpi { display: block; font-size: 17px; font-weight: 500; line-height: 1.2;
   letter-spacing: -0.01em; margin-bottom: 12px; white-space: nowrap; overflow: hidden;
   text-overflow: ellipsis; }
-.verdict .kpi span { font-size: 12px; color: var(--muted); }
-.verdict .kpi span.stat { display: block; margin-top: 6px; }
-.verdict .kpi span b { font-size: 15px; color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
-.verdict .kpi span.lead b { font-size: 27px; font-weight: 700; letter-spacing: -0.02em; }
-.verdict .kpi.state span.lead b { color: var(--state); }
+.verdict .kpi .metrics { display: flex; gap: 22px; }
+.verdict .kpi .metric { display: flex; flex-direction: column; gap: 2px; }
+.verdict .kpi .metric span { font-size: 12px; color: var(--muted); font-weight: 500; white-space: nowrap; }
+.verdict .kpi .metric b { font-size: 18px; font-weight: 500; color: var(--ink); font-family: var(--mono);
+  font-variant-numeric: tabular-nums; letter-spacing: -0.02em; line-height: 1.15; white-space: nowrap; }
+.verdict .kpi.state .metric:first-child b { color: var(--state); }
 table { border-collapse: collapse; width: 100%; font-size: 13.5px;
         font-variant-numeric: tabular-nums; }
 th { text-align: left; font-family: var(--mono); font-size: 12px; text-transform: uppercase;
@@ -113,6 +118,8 @@ td.n, th.n { text-align: right; font-family: var(--mono); white-space: nowrap; }
 .ci-dot { position: absolute; top: -2px; width: 4px; height: 12px; border-radius: 2px; background: var(--indigo); }
 .name { font-weight: 600; white-space: nowrap; }
 .think { font-size: 11px; color: var(--muted); }
+.think.off { color: var(--warn); border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
+             border-radius: var(--r-sm); padding: 0 5px; }
 .grid td, .grid th { text-align: center; padding: 6px 6px; }
 .grid td.rowname { text-align: left; font-weight: 600; white-space: nowrap; }
 .foot { margin-top: 48px; padding-top: 14px; border-top: 1px solid var(--line);
@@ -205,7 +212,6 @@ def _cost_lines(records, manifest, prices, alias=None):
     return models_usd, jury_usd, sorted(unpriced)
 
 
-
 def _win_rates(grid: dict, names: list[str]) -> dict[str, float]:
     """Rated-round win share per model from the win grid (ties are 0.5 in it)."""
     rates = {}
@@ -258,8 +264,7 @@ def _value_map_svg(points, champion: str, size_label: str = "average response le
     tmax = max(t for *_, t in points) or 1.0
     elos = [e for _, _, e, _, _ in points]
     # Pad the ELO range, then snap the axis to tick multiples.
-    step = next((s for s in (50, 100, 200, 500, 1000)
-                 if (max(elos) - min(elos)) / s <= 6), 2000)
+    step = next((s for s in (50, 100, 200, 500, 1000) if (max(elos) - min(elos)) / s <= 6), 2000)
     e_lo = math.floor((min(elos) - step * 0.4) / step) * step
     e_hi = math.ceil((max(elos) + step * 0.4) / step) * step
     W, H, L, R, T, B = 720, 310, 70, 40, 30, 60
@@ -286,7 +291,11 @@ def _value_map_svg(points, champion: str, size_label: str = "average response le
         x, y = px(c), py(e)
         rad = max(9.0, 5 + 9 * (t / tmax))
         on_frontier = round(x) in fx
-        fill = "var(--brand)" if name == champion else ("var(--teal-soft)" if on_frontier else "var(--dot-mute)")
+        fill = (
+            "var(--brand)"
+            if name == champion
+            else ("var(--teal-soft)" if on_frontier else "var(--dot-mute)")
+        )
         rk = rank_of[name]
         # Surface ring separates overlapping dots; dot fills are dark enough for
         # plain white digits (no outline) in both light and dark.
@@ -319,8 +328,7 @@ def _value_map_svg(points, champion: str, size_label: str = "average response le
                     f"stroke='var(--muted)' stroke-width='0.75' opacity='0.6'/>"
                 )
             dots.append(
-                leader
-                + f"<text x='{lx:.0f}' y='{ly:.0f}' font-size='11' font-weight='700' "
+                leader + f"<text x='{lx:.0f}' y='{ly:.0f}' font-size='11' font-weight='700' "
                 f"fill='var(--ink)' text-anchor='middle'>{_e(name)} "
                 f"<tspan fill='var(--muted)' font-weight='400'>{_fmt_usd(c)} &middot; ELO {e:.0f}</tspan></text>"
             )
@@ -329,8 +337,11 @@ def _value_map_svg(points, champion: str, size_label: str = "average response le
             f"<span style='white-space:nowrap'><b>{rk}</b> {_e(name)} "
             f"<span style='color:var(--muted)'>{_fmt_usd(c)} &middot; ELO {e:.0f} &middot; {r:.0%}{star}</span></span>"
         )
-    key = ("<p class='note' style='display:flex;flex-wrap:wrap;gap:4px 18px'>"
-           + "".join(key_rows) + "</p>")
+    key = (
+        "<p class='note' style='display:flex;flex-wrap:wrap;gap:4px 18px'>"
+        + "".join(key_rows)
+        + "</p>"
+    )
 
     # Axis ticks: y at round ELO steps with faint gridlines; x at $ decades (log scale).
     y_ticks = "".join(
@@ -348,11 +359,21 @@ def _value_map_svg(points, champion: str, size_label: str = "average response le
         if d < x0 - 0.05 or d > x1 + 0.05:
             continue
         tx = L + (d - x0) / span * (W - L - R)
-        val = 10 ** d
+        val = 10**d
         x_ticks += (
             f"<line x1='{tx:.0f}' y1='{H - B}' x2='{tx:.0f}' y2='{H - B + 5}' stroke='var(--muted)'/>"
             f"<text x='{tx:.0f}' y='{H - B + 17}' font-size='10' fill='var(--muted)' "
             f"text-anchor='middle'>{_fmt_usd(val)}</text>"
+        )
+    # Label the far-right extreme (the priciest model) so the right end of the
+    # axis carries a number, mirroring the top ELO tick. Decade ticks stop at
+    # the last whole $ power, which is usually left of the real max. Skip when a
+    # decade already lands on the edge.
+    if abs(x1 - round(x1)) > 0.03:
+        x_ticks += (
+            f"<line x1='{W - R}' y1='{H - B}' x2='{W - R}' y2='{H - B + 5}' stroke='var(--muted)'/>"
+            f"<text x='{W - R}' y='{H - B + 17}' font-size='10' fill='var(--muted)' "
+            f"text-anchor='end'>{_fmt_usd(10**x1)}</text>"
         )
 
     return f"""
@@ -373,7 +394,6 @@ def _value_map_svg(points, champion: str, size_label: str = "average response le
 higher). Dot size is {size_label}; the champion is orange; hover any dot for cost, ELO,
 and win rate. Win rate counts rated rounds only.</p>
 """
-
 
 
 def _speed_stats(records, alias=None) -> list[tuple[str, float, float, float, float]]:
@@ -402,13 +422,15 @@ def _speed_stats(records, alias=None) -> list[tuple[str, float, float, float, fl
             a[5] += 1
     out = []
     for name, (ts, tn, ft, fn, ot, on, ds) in agg.items():
-        out.append((
-            name,
-            ts / tn if tn else 0.0,
-            ft / fn if fn else 0.0,
-            ot / on if on else 0.0,
-            ds / tn if tn else 0.0,
-        ))
+        out.append(
+            (
+                name,
+                ts / tn if tn else 0.0,
+                ft / fn if fn else 0.0,
+                ot / on if on else 0.0,
+                ds / tn if tn else 0.0,
+            )
+        )
     return out
 
 
@@ -424,8 +446,10 @@ def _speed_svg(stats) -> str:
     rows.sort(key=lambda x: -x[1])
     vmax = max(x[1] for x in rows) or 1.0
     title = "Speed"
-    note = ("Average tokens per second over the run's streamed responses; "
-            "time to first token annotated.")
+    note = (
+        "Average tokens per second over the run's streamed responses; "
+        "time to first token annotated."
+    )
     W, L, RH = 720, 170, 26
     H = 24 + RH * len(rows) + 8
     parts = []
@@ -493,6 +517,7 @@ def build_report_html(
         k: tuple(v) for k, v in (report.get("elo_ci") or {}).items()
     }
     thinking = report.get("thinking") or {}
+    thinking_off = report.get("thinking_off") or {}
     verbosity = report.get("verbosity") or {}
     elo_sc = report.get("elo_style_controlled") or {}
     length_coef = report.get("length_coef")
@@ -510,9 +535,7 @@ def build_report_html(
     agreement = report.get("mean_agreement")
 
     started = manifest.get("started_at")
-    finished = manifest.get("finished_at") or (
-        max((r.timestamp for r in records), default=None)
-    )
+    finished = manifest.get("finished_at") or (max((r.timestamp for r in records), default=None))
     duration = ""
     if started and finished and finished > started + 1:
         duration = f"{(finished - started) / 60:.1f} min"
@@ -532,7 +555,12 @@ def build_report_html(
     for i, (name, e0) in enumerate(ranked, 1):
         lo, hi = ci.get(name, (e0, e0))
         dlo, dhi = max(lo, floor), min(hi, ceil)
-        think = ' <span class="think">thinking</span>' if thinking.get(name) else ""
+        if thinking.get(name):
+            think = ' <span class="think">thinking</span>'
+        elif thinking_off.get(name):
+            think = ' <span class="think off">thinking off</span>'
+        else:
+            think = ""
         tok = verbosity.get(name)
         sc_cell = f"<td class='n'>{elo_sc[name]:.0f}</td>" if name in elo_sc else ""
         rank = medals[i - 1] if i <= 3 else str(i)
@@ -551,9 +579,7 @@ def build_report_html(
     grid = report.get("win_grid") or {}
     order = [n for n, _ in ranked]
     head = "".join(f"<th class='n'>{i}</th>" for i in range(1, len(order) + 1))
-    vmax = max(
-        (v for row in grid.values() for v in (row or {}).values()), default=0.0
-    )
+    vmax = max((v for row in grid.values() for v in (row or {}).values()), default=0.0)
     grid_rows = []
     for i, a in enumerate(order, 1):
         cells = []
@@ -579,9 +605,10 @@ def build_report_html(
             f"<td class='n'>{_pct(j.get('tie_rate'))}</td></tr>"
         )
     cohen = report.get("cohen") or {}
-    cohen_bits = ", ".join(
-        f"{_e(k)}: {v.get('kappa')}" if isinstance(v, dict) else f"{_e(k)}: {v}"
-        for k, v in cohen.items()
+    _ks = [v.get("kappa") if isinstance(v, dict) else v for v in cohen.values()]
+    _ks = [k for k in _ks if isinstance(k, (int, float))]
+    cohen_range = (
+        f"{min(_ks):.2f} to {max(_ks):.2f}" if len(_ks) > 1 else (f"{_ks[0]:.2f}" if _ks else "")
     )
 
     # Rounds and category accounting.
@@ -603,23 +630,39 @@ def build_report_html(
     if top_separated is not None:
         runner_name = ranked[1][0]
         if top_separated:
-            signal_rows.append(("Top-spot separation",
-                "top spot clears the runner-up at 95% CI", " good"))
+            signal_rows.append(
+                ("Top-spot separation", "top spot clears the runner-up at 95% CI", " good")
+            )
         else:
-            signal_rows.append(("Top-spot separation",
-                f"{_e(runner_name)} is statistically indistinguishable at this sample size",
-                " warn"))
+            signal_rows.append(
+                (
+                    "Top-spot separation",
+                    f"{_e(runner_name)} is statistically indistinguishable at this sample size",
+                    " warn",
+                )
+            )
     if fleiss.get("kappa") is not None:
-        signal_rows.append(("Jury agreement (Fleiss&#39; &kappa;)",
-            f"<b>{fleiss['kappa']}</b> {_e(fleiss.get('label', ''))}, over "
-            f"{fleiss.get('rounds_used', '?')}/{fleiss.get('rounds_total', '?')} "
-            f"full-panel rounds", ""))
+        signal_rows.append(
+            (
+                "How much the jury agreed",
+                f"<b>{fleiss['kappa']} of 1</b> ({_e(fleiss.get('label', ''))}, 1 = every judge "
+                f"agreed), across {fleiss.get('rounds_used', '?')}/"
+                f"{fleiss.get('rounds_total', '?')} full-panel rounds",
+                "",
+            )
+        )
     if length_coef is not None:
         lean = "longer" if length_coef > 0 else "shorter"
-        signal_rows.append(("Jury length bias",
-            f"<b>{length_coef:+.2f}</b> leaned {lean}; the len-ctrl column prices it out", ""))
-    signal_rows.append(("Decisive-vote agreement", f"<b>{_pct(agreement)}</b>", ""))
-    signal_rows.append(("Jury share of tokens", f"<b>{jury_share}</b>", ""))
+        signal_rows.append(
+            (
+                "Did length sway the jury",
+                f"the jury leaned toward <b>{lean} answers</b>; the length-adjusted column "
+                f"prices that out",
+                "",
+            )
+        )
+    signal_rows.append(("Judges agreeing on decisive rounds", f"<b>{_pct(agreement)}</b>", ""))
+    signal_rows.append(("Jury share of tokens used", f"<b>{jury_share}</b>", ""))
     meth_rows = "".join(
         f"<tr><td class='name'>{lbl}</td><td class='sig{c}'>{txt}</td></tr>"
         for lbl, txt, c in signal_rows
@@ -634,18 +677,39 @@ def build_report_html(
     speed = _speed_svg(stats_all)
     dur_by = {n: d for n, _t, _f, _o, d in stats_all}
 
+    # Fairness disclosure: name any model that ran with reasoning explicitly
+    # switched off, so its rating isn't read as a like-for-like result.
+    off_names = [n for n in order if thinking_off.get(n)]
+    off_note = (
+        f' <span class="sig warn">Not a like-for-like field:</span> '
+        f"{', '.join(_e(n) for n in off_names)} ran with vendor reasoning explicitly "
+        f'disabled (tagged <span class="think off">thinking off</span> above); their '
+        f"scores sit below what the same model would earn reasoning freely."
+        if off_names
+        else ""
+    )
+
     value_map = ""
     if prices:
         per_cost = _per_model_cost(records, manifest, prices, alias)
         rates = _win_rates(grid, order)
         use_dur = any(dur_by.get(n, 0.0) > 0 for n in order)
         pts = [
-            (n, per_cost[n], elo.get(n, 0.0), rates.get(n, 0.0),
-             dur_by.get(n, 0.0) if use_dur else (verbosity.get(n) or 0.0))
-            for n in order if n in per_cost and per_cost[n] > 0
+            (
+                n,
+                per_cost[n],
+                elo.get(n, 0.0),
+                rates.get(n, 0.0),
+                dur_by.get(n, 0.0) if use_dur else (verbosity.get(n) or 0.0),
+            )
+            for n in order
+            if n in per_cost and per_cost[n] > 0
         ]
-        value_map = _value_map_svg(pts, champion, size_label=(
-            "average time to answer" if use_dur else "average response length"))
+        value_map = _value_map_svg(
+            pts,
+            champion,
+            size_label=("average time to answer" if use_dur else "average response length"),
+        )
 
     rates_all = _win_rates(grid, order)
     per_cost_all = _per_model_cost(records, manifest, prices, alias) if prices else {}
@@ -656,31 +720,59 @@ def build_report_html(
     cost_note = ""
 
     def _card(lbl, big, cap, extra=""):
-        return (f"<div class='costcard{extra}'><div class='lbl'>{lbl}</div>"
-                f"<div class='big'>{big}</div><div class='cap'>{cap}</div></div>")
+        return (
+            f"<div class='costcard{extra}'><div class='lbl'>{lbl}</div>"
+            f"<div class='big'>{big}</div><div class='cap'>{cap}</div></div>"
+        )
 
     if cost:
         w_usd, j_usd, unpriced = cost
         total = w_usd + (j_usd or 0.0)
         j_big = f"&asymp; ${j_usd:,.2f}" if j_usd is not None else "n/a"
-        cost_cards = "<div class='costcards'>" + (
-            _card("Models", f"${w_usd:,.2f}", f"{w_in:,} in &middot; {w_out:,} out &middot; exact")
-            + _card("Jury", j_big, f"{j_in:,} in &middot; {j_out:,} out &middot; estimated")
-            + _card("Estimated total", f"&asymp; ${total:,.2f}",
-                    f"jury {jury_share} of tokens", extra=" total")
-        ) + "</div>"
+        cost_cards = (
+            "<div class='costcards'>"
+            + (
+                _card(
+                    "Models", f"${w_usd:,.2f}", f"{w_in:,} in &middot; {w_out:,} out &middot; exact"
+                )
+                + _card("Jury", j_big, f"{j_in:,} in &middot; {j_out:,} out &middot; estimated")
+                + _card(
+                    "Estimated total",
+                    f"&asymp; ${total:,.2f}",
+                    f"jury {jury_share} of tokens",
+                    extra=" total",
+                )
+            )
+            + "</div>"
+        )
         cost_note = (
             "<p class='note'>Model spend is exact (per-model catalog rates); jury spend is "
             "estimated at the panel's mean rate because the log stores the panel's token total, "
-            "not per-judge splits." + (
-                " Unpriced in the catalog and excluded: " + ", ".join(unpriced) + "." if unpriced else ""
-            ) + "</p>"
+            "not per-judge splits."
+            + (
+                " Unpriced in the catalog and excluded: " + ", ".join(unpriced) + "."
+                if unpriced
+                else ""
+            )
+            + "</p>"
         )
     else:
-        cost_cards = "<div class='costcards'>" + (
-            _card("Models", f"{w_in + w_out:,}", f"{w_in:,} in &middot; {w_out:,} out &middot; tokens")
-            + _card("Jury", f"{j_in + j_out:,}", f"{j_in:,} in &middot; {j_out:,} out &middot; tokens")
-        ) + "</div>"
+        cost_cards = (
+            "<div class='costcards'>"
+            + (
+                _card(
+                    "Models",
+                    f"{w_in + w_out:,}",
+                    f"{w_in:,} in &middot; {w_out:,} out &middot; tokens",
+                )
+                + _card(
+                    "Jury",
+                    f"{j_in + j_out:,}",
+                    f"{j_in:,} in &middot; {j_out:,} out &middot; tokens",
+                )
+            )
+            + "</div>"
+        )
 
     # Pragmatic verdict banner (the auto-router dashboard treatment): one
     # actionable sentence, a plain-words explainer, two large KPIs.
@@ -700,45 +792,71 @@ def build_report_html(
             f"rated win. Re-run with more prompts or a decisive jury to separate the field."
         )
     elif separated:
-        vclass, headline = "", (
-            f"Adopt {_e(champion)}: wins {champ_rate:.0%} of rated rounds, "
-            f"statistically ahead at 95% confidence."
+        vclass, headline = (
+            "",
+            (
+                f"Adopt {_e(champion)}: wins {champ_rate:.0%} of rated rounds, "
+                f"statistically ahead at 95% confidence."
+            ),
         )
         expl = (
             f"{_e(champion)} beat every other model in this pool on your prompts and its lead "
             f"over {_e(runner_name)} exceeds the uncertainty of a run this size."
         )
     else:
-        vclass, headline = " tied", (
-            f"{_e(champion)} leads, but {_e(runner_name)} is statistically tied: "
-            f"decide on cost and speed."
+        vclass, headline = (
+            " tied",
+            (
+                f"{_e(champion)} leads, but {_e(runner_name)} is statistically tied: "
+                f"decide on cost and speed."
+            ),
         )
         expl = (
             f"{_e(champion)} has the best rating, but at {len(records)} rounds the gap to "
             f"{_e(runner_name)} is inside the error bars. The value map below is the "
             f"tie-breaker; more rounds would separate them."
         )
-    status = ("&#10003; TOP SPOT SEPARATED" if separated
-              else "&#9888; STATISTICAL TIE AT THE TOP")
+    status = "&#10003; TOP SPOT SEPARATED" if separated else "&#9888; STATISTICAL TIE AT THE TOP"
     top3 = []
     for i, (nm, e0) in enumerate(ranked[:3]):
         cls = " state" if i == 0 else ""
-        # ELO leads (it's the ranking axis); win rate is secondary and labelled as
-        # a share, not a rank -- it can invert the order (opponent strength ignored).
-        stats = (
-            f"<span class='stat lead'><b>{e0:.0f}</b> ELO score</span>"
-            f"<span class='stat'><b>{rates_all.get(nm, 0.0):.0%}</b> rated-round win share</span>"
+        # Metric row in orq's tower-metric-card idiom: muted label on top, value
+        # below in mono at medium weight. ELO first (the ranking axis).
+        metrics = (
+            f"<div class='metric'><span>ELO</span><b>{e0:.0f}</b></div>"
+            f"<div class='metric'><span>win share</span><b>{rates_all.get(nm, 0.0):.0%}</b></div>"
         )
         if nm in per_cost_all:
-            stats += f"<span class='stat'><b>{_fmt_usd(per_cost_all[nm])}</b> total cost</span>"
+            metrics += (
+                f"<div class='metric'><span>cost</span><b>{_fmt_usd(per_cost_all[nm])}</b></div>"
+            )
         top3.append(
-            f"<div class='kpi{cls}'><b class='name-kpi'>{medals[i]} {_e(nm)}</b>{stats}</div>"
+            f"<div class='kpi{cls}'>"
+            f"<div class='kpi-body'><b class='name-kpi'>{_e(nm)}</b>"
+            f"<div class='metrics'>{metrics}</div></div>"
+            f"<span class='medal'>{medals[i]}</span></div>"
         )
+    # Reconcile the common confusion when a lower-ranked card shows a higher
+    # win share than the model above it (win share ignores opponent strength;
+    # ELO doesn't). Only shown when that inversion is actually on the card.
+    shown = ranked[:3]
+    inversion = any(
+        rates_all.get(shown[j][0], 0.0) > rates_all.get(shown[i][0], 0.0)
+        for i in range(len(shown))
+        for j in range(i + 1, len(shown))
+    )
+    winshare_note = (
+        "<p class='vnote'>Win share counts every rated round equally; ELO weights "
+        "opponent strength and head-to-head results, so a model can post a "
+        "higher win share yet rank lower.</p>"
+        if inversion
+        else ""
+    )
     verdict_banner = (
         f"<div class='verdict{vclass}'><p class='eyebrow'>{status}</p>"
         f"<h1>{headline}</h1>"
         f"<p class='expl'>{expl}</p><div class='kpis'>"
-        f"{''.join(top3)}</div></div>"
+        f"{''.join(top3)}</div>{winshare_note}</div>"
     )
 
     # Legacy runs minted "tour-…"; display them under the current "bench-" term.
@@ -750,9 +868,9 @@ def build_report_html(
         label = _e(ds.get("name") or ds["id"])
         dataset_frag = (
             f"dataset <a href='{_e(ds['url'])}'>{label}</a> &middot; "
-            if ds.get("url") else f"dataset {label} &middot; "
+            if ds.get("url")
+            else f"dataset {label} &middot; "
         )
-
 
     return f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
@@ -767,12 +885,12 @@ def build_report_html(
 <h2>Leaderboard</h2>
 <div class="tablewrap"><table>
 <thead><tr><th class="n">#</th><th>Model</th><th class="n">ELO</th><th class="n">95% CI</th>
-<th>CI range (shared scale)</th>{"<th class='n'>len-ctrl</th>" if elo_sc else ""}<th class="n">avg out tok</th></tr></thead>
+<th>CI range (shared scale)</th>{"<th class='n'>length-adj.</th>" if elo_sc else ""}<th class="n">avg length</th></tr></thead>
 <tbody>{"".join(ladder_rows)}</tbody></table></div>
-<p class="note">Bradley-Terry MLE over every rated round (wins and ties), anchored at a
-1000-point mean; intervals are 200-iteration bootstrap percentiles. Overlapping intervals are
-the honest output on a run this size. A &minus;&infin; lower bound means the model won so few
-rounds its rating is unidentifiable below.{" The len-ctrl column refits the rating with the jury&#39;s length preference priced out; a large raw-vs-len-ctrl gap means verbosity, not quality, is doing the separating." if elo_sc else ""}</p>
+<p class="note">ELO is a skill rating anchored at 1000: a model climbs by winning rounds, and more
+for beating a strong opponent, so a higher score means better on your prompts. The 95% CI is the
+range its true rating most likely sits in; the bar plots each on one shared scale, so models
+whose bars overlap are effectively tied at this sample size.{" The length-adj. column prices out the jury&#39;s length preference; a large gap between a model&#39;s ELO and its length-adjusted score means verbosity, not quality, was separating them." if elo_sc else ""} Full method (Bradley-Terry, bootstrap intervals, the &minus;&infin; bound) is in Methodology in detail below.{off_note}</p>
 
 {value_map}
 {speed}
@@ -785,14 +903,14 @@ rounds its rating is unidentifiable below.{" The len-ctrl column refits the rati
 {cost_cards}
 {cost_note}
 
-<h2>The jury</h2>
+<details class="method"><summary>The jury</summary>
 <div class="tablewrap"><table>
 <thead><tr><th>Judge</th><th class="n">flip rate</th><th class="n">tie rate</th></tr></thead>
 <tbody>{"".join(jury_rows) or "<tr><td colspan='3'>no per-judge stats recorded</td></tr>"}</tbody>
 </table></div>
 <p class="note">Each judge sees every pair in both seat orders; a judge that contradicts
-itself abstains (the flip rate) and abstentions never become verdicts &mdash; a high flip rate
-flags a judge to distrust. Pairwise Cohen&#39;s &kappa;: {cohen_bits or "n/a"}.</p>
+itself abstains (the flip rate) and abstentions never become verdicts; a high flip rate
+flags a judge to distrust. Judges also agree with one another (0 = chance, 1 = perfect): {cohen_range or "n/a"}.</p>
 
 <p class="subhead">Panel verdicts across all {len(records)} rounds</p>
 <div class="badges">
@@ -800,27 +918,29 @@ flags a judge to distrust. Pairwise Cohen&#39;s &kappa;: {cohen_bits or "n/a"}.<
   <span class="badge"><span class="sideB">B</span> wins <b>{verdicts["B"]}</b></span>
   <span class="badge">ties <b>{verdicts["tie"]}</b></span>
   <span class="badge{inc_cls}">inconclusive <b>{verdicts["inconclusive"]}</b></span>
-  {f'<span class="badge warn">errored <b>{voids}</b></span>' if voids else ''}
+  {f'<span class="badge warn">errored <b>{voids}</b></span>' if voids else ""}
 </div>
 <p class="note">The A-vs-B split is panel seat lean; a large skew would flag position bias in the
 setup. Inconclusive rounds carry no signal and are dropped from the rating, never counted as ties.{" An errored round is a network or infrastructure failure, not a model failure; it is logged and excluded." if voids else ""}</p>
+</details>
 
-<h2>Confidence stats</h2>
+<details class="method"><summary>Confidence stats</summary>
 <div class="tablewrap"><table>
 <thead><tr><th>Signal</th><th>Reading</th></tr></thead>
 <tbody>{meth_rows}</tbody></table></div>
 <p class="note">These are run-confidence signals, not model scores: whether the top spot
 clears the noise floor, how tightly the jury agreed, and whether length rather than quality
 did the separating.</p>
+</details>
 
 <details class="method"><summary>Methodology in detail</summary>
 <h3>Ratings</h3>
 <p>Bradley-Terry MLE over every rated round (wins and ties), anchored at a 1000-point mean.
 95% intervals are 200-iteration bootstrap percentiles; small pools give wide, overlapping
 intervals, which is the honest output at this size. A &minus;&infin; lower bound means a model
-won so few rounds its rating is unidentifiable below. The len-ctrl column refits the rating
-with the jury&#39;s length preference priced out; a large raw-vs-len-ctrl gap means verbosity,
-not quality, is doing the separating.</p>
+won so few rounds its rating is unidentifiable below. The length-adjusted column refits the
+rating with the jury&#39;s length preference priced out; a large gap between ELO and the
+length-adjusted score means verbosity, not quality, is doing the separating.</p>
 <h3>The jury</h3>
 <p>Every judge scores each pair in both seat orders; a judge that contradicts itself between
 orders abstains (the flip rate), and abstentions never become verdicts. Fleiss&#39; &kappa;
@@ -866,7 +986,15 @@ def write_report(
     prices: dict[str, tuple[float, float]] | None = None,
 ) -> Path:
     out = report_path_for(log_path)
-    out.write_text(build_report_html(
-        cfg=cfg, records=records, elo=elo, report=report, manifest=manifest, prices=prices,
-    ), encoding="utf-8")
+    out.write_text(
+        build_report_html(
+            cfg=cfg,
+            records=records,
+            elo=elo,
+            report=report,
+            manifest=manifest,
+            prices=prices,
+        ),
+        encoding="utf-8",
+    )
     return out

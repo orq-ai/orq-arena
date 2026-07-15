@@ -25,8 +25,7 @@ from ..data.schemas import BattleRecord
 from ..events import ArenaEvent, StandingsUpdated, TournamentEnded
 from ..roster import CandidateSpec
 from ..providers.orq_gateway import OrqGateway
-from .elo import (bootstrap_ci, bradley_terry_mle, build_wins_matrix,
-                  style_controlled_elo)
+from .elo import bootstrap_ci, bradley_terry_mle, build_wins_matrix, style_controlled_elo
 
 Outcome = tuple[str, str, str, str]  # (name, name, 'winner' | 'tie', category)
 
@@ -40,9 +39,7 @@ def round_robin_schedule(
     return schedule
 
 
-def outcomes_from_records(
-    records: list[BattleRecord], name_a: str, name_b: str
-) -> list[Outcome]:
+def outcomes_from_records(records: list[BattleRecord], name_a: str, name_b: str) -> list[Outcome]:
     """Per-round rating feed: wins and ties count, inconclusive/void don't."""
     out: list[Outcome] = []
     for rec in records:
@@ -81,14 +78,15 @@ def _rebuild_comparisons(records: list[BattleRecord]) -> list[PairwiseComparison
     for rec in records:
         if rec.error is not None:
             continue
-        comps.append(
-            PairwiseComparison(winner=rec.majority_verdict, votes=rec.judge_votes)
-        )
+        comps.append(PairwiseComparison(winner=rec.majority_verdict, votes=rec.judge_votes))
     return comps
 
 
 def _final_report(
-    cfg: ArenaConfig, records: list[BattleRecord], outcomes: list[Outcome], names: list[str],
+    cfg: ArenaConfig,
+    records: list[BattleRecord],
+    outcomes: list[Outcome],
+    names: list[str],
     preflight: dict | None = None,
 ) -> dict:
     # A candidate "thinks" if its config says so OR the preflight probe saw it
@@ -138,14 +136,17 @@ def _final_report(
     y_by_verdict = {"A": 1.0, "B": 0.0, "tie": 0.5}
     style_rows = [
         (
-            orc_by_model[rec.model_a], orc_by_model[rec.model_b],
+            orc_by_model[rec.model_a],
+            orc_by_model[rec.model_b],
             y_by_verdict[rec.majority_verdict],
-            len(rec.response_a or ""), len(rec.response_b or ""),
+            len(rec.response_a or ""),
+            len(rec.response_b or ""),
         )
         for rec in records
         if rec.error is None
         and rec.majority_verdict in y_by_verdict
-        and rec.model_a in orc_by_model and rec.model_b in orc_by_model
+        and rec.model_a in orc_by_model
+        and rec.model_b in orc_by_model
     ]
     elo_sc, length_coef = style_controlled_elo(style_rows, names)
     return {
@@ -155,23 +156,33 @@ def _final_report(
         "elo_by_category": elo_by_category(outcomes, names),
         "category_counts": cat_counts,
         "tokens": {
-            "models_in": model_in, "models_out": model_out,
-            "judges_in": judge_in, "judges_out": judge_out,
+            "models_in": model_in,
+            "models_out": model_out,
+            "judges_in": judge_in,
+            "judges_out": judge_out,
         },
         "jury": jury.model_dump() if jury else None,
         "mean_agreement": jury.mean_agreement if jury else None,
         "fleiss": fleiss,
         "cohen": cohen,
         "verbosity": {orc_by_model.get(m, m): sum(v) / len(v) for m, v in tokens.items() if v},
-        "reasoning_tokens": {orc_by_model.get(m, m): sum(v) / len(v) for m, v in reasoning.items() if v},
+        "reasoning_tokens": {
+            orc_by_model.get(m, m): sum(v) / len(v) for m, v in reasoning.items() if v
+        },
         "win_grid": grid,
         "thinking": {
-            w.name: (w.thinking_enabled or probed.get(w.name, False))
-            for w in cfg.candidates
+            w.name: (w.thinking_enabled or probed.get(w.name, False)) for w in cfg.candidates
         },
-        "mixed_pool": len({
-            w.thinking_enabled or probed.get(w.name, False) for w in cfg.candidates
-        }) > 1,
+        # Explicitly reasoning-off models (unless the probe caught them thinking
+        # anyway): the report flags these so a forced-off model isn't read as a
+        # weak one that ran on equal footing.
+        "thinking_off": {
+            w.name: True
+            for w in cfg.candidates
+            if w.thinking_disabled and not probed.get(w.name, False)
+        },
+        "mixed_pool": len({w.thinking_enabled or probed.get(w.name, False) for w in cfg.candidates})
+        > 1,
         "error_rounds": sum(1 for r in records if r.error is not None),
         "rated_rounds": len(outcomes),
         "by_model_names": {w.short_model: w.name for w in by_model.values()},
@@ -179,7 +190,9 @@ def _final_report(
 
 
 def rebuild_from_log(
-    cfg: ArenaConfig, records: list[BattleRecord], preflight: dict | None = None,
+    cfg: ArenaConfig,
+    records: list[BattleRecord],
+    preflight: dict | None = None,
 ) -> tuple[dict[str, float], dict]:
     """Recompute (elo, report) from a recorded log, keyed exactly like the
     live run (display names), so a regenerated report page matches the one
@@ -190,9 +203,11 @@ def rebuild_from_log(
     for rec in records:
         if rec.error is not None:
             continue
-        outcomes.extend(outcomes_from_records(
-            [rec], alias.get(rec.model_a, rec.model_a), alias.get(rec.model_b, rec.model_b)
-        ))
+        outcomes.extend(
+            outcomes_from_records(
+                [rec], alias.get(rec.model_a, rec.model_a), alias.get(rec.model_b, rec.model_b)
+            )
+        )
     names = sorted({alias.get(m, m) for r in records for m in (r.model_a, r.model_b)})
     elo = bradley_terry_mle(build_wins_matrix(_triples(outcomes)), names)
     report = _final_report(cfg, records, outcomes, names, preflight=preflight)
@@ -200,9 +215,16 @@ def rebuild_from_log(
 
 
 def _write_manifest(
-    path: Path, *, cfg: ArenaConfig, prompts: list[PromptItem], seed: int,
-    tournament_id: str, started_at: float, finished_at: float | None = None,
-    report: dict | None = None, preflight: dict | None = None,
+    path: Path,
+    *,
+    cfg: ArenaConfig,
+    prompts: list[PromptItem],
+    seed: int,
+    tournament_id: str,
+    started_at: float,
+    finished_at: float | None = None,
+    report: dict | None = None,
+    preflight: dict | None = None,
     dataset: dict | None = None,
 ) -> None:
     try:
@@ -215,14 +237,15 @@ def _write_manifest(
         "tournament_id": tournament_id,
         "started_at": started_at,
         "seed": seed,
-        "config_sha256": hashlib.sha256(
-            cfg.model_dump_json().encode("utf-8")
-        ).hexdigest()[:16],
+        "config_sha256": hashlib.sha256(cfg.model_dump_json().encode("utf-8")).hexdigest()[:16],
         "prompts_sha256": hashlib.sha256(
             "\n".join(p.text for p in prompts).encode("utf-8")
         ).hexdigest()[:16],
         "prompt_count": len(prompts),
-        "candidates": {c.name: {"model": c.model_id, "reasoning": c.reasoning or "vendor-default"} for c in cfg.candidates},
+        "candidates": {
+            c.name: {"model": c.model_id, "reasoning": c.reasoning or "vendor-default"}
+            for c in cfg.candidates
+        },
         "judges": list(cfg.judges),
         "replacement_judges": list(cfg.replacement_judges),
         "min_successful_judges": cfg.min_successful_judges,
@@ -274,14 +297,17 @@ async def run_tournament(
     candidate_by_name = {w.name: w for w in cfg.candidates}
     use_swiss = len(cfg.candidates) > 8
     schedule = [] if use_swiss else round_robin_schedule(cfg.candidates, seed)
-    matches_total = (
-        cfg.swiss_rounds * (len(names) // 2) if use_swiss else len(schedule)
-    )
+    matches_total = cfg.swiss_rounds * (len(names) // 2) if use_swiss else len(schedule)
     started_at = time.time()
     tournament_id = f"bench-{int(started_at)}"
     _write_manifest(
-        manifest_path, cfg=cfg, prompts=prompts, seed=seed,
-        tournament_id=tournament_id, started_at=started_at, preflight=preflight,
+        manifest_path,
+        cfg=cfg,
+        prompts=prompts,
+        seed=seed,
+        tournament_id=tournament_id,
+        started_at=started_at,
+        preflight=preflight,
         dataset=dataset,
     )
 
@@ -317,9 +343,7 @@ async def run_tournament(
             async with state_lock:
                 log.append_many(result.battles)
                 all_records.extend(result.battles)
-                outcomes.extend(
-                    outcomes_from_records(result.battles, w_a.name, w_b.name)
-                )
+                outcomes.extend(outcomes_from_records(result.battles, w_a.name, w_b.name))
                 if outcomes:
                     elo = bradley_terry_mle(build_wins_matrix(_triples(outcomes)), names)
                 matches_done += 1
@@ -338,10 +362,12 @@ async def run_tournament(
             for i, (w_a, w_b) in enumerate(schedule, 1):
                 await _run_match(i, w_a, w_b, slices[i - 1])
         else:
-            await asyncio.gather(*(
-                _run_match(i, w_a, w_b, slices[i - 1])
-                for i, (w_a, w_b) in enumerate(schedule, 1)
-            ))
+            await asyncio.gather(
+                *(
+                    _run_match(i, w_a, w_b, slices[i - 1])
+                    for i, (w_a, w_b) in enumerate(schedule, 1)
+                )
+            )
     else:
         # Pools >8: Swiss, pair by score group between rounds (decision 15:
         # pairing consumes match winners; the rating stays per-round).
@@ -356,9 +382,9 @@ async def run_tournament(
             tasks = []
             for a, b in pairs:
                 match_no += 1
-                tasks.append(_run_match(
-                    match_no, candidate_by_name[a], candidate_by_name[b], _draw_slice()
-                ))
+                tasks.append(
+                    _run_match(match_no, candidate_by_name[a], candidate_by_name[b], _draw_slice())
+                )
             results = await asyncio.gather(*tasks)
             for res in results:
                 if res.by == "draw":
@@ -368,9 +394,15 @@ async def run_tournament(
 
     report = _final_report(cfg, all_records, outcomes, names, preflight=preflight)
     _write_manifest(
-        manifest_path, cfg=cfg, prompts=prompts, seed=seed,
-        tournament_id=tournament_id, started_at=started_at,
-        finished_at=time.time(), report=report, preflight=preflight,
+        manifest_path,
+        cfg=cfg,
+        prompts=prompts,
+        seed=seed,
+        tournament_id=tournament_id,
+        started_at=started_at,
+        finished_at=time.time(),
+        report=report,
+        preflight=preflight,
         dataset=dataset,
     )
 
@@ -384,8 +416,12 @@ async def run_tournament(
             prices = {}
         write_report(
             prices=prices or None,
-            cfg=cfg, records=all_records, elo=elo, report=report,
-            manifest=json.loads(manifest_path.read_text(encoding="utf-8")), log_path=battle_log_path,
+            cfg=cfg,
+            records=all_records,
+            elo=elo,
+            report=report,
+            manifest=json.loads(manifest_path.read_text(encoding="utf-8")),
+            log_path=battle_log_path,
         )
     except Exception as exc:  # a finished run must never die on its report page
         from loguru import logger

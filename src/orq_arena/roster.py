@@ -45,6 +45,15 @@ class CandidateSpec(BaseModel):
         effort = r.get("reasoning_effort")
         return bool(effort and effort != "none")
 
+    @property
+    def thinking_disabled(self) -> bool:
+        """True if reasoning is *explicitly* switched off, so the report can tell
+        a forced-off model apart from a vendor default that simply doesn't reason."""
+        r = self.reasoning or {}
+        if (r.get("thinking") or {}).get("type") == "disabled":
+            return True
+        return r.get("reasoning_effort") == "none"
+
 
 def assign_candidates(model_ids: list[str], existing: list[CandidateSpec]) -> list[CandidateSpec]:
     """Build CandidateSpecs for picked models.
