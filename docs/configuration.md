@@ -54,6 +54,7 @@ what the shell hasn't set. A missing `.env` is silently fine.
 |---|---|
 | `orq_arena.yaml` | The default roster + rules, shipped at the project root. Loaded whenever `--config` is omitted or points here, `DEFAULT_CONFIG = "orq_arena.yaml"` in `src/orq_arena/cli.py`. Ships 8 candidates, uniform thinking-**OFF**, so the ELO compares models rather than vendor default reasoning settings. |
 | `configs/reasoning_arena.yaml` | Uniform thinking-**ON** counterpart of the default file, the "does thinking help?" benchmark. Not loaded automatically; run it explicitly with `--config configs/reasoning_arena.yaml`. |
+| `configs/frontier_8.yaml`, `configs/budget_8.yaml`, `configs/frontier_16.yaml` | Ready-made pools tiered by the Artificial Analysis intelligence index (frontier ~40-56, budget ~12-25, 16-model stress test). See [`configs/README.md`](https://github.com/orq-ai/orq-arena/blob/master/configs/README.md). |
 
 Any YAML path can be passed to `--config`; `load_config()` (`src/orq_arena/config.py`) reads it
 with `yaml.safe_load` and validates it into an `ArenaConfig` via
@@ -111,7 +112,7 @@ judges:
   - openai/gpt-5.4-nano
 
 replacement_judges:
-  - mistral/mistral-large-2411
+  - mistral/mistral-medium-2604
 
 criteria: >-
   Accuracy and correctness, helpfulness and completeness, clarity, and

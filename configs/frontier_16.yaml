@@ -1,0 +1,49 @@
+# Big pool: 16 strong models across 8 providers. The stress test, and a real
+# pairwise-preference dataset generator (battles.jsonl grows fast at this size).
+#
+# Coherent tier: every candidate sits in the ~29-56 band of the Artificial
+# Analysis intelligence index (source: orquesta-web autorouter-intelligence), so
+# the field is uniformly strong, no makeweights. Reasoning-native models run at
+# their default effort; this compares them at full strength, not under a uniform
+# cap. In a pool this wide the judges share provider families with several
+# candidates: that's expected, and the report flags it as a caveat.
+#
+# Cost: 16 models = C(16,2)=120 matches. The preflight prints an exact spend
+# ceiling and asks once before anything runs. Consider --rounds to trim, or a
+# smaller --prompts slice.
+#
+# Run: orq-arena run --config configs/frontier_16.yaml --prompts your_prompts.jsonl
+
+candidates:
+  - model_id: anthropic/claude-opus-4-8          # AA 55.7
+  - model_id: anthropic/claude-opus-4-7          # AA 53.5
+  - model_id: anthropic/claude-sonnet-4-6        # AA 35.9
+  - model_id: openai/gpt-5.4                      # AA 51.4
+  - model_id: openai/gpt-5.4-mini                 # AA 40.0
+  - model_id: google/gemini-3.5-flash            # AA 50.2
+  - model_id: google/gemini-3.1-pro-preview      # AA 46.5
+  - model_id: google/gemini-3-pro-preview        # AA 39.6
+  - model_id: deepseek/deepseek-v4-pro           # AA 44.3
+  - model_id: deepseek/deepseek-v4-flash         # AA 40.3
+  - model_id: moonshotai/kimi-k2.6               # AA 42.8
+  - model_id: moonshotai/kimi-k2.5               # AA 38.1
+  - model_id: alibaba/qwen3.5-27b                # AA 33.8
+  - model_id: alibaba/qwen3.5-35b-a3b            # AA 29.3
+  - model_id: xai/grok-4-1-fast                   # AA 30.6 (reasoning)
+  - model_id: mistral/mistral-medium-2604        # AA 29.9
+
+judges:
+  - anthropic/claude-haiku-4-5-20251001
+  - google/gemini-2.5-flash-lite
+  - openai/gpt-5.4-nano
+
+# Also a candidate above; self-judge exclusion drops it from the panel for the
+# matches it competes in, and promotes it elsewhere only if a primary errors.
+replacement_judges:
+  - mistral/mistral-medium-2604
+
+criteria: >-
+  Accuracy and correctness, helpfulness and completeness, clarity, and
+  relevance to the prompt.
+
+min_successful_judges: 2

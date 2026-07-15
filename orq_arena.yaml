@@ -72,10 +72,12 @@ judges:
   - google/gemini-2.5-flash-lite
   - openai/gpt-5.4-nano
 
-# Neutral stand-ins promoted when a primary judge errors. Keep these at least
-# as strong as the primary panel so a stand-in never weakens a verdict.
+# Neutral stand-ins promoted when a primary judge errors. Kept above the primary
+# panel on the Artificial Analysis intelligence index (mistral-medium-2604 ~30,
+# vs the cheap trio ~12-18) so a stand-in never weakens a verdict. NB: don't
+# reach for mistral-large-2411 here, it's the old Large 2 (AA ~9), weaker.
 replacement_judges:
-  - mistral/mistral-large-2411
+  - mistral/mistral-medium-2604
 
 # What the jury judges on (feeds evaluatorq's pairwise criteria).
 criteria: >-

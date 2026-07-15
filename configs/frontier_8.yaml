@@ -1,0 +1,38 @@
+# Frontier pool: the 8 strongest models on the router, each at its best.
+#
+# Coherent tier: every candidate sits in the ~40-56 band of the Artificial
+# Analysis intelligence index (source: orquesta-web autorouter-intelligence).
+# These are reasoning-native models, so they run at their default (best) effort
+# rather than forced thinking-OFF; the ELO compares them at full strength, not
+# under a uniform effort cap. For a fair uniform-effort test use orq_arena.yaml.
+#
+# Run: orq-arena run --config configs/frontier_8.yaml --prompts your_prompts.jsonl
+# Cost note: 8 models = C(8,2)=28 matches. Frontier models are pricey; the
+# preflight prints an exact spend ceiling before anything runs.
+
+candidates:
+  - model_id: anthropic/claude-opus-4-8          # AA 55.7
+  - model_id: anthropic/claude-opus-4-7          # AA 53.5
+  - model_id: openai/gpt-5.4                      # AA 51.4
+  - model_id: google/gemini-3.5-flash            # AA 50.2
+  - model_id: google/gemini-3.1-pro-preview      # AA 46.5
+  - model_id: deepseek/deepseek-v4-pro           # AA 44.3
+  - model_id: moonshotai/kimi-k2.6               # AA 42.8
+  - model_id: deepseek/deepseek-v4-flash         # AA 40.3
+
+# Cheap trio for the panel; frontier candidates are judged, not judging, so no
+# self-judge overlap here. Swap in frontier judges (opus/gpt-5.4/gemini-pro) if
+# you want to defend the numbers, at ~10x judge cost.
+judges:
+  - anthropic/claude-haiku-4-5-20251001
+  - google/gemini-2.5-flash-lite
+  - openai/gpt-5.4-nano
+
+replacement_judges:
+  - mistral/mistral-medium-2604   # AA ~30, above the primary panel
+
+criteria: >-
+  Accuracy and correctness, helpfulness and completeness, clarity, and
+  relevance to the prompt.
+
+min_successful_judges: 2
