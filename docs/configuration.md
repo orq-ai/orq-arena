@@ -39,37 +39,12 @@ Notes:
 
 ### `.env` loading
 
-`.env` is read by a small stdlib-only loader in `src/orq_arena/cli.py` (`_load_dotenv`), called
-once at the top of every CLI invocation (the `@click.group()` `cli()` entry point), before any
-subcommand runs:
+Every CLI invocation reads `./.env` once before any subcommand runs. It parses `KEY=VALUE`
+lines (skipping blanks and `#` comments, stripping surrounding quotes) and loads them with
+`os.environ.setdefault`, so **the real shell environment always wins**; `.env` only fills in
+what the shell hasn't set. A missing `.env` is silently fine.
 
-```python
-def _load_dotenv() -> None:
-    """Read KEY=VALUE lines from ./.env into the env (never overriding it)."""
-    import os
-    from pathlib import Path
-
-    env = Path(".env")
-    if not env.is_file():
-        return
-    for line in env.read_text().splitlines():
-        line = line.strip()
-        if line and not line.startswith("#") and "=" in line:
-            key, _, value = line.partition("=")
-            os.environ.setdefault(key.strip(), value.strip().strip("'\""))
-```
-
-Behavior worth knowing:
-
-- No `python-dotenv` dependency, this is a ~10-line stdlib parser.
-- Reads `./.env` relative to the current working directory; silently does nothing if the file
-  is absent (no error on a missing `.env`).
-- Parses `KEY=VALUE` lines, skips blank lines and lines starting with `#`, and strips
-  surrounding single/double quotes from the value.
-- Uses `os.environ.setdefault`, **a variable already present in the real shell environment is
-  never overridden by `.env`.** `.env` only fills in what the shell hasn't already set.
-- `.env` is git-ignored (`.gitignore`); `.env.example` is the committed template with
-  `ORQ_API_KEY=` blank.
+`.env` is git-ignored; `.env.example` is the committed template with `ORQ_API_KEY=` blank.
 
 ---
 
