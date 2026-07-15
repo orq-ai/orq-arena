@@ -31,7 +31,7 @@ candidates:
   - model_id: moonshotai/kimi-k2.6      # always-thinking by model design
 
   - model_id: deepseek/deepseek-reasoner   # always-thinking model
-  - model_id: moonshotai/kimi-k2-thinking  # always-thinking model
+  - model_id: deepseek/deepseek-v4-pro     # reasoning-native (kimi-k2-thinking was 404 in-workspace)
 
 judges:
   - anthropic/claude-haiku-4-5-20251001
