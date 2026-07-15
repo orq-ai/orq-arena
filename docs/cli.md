@@ -20,6 +20,35 @@ uv run orq-arena --help              # list every subcommand
 uv run orq-arena <command> --help    # per-command flag help
 ```
 
+```text
+Usage: orq-arena [OPTIONS] COMMAND [ARGS]...
+
+  orq-arena, LLM arena benchmark: orq.ai router + evaluatorq jury.
+
+Options:
+  --help  Show this message and exit.
+
+Commands:
+  anchor          Merge human vote files against a recorded run: κ + rank...
+  annotate        Render a blinded human-annotation page from a recorded...
+  demo            Replay a recorded tournament from a fixture file (no...
+  list-models     Print the configured candidate roster.
+  refresh-models  Re-fetch the workspace-enabled chat model list from...
+  rejudge         Re-judge a recorded run with a different panel, zero...
+  report          Render the single-file HTML report page from a recorded...
+  run             Run the arena benchmark (hits orq.ai): headless logs by...
+```
+
+!!! info "About the output blocks on this page"
+
+    The *Expected output* blocks below are captured from real invocations
+    against the committed example run at
+    [`examples/quickstart/`](https://github.com/orq-ai/orq-arena/tree/master/examples/quickstart),
+    keyless wherever the command makes no API calls. The two blocks that need
+    live judge calls (`run`, `rejudge --judge`) are reconstructed from that
+    same run's recorded numbers and marked as such. Your model names and
+    numbers will differ; the shape won't.
+
 For installation and your first run, see [getting-started.md](getting-started.md). For the
 full `orq_arena.yaml` key reference, see [configuration.md](configuration.md).
 
@@ -170,6 +199,50 @@ uv run orq-arena run --headless --config orq_arena.yaml --yes
 uv run orq-arena run --config configs/reasoning_arena.yaml --prompts prompts/starter.jsonl --output reasoning_battles.jsonl
 ```
 
+**Expected output** (headless, piped; reconstructed from the committed
+[`examples/quickstart`](https://github.com/orq-ai/orq-arena/tree/master/examples/quickstart) run's
+recorded manifest and log, its 4-model pool against the default judge trio):
+
+```text
+$ uv run orq-arena run --config examples/quickstart/config.yaml -y --no-open \
+    --output examples/quickstart/battles.jsonl
+preflight: 6 matches × 5 rounds → 60 model streams + 180 judge calls + 4 probe calls
+  ⚖ judge/contestant family overlap: anthropic/claude-haiku-4-5-20251001, google/gemini-2.5-flash-lite, openai/gpt-5.4-nano. Self-preference bias is not corrected by seat swapping; prefer judges from families outside the pool.
+  spend ceiling ≈ $2.31 (models $1.11 + judges $1.16 + probe $0.04; every output cap fully hit, live runs land under)
+thinking probe…
+  pool is thinking-clean ✓
+M1 🤝 draw
+match 1/6 done
+M2 gemini-3.5-flash beats gpt-5.4-mini
+match 2/6 done
+M4 claude-sonnet-4-6 beats mistral-medium-2604
+match 3/6 done
+M3 gpt-5.4-mini beats mistral-medium-2604
+match 4/6 done
+M5 claude-sonnet-4-6 beats gpt-5.4-mini
+match 5/6 done
+M6 gemini-3.5-flash beats mistral-medium-2604
+match 6/6 done
+      FINAL STANDINGS
+┏━━━┳━━━━━━━━━━━━━━━━━━━━━┳━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━┓
+┃ # ┃ Model               ┃ ELO  ┃ 95% CI    ┃ len-ctrl ┃
+┡━━━╇━━━━━━━━━━━━━━━━━━━━━╇━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━┩
+│ 1 │ gemini-3.5-flash    │ 1572 │ 1259–5000 │ 1301     │
+│ 2 │ claude-sonnet-4-6   │ 1572 │ 1238–4803 │ 1371     │
+│ 3 │ gpt-5.4-mini        │ 489  │ -3000–1810│ 717      │
+│ 4 │ mistral-medium-2604 │ 367  │ -3000–1686│ 611      │
+└───┴─────────────────────┴──────┴───────────┴──────────┘
+mean inter-judge agreement: 95%
+style control: jury length coefficient +2.33 (leaned longer); len-ctrl column prices it out
+tokens, models 1,728 in / 51,324 out · jury 349,228 in / 23,643 out
+battle log → examples/quickstart/battles.jsonl
+report page → examples/quickstart/battles.report.html
+```
+
+On a terminal (not piped) the per-match lines print above a pinned progress bar
+(spinner, rounds M-of-N, elapsed, current leader), and without `-y` the run pauses
+at `Proceed? [y/N]` after the preflight, before any battle or judge call.
+
 See [Match rules, gateway, candidates, and judges](configuration.md) for every YAML key this
 command reads, and [methodology.md](methodology.md) for how matches are scheduled and scored.
 
@@ -235,7 +308,7 @@ orq-arena list-models [--config PATH]
   roster order, 1-indexed. Format string: `f"{'Seed':<5} {'Name':<26} Model ID"` for the
   header, `f"{i:<5} {w.name:<26} {w.model_id}"` per row.
 
-**Example**, against the shipped `orq_arena.yaml` (8 candidates, none with a custom `name`):
+**Expected output**, against the shipped `orq_arena.yaml` (8 candidates, none with a custom `name`):
 
 ```bash
 uv run orq-arena list-models
@@ -250,8 +323,8 @@ Seed  Name                       Model ID
 4     gpt-5.4-mini               openai/gpt-5.4-mini
 5     gemini-3.1-pro-preview     google/gemini-3.1-pro-preview
 6     gemini-3.5-flash           google/gemini-3.5-flash
-7     deepseek-chat               deepseek/deepseek-chat
-8     mistral-medium-2604         mistral/mistral-medium-2604
+7     deepseek-chat              deepseek/deepseek-chat
+8     mistral-medium-2604        mistral/mistral-medium-2604
 ```
 
 ```bash
@@ -270,7 +343,7 @@ mutually exclusive modes: the default `--judge` mode re-scores a log with a new 
 ```text
 orq-arena rejudge [LOG_PATH] --judge MODEL_ID [--judge MODEL_ID ...] [--criteria TEXT]
                   [--config PATH] [--output PATH] [--report-json PATH] [--concurrency N]
-orq-arena rejudge --compare REPORT_JSON [REPORT_JSON ...]
+orq-arena rejudge --compare REPORT_JSON [--compare REPORT_JSON ...]
 ```
 
 | Argument / Flag | Default | Effect |
@@ -349,6 +422,29 @@ uv run orq-arena rejudge battles.jsonl \
 uv run orq-arena rejudge my_battles.jsonl --judge openai/gpt-5.4-nano --concurrency 8
 ```
 
+**Expected output** (illustrative; the table shape and labels are exact, the numbers are
+from a single-judge rejudge of the committed example run):
+
+```text
+$ uv run orq-arena rejudge examples/quickstart/battles.jsonl --judge openai/gpt-5.1
+
+re-judged 30 rounds, 6 verdicts changed
+rank correlation (Spearman) old→new: 0.80 , judge-robust ranking
+old ranking: gemini-3.5-flash > claude-sonnet-4-6 > gpt-5.4-mini > mistral-medium-2604
+new ranking: claude-sonnet-4-6 > gemini-3.5-flash > gpt-5.4-mini > mistral-medium-2604
+       new jury behaviour
+┏━━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━┓
+┃ judge   ┃ A-lean ┃ B-lean ┃ flip rate ┃ tie rate ┃
+┡━━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━┩
+│ gpt-5.1 │ 48%    │ 52%    │ 10%       │ 13%      │
+└─────────┴────────┴────────┴───────────┴──────────┘
+```
+
+Below a Spearman of 0.8 the second line reads
+`, ranking is panel-sensitive; treat with care` instead, and a
+`mean inter-judge agreement: NN%` line follows the table whenever the panel
+has more than one judge.
+
 ---
 
 ## `rejudge --compare`
@@ -359,8 +455,14 @@ panel `rejudge <log> --judge ... --report-json candidate.json` (judge tokens onl
 the saved reports with `rejudge --compare`. Makes no API calls.
 
 ```text
-orq-arena rejudge --compare REPORT_JSON [REPORT_JSON ...]
+orq-arena rejudge --compare REPORT_JSON [--compare REPORT_JSON ...]
 ```
+
+!!! warning "`--compare` is a repeated flag, not a list"
+
+    Pass `--compare` once **per report**: `--compare solo.json --compare panel.json`.
+    A bare second path (`--compare solo.json panel.json`) silently binds to the
+    `LOG_PATH` positional instead, and the table tabulates only the first report.
 
 Columns per candidate: Spearman vs the recorded ranking (does the ranking depend on this
 jury?), inconclusive rate (decisiveness), mean agreement, worst per-judge flip rate
@@ -371,7 +473,23 @@ which jury is *right* needs gold pairs or a human anchor (see [`annotate`](#anno
 uv run orq-arena rejudge battles.jsonl --judge openai/gpt-5.1 --report-json solo.json
 uv run orq-arena rejudge battles.jsonl --judge anthropic/claude-haiku-4-5-20251001 \
   --judge openai/gpt-5.1 --report-json panel.json
-uv run orq-arena rejudge --compare solo.json panel.json
+uv run orq-arena rejudge --compare solo.json --compare panel.json
+```
+
+**Expected output** (the report JSONs carry the numbers; the compare step itself makes no API calls):
+
+```text
+                                  jury candidates over the same recorded log
+┏━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━┓
+┃ panel           ┃ spearman vs run ┃ inconclusive ┃ agreement ┃ worst flip      ┃ tie rate ┃ changed        ┃
+┃                 ┃                 ┃              ┃           ┃ (judge)         ┃          ┃ verdicts       ┃
+┡━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━┩
+│ gpt-5.1         │ 0.80            │ 10%          │ n/a       │ 10% (gpt-5.1)   │ 13%      │ 6/30           │
+│ claude-haiku-4… │ 1.00            │ 17%          │ 86%       │ 13% (gpt-5.1)   │ 7%       │ 3/30           │
+│ gpt-5.1         │                 │              │           │                 │          │                │
+└─────────────────┴─────────────────┴──────────────┴───────────┴─────────────────┴──────────┴────────────────┘
+read: high spearman = the ranking does not depend on this jury; low inconclusive = decisive; low flip =
+self-consistent. These measure reliability, not accuracy; accuracy needs gold pairs or a human anchor.
 ```
 
 ## `report`
@@ -403,6 +521,14 @@ manifest hashes for reproducibility.
 ```bash
 uv run orq-arena report outputs/g1/battles.jsonl
 uv run orq-arena report battles.jsonl --output /tmp/run.html
+```
+
+**Expected output** (one line; without a key the page's cost section is simply omitted,
+nothing warns or fails):
+
+```text
+$ uv run orq-arena report examples/quickstart/battles.jsonl
+report page -> examples/quickstart/battles.report.html
 ```
 
 ## `annotate`
@@ -455,6 +581,13 @@ uv run orq-arena annotate battles.jsonl --exclude votes-dana.json --out dana-rou
 uv run orq-arena annotate outputs/g1/battles.jsonl --serve --sample 60
 ```
 
+**Expected output** (file mode; `--serve` prints the local URL instead and holds until Ctrl-C):
+
+```text
+$ uv run orq-arena annotate examples/quickstart/battles.jsonl --out annotate.html --sample 10
+10 rounds -> annotate.html (blind; votes export as votes.json)
+```
+
 ## `anchor`
 
 Merge one or more human vote files back against the recorded run and print the human-anchor
@@ -478,6 +611,19 @@ round in the log are counted and warned, never crash.
 
 ```bash
 uv run orq-arena anchor outputs/g1/battles.jsonl votes-h1.json votes-h2.json
+```
+
+**Expected output** (two raters over the committed example run):
+
+```text
+                         human anchor vs panel
+┏━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━┳━━━━━━━━┓
+┃ annotator ┃ voted ┃ κ rounds ┃ κ vs panel ┃ label          ┃ rank ρ ┃
+┡━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━╇━━━━━━━━┩
+│ h1        │ 29    │ 19       │ 0.90       │ almost perfect │ 0.80   │
+│ h2        │ 27    │ 19       │ 0.80       │ substantial    │ 0.80   │
+└───────────┴───────┴──────────┴────────────┴────────────────┴────────┘
+inter-annotator h1 × h2: κ=0.44 (moderate, 26 rounds)
 ```
 
 ## `refresh-models`
@@ -533,6 +679,14 @@ orq-arena refresh-models [--config PATH] [--show/--no-show]
 uv run orq-arena refresh-models
 uv run orq-arena refresh-models --show
 uv run orq-arena refresh-models --config configs/reasoning_arena.yaml --show
+```
+
+**Expected output** (here keyless, so the live fetch is skipped and the cache re-reported;
+with a key, `source=live` and `age=0s`):
+
+```text
+$ uv run orq-arena refresh-models
+137 models (source=cache, age=4528s, cache=/Users/you/.cache/orq-arena/models.json)
 ```
 
 ---

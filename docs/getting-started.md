@@ -16,9 +16,11 @@ Every command below runs through the **`orq-arena`** CLI (installed by the steps
 [1. Install](#1-install)). Run `uv run orq-arena --help` to list every subcommand. The full
 subcommand and flag reference is in **[cli.md](cli.md)**.
 
-> **No API key yet?** Skip straight to [2. Try it now](#2-try-it-now-no-api-key-needed),
-> `orq-arena demo` replays a full recorded tournament with no network calls. Come back to
-> step 3 when you're ready to point at real models.
+!!! tip "No API key yet?"
+
+    Skip straight to [2. Try it now](#2-try-it-now-no-api-key-needed),
+    `orq-arena demo` replays a full recorded tournament with no network calls. Come back to
+    step 3 when you're ready to point at real models.
 
 ---
 
@@ -79,6 +81,8 @@ This replays a fully recorded tournament, 3 matches, 6 judged rounds, all 3 defa
 voting, from `fixtures/demo_tournament.json` through the exact same TUI screens a live run
 uses: streaming responses, judge verdicts, HP drama, and the final leaderboard. No network
 calls, no API key. Press `q` to quit, `s` to save a screenshot.
+
+![The live fight screen: both candidates streaming side by side, judge cards, HP bars](assets/fight.svg)
 
 `demo` renders through the Textual TUI, so it needs the optional `[tui]` extra
 (`uv sync --extra tui`, see [1. Install](#1-install)); without it the command prints a friendly
@@ -142,6 +146,8 @@ without it `orq-arena run` with no `--config` prints an install hint):
    responses, per-judge votes with flip badges), `M` to generate per-model coach notes, `S` to
    save a screenshot, `ENTER`/`SPACE`/`Q` to exit.
 
+![The final leaderboard: ELO with 95% CIs and the len-ctrl column, per-judge behaviour, win grid](assets/leaderboard.svg)
+
 If your workspace catalog can't be reached, orq-arena degrades in two stages: a plain network
 hiccup keeps the picker open but limits it to the models already in your YAML roster (a red
 `FALLBACK` badge marks this); an outright failure to fetch anything drops you back to the
@@ -188,7 +194,21 @@ Full flag reference for `run` and every other subcommand (`demo`, `rejudge` with
 ## Where results land
 
 Every live run, TUI or headless, writes to the same three files, all in the current working
-directory by default:
+directory by default. Everything downstream, re-judging, reporting, human annotation, works
+from the battle log alone, with no further model regeneration:
+
+```mermaid
+flowchart LR
+    run["orq-arena run"] --> log["battles.jsonl<br/>(one row per judged round)"]
+    run --> manifest["battles.run.json<br/>(seeded manifest)"]
+    run --> html["battles.report.html"]
+    log --> report["orq-arena report"] --> html
+    log --> rejudge["orq-arena rejudge --judge …<br/>(new jury, judge tokens only)"]
+    rejudge --> compare["rejudge --compare<br/>(jury selection table)"]
+    log --> annotate["orq-arena annotate<br/>(blind rating page)"] --> votes["votes.json"]
+    votes --> anchor["orq-arena anchor<br/>(κ vs humans)"]
+    log --> anchor
+```
 
 | File | Contents |
 |---|---|
@@ -207,39 +227,44 @@ page on demand.
 
 ## Troubleshooting
 
-**`RuntimeError: ORQ_API_KEY is not set. Export it before running orq-arena.`**
-`.env` is missing, empty, or still the blank template. Run `cp .env.example .env`, fill in a
-real key from [my.orq.ai](https://my.orq.ai) > workspace settings > API keys, and re-run. This
-only fires on `run` or `rejudge`, `demo`, `list-models`, and `refresh-models` never
-construct a gateway client, so they run with no key at all (`refresh-models` just falls back
-to cached results, or an empty list).
+??? failure "`RuntimeError: ORQ_API_KEY is not set. Export it before running orq-arena.`"
 
-**`Error: --tui and --headless contradict each other`**
-Both flags were passed to `orq-arena run`; drop one. `--headless` is a deprecated no-op
-(headless is already the default with `--config`); `--tui` opts into the live show.
+    `.env` is missing, empty, or still the blank template. Run `cp .env.example .env`, fill in a
+    real key from [my.orq.ai](https://my.orq.ai) > workspace settings > API keys, and re-run. This
+    only fires on `run` or `rejudge`, `demo`, `list-models`, and `refresh-models` never
+    construct a gateway client, so they run with no key at all (`refresh-models` just falls back
+    to cached results, or an empty list).
 
-**`catalog load failed: ...` toast, then dropped back to the title screen**
-The picker's catalog load raised an unexpected error. Note this is rare by design: HTTP
-failures, a bad `ORQ_API_KEY`, an unreachable gateway, a flaky network, are swallowed
-inside the fetch and degrade to a cached or YAML-only roster, shown as a `FALLBACK` badge in
-the picker instead of this toast. Pressing `ENTER` on the title screen still runs the roster
-already in `orq_arena.yaml`. `orq-arena refresh-models` reports which source the catalog came
-from (live, cache, or fallback, it does not print the underlying HTTP error), and `--config`
-skips the picker altogether.
+??? failure "`Error: --tui and --headless contradict each other`"
 
-**A response panel shows `✂ truncated`**
-The candidate hit its output cap (`gateway.candidate_max_tokens`, default `2048`) before
-finishing, judges tend to penalize a cut-off answer. Raise `gateway.candidate_max_tokens` in
-your YAML, or set a higher per-candidate `max_tokens` on that one entry. See
-[configuration.md](configuration.md#gateway-gatewayconfig).
+    Both flags were passed to `orq-arena run`; drop one. `--headless` is a deprecated no-op
+    (headless is already the default with `--config`); `--tui` opts into the live show.
 
-**A model you expected in the default pool isn't there**
-`orq_arena.yaml` deliberately excludes models the router can't disable thinking for, the
-shipped file's own comment names `moonshotai/kimi-k2.6`, `deepseek/deepseek-v4-pro`, and
-`alibaba/qwen3.5-flash` as excluded for this reason. Mixing an always-thinking model into the
-uniform thinking-**OFF** pool would compare reasoning tokens no config could turn off. Add
-them to `configs/reasoning_arena.yaml` (the thinking-**ON** preset) instead, or pick them
-explicitly in the roster picker if a mixed pool is what you want.
+??? warning "`catalog load failed: ...` toast, then dropped back to the title screen"
+
+    The picker's catalog load raised an unexpected error. Note this is rare by design: HTTP
+    failures, a bad `ORQ_API_KEY`, an unreachable gateway, a flaky network, are swallowed
+    inside the fetch and degrade to a cached or YAML-only roster, shown as a `FALLBACK` badge in
+    the picker instead of this toast. Pressing `ENTER` on the title screen still runs the roster
+    already in `orq_arena.yaml`. `orq-arena refresh-models` reports which source the catalog came
+    from (live, cache, or fallback, it does not print the underlying HTTP error), and `--config`
+    skips the picker altogether.
+
+??? warning "A response panel shows `✂ truncated`"
+
+    The candidate hit its output cap (`gateway.candidate_max_tokens`, default `2048`) before
+    finishing, judges tend to penalize a cut-off answer. Raise `gateway.candidate_max_tokens` in
+    your YAML, or set a higher per-candidate `max_tokens` on that one entry. See
+    [configuration.md](configuration.md#gateway-gatewayconfig).
+
+??? question "A model you expected in the default pool isn't there"
+
+    `orq_arena.yaml` deliberately excludes models the router can't disable thinking for, the
+    shipped file's own comment names `moonshotai/kimi-k2.6`, `deepseek/deepseek-v4-pro`, and
+    `alibaba/qwen3.5-flash` as excluded for this reason. Mixing an always-thinking model into the
+    uniform thinking-**OFF** pool would compare reasoning tokens no config could turn off. Add
+    them to `configs/reasoning_arena.yaml` (the thinking-**ON** preset) instead, or pick them
+    explicitly in the roster picker if a mixed pool is what you want.
 
 ---
 

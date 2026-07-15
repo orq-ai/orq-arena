@@ -158,14 +158,16 @@ hardcoded in `OrqGateway.__init__` alongside `stream_read_timeout_s`, only the r
 is exposed as a config key. The preflight probe call (see below) also uses a hardcoded
 `max_tokens=1000`, independent of `candidate_max_tokens`/`judge_max_tokens`.
 
-**Credential/host resolution at defaults.** When `base_url` and `api_key_env` are left at their
-defaults, `OrqGateway` delegates credential and host resolution to evaluatorq's
-`resolve_llm_client` (the company-wide single source of truth). That path **honors the
-`ORQ_BASE_URL` environment variable** (host plus `/v3/router`, the way to point at a staging
-host) and **requires an ORQ key**, it will not silently fall back to `OPENAI_API_KEY`. Setting
-either `base_url` or `api_key_env` in the YAML is a **bring-your-own-endpoint opt-out**: the run
-then uses the config verbatim with no environment-variable precedence, so `ORQ_BASE_URL` is
-ignored and only the named `api_key_env` variable is read.
+!!! info "Credential/host resolution at defaults"
+
+    When `base_url` and `api_key_env` are left at their defaults, `OrqGateway` delegates
+    credential and host resolution to evaluatorq's `resolve_llm_client` (the company-wide
+    single source of truth). That path **honors the `ORQ_BASE_URL` environment variable**
+    (host plus `/v3/router`, the way to point at a staging host) and **requires an ORQ
+    key**, it will not silently fall back to `OPENAI_API_KEY`. Setting either `base_url` or
+    `api_key_env` in the YAML is a **bring-your-own-endpoint opt-out**: the run then uses
+    the config verbatim with no environment-variable precedence, so `ORQ_BASE_URL` is
+    ignored and only the named `api_key_env` variable is read.
 
 #### Bring your own endpoint
 

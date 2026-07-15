@@ -55,6 +55,18 @@ caveat on record. The clean setup is a jury drawn entirely from families outside
 
 ### Consistency gating, a flip is an abstention, not a coin flip
 
+```mermaid
+flowchart TD
+    o1["verdict in seat order 1 (A,B)"] --> rec{"same verdict<br/>both orders?"}
+    o2["verdict in seat order 2 (B,A)"] --> rec
+    rec -- yes --> vote["reconciled vote"]
+    rec -- no --> flip["abstain, flipped=True"]
+    rec -- "a call failed" --> fail["abstain, not a flip"]
+    vote --> quorum{"≥ min_successful_judges<br/>decisive votes?"}
+    quorum -- yes --> verdict["round verdict: A / B / tie"]
+    quorum -- no --> inc["inconclusive,<br/>never reaches the rating"]
+```
+
 For each judge, the two verdicts (one per ordering) are reconciled:
 
 - **Same verdict both times** → that becomes the judge's reconciled vote for the round.
@@ -333,10 +345,12 @@ can inspect and reproduce yourself. It is a small **4-model, thinking-OFF pool**
 round-robin, `C(4,2) = 6` matches) judged by the shipped 3-judge default panel, chosen to be fast
 and cheap to regenerate rather than to be a rigorous benchmark.
 
-> The numbers below are from the committed `examples/quickstart` run. Open
-> `examples/quickstart/battles.report.html` to read them, or regenerate the report from the
-> committed log with `orq-arena report examples/quickstart/battles.jsonl`. To re-run the whole
-> tournament from scratch, use the command in `examples/quickstart/config.yaml`'s header.
+!!! example "Read the numbers yourself"
+
+    The numbers below are from the committed `examples/quickstart` run. Open
+    `examples/quickstart/battles.report.html` to read them, or regenerate the report from the
+    committed log with `orq-arena report examples/quickstart/battles.jsonl`. To re-run the whole
+    tournament from scratch, use the command in `examples/quickstart/config.yaml`'s header.
 
 What the committed run lets you see end to end, on real data:
 
@@ -356,12 +370,14 @@ What the committed run lets you see end to end, on real data:
   correlation the command prints, the direct test that the ranking is not an artifact of which
   judges were picked.
 
-**The honest reading:** a cheap multi-judge panel tends to abstain on *close* pairs, and the
-quorum then correctly refuses to force a verdict out of a panel that can't agree with itself. A
-high inconclusive rate is the consistency gate doing its job, not evidence the rating is
-unreliable, but it does mean a cheap panel rates on fewer rounds than it judges. Check
-`rated_rounds` against the total round count in your own run's manifest (the committed example's
-included) before leaning on a close pairwise gap.
+!!! warning "The honest reading"
+
+    A cheap multi-judge panel tends to abstain on *close* pairs, and the
+    quorum then correctly refuses to force a verdict out of a panel that can't agree with itself. A
+    high inconclusive rate is the consistency gate doing its job, not evidence the rating is
+    unreliable, but it does mean a cheap panel rates on fewer rounds than it judges. Check
+    `rated_rounds` against the total round count in your own run's manifest (the committed example's
+    included) before leaning on a close pairwise gap.
 
 ## Current limitations
 
