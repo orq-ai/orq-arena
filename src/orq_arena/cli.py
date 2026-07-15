@@ -226,29 +226,46 @@ def list_models(config_path: str) -> None:
 
 @cli.command()
 @click.argument("log_path", default=DEFAULT_OUTPUT)
-@click.option("--judge", "judges", multiple=True, required=True,
+@click.option("--judge", "judges", multiple=True,
               help="Router model id; repeat for a panel.")
 @click.option("--criteria", default=None, help="Override judging criteria.")
 @click.option("--config", "config_path", default=DEFAULT_CONFIG, show_default=True)
 @click.option("--output", "output_path", default=None,
               help="Write re-judged rounds to this JSONL.")
 @click.option("--report-json", default=None, help="Write the summary as JSON.")
+@click.option("--compare", "compare_jsons", multiple=True, type=click.Path(exists=True),
+              help="Tabulate saved --report-json files side by side; no API calls. "
+                   "Repeat per file. Use instead of --judge.")
 @click.option("--concurrency", default=4, show_default=True)
 def rejudge(log_path: str, judges: tuple[str, ...], criteria: str | None,
             config_path: str, output_path: str | None, report_json: str | None,
-            concurrency: int) -> None:
+            compare_jsons: tuple[str, ...], concurrency: int) -> None:
     """Re-judge a recorded run with a different panel, zero regeneration.
 
     The evaluatorq demo inside the demo: the responses are already on disk,
     so swapping the jury costs judge tokens only. Prints the new jury's
     behaviour and the Spearman correlation against the recorded ranking.
+
+    The jury-selection loop: run `--judge ... --report-json candidate.json`
+    per candidate panel, then `--compare a.json b.json ...` to tabulate them
+    side by side (no API calls).
     """
     import asyncio
+
+    _quiet_logs()
+    if compare_jsons:
+        if judges:
+            raise click.ClickException("--compare tabulates saved reports; drop --judge")
+        from .rejudge import compare_reports, render_comparison
+
+        render_comparison(compare_reports(list(compare_jsons)))
+        return
+    if not judges:
+        raise click.ClickException("pass --judge <model> (repeatable), or --compare <report.json>")
 
     from .rejudge import (load_records, rejudge_run, render_result,
                           save_report_json, write_rejudged)
 
-    _quiet_logs()
     cfg = load_config(config_path)
     records = load_records(log_path)
     if not records:
@@ -265,20 +282,6 @@ def rejudge(log_path: str, judges: tuple[str, ...], criteria: str | None,
     if report_json:
         save_report_json(report_json, result)
         click.echo(f"summary -> {report_json}")
-
-
-@cli.command("jury-compare")
-@click.argument("report_jsons", nargs=-1, required=True)
-def jury_compare(report_jsons: tuple[str, ...]) -> None:
-    """Compare candidate juries from saved rejudge reports, side by side.
-
-    The jury-selection loop: run once, then `rejudge <log> --judge ...
-    --report-json candidate.json` per candidate panel (judge tokens only),
-    then compare the candidates here. No API calls.
-    """
-    from .rejudge import compare_reports, render_comparison
-
-    render_comparison(compare_reports(list(report_jsons)))
 
 
 @cli.command("report")

@@ -300,10 +300,8 @@ async def run_tournament(
     manifest_path = Path(battle_log_path).with_suffix(".run.json")
 
     names = [w.name for w in cfg.candidates]
-    candidate_by_name = {w.name: w for w in cfg.candidates}
-    use_swiss = len(cfg.candidates) > 8
-    schedule = [] if use_swiss else round_robin_schedule(cfg.candidates, seed)
-    matches_total = cfg.swiss_rounds * (len(names) // 2) if use_swiss else len(schedule)
+    schedule = round_robin_schedule(cfg.candidates, seed)
+    matches_total = len(schedule)
     started_at = time.time()
     tournament_id = f"bench-{int(started_at)}"
     _write_manifest(
@@ -360,43 +358,17 @@ async def run_tournament(
                 )
             return result
 
-    if not use_swiss:
-        # Slices pre-drawn so the schedule is seed-stable regardless of
-        # completion order under concurrency.
-        slices = [_draw_slice() for _ in schedule]
-        if concurrency <= 1:
-            for i, (w_a, w_b) in enumerate(schedule, 1):
-                await _run_match(i, w_a, w_b, slices[i - 1])
-        else:
-            await asyncio.gather(
-                *(
-                    _run_match(i, w_a, w_b, slices[i - 1])
-                    for i, (w_a, w_b) in enumerate(schedule, 1)
-                )
-            )
+    # Slices pre-drawn so the schedule is seed-stable regardless of
+    # completion order under concurrency.
+    slices = [_draw_slice() for _ in schedule]
+    if concurrency <= 1:
+        for i, (w_a, w_b) in enumerate(schedule, 1):
+            await _run_match(i, w_a, w_b, slices[i - 1])
     else:
-        # Pools >8: Swiss, pair by score group between rounds (decision 15:
-        # pairing consumes match winners; the rating stays per-round).
-        from .swiss import SwissScheduler
-
-        scheduler = SwissScheduler(names)
-        match_no = 0
-        for _swiss_round in range(1, cfg.swiss_rounds + 1):
-            pairs = scheduler.next_round_pairs()
-            if not pairs:
-                break
-            tasks = []
-            for a, b in pairs:
-                match_no += 1
-                tasks.append(
-                    _run_match(match_no, candidate_by_name[a], candidate_by_name[b], _draw_slice())
-                )
-            results = await asyncio.gather(*tasks)
-            for res in results:
-                if res.by == "draw":
-                    scheduler.record_outcome(res.winner.name, res.loser.name, tie=True)
-                else:
-                    scheduler.record_outcome(res.winner.name, res.loser.name)
+        await asyncio.gather(*(
+            _run_match(i, w_a, w_b, slices[i - 1])
+            for i, (w_a, w_b) in enumerate(schedule, 1)
+        ))
 
     report = _final_report(cfg, all_records, outcomes, names, preflight=preflight)
     _write_manifest(
