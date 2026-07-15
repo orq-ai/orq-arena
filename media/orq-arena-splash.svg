@@ -66,17 +66,6 @@
     Head-to-head LLM benchmark on your own data, and get a leaderboard you can trust.
   </text>
 
-  <!-- The two sides: A magenta vs B cyan, the arena's color code -->
-  <g font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="13" font-weight="600">
-    <rect x="92"  y="316" width="118" height="26" rx="6" fill="#ff3bd4" opacity="0.16"
-          stroke="#ff3bd4" stroke-opacity="0.55" stroke-width="1.2"/>
-    <text x="112" y="334" fill="#ff8ae6">SIDE A</text>
-    <text x="226" y="334" fill="#EAE2D9" opacity="0.6">vs</text>
-    <rect x="256" y="316" width="118" height="26" rx="6" fill="#00e5ff" opacity="0.14"
-          stroke="#00e5ff" stroke-opacity="0.55" stroke-width="1.2"/>
-    <text x="276" y="334" fill="#7deeff">SIDE B</text>
-  </g>
-
   <!-- Footer -->
   <text x="92" y="376" font-size="13" fill="#EAE2D9" opacity="0.5" letter-spacing="1"
         font-family="ui-monospace, 'SF Mono', Menlo, monospace">
