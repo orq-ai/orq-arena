@@ -356,8 +356,8 @@ def rejudge(
     behaviour and the Spearman correlation against the recorded ranking.
 
     The jury-selection loop: run `--judge ... --report-json candidate.json`
-    per candidate panel, then `--compare a.json b.json ...` to tabulate them
-    side by side (no API calls).
+    per candidate panel, then `--compare a.json --compare b.json` to tabulate
+    them side by side (no API calls).
     """
     import asyncio
 
