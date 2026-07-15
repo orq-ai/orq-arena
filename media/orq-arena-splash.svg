@@ -63,7 +63,7 @@
 
   <!-- Tagline -->
   <text x="92" y="288" font-size="19" fill="#EAE2D9" opacity="0.82">
-    Models fight, a position-bias-gated jury judges, ELO comes out.
+    Head-to-head LLM benchmark on your own data, and get a leaderboard you can trust.
   </text>
 
   <!-- The two sides: A magenta vs B cyan, the arena's color code -->
