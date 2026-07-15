@@ -1319,6 +1319,10 @@ dependencies = [
     { name = "pydantic" },
     { name = "pyyaml" },
     { name = "rich" },
+]
+
+[package.optional-dependencies]
+tui = [
     { name = "textual" },
 ]
 
@@ -1328,6 +1332,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "ruff" },
+    { name = "textual" },
     { name = "textual-dev" },
 ]
 docs = [
@@ -1347,8 +1352,9 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.7" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "rich", specifier = ">=13.7" },
-    { name = "textual", specifier = ">=0.83" },
+    { name = "textual", marker = "extra == 'tui'", specifier = ">=0.83" },
 ]
+provides-extras = ["tui"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1356,6 +1362,7 @@ dev = [
     { name = "pytest", specifier = ">=8" },
     { name = "pytest-asyncio", specifier = ">=0.23" },
     { name = "ruff", specifier = ">=0.6" },
+    { name = "textual", specifier = ">=0.83" },
     { name = "textual-dev", specifier = ">=1.6" },
 ]
 docs = [

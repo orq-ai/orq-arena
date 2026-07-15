@@ -115,17 +115,25 @@ def test_report_family_overlap_badge_from_manifest():
     records = [_record("A"), _record("A")]
     manifest = MANIFEST | {"preflight": {"family_overlaps": ["prov/judge-1"]}}
     html = build_report_html(
-        cfg=CFG, records=records, elo={"model-a": 1100.0, "model-b": 900.0},
-        report=REPORT, manifest=manifest,
+        cfg=CFG,
+        records=records,
+        elo={"model-a": 1100.0, "model-b": 900.0},
+        report=REPORT,
+        manifest=manifest,
     )
-    assert "judge/contestant family overlap" in html
+    # Rendered as a Confidence-stats caveat row (favoring master's drawer design).
+    assert "family overlap" in html.lower()
+    assert "provider family" in html
     assert "prov/judge-1" in html
-    # empty list renders no badge
+    # empty list renders no caveat
     clean = build_report_html(
-        cfg=CFG, records=records, elo={"model-a": 1100.0, "model-b": 900.0},
-        report=REPORT, manifest=MANIFEST | {"preflight": {"family_overlaps": []}},
+        cfg=CFG,
+        records=records,
+        elo={"model-a": 1100.0, "model-b": 900.0},
+        report=REPORT,
+        manifest=MANIFEST | {"preflight": {"family_overlaps": []}},
     )
-    assert "judge/contestant family overlap" not in clean
+    assert "provider family" not in clean
 
 
 def test_report_path_convention(tmp_path):
