@@ -2,7 +2,8 @@
 
 How orq-arena turns judged pairwise rounds into a Bradley-Terry ELO rating, the judging
 protocol, the scoring math, the confidence intervals, the agreement and bias metrics that let you
-audit the panel, the reliability and reproducibility policies, and what a real run measured.
+audit the panel, the reliability and reproducibility policies, and what the committed example run
+demonstrates.
 
 ## Plain-English summary
 
@@ -15,7 +16,7 @@ For every round, one prompt, two candidates, in a tournament:
    contradicts itself between orders **abstains** rather than being averaged or trusted on a coin
    flip.
 3. If fewer than `min_successful_judges` (default 2) judges cast a decisive vote, the round is
-   `inconclusive`: no HP damage, and it never reaches the rating.
+   `inconclusive`: it never reaches the rating.
 4. Every other judged round, a win for A, a win for B, or a tie, feeds a **Bradley-Terry
    maximum-likelihood** fit across every round judged so far in the tournament; ties count as
    half a win each.
@@ -27,8 +28,8 @@ For every round, one prompt, two candidates, in a tournament:
    κ), how often each individual judge flipped between seat orders, and the jury's fitted
    **length coefficient**, public, per-judge evidence of how much to trust that vote.
 
-The rest of this page is the detail behind those six steps, plus what an actual 8-candidate run
-measured.
+The rest of this page is the detail behind those six steps, plus what the committed example run
+demonstrates.
 
 ## Judging protocol
 
@@ -88,33 +89,31 @@ relevance to the prompt."` It can be swapped for a single re-judge without touch
 [Jury swapping](#jury-swapping-re-judge-without-regenerating) below). Full field reference:
 [Configuration → judges, replacement_judges, criteria, min_successful_judges](configuration.md#judges-replacement_judges-criteria-min_successful_judges).
 
-## Scoring: HP damage vs. the rating
+## Scoring: what the rating sees, and what the TUI shows
 
-This is the distinction most worth getting right: **the HP bar in the TUI and the ELO rating on
-the leaderboard are computed from the same verdicts, but they are not the same computation.**
+This is the distinction most worth getting right: **the rating is built from per-round judged
+verdicts, and the HP bar in the TUI is a separate, presentation-only recomputation of those same
+verdicts.** The engine itself no longer tracks HP at all.
 
-### HP damage is presentation
+### HP lives entirely in the TUI
 
-`src/orq_arena/arena/damage.py::compute_damage` maps a round's reconciled consensus to a damage tier:
+There is no HP or damage in the scored pipeline. The live show recomputes health bars, damage
+tiers, and KO client-side from the judged verdicts (`src/orq_arena/tui/hp.py::HPTracker`), purely
+for the drama on screen: a unanimous round drops the bar further than a split one, and a bar
+reaching zero draws a KO. The `match.starting_hp` / `damage_unanimous` / `damage_majority` config
+keys feed only this display (see
+[Configuration → match](configuration.md#match-matchrules)); none of them reach the rating.
 
-| Consensus | Damage | Counts toward the round cap? |
-|---|---|---|
-| `tie` or `inconclusive` | `match.damage_tie` (default 0) | No |
-| `A` or `B`, unanimous | `match.damage_unanimous` (default 30) | Yes |
-| `A` or `B`, split | `match.damage_majority` (default 15) | Yes |
+The match winner is decided by **judged round wins**: whichever side won more rounds takes the
+match, and equal round wins is a draw (an empty winner, `MatchResolved`/`MatchResult` no longer
+carry a `by` field). That per-match outcome drives the on-screen story only. Every prompt in the
+drawn slice is always judged regardless of where the HP bar happens to sit, and the turn loop
+keeps drawing prompts until `match.max_rounds` decisive rounds have counted.
 
-"Unanimous" requires **at least two decisive votes** that all agree with the panel's reconciled
-winner, a single surviving vote after a quorum-thin round can never trigger the higher damage
-tier, even though it technically "won" the round.
+### The rating is per-round, not per-match
 
-KO is presentation only: the turn loop keeps drawing prompts and judging rounds until
-`match.max_rounds` rounds have counted, regardless of whether HP already hit zero. A match's `by`
-field (`"ko"` vs. `"round_cap"`) only changes the on-screen story, never what gets rated.
-
-### The rating ignores HP entirely
-
-Live standings and the final leaderboard are **not** derived from match-level (HP) wins and
-losses at all. After every match, `src/orq_arena/tournament/driver.py::outcomes_from_records` walks that
+Live standings and the final leaderboard are **not** derived from the per-match winner at all.
+After every match, `src/orq_arena/tournament/driver.py::outcomes_from_records` walks that
 match's `BattleRecord`s and extracts one outcome per **judged round**:
 
 - `majority_verdict == "A"` → a win for A
@@ -123,11 +122,11 @@ match's `BattleRecord`s and extracts one outcome per **judged round**:
 - `majority_verdict == "inconclusive"`, or a voided round (`error` set) → **dropped**: not fed
   to the rating, and specifically never counted as a tie.
 
-That per-round outcome list, never the per-match HP winner, is what
+That per-round outcome list, never the per-match winner, is what
 `src/orq_arena/tournament/elo.py::bradley_terry_mle` fits. A default 8-candidate round-robin
 (`match.max_rounds=5`) therefore rates on up to `C(8,2) × 5 = 140` round-level comparisons pooled
-across the whole field, not the 7 match-level knockouts any single candidate would show on the HP
-scoreboard (each candidate meets every other candidate exactly once). See
+across the whole field, not the 7 match-level wins any single candidate would show on the
+match scoreboard (each candidate meets every other candidate exactly once). See
 [Architecture → one judged round, in detail](architecture.md#one-judged-round-in-detail) for the
 full sequence diagram from prompt to `battles.jsonl`.
 
@@ -192,17 +191,6 @@ rather than shown with misleadingly precise ratings. On the shipped 30-prompt st
 [Current limitations](#current-limitations)), most categories will not clear that floor in a
 single round-robin run, per-category breakdowns become meaningful once you scale the prompt set
 or accumulate multiple runs.
-
-### Swiss pairing above 8 candidates
-
-Above 8 candidates, `src/orq_arena/tournament/swiss.py::SwissScheduler` replaces the full round-robin with
-score-group Swiss pairing automatically, `len(cfg.candidates) > 8`, no config flag. Swiss pairing
-exists purely to spend match budget efficiently: it consumes each match's **HP-based winner** to
-pair strong candidates against strong candidates sooner, converging the Bradley-Terry estimate in
-fewer matches than random pairing would. The rating computation itself is unaffected, every
-judged round from a Swiss-paired match still goes through the exact same
-`outcomes_from_records → bradley_terry_mle` path as a round-robin match. Swiss changes which
-matches get played; it never changes how a played round is rated.
 
 ## Agreement and bias metrics
 
@@ -277,9 +265,8 @@ Every run is seeded and manifested so its rating can be audited or re-derived af
 
 - **Seeded schedule and prompt slices**: `round_robin_schedule` shuffles the pairing order with
   `random.Random(seed)` (default `seed=42`), and every match's prompt slice is drawn the same
-  way. In round-robin runs every slice is pre-drawn before any match starts, so the schedule
-  stays stable regardless of completion order under concurrency; Swiss runs (above 8 models)
-  draw each round's slices when that round is scheduled.
+  way. Every slice is pre-drawn before any match starts, so the schedule stays stable regardless
+  of completion order under concurrency.
 - **A run manifest, written twice**: `src/orq_arena/tournament/driver.py::_write_manifest` writes
   `<output>.run.json` immediately at tournament start (config hash, prompt hash, roster, judge
   panel, replacement judges, quorum, the installed `evaluatorq` version, `started_at`) and
@@ -347,42 +334,44 @@ works with these models daily may recognize a family's prose style, the same sel
 caveat the jury carries, so prefer raters who don't, and report who rated alongside the
 numbers.
 
-## Measured evidence: what a real 8-model run measured
+## Measured evidence: the committed example run
 
-Everything in this section is not simulated or illustrative, it is what an actual full
-round-robin run over 8 candidates measured against the shipped default config and judge panel
-(recorded in the project's own engineering log, `REFACTOR_PLAN.md`):
+This repository ships a real recorded run at
+[`examples/quickstart/`](https://github.com/orq-ai/orq-arena/tree/master/examples/quickstart),
+so the mechanisms above are not just described, they are demonstrated on committed artifacts you
+can inspect and reproduce yourself. It is a small **4-model, thinking-OFF pool** (a full
+round-robin, `C(4,2) = 6` matches) judged by the shipped 3-judge default panel, chosen to be fast
+and cheap to regenerate rather than to be a rigorous benchmark.
 
-- **28 matches, 140 rounds, 10.7 minutes**, unattended, at concurrency 4, 280 model streams,
-  840 judge calls (140 rounds × the 3-judge default panel × 2 seat orders).
-- **Zero voided rounds.** Every one of the 140 rounds streamed cleanly on both sides; token
-  accounting was complete on all 140.
-- **93% mean agreement across decisively-voted rounds; Fleiss' κ = 0.815** ("almost perfect" on
-  the Landis-Koch scale), when the panel did reach a decisive verdict, it was highly consistent.
-- **48.6% of rounds (68/140) came back inconclusive**: a strikingly high number at first read.
-  Broken down, **59 of those 68 were flip-abstentions** (a judge disagreed with itself across
-  seat orders and correctly sat out) and **9 were true judge splits** (multiple judges
-  decisively disagreeing with each other). Per-judge flip rates on that panel: haiku **30%**,
-  flash-lite **45%**, nano **45%**: with two of three judges flipping on roughly half their
-  rounds, the default `min_successful_judges=2` quorum frequently couldn't be met.
-- **The jury cost roughly 87% of the run's total tokens**: candidates used 8.3k input / 219k
-  output tokens; the judge panel used 1.47M input / 109k output tokens. Two seat orders times a
-  3-judge panel, on every round, adds up fast.
-- **A jury swap held rank correlation at Spearman 0.83** under a different 3-judge candidate
-  panel, even though that panel's own inconclusive rate was *higher* (52.9%) than the original
-  run's. A solo judge, by contrast, measurably was not a substitute: run solo, one judge flipped
-  on 25% of the same rounds and its own ranking correlated with the original at only Spearman
-  0.50.
+> The numbers below are from the committed `examples/quickstart` run. Open
+> `examples/quickstart/battles.report.html` to read them, or regenerate the report from the
+> committed log with `orq-arena report examples/quickstart/battles.jsonl`. To re-run the whole
+> tournament from scratch, use the command in `examples/quickstart/config.yaml`'s header.
 
-**The honest reading of that inconclusive rate:** a cheap 3-judge panel abstains heavily on
-*close* frontier-model pairs, that is what a ~45% flip rate on two of three judges means, and
-the quorum then correctly refuses to force a verdict out of a panel that can't agree with itself.
-What the 93% decisive agreement, 0.815 Fleiss' κ, and 0.83 rejudge Spearman show together is that
-**the panel isn't noisy, it's conservative**: the votes it does cast are highly consistent, and
-the ranking they produce is stable under a jury swap. High abstention on hard pairs is the
-consistency gate doing its job, not evidence the rating is unreliable, but it does mean a cheap
-panel rates on fewer rounds than it judges. Check `rated_rounds` against the total round count in
-your own run's manifest before leaning on a close pairwise gap.
+What the committed run lets you see end to end, on real data:
+
+- **The full pipeline on committed artifacts**: `config.yaml` (the roster and rules),
+  `battles.jsonl` (one row per judged round, both responses and per-judge reconciled votes),
+  `battles.run.json` (the seeded manifest, config/prompt hashes, panel, agreement stats), and the
+  regenerable HTML report. Nothing here is simulated.
+- **The agreement and bias metrics in context**: open the report's jury-behaviour table and the
+  manifest's `mean_agreement` / `fleiss` fields to read how consistently that panel voted and how
+  often each judge flipped between seat orders, then compare `rated_rounds` against the total
+  round count to see how many rounds actually reached the rating.
+- **Jury cost dominance**: the manifest's token totals show how much of a run's spend the panel
+  accounts for (two seat orders times a multi-judge panel, on every round, adds up fast), against
+  the candidates' own token use.
+- **Rank stability under a jury swap**: re-judge the committed log with a different panel
+  (`orq-arena rejudge examples/quickstart/battles.jsonl --judge ...`) and read the Spearman
+  correlation the command prints, the direct test that the ranking is not an artifact of which
+  judges were picked.
+
+**The honest reading:** a cheap multi-judge panel tends to abstain on *close* pairs, and the
+quorum then correctly refuses to force a verdict out of a panel that can't agree with itself. A
+high inconclusive rate is the consistency gate doing its job, not evidence the rating is
+unreliable, but it does mean a cheap panel rates on fewer rounds than it judges. Check
+`rated_rounds` against the total round count in your own run's manifest (the committed example's
+included) before leaning on a close pairwise gap.
 
 ## Current limitations
 

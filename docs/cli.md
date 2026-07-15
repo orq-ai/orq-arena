@@ -9,8 +9,8 @@ every flag, default, and behavior documented below is read directly from it (plu
 [`providers/models_list.py`](https://github.com/orq-ai/orq-arena/blob/master/src/orq_arena/providers/models_list.py) for the two commands
 that delegate to them).
 
-It exposes nine subcommands: [`run`](#run), [`demo`](#demo), [`list-models`](#list-models),
-[`rejudge`](#rejudge), [`jury-compare`](#jury-compare), [`report`](#report),
+It exposes eight subcommands: [`run`](#run), [`demo`](#demo), [`list-models`](#list-models),
+[`rejudge`](#rejudge) (including its [`--compare`](#rejudge-compare) mode), [`report`](#report),
 [`annotate`](#annotate), [`anchor`](#anchor), and [`refresh-models`](#refresh-models). The `cli` group itself defines
 no flags beyond Click's built-in `--help`; there is no `--version` option. Every flag below
 lives on a specific subcommand.
@@ -27,12 +27,11 @@ full `orq_arena.yaml` key reference, see [configuration.md](configuration.md).
 
 | Command | Purpose |
 |---|---|
-| [`run`](#run) | Round-robin (or Swiss, >8 models) benchmark via the orq.ai router: headless by default, HTML report opens at the end, `--tui` for the live show. |
+| [`run`](#run) | Round-robin benchmark via the orq.ai router: headless by default, HTML report opens at the end, `--tui` for the live show. |
 | [`demo`](#demo) | Replay a recorded tournament fixture, zero API calls, zero key. |
 | [`list-models`](#list-models) | Print the configured roster (seed, name, model id). |
-| [`rejudge`](#rejudge) | Re-score a recorded `battles.jsonl` with a different judge panel, zero regeneration. |
+| [`rejudge`](#rejudge) | Re-score a recorded `battles.jsonl` with a different judge panel, zero regeneration; or, with [`--compare`](#rejudge-compare), tabulate saved rejudge reports side by side. |
 | [`report`](#report) | Render the single-file HTML report page from a recorded run; no model calls, one optional catalog read for prices. |
-| [`jury-compare`](#jury-compare) | Tabulate candidate juries from saved rejudge reports, side by side; no API calls. |
 | [`annotate`](#annotate) | Render a blinded human-annotation page from a recorded run; no API calls. |
 | [`anchor`](#anchor) | Merge human vote files back against a run: panel↔human κ + rank correlation; no API calls. |
 | [`refresh-models`](#refresh-models) | Force re-fetch of the 24h workspace model-catalog cache. |
@@ -82,11 +81,13 @@ A few things apply across every subcommand and are only documented once, here:
 
 ## `run`
 
-Run the benchmark (round-robin, or Swiss above 8 models), hits orq.ai. With
+Run the benchmark (a full round-robin over the pool), hits orq.ai. With
 `--config` the run is headless: matches in parallel, plain log lines on pipes, a
 progress bar on terminals, and the HTML report opens in your browser at the end.
 `--tui` runs the same tournament as the live show instead. Without `--config`
 the interactive roster picker opens first, which needs (and implies) the TUI.
+Both `--tui` and the picker require the optional `[tui]` extra (`uv sync --extra tui`);
+without it they print a friendly install hint. The headless run needs no extra.
 
 ```text
 orq-arena run [--config PATH] [--prompts PATH] [--output PATH] [--rounds N]
@@ -97,7 +98,7 @@ orq-arena run [--config PATH] [--prompts PATH] [--output PATH] [--rounds N]
 |---|---|---|
 | `--config PATH` | none, triggers the roster picker (see Behavior below) | Use this YAML roster as-is and skip the interactive picker. |
 | `--prompts PATH` | `prompts/starter.jsonl` | JSONL prompt file, see [Prompts file format](configuration.md#prompts-file-format), or `orq:<dataset_id>` to pull an [orq.ai Dataset](https://docs.orq.ai/docs/ai-studio/optimize/datasets): each datapoint's last user message becomes a prompt, `{{var}}` placeholders filled from its `inputs`; datapoints without a user message are skipped. Uses the same API key as the gateway. Always honored, whether or not `--config` is given. When the prompts come from a Dataset, the run manifest records its id, display name, and studio URL, and the HTML report links the dataset by name. |
-| `--output PATH` | `battles.jsonl` | Where the battle log (schema v2) is written as rounds complete. |
+| `--output PATH` | `battles.jsonl` | Where the battle log (schema v3) is written as rounds complete. |
 | `--rounds N` | `match.max_rounds` from the YAML | Rounds per match. The preflight warns when this samples a subset of your prompts. |
 | `--overwrite` | off | Allow replacing an existing non-empty battle log at `--output`; without it the run refuses rather than erase a recorded run. |
 | `--tui` | off | Watch the live TUI show instead of headless logs. Headless runs use `headless_concurrency` (default `4`, see [configuration.md](configuration.md)) to parallelize matches. |
@@ -150,7 +151,7 @@ orq-arena run [--config PATH] [--prompts PATH] [--output PATH] [--rounds N]
 - **Confirmation.** Unless `--yes`/`-y` is given, the CLI prompts `Proceed?`
   (`click.confirm(..., abort=True)`); declining aborts before any battle or judge calls
   (the thinking probe, when enabled, has already made its one probe stream per model).
-- **Output.** Every judged round is appended to `--output` (`battles.jsonl`, schema v2) as the
+- **Output.** Every judged round is appended to `--output` (`battles.jsonl`, schema v3) as the
   run proceeds, live-run or headless alike.
 
 **Examples:**
@@ -177,7 +178,9 @@ schedules and scores matches.
 
 ## `demo`
 
-Replay a recorded tournament from a fixture file, no API calls, no key required.
+Replay a recorded tournament from a fixture file, no API calls, no key required. `demo`
+renders through the Textual TUI, so it needs the optional `[tui]` extra (`uv sync --extra tui`);
+without it the command prints a friendly install hint instead of a traceback.
 
 ```text
 orq-arena demo [--fixture PATH] [--config PATH]
@@ -261,17 +264,21 @@ uv run orq-arena list-models --config configs/reasoning_arena.yaml
 ## `rejudge`
 
 Re-judge a recorded run with a different panel, zero regeneration. The responses in the
-battle log are already on disk, so swapping the jury costs judge tokens only.
+battle log are already on disk, so swapping the jury costs judge tokens only. `rejudge` has two
+mutually exclusive modes: the default `--judge` mode re-scores a log with a new panel, and
+[`--compare`](#rejudge-compare) tabulates saved rejudge reports side by side (no API calls).
 
 ```text
 orq-arena rejudge [LOG_PATH] --judge MODEL_ID [--judge MODEL_ID ...] [--criteria TEXT]
                   [--config PATH] [--output PATH] [--report-json PATH] [--concurrency N]
+orq-arena rejudge --compare REPORT_JSON [REPORT_JSON ...]
 ```
 
 | Argument / Flag | Default | Effect |
 |---|---|---|
-| `log_path` (positional) | `battles.jsonl` | Recorded battle log to re-judge (schema v2 JSONL). Optional, omit it to re-judge the default log in the current directory. |
-| `--judge MODEL_ID` | none, **required, repeatable** | Router model id for the new panel; pass `--judge` multiple times for a multi-judge panel. Click raises a missing-option error if omitted entirely. |
+| `log_path` (positional) | `battles.jsonl` | Recorded battle log to re-judge (schema v3 JSONL). Optional, omit it to re-judge the default log in the current directory. Ignored in `--compare` mode. |
+| `--judge MODEL_ID` | none, **required unless `--compare`, repeatable** | Router model id for the new panel; pass `--judge` multiple times for a multi-judge panel. Mutually exclusive with `--compare`. |
+| `--compare REPORT_JSON` | none, **repeatable** | Switches to compare mode: tabulate the given saved rejudge report JSONs side by side (see [`rejudge --compare`](#rejudge-compare)). Mutually exclusive with `--judge`; makes no API calls. |
 | `--criteria TEXT` | `cfg.criteria` from `--config` | Override the judging criteria for this rejudge only, doesn't touch the YAML file. |
 | `--config PATH` | `orq_arena.yaml` | Supplies `gateway`, and (unless overridden) `criteria`, `replacement_judges`, and `min_successful_judges`. |
 | `--output PATH` | none, result only printed | Write the re-judged rounds to this JSONL path. |
@@ -345,14 +352,15 @@ uv run orq-arena rejudge my_battles.jsonl --judge openai/gpt-5.4-nano --concurre
 
 ---
 
-## `jury-compare`
+## `rejudge --compare`
 
-Compare candidate juries over the same recorded log. The selection loop: run once, then for
-each candidate panel `rejudge <log> --judge ... --report-json candidate.json` (judge tokens
-only), then compare the saved reports. Makes no API calls.
+Compare candidate juries over the same recorded log, a mode of [`rejudge`](#rejudge) selected by
+passing `--compare` instead of `--judge`. The selection loop: run once, then for each candidate
+panel `rejudge <log> --judge ... --report-json candidate.json` (judge tokens only), then compare
+the saved reports with `rejudge --compare`. Makes no API calls.
 
 ```text
-orq-arena jury-compare REPORT_JSON [REPORT_JSON ...]
+orq-arena rejudge --compare REPORT_JSON [REPORT_JSON ...]
 ```
 
 Columns per candidate: Spearman vs the recorded ranking (does the ranking depend on this
@@ -364,7 +372,7 @@ which jury is *right* needs gold pairs or a human anchor (see [`annotate`](#anno
 uv run orq-arena rejudge battles.jsonl --judge openai/gpt-5.1 --report-json solo.json
 uv run orq-arena rejudge battles.jsonl --judge anthropic/claude-haiku-4-5-20251001 \
   --judge openai/gpt-5.1 --report-json panel.json
-uv run orq-arena jury-compare solo.json panel.json
+uv run orq-arena rejudge --compare solo.json panel.json
 ```
 
 ## `report`

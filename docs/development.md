@@ -27,19 +27,27 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 ```bash
 git clone https://github.com/orq-ai/orq-arena.git
 cd orq-arena
-uv sync
+uv sync --extra tui
 ```
 
-`uv sync` installs the runtime dependencies (`textual`, `click`, `pydantic`, `pyyaml`, `openai`,
+`textual` is an **optional extra** for end users (`[project.optional-dependencies]`
+`tui = ["textual>=0.83"]`), not a core runtime dependency: a plain `pip install orq-arena` runs
+the benchmark, report, and rejudge without it. Contributors need it, though: the headless render
+tests import `textual` and the live TUI is part of the surface you're changing. `uv sync --extra
+tui` is the explicit, self-documenting way to get it.
+
+`uv sync` installs the core runtime dependencies (`click`, `pydantic`, `pyyaml`, `openai`,
 `httpx`, `evaluatorq`, `[project.dependencies]` in `pyproject.toml`) plus everything in the
-**`dev` dependency group** (`[dependency-groups]`, PEP 735 groups, not a `[project.optional-dependencies]`
-extra): `pytest>=8`, `pytest-asyncio>=0.23`, `textual-dev>=1.6`. uv includes the `dev` group by
-default, so there's no separate `--extra`/`--group` flag to remember for local setup. Installing
-also registers the **`orq-arena`** console script (`[project.scripts]` → `orq_arena.cli:cli`),
-which is the entry point used throughout this guide.
+**`dev` dependency group** (`[dependency-groups]`, PEP 735 groups, not a
+`[project.optional-dependencies]` extra): `pytest>=8`, `pytest-asyncio>=0.23`, and both
+`textual>=0.83` and `textual-dev>=1.6`. Because the `dev` group already carries `textual`, a
+default `uv sync` (dev included) also has what the render tests need; passing `--extra tui` on top
+just makes the TUI dependency explicit rather than relying on the dev group. Installing also
+registers the **`orq-arena`** console script (`[project.scripts]` → `orq_arena.cli:cli`), the
+entry point used throughout this guide.
 
 CI installs the same way with `uv sync --frozen`, which fails instead of silently updating
-`uv.lock` if it's out of date.
+`uv.lock` if it's out of date (the `dev` group's `textual` is what lets CI's render tests run).
 
 For the fork/clone/verify walkthrough (including the zero-cost sanity checks), see
 ["Development setup" in CONTRIBUTING.md](https://github.com/orq-ai/orq-arena/blob/master/CONTRIBUTING.md#development-setup), the notes above
@@ -68,7 +76,7 @@ single one-way event queue. Core packages import zero `textual` today:
 
 | Layer | Packages | Role |
 |---|---|---|
-| Core | `cli.py`, `config.py`, `events.py`, `preflight.py`, `rejudge.py`, `anchor.py`, `report.py`, `headless.py`, `orcs/`, `providers/`, `tournament/`, `arena/`, `data/`, `analysis/` | Schedules matches, streams both sides, invokes the evaluatorq jury, scores damage, computes ELO/CIs/κ, the benchmark itself. |
+| Core | `cli.py`, `config.py`, `events.py`, `preflight.py`, `rejudge.py`, `anchor.py`, `report.py`, `headless.py`, `roster.py`, `providers/`, `tournament/`, `arena/`, `data/`, `analysis/` | Schedules matches, streams both sides, invokes the evaluatorq jury, resolves matches by judged round wins, computes ELO/CIs/κ, the benchmark itself. |
 | Presentation | `tui/` (`app.py`, `screens/`, `widgets/`) | The only package that imports `textual`. Renders the CRT-neon show; a pure consumer. |
 
 The seam between them is [`events.py`](https://github.com/orq-ai/orq-arena/blob/master/src/orq_arena/events.py)`::ArenaEvent`, a pydantic
@@ -184,8 +192,8 @@ builds a `BattleBrowserScreen` from real (or synthetic, if no fixture log is on 
 
 > **Textual pitfall, never name a widget method `_render`.** Textual's own `Widget`/`Static`
 > machinery uses that name internally; shadowing it with a method of your own has crashed this app
-> twice (`REFACTOR_PLAN.md`'s fix log: "Textual 8.x `_render` shadowing (×2, second caught by the
-> render test)"). `tests/test_browser_render.py` exists specifically to catch this class of
+> twice (the second time caught only by a render test, per the `tests/test_fight_render.py`
+> docstring). `tests/test_browser_render.py` exists specifically to catch this class of
 > regression, when you add a widget with custom render logic, give it a headless `run_test()`
 > pilot test rather than trusting it visually.
 
@@ -197,7 +205,7 @@ builds a `BattleBrowserScreen` from real (or synthetic, if no fixture log is on 
   pre-commit, no Makefile. The only automated gate is the test suite
   (`uv run pytest -q` in CI). Match what's already there: `from __future__ import annotations` at
   the top of most modules, `@dataclass` for lightweight internal data (`preflight.py`,
-  `arena/battle.py`, `arena/damage.py`, `tournament/swiss.py`, `providers/models_list.py`,
+  `arena/battle.py`, `providers/models_list.py`,
   `data/prompts.py`), pydantic `BaseModel` for anything validated at a boundary, config, events,
   schemas, roster (`config.py`, `events.py`, `data/schemas.py`, `roster.py`,
   `analysis/postmortem.py`), and `async`/`await` through the tournament/battle/gateway path.
@@ -207,8 +215,9 @@ builds a `BattleBrowserScreen` from real (or synthetic, if no fixture log is on 
 - **Methodology invariants need a plan-level discussion first.** Judging, rating, or void-policy
   changes touch the numbers the README calls defensible. See
   ["Design invariants worth knowing" in docs/architecture.md](architecture.md#design-invariants-worth-knowing)
-  for what's currently load-bearing (round-robin/Swiss sizing, the jury quorum, unanimous-vs-majority
-  damage, the read-gap-only timeout, the one-way event queue) before changing any of it,
+  for what's currently load-bearing (the full round-robin schedule, the round-wins match winner
+  with HP living only in the TUI, the jury quorum, the read-gap-only timeout, the one-way event
+  queue) before changing any of it,
   ["Making changes" in CONTRIBUTING.md](https://github.com/orq-ai/orq-arena/blob/master/CONTRIBUTING.md#making-changes) is the process pointer.
 - **No secrets in the repo.** `.env` is gitignored; `.env.example` is the committed template. See
   ["Never commit secrets" in CONTRIBUTING.md](https://github.com/orq-ai/orq-arena/blob/master/CONTRIBUTING.md#never-commit-secrets).

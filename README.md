@@ -29,11 +29,13 @@ orq-arena is that missing layer. It runs a round-robin over any pool of models r
 
 - **A defensible ranking**: pairwise judging in both seat orders, per-round Bradley-Terry with ties, bootstrap 95% CIs, Fleiss'/Cohen's κ, and a seeded manifest per run.
 - **A report you can forward**: every run ends with a self-contained HTML page: a plain-words verdict, the ELO ladder with error bars, an ELO-vs-cost value map, speed, token and dollar accounting.
-- **Real benchmark data out the back**: every round lands in `battles.jsonl` (schema v2) with both responses, reconciled per-judge votes, exact token/reasoning-token usage, per-response timing.
+- **Real benchmark data out the back**: every round lands in `battles.jsonl` (schema v3) with both responses, reconciled per-judge votes, exact token/reasoning-token usage, per-response timing.
 - **Headless by default**: plain log lines on pipes, a progress bar on terminals, matches in parallel; drop it in CI or cron as-is.
 - **Jury swaps without regeneration**: re-judge any recorded run with a different panel and get a rank-stability answer (Spearman).
-- **A human anchor in one file**: `annotate` renders any recorded run into a blind browser page (no names, no jury votes, seeded side swaps); send it to raters, feed their `votes.json` to `anchor`, and get panel-vs-human κ plus rank correlation.
-- **A live show when you want one**: `--tui` streams the same run as a CRT-neon arena: side-by-side responses, judge cards calling out position-biased votes, HP drama. `orq-arena demo` replays one with no API key.
+- **A human anchor in one file**: `annotate` renders any recorded run into a blind browser page (no names, no jury votes, seeded side swaps); send it to raters, feed their `votes.json` to `anchor`, and get panel-vs-human κ plus rank correlation. (This is the mechanism; no anchor study has been published against orq-arena yet, see [Methodology](docs/methodology.md#current-limitations).)
+- **A live show when you want one**: `--tui` (the optional `[tui]` extra) streams the same run as a CRT-neon arena: side-by-side responses, judge cards calling out position-biased votes, HP drama. `orq-arena demo` replays one with no API key.
+
+A committed example run lives at [`examples/quickstart/`](examples/quickstart/) (a small 4-model, thinking-OFF pool): inspect `examples/quickstart/battles.jsonl` and its manifest, and regenerate the HTML report with `uv run orq-arena report examples/quickstart/battles.jsonl`.
 
 ## Installation
 
@@ -45,6 +47,11 @@ cd orq-arena
 uv sync
 ```
 
+`uv sync` (or `pip install orq-arena`) installs the core: the benchmark, the HTML report, and
+`rejudge` all run on this. The live `--tui` show, the interactive roster picker (the no-`--config`
+path), and `orq-arena demo` need the optional `tui` extra: `uv sync --extra tui` (or
+`pip install "orq-arena[tui]"`). Without it those commands print a friendly install hint.
+
 ## Quick start
 
 1. Get an API key from your [orq.ai](https://my.orq.ai) workspace: `cp .env.example .env`, then fill in `ORQ_API_KEY` (loaded automatically).
@@ -54,7 +61,12 @@ uv sync
 uv run orq-arena run --config orq_arena.yaml --prompts your_prompts.jsonl
 ```
 
-The preflight prints exact call counts and a spend ceiling, asks once, then matches run in parallel with plain log lines. When the last round lands, the **HTML report opens in your browser** (`--no-open` to skip, `--yes` to skip the pause; both make it CI-ready).
+The preflight prints exact call counts and a spend ceiling, asks once, then matches run in parallel with plain log lines. When the last round lands, the **HTML report opens in your browser** (`--no-open` to skip, `--yes`/`-y` to skip the pause; both make it CI-ready). For CI or cron, pass `-y`: the confirmation prompt aborts on EOF in a non-interactive shell, so it is required there.
+
+```bash
+# CI/cron-ready: no confirmation pause, no browser
+uv run orq-arena run --config orq_arena.yaml --prompts your_prompts.jsonl -y --no-open
+```
 
 Bring your prompts either way:
 
@@ -124,7 +136,7 @@ Full guides live at **[orq-ai.github.io/orq-arena](https://orq-ai.github.io/orq-
 | Guide | Description |
 |-------|-------------|
 | [Getting Started](docs/getting-started.md) | Prerequisites, install, first live run, common setup issues |
-| [CLI Reference](docs/cli.md) | Every command and flag, `run`, `demo`, `rejudge`, `jury-compare`, `report`, `annotate`, `anchor`, `list-models`, `refresh-models` |
+| [CLI Reference](docs/cli.md) | Every command and flag, `run`, `demo`, `rejudge` (with `--compare`), `report`, `annotate`, `anchor`, `list-models`, `refresh-models` |
 | [Configuration](docs/configuration.md) | Every `orq_arena.yaml` key, reasoning recipes, defaults |
 | [Methodology](docs/methodology.md) | Bradley-Terry scoring, bias controls, confidence intervals, reproducibility |
 | [Architecture](docs/architecture.md) | Component overview, data flow, key abstractions |

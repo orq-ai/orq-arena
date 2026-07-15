@@ -49,11 +49,23 @@ cd orq-arena
 uv sync
 ```
 
-`uv sync` creates a `.venv` and installs orq-arena plus its dependencies (`textual`, `click`,
+`uv sync` creates a `.venv` and installs orq-arena plus its core dependencies (`click`,
 `pydantic`, `pyyaml`, `openai`, `httpx`, `evaluatorq`) resolved against `uv.lock`. This
 registers the **`orq-arena`** console script (entry point `orq_arena.cli:cli` in
 `pyproject.toml`'s `[project.scripts]`), every command below is run through `uv run` so this
 is the only setup step.
+
+The core install runs the benchmark, the HTML report, and `rejudge`. The Textual live show,
+though, is an **optional extra**: the interactive roster picker (the no-`--config` path), the
+`--tui` live run, and `orq-arena demo` need `textual`, which is not in the core dependencies.
+Add it with:
+
+```bash
+uv sync --extra tui
+```
+
+Without the extra, those three commands print a friendly install hint instead of running. If
+you only intend to run headless benchmarks (with `--config`), the plain `uv sync` is enough.
 
 ---
 
@@ -68,10 +80,12 @@ voting, from `fixtures/demo_tournament.json` through the exact same TUI screens 
 uses: streaming responses, judge verdicts, HP drama, and the final leaderboard. No network
 calls, no API key. Press `q` to quit, `s` to save a screenshot.
 
-`demo` still loads `orq_arena.yaml` (only for cosmetic labels like the judge names in the
-fight-screen header), it ships in the repo, so this works immediately after `uv sync` with no
-edits needed. `demo` also takes `--fixture` and `--config` if you want to point it elsewhere;
-see [cli.md](cli.md).
+`demo` renders through the Textual TUI, so it needs the optional `[tui]` extra
+(`uv sync --extra tui`, see [1. Install](#1-install)); without it the command prints a friendly
+install hint. `demo` still loads `orq_arena.yaml` (only for cosmetic labels like the judge names
+in the fight-screen header), it ships in the repo, so this works immediately after
+`uv sync --extra tui` with no edits needed. `demo` also takes `--fixture` and `--config` if you
+want to point it elsewhere; see [cli.md](cli.md).
 
 ---
 
@@ -106,7 +120,9 @@ existing cache, else an empty list (the YAML-roster fallback belongs to `run`'s 
 uv run orq-arena run
 ```
 
-Without `--config`, this opens the roster picker over your workspace-enabled model catalog:
+Without `--config`, this opens the roster picker over your workspace-enabled model catalog (the
+picker is part of the live TUI, so it needs the optional `[tui]` extra, `uv sync --extra tui`;
+without it `orq-arena run` with no `--config` prints an install hint):
 
 1. **Pick your pool.** The picker fetches your workspace's chat-capable models (cached 24h at
    `~/.cache/orq-arena/models.json`) into a searchable, provider-filterable list. Toggle
@@ -118,10 +134,9 @@ Without `--config`, this opens the roster picker over your workspace-enabled mod
    the single word: ok") to catch vendor-default thinking that contradicts your config. If a
    model reasons despite being configured off, you'll see a toast:
    `🧠 thinks despite config: ..., ranking will be footnoted`.
-3. **The fight.** Every pair of candidates meets once (round-robin up to 8 candidates; Swiss
-   pairing engages automatically above that, never a flag you set). For each prompt, both
-   candidates stream side by side, the jury votes in both seat orders, HP drops, and the round
-   is logged.
+3. **The fight.** Every pair of candidates meets once (a full round-robin over the pool). For
+   each prompt, both candidates stream side by side, the jury votes in both seat orders, HP
+   drops on the TUI health bars, and the round is logged.
 4. **The leaderboard.** Once every match finishes, the final Bradley-Terry ELO leaderboard
    opens with bootstrap 95% CIs. Press `B` to browse every judged round (prompt, both
    responses, per-judge votes with flip badges), `M` to generate per-model coach notes, `S` to
@@ -163,9 +178,10 @@ from your workspace, same API key.
 With `--config` the run is headless by default: matches run in parallel under
 `headless_concurrency` (default 4) through a Rich one-liner printer, and the HTML report
 opens in your browser when the run ends (`--no-open` to skip; it never opens in CI). Pass
-`--tui` to watch the live Textual show instead. Without `--config` the roster picker opens,
-which needs the TUI. Full flag reference for `run` and every other subcommand (`demo`, `rejudge`, `jury-compare`, `report`, `annotate`, `anchor`, `list-models`,
-`refresh-models`): **[cli.md](cli.md)**.
+`--tui` to watch the live Textual show instead (it needs the optional `[tui]` extra,
+`uv sync --extra tui`). Without `--config` the roster picker opens, which needs that same extra.
+Full flag reference for `run` and every other subcommand (`demo`, `rejudge` with `--compare`,
+`report`, `annotate`, `anchor`, `list-models`, `refresh-models`): **[cli.md](cli.md)**.
 
 ---
 
@@ -176,7 +192,7 @@ directory by default:
 
 | File | Contents |
 |---|---|
-| `battles.jsonl` | One JSON line per judged (or voided) round, `BattleRecord`, schema v2: both responses, reconciled per-judge votes, token/TTFT accounting, HP before/after. |
+| `battles.jsonl` | One JSON line per judged (or voided) round, `BattleRecord`, schema v3: both responses, reconciled per-judge votes, token/TTFT accounting. (v3 drops the old HP/damage columns, HP is now a TUI-only presentation.) |
 | `battles.run.json` | The run manifest, written next to the log, config/prompt hashes, roster, judge panel, seed, and (once finished) agreement stats. |
 | `battles.report.html` | A single-file HTML report, no server, no external assets. The verdict banner leads with the top 3 models (win rate, ELO score, total cost); a value map plots ELO against cost per model on a log scale; a Speed section (tokens per second, time to first token) appears whenever the log carries per-side durations. Runs sourced from an orq.ai Dataset (`--prompts orq:<dataset_id>`) link the dataset by name in the report. |
 

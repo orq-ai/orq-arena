@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>orq-arena report &middot; tour-1784139842</title>
+<style>
+:root {
+  color-scheme: light;
+  /* orq.ai brand palette (Brand Guidelines v1.0), same tokens as the
+     Model-Router-Auto-Evaluation dashboard: warm beige neutrals, Pulse
+     Orange accent, Incognito Black ink. A/B side colors stay functional. */
+  --brand: #DF5325;
+  --ink:#141319; --a:#c8189e; --b:#0092ab;
+  --paper: oklch(0.966 0.008 83); --card: oklch(0.992 0.005 83);
+  --line: oklch(0.885 0.011 83);
+  --teal: #141319; --teal-soft: oklch(0.50 0.13 158); --muted: oklch(0.535 0.013 83);
+  --good: oklch(0.50 0.13 158); --warn: oklch(0.55 0.12 75);
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--sans);
+       line-height: 1.55; -webkit-font-smoothing: antialiased; }
+.wrap { max-width: 960px; margin: 0 auto; padding: 0 24px 72px; }
+header { display: flex; align-items: center; gap: 10px; padding: 26px 0 14px;
+         border-bottom: 2px solid var(--ink); color: var(--ink); }
+header .brand { font-weight: 700; font-size: 17px; letter-spacing: -0.3px; }
+header .kind { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+h1 { font-size: 30px; line-height: 1.15; margin: 26px 0 4px; letter-spacing: -0.5px; }
+h2 { font-size: 17px; margin: 40px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+.sub { color: var(--muted); font-family: var(--mono); font-size: 12.5px; }
+.sub a { color: var(--brand); text-decoration: none; }
+.sub a:hover { text-decoration: underline; }
+.badges { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 4px; }
+.badge { font-family: var(--mono); font-size: 12px; padding: 3px 10px; border-radius: 20px;
+         border: 1px solid var(--line); background: var(--card); }
+.badge b { font-weight: 600; }
+.badge.good { border-color: #b5cba3; background: #eef4e6; color: var(--good); }
+.badge.warn { border-color: #e0c98d; background: #f8efd9; color: var(--warn); }
+.verdict { background: oklch(0.945 0.012 83); border: 1px solid var(--line);
+  border-radius: 14px; padding: 26px 30px 22px; margin: 26px 0 12px;
+  --state: var(--good); }
+.verdict.tied { --state: var(--warn); }
+.verdict .eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--state); font-weight: 600; margin: 0 0 10px; }
+.verdict h1 { margin: 0 0 10px; font-size: 27px; line-height: 1.25; letter-spacing: -0.02em; }
+.verdict .expl { color: var(--muted); font-size: 13.5px; max-width: 64ch; margin: 0 0 18px; }
+.verdict .kpis { display: flex; gap: 44px; border-top: 1px solid var(--line); padding-top: 16px; }
+.verdict .kpi > b { display: block; font-size: 34px; font-weight: 700; letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums; color: var(--ink); }
+.verdict .kpi.state > b { color: var(--state); }
+.verdict .kpi span { font-size: 12px; color: var(--muted); }
+.verdict .kpi span.stat { display: block; margin-top: 4px; }
+.verdict .kpi span b { font-size: 16px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.verdict .kpi span.lead b { font-size: 23px; letter-spacing: -0.02em; }
+.verdict .kpi.state span.lead b { color: var(--state); }
+.verdict .kpi > b.name-kpi { font-size: 26px; line-height: 1.15; padding-top: 5px; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px;
+        font-variant-numeric: tabular-nums; }
+th { text-align: left; font-family: var(--mono); font-size: 10.5px; text-transform: uppercase;
+     letter-spacing: 0.08em; color: var(--muted); padding: 6px 10px;
+     border-bottom: 1.5px solid var(--line); }
+td { padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+td.n, th.n { text-align: right; font-family: var(--mono); white-space: nowrap; }
+.tablewrap { overflow-x: auto; background: var(--card); border: 1px solid var(--line);
+             border-radius: 10px; padding: 4px 8px 8px; }
+.ci-track { position: relative; height: 8px; background: #efece3; border-radius: 4px; min-width: 160px; }
+.ci-range { position: absolute; top: 0; height: 8px; background: #cfe3da; border-radius: 4px; }
+.ci-dot { position: absolute; top: -2px; width: 4px; height: 12px; border-radius: 2px; background: var(--teal-soft); }
+.name { font-weight: 600; white-space: nowrap; }
+.think { font-size: 11px; color: var(--muted); }
+.grid td, .grid th { text-align: center; padding: 6px 6px; }
+.grid td.rowname { text-align: left; font-weight: 600; white-space: nowrap; }
+.foot { margin-top: 48px; padding-top: 14px; border-top: 2px solid var(--line);
+        font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+.foot code { background: #f0ede4; padding: 1px 5px; border-radius: 3px; }
+.note { font-size: 12.5px; color: var(--muted); margin: 8px 2px; }
+.sideA { color: var(--a); font-weight: 600; } .sideB { color: var(--b); font-weight: 600; }
+@media (max-width: 640px) { h1 { font-size: 24px; } }
+</style></head><body><div class="wrap">
+
+<header><svg viewBox="14 3 86 94" width="22" height="22" aria-hidden="true"><g fill="currentColor"><path d="M83.5914 27.8049C83.5914 30.8783 83.5914 32.4151 82.9932 33.589C82.4671 34.6216 81.6276 35.4611 80.595 35.9872C79.4211 36.5854 77.8843 36.5854 74.8109 36.5854H72.8597C69.7862 36.5854 68.2495 36.5854 67.0756 35.9872C66.043 35.4611 65.2035 34.6216 64.6773 33.589C64.0792 32.4151 64.0792 30.8783 64.0792 27.8049V25.6098C64.0792 22.7662 64.0792 21.3444 63.565 20.2417C63.0198 19.0724 62.0799 18.1326 60.9106 17.5873C59.808 17.0732 58.3862 17.0732 55.5426 17.0732C52.699 17.0732 51.2772 17.0732 50.1746 16.559C49.0053 16.0137 48.0654 15.0739 47.5202 13.9046C47.006 12.802 47.006 11.3802 47.006 8.53659C47.006 5.69299 47.006 4.27119 47.5202 3.16856C48.0654 1.99924 49.0053 1.05943 50.1746 0.514165C51.2772 0 52.7091 0 55.573 0C58.4368 0 59.8687 0 60.9714 0.514165C62.1407 1.05943 63.0805 1.99924 63.6258 3.16856C64.1399 4.27119 64.1399 5.69299 64.1399 8.53659C64.1399 11.3802 64.1399 12.802 64.6541 13.9046C65.1994 15.0739 66.1392 16.0137 67.3085 16.559C68.4111 17.0732 69.8329 17.0732 72.6765 17.0732H74.8109C77.8843 17.0732 79.4211 17.0732 80.595 17.6713C81.6276 18.1974 82.4671 19.037 82.9932 20.0696C83.5914 21.2435 83.5914 22.7802 83.5914 25.8537V27.8049Z"/><path d="M28.4694 17.0732C31.5429 17.0732 33.0796 17.0732 34.2535 17.6713C35.2861 18.1974 36.1256 19.037 36.6518 20.0696C37.2499 21.2435 37.2499 22.7802 37.2499 25.8537V27.8049C37.2499 30.8783 37.2499 32.4151 36.6518 33.589C36.1256 34.6216 35.2861 35.4611 34.2535 35.9872C33.0796 36.5854 31.5429 36.5854 28.4694 36.5854H26.2743C23.4307 36.5854 22.0089 36.5854 20.9063 37.0995C19.737 37.6448 18.7971 38.5846 18.2519 39.7539C17.7377 40.8566 17.7377 42.2784 17.7377 45.122C17.7377 47.9656 17.7377 49.3873 17.2236 50.49C16.6783 51.6593 15.7385 52.5991 14.5692 53.1444C13.4665 53.6585 12.0447 53.6585 9.20114 53.6585C6.35754 53.6585 4.93574 53.6585 3.83311 53.1444C2.66379 52.5991 1.72398 51.6593 1.17872 50.49C0.664551 49.3873 0.664551 47.9554 0.664551 45.0916C0.664551 42.2277 0.664551 40.7958 1.17872 39.6932C1.72398 38.5239 2.66379 37.5841 3.83311 37.0388C4.93574 36.5246 6.35754 36.5246 9.20114 36.5246C12.0447 36.5246 13.4665 36.5246 14.5692 36.0105C15.7385 35.4652 16.6783 34.5254 17.2236 33.3561C17.7377 32.2534 17.7377 30.8316 17.7377 27.988V25.8537C17.7377 22.7802 17.7377 21.2435 18.3359 20.0696C18.862 19.037 19.7015 18.1974 20.7341 17.6713C21.908 17.0732 23.4448 17.0732 26.5182 17.0732H28.4694Z"/><path d="M37.2499 91.4634C37.2499 88.6198 37.2499 87.198 36.7357 86.0954C36.1905 84.9261 35.2507 83.9863 34.0814 83.441C32.9787 82.9268 31.5569 82.9268 28.7133 82.9268H26.5182C23.4448 82.9268 21.908 82.9268 20.7341 82.3287C19.7015 81.8026 18.862 80.963 18.3359 79.9304C17.7377 78.7565 17.7377 77.2198 17.7377 74.1463V72.1951C17.7377 69.1217 17.7377 67.5849 18.3359 66.411C18.862 65.3784 19.7015 64.5389 20.7341 64.0128C21.908 63.4146 23.4447 63.4146 26.5182 63.4146L28.4694 63.4146C31.5429 63.4146 33.0796 63.4146 34.2535 64.0128C35.2861 64.5389 36.1256 65.3784 36.6518 66.411C37.2499 67.5849 37.2499 69.1217 37.2499 72.1951V74.3295C37.2499 77.1731 37.2499 78.5949 37.7641 79.6975C38.3093 80.8669 39.2492 81.8067 40.4185 82.3519C41.5211 82.8661 42.9429 82.8661 45.7865 82.8661C48.6301 82.8661 50.0519 82.8661 51.1545 83.3803C52.3238 83.9255 53.2637 84.8653 53.8089 86.0347C54.3231 87.1373 54.3231 88.5692 54.3231 91.433C54.3231 94.2969 54.3231 95.7288 53.8089 96.8314C53.2637 98.0008 52.3238 98.9406 51.1545 99.4858C50.0519 100 48.6301 100 45.7865 100C42.9429 100 41.5211 100 40.4185 99.4858C39.2492 98.9406 38.3093 98.0008 37.7641 96.8315C37.2499 95.7288 37.2499 94.307 37.2499 91.4634Z"/><path d="M72.8597 82.9268C69.7862 82.9268 68.2495 82.9268 67.0756 82.3287C66.043 81.8026 65.2035 80.963 64.6773 79.9304C64.0792 78.7565 64.0792 77.2198 64.0792 74.1463V72.1951C64.0792 69.1217 64.0792 67.5849 64.6773 66.411C65.2035 65.3784 66.043 64.5389 67.0756 64.0128C68.2495 63.4146 69.7862 63.4146 72.8597 63.4146H75.0548C77.8984 63.4146 79.3202 63.4146 80.4228 62.9005C81.5921 62.3552 82.532 61.4154 83.0772 60.2461C83.5914 59.1434 83.5914 57.7217 83.5914 54.8781C83.5914 52.0345 83.5914 50.6127 84.1055 49.51C84.6508 48.3407 85.5906 47.4009 86.7599 46.8556C87.8626 46.3415 89.2844 46.3415 92.128 46.3415C94.9716 46.3415 96.3934 46.3415 97.496 46.8556C98.6653 47.4009 99.6051 48.3407 100.15 49.51C100.665 50.6127 100.665 52.0446 100.665 54.9084C100.665 57.7723 100.665 59.2042 100.15 60.3068C99.6051 61.4761 98.6653 62.4159 97.496 62.9612C96.3934 63.4754 94.9716 63.4754 92.128 63.4754C89.2844 63.4754 87.8626 63.4754 86.7599 63.9895C85.5906 64.5348 84.6508 65.4746 84.1055 66.6439C83.5914 67.7466 83.5914 69.1684 83.5914 72.012V74.1463C83.5914 77.2198 83.5914 78.7565 82.9932 79.9304C82.4671 80.963 81.6276 81.8026 80.595 82.3287C79.4211 82.9268 77.8844 82.9268 74.8109 82.9268H72.8597Z"/><path d="M50.6645 58.5366C48.1085 58.5366 46.8305 58.5366 45.8149 58.1403C44.3062 57.5516 43.1129 56.3583 42.5242 54.8496C42.1279 53.834 42.1279 52.556 42.1279 50C42.1279 47.444 42.1279 46.166 42.5242 45.1504C43.1129 43.6417 44.3062 42.4484 45.8149 41.8597C46.8305 41.4634 48.1085 41.4634 50.6645 41.4634C53.2205 41.4634 54.4985 41.4634 55.5141 41.8597C57.0228 42.4484 58.2161 43.6417 58.8048 45.1504C59.2011 46.166 59.2011 47.444 59.2011 50C59.2011 52.556 59.2011 53.834 58.8048 54.8496C58.2161 56.3583 57.0228 57.5516 55.5141 58.1403C54.4985 58.5366 53.2205 58.5366 50.6645 58.5366Z"/></g></svg><span class="brand">orq.ai</span><span class="kind">4 MODELS &middot; 30 ROUNDS &middot; 3.5 MIN &middot; ORQ-ARENA RUN</span></header>
+
+<div class='verdict tied'><p class='eyebrow'>&#9888; STATISTICAL TIE AT THE TOP</p><h1>gemini-3.5-flash leads, but claude-sonnet-4-6 is statistically tied: decide on cost and speed.</h1><p class='expl'>gemini-3.5-flash has the best rating, but at 30 rounds the gap to claude-sonnet-4-6 is inside the error bars. The value map below is the tie-breaker; more rounds would separate them.</p><div class='kpis'><div class='kpi state'><b class='name-kpi'>&#129351; gemini-3.5-flash</b><span class='stat lead'><b>88%</b> win rate</span><span class='stat'><b>1572</b> ELO score</span><span class='stat'><b>$0.14</b> total cost</span></div><div class='kpi'><b class='name-kpi'>&#129352; claude-sonnet-4-6</b><span class='stat lead'><b>90%</b> win rate</span><span class='stat'><b>1572</b> ELO score</span><span class='stat'><b>$0.23</b> total cost</span></div><div class='kpi'><b class='name-kpi'>&#129353; gpt-5.4-mini</b><span class='stat lead'><b>20%</b> win rate</span><span class='stat'><b>489</b> ELO score</span><span class='stat'><b>$0.046</b> total cost</span></div></div></div>
+<p class="sub">4 models &middot; tour-1784139842 &middot; 2026-07-15 20:24
+ &middot; 3.5 min &middot; 30 rounds
+(19 rated &middot; 11 inconclusive &middot; 0 voided)</p>
+
+<div class="badges">
+  <span class="badge warn">CI overlap: claude-sonnet-4-6 is statistically indistinguishable at this sample size</span>
+  <span class="badge warn">judge/contestant family overlap: anthropic/claude-haiku-4-5-20251001, google/gemini-2.5-flash-lite, openai/gpt-5.4-nano &mdash; self-preference bias is not corrected by seat swapping</span>
+  <span class="badge">Fleiss&#39; &kappa; <b>1.0</b> (almost perfect) over 8/30 full-panel rounds</span>
+  <span class="badge">jury length coefficient <b>+2.33</b> (leaned longer; len-ctrl column prices it out)</span>
+  <span class="badge">decisive-vote agreement <b>95%</b></span>
+  <span class="badge">jury share of tokens <b>88%</b></span>
+</div>
+
+<h2>Leaderboard</h2>
+<div class="tablewrap"><table>
+<thead><tr><th class="n">#</th><th>Model</th><th class="n">ELO</th><th class="n">95% CI</th>
+<th>CI range (shared scale)</th><th class='n'>len-ctrl</th><th class="n">avg out tok</th></tr></thead>
+<tbody><tr><td class='n'>1</td><td class='name'>gemini-3.5-flash</td><td class='n'>1572</td><td class='n'>1259&ndash;5000</td><td title='1259 to 5000'><div class="ci-track"><div class="ci-range" style="left:65.2%;width:34.8%"></div><div class="ci-dot" style="left:81.6%"></div></div></td><td class='n'>1301</td><td class='n'>1003</td></tr><tr><td class='n'>2</td><td class='name'>claude-sonnet-4-6</td><td class='n'>1572</td><td class='n'>1238&ndash;4803</td><td title='1238 to 4803'><div class="ci-track"><div class="ci-range" style="left:64.1%;width:35.9%"></div><div class="ci-dot" style="left:81.6%"></div></div></td><td class='n'>1371</td><td class='n'>1011</td></tr><tr><td class='n'>3</td><td class='name'>gpt-5.4-mini</td><td class='n'>489</td><td class='n'>-3000&ndash;1810</td><td title='-3000 to 1810'><div class="ci-track"><div class="ci-range" style="left:0.0%;width:94.1%"></div><div class="ci-dot" style="left:24.8%"></div></div></td><td class='n'>717</td><td class='n'>674</td></tr><tr><td class='n'>4</td><td class='name'>mistral-medium-2604</td><td class='n'>367</td><td class='n'>-3000&ndash;1686</td><td title='-3000 to 1686'><div class="ci-track"><div class="ci-range" style="left:0.0%;width:87.6%"></div><div class="ci-dot" style="left:18.4%"></div></div></td><td class='n'>611</td><td class='n'>733</td></tr></tbody></table></div>
+<p class="note">Bradley-Terry MLE over every rated round (wins and ties), anchored at a
+1000-point mean; intervals are 200-iteration bootstrap percentiles. Overlapping intervals are
+the honest output on a run this size. The len-ctrl column refits the rating with the jury&#39;s length preference priced out; a large raw-vs-len-ctrl gap means verbosity, not quality, is doing the separating.</p>
+
+
+<h2>Value map</h2>
+<div class="tablewrap">
+<svg viewBox="0 0 720 310" width="100%" role="img" aria-label="ELO vs cost">
+<line x1="70" y1="250" x2="680" y2="250" stroke="var(--line)"/>
+<line x1="70" y1="30" x2="70" y2="250" stroke="var(--line)"/>
+<text x="62" y="20" font-size="10" fill="var(--muted)" text-anchor="end">ELO</text>
+<line x1='70' y1='250' x2='680' y2='250' stroke='var(--line)' stroke-width='1' /><text x='62' y='254' font-size='10' fill='var(--muted)' text-anchor='end'>0</text><line x1='70' y1='195' x2='680' y2='195' stroke='var(--line)' stroke-width='0.5' stroke-dasharray=2 3/><text x='62' y='199' font-size='10' fill='var(--muted)' text-anchor='end'>500</text><line x1='70' y1='140' x2='680' y2='140' stroke='var(--line)' stroke-width='0.5' stroke-dasharray=2 3/><text x='62' y='144' font-size='10' fill='var(--muted)' text-anchor='end'>1000</text><line x1='70' y1='85' x2='680' y2='85' stroke='var(--line)' stroke-width='0.5' stroke-dasharray=2 3/><text x='62' y='89' font-size='10' fill='var(--muted)' text-anchor='end'>1500</text><line x1='70' y1='30' x2='680' y2='30' stroke='var(--line)' stroke-width='1' /><text x='62' y='34' font-size='10' fill='var(--muted)' text-anchor='end'>2000</text>
+<line x1='366' y1='250' x2='366' y2='255' stroke='var(--muted)'/><text x='366' y='267' font-size='10' fill='var(--muted)' text-anchor='middle'>$0.10</text>
+<text x="375" y="296" font-size="11" fill="var(--muted)" text-anchor="middle">cost per model over the whole run (log scale)</text>
+<polyline points="70,196 482,77" fill="none" stroke="var(--brand)" stroke-width="1.5" stroke-dasharray="5 4"/>
+<circle cx='482' cy='77' r='9' fill='var(--brand)' opacity='.88'><title>gemini-3.5-flash: $0.14, ELO 1572, 88% win rate</title></circle><text x='482' y='81' font-size='10' font-weight='700' fill='#fff' text-anchor='middle' pointer-events='none'>1</text><text x='482' y='58' font-size='11' font-weight='700' fill='var(--ink)' text-anchor='middle'>gemini-3.5-flash <tspan fill='var(--muted)' font-weight='400'>$0.14 &middot; ELO 1572</tspan></text><circle cx='680' cy='77' r='14' fill='#b5b1a4' opacity='.88'><title>claude-sonnet-4-6: $0.23, ELO 1572, 90% win rate</title></circle><text x='680' y='81' font-size='10' font-weight='700' fill='#fff' text-anchor='middle' pointer-events='none'>2</text><line x1='600' y1='41' x2='680' y2='62' stroke='var(--muted)' stroke-width='0.75' opacity='0.6'/><text x='600' y='38' font-size='11' font-weight='700' fill='var(--ink)' text-anchor='middle'>claude-sonnet-4-6 <tspan fill='var(--muted)' font-weight='400'>$0.23 &middot; ELO 1572</tspan></text><circle cx='70' cy='196' r='9' fill='var(--teal-soft)' opacity='.88'><title>gpt-5.4-mini: $0.046, ELO 489, 20% win rate</title></circle><text x='70' y='200' font-size='10' font-weight='700' fill='#fff' text-anchor='middle' pointer-events='none'>3</text><line x1='185' y1='150' x2='70' y2='186' stroke='var(--muted)' stroke-width='0.75' opacity='0.6'/><text x='185' y='147' font-size='11' font-weight='700' fill='var(--ink)' text-anchor='middle'>gpt-5.4-mini <tspan fill='var(--muted)' font-weight='400'>$0.046 &middot; ELO 489</tspan></text><circle cx='297' cy='210' r='12' fill='#b5b1a4' opacity='.88'><title>mistral-medium-2604: $0.083, ELO 367, 10% win rate</title></circle><text x='297' y='213' font-size='10' font-weight='700' fill='#fff' text-anchor='middle' pointer-events='none'>4</text><text x='297' y='233' font-size='10' fill='var(--muted)' text-anchor='middle' pointer-events='none'>mistral-medium-2604</text>
+</svg></div>
+<p class='note' style='display:flex;flex-wrap:wrap;gap:4px 18px'><span style='white-space:nowrap'><b>1</b> gemini-3.5-flash <span style='color:var(--muted)'>$0.14 &middot; ELO 1572 &middot; 88% &#9733;</span></span><span style='white-space:nowrap'><b>2</b> claude-sonnet-4-6 <span style='color:var(--muted)'>$0.23 &middot; ELO 1572 &middot; 90%</span></span><span style='white-space:nowrap'><b>3</b> gpt-5.4-mini <span style='color:var(--muted)'>$0.046 &middot; ELO 489 &middot; 20% &#9733;</span></span><span style='white-space:nowrap'><b>4</b> mistral-medium-2604 <span style='color:var(--muted)'>$0.083 &middot; ELO 367 &middot; 10%</span></span></p>
+<p class="note">Dashed line: the best-value frontier (&#9733; in the key; no cheaper model rates
+higher). Dot size is average time to answer; the champion is magenta; hover any dot for cost, ELO,
+and win rate. Win rate counts rated rounds only.</p>
+
+
+<h2>Speed</h2>
+<div class="tablewrap">
+<svg viewBox="0 0 720 136" width="100%" role="img" aria-label="Speed per model">
+<text x='162' y='30' font-size='10.5' fill='var(--muted)' text-anchor='end'>gpt-5.4-mini</text><rect x='170' y='18' width='360' height='14' rx='4' fill='var(--teal-soft)' opacity='0.85'/><text x='538' y='30' font-size='10.5' fill='var(--muted)'>112 tok/s &middot; ttft 0.5s</text><text x='162' y='56' font-size='10.5' fill='var(--muted)' text-anchor='end'>gemini-3.5-flash</text><rect x='170' y='44' width='347' height='14' rx='4' fill='var(--teal-soft)' opacity='0.68'/><text x='525' y='56' font-size='10.5' fill='var(--muted)'>108 tok/s &middot; ttft 1.0s</text><text x='162' y='82' font-size='10.5' fill='var(--muted)' text-anchor='end'>mistral-medium-2604</text><rect x='170' y='70' width='225' height='14' rx='4' fill='var(--teal-soft)' opacity='0.52'/><text x='403' y='82' font-size='10.5' fill='var(--muted)'>70 tok/s &middot; ttft 0.4s</text><text x='162' y='108' font-size='10.5' fill='var(--muted)' text-anchor='end'>claude-sonnet-4-6</text><rect x='170' y='96' width='157' height='14' rx='4' fill='var(--teal-soft)' opacity='0.35'/><text x='335' y='108' font-size='10.5' fill='var(--muted)'>49 tok/s &middot; ttft 1.2s</text>
+</svg></div>
+<p class="note">Average tokens per second over the run's streamed responses; time to first token annotated.</p>
+
+<h2>Win grid</h2>
+<div class="tablewrap"><table class="grid">
+<thead><tr><th>row beats column (ties count &frac12;)</th><th class='n'>1</th><th class='n'>2</th><th class='n'>3</th><th class='n'>4</th></tr></thead>
+<tbody><tr><td class='rowname'>1. gemini-3.5-flash</td><td>&middot;</td><td style='background:rgba(223,83,37,0.21)'>1</td><td style='background:rgba(223,83,37,0.44)'>3</td><td style='background:rgba(223,83,37,0.44)'>3</td></tr><tr><td class='rowname'>2. claude-sonnet-4-6</td><td style='background:rgba(223,83,37,0.21)'>1</td><td>&middot;</td><td style='background:rgba(223,83,37,0.55)'>4</td><td style='background:rgba(223,83,37,0.55)'>4</td></tr><tr><td class='rowname'>3. gpt-5.4-mini</td><td>0</td><td>0</td><td>&middot;</td><td style='background:rgba(223,83,37,0.33)'>2</td></tr><tr><td class='rowname'>4. mistral-medium-2604</td><td>0</td><td>0</td><td style='background:rgba(223,83,37,0.21)'>1</td><td>&middot;</td></tr></tbody></table></div>
+
+<h2>The jury</h2>
+<div class="tablewrap"><table>
+<thead><tr><th>Judge</th><th class="n"><span class="sideA">A</span>-lean</th>
+<th class="n"><span class="sideB">B</span>-lean</th><th class="n">flip rate</th>
+<th class="n">tie rate</th></tr></thead>
+<tbody><tr><td class='name'>claude-haiku-4-5-20251001</td><td class='n'>48%</td><td class='n'>52%</td><td class='n'>23%</td><td class='n'>0%</td></tr><tr><td class='name'>gemini-2.5-flash-lite</td><td class='n'>64%</td><td class='n'>36%</td><td class='n'>23%</td><td class='n'>3%</td></tr><tr><td class='name'>gpt-5.4-nano</td><td class='n'>55%</td><td class='n'>45%</td><td class='n'>63%</td><td class='n'>0%</td></tr></tbody>
+</table></div>
+<p class="note">Each judge sees every pair in both seat orders; a judge that contradicts
+itself abstains (the flip rate) and abstentions never become verdicts. Pairwise Cohen&#39;s
+&kappa;: claude-haiku-4-5-20251001 × gemini-2.5-flash-lite: 0.789, claude-haiku-4-5-20251001 × gpt-5.4-nano: 1.0, gemini-2.5-flash-lite × gpt-5.4-nano: 1.0.</p>
+
+<h2>Rounds</h2>
+<div class="badges">
+  <span class="badge"><span class="sideA">A</span> wins <b>10</b></span>
+  <span class="badge"><span class="sideB">B</span> wins <b>9</b></span>
+  <span class="badge">ties <b>0</b></span>
+  <span class="badge">inconclusive <b>11</b></span>
+  <span class="badge">voided <b>0</b></span>
+</div>
+<p class="note">Inconclusive rounds carry no signal and are dropped from the rating, never
+counted as ties. A voided round is a network failure, not a model failure; it is logged and
+excluded.</p>
+
+<h2>Tokens and cost</h2>
+<div class="tablewrap"><table>
+<thead><tr><th></th><th class="n">input</th><th class="n">output</th><th class='n'>est. cost</th></tr></thead>
+<tbody>
+<tr><td class="name">models</td><td class="n">1,728</td><td class="n">51,324</td><td class='n'>$0.49</td></tr>
+<tr><td class="name">jury</td><td class="n">349,228</td><td class="n">23,643</td><td class='n'>&asymp; $0.20</td></tr>
+<tr><td class='name'>total</td><td class='n'></td><td class='n'></td><td class='n'><b>&asymp; $0.70</b></td></tr>
+</tbody></table></div>
+<p class='note'>Model spend is exact (per-model catalog rates); jury spend is estimated at the panel's mean rate because the log stores the panel's token total, not per-judge splits.</p>
+
+<div class="foot">
+config <code>83ce3f5dea7d2453</code> &middot;
+prompts <code>08a73bd44a661254</code> (30) &middot;
+seed <code>42</code> &middot;
+panel: claude-haiku-4-5-20251001, gemini-2.5-flash-lite, gpt-5.4-nano &middot; evaluatorq <code>1.8.0</code><br>
+generated by <a href="https://github.com/orq-ai/orq-arena">orq-arena</a>; regenerate any time
+with <code>orq-arena report &lt;battles.jsonl&gt;</code>. Every verdict via evaluatorq&#39;s
+pairwise jury; every token via the orq.ai router gateway.
+</div>
+
+</div></body></html>

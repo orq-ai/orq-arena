@@ -25,3 +25,8 @@ votes*.json
 .planning/
 REFACTOR_PLAN.md
 site/
+
+# The committed example run is the exception to the ignores above.
+!examples/**/battles.jsonl
+!examples/**/battles.run.json
+examples/**/run.log
