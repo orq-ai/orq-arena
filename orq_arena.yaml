@@ -1,13 +1,14 @@
 # orq-arena default configuration.
 # All candidate + judge calls route through the orq.ai router gateway.
 
-# Match rules (hybrid: HP + round cap)
+# Match rules. max_rounds caps the decisive rounds per match; starting_hp and
+# the damage_* tiers drive the live TUI health bars only (the rating never
+# sees them, it's fed per-round verdicts).
 match:
-  starting_hp: 100
   max_rounds: 5
+  starting_hp: 100
   damage_unanimous: 30    # all decisive votes agree (minimum 2)
   damage_majority: 15     # split decision
-  damage_tie: 0           # tie/inconclusive doesn't count toward the round cap
 
 # Orq.ai gateway
 gateway:

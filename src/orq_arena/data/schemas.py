@@ -1,8 +1,9 @@
-"""Battle record, schema v2, one JSONL row per judged (or voided) round.
+"""Battle record, schema v3, one JSONL row per judged (or voided) round.
 
-v2 replaces the hand-rolled judge schema with evaluatorq's reconciled
-``PairwiseVote`` dumps and drops orq-battlebench byte-compat (the token
-fields it promised were never real; these are).
+v2 replaced the hand-rolled judge schema with evaluatorq's reconciled
+``PairwiseVote`` dumps. v3 drops the arena HP bookkeeping (damage/hp fields):
+HP was never scored, it's a TUI-only presentation the show now derives from
+the judged verdicts. Old v2 logs still load (the dropped fields are ignored).
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ from pydantic import BaseModel, Field
 class BattleRecord(BaseModel):
     """A single prompt-turn battle record."""
 
-    schema_version: int = 2
+    schema_version: int = 3
 
     prompt_hash: str
     prompt_text: str
@@ -58,8 +59,3 @@ class BattleRecord(BaseModel):
     tournament_id: str = ""
     match_id: str = ""
     round_number: int = 0
-    damage_dealt: int = 0
-    hp_a_before: int = 0
-    hp_b_before: int = 0
-    hp_a_after: int = 0
-    hp_b_after: int = 0

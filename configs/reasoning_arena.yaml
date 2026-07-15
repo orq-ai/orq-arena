@@ -3,11 +3,10 @@
 # Run: orq-arena run --config configs/reasoning_arena.yaml
 
 match:
-  starting_hp: 100
   max_rounds: 5
+  starting_hp: 100        # TUI health-bar knobs only; the rating ignores them
   damage_unanimous: 30
   damage_majority: 15
-  damage_tie: 0
 
 gateway:
   base_url: https://api.orq.ai/v3/router

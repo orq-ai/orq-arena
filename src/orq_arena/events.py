@@ -92,20 +92,13 @@ class TurnResolved(BaseModel):
     match_id: str
     round_number: int
     majority: str  # 'A' | 'B' | 'tie' | 'inconclusive'
-    damage_dealt: int
-    loser_side: Literal["a", "b", "none"]
-    hp_a: int
-    hp_b: int
 
 
 class MatchResolved(BaseModel):
     type: Literal["match_resolved"] = "match_resolved"
     match_id: str
-    winner: str  # name ('' on a draw)
+    winner: str  # name of the model that won more rounds ('' on a draw)
     loser: str
-    by: Literal["ko", "round_cap", "draw"]
-    final_hp_a: int
-    final_hp_b: int
 
 
 class TournamentEnded(BaseModel):

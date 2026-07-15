@@ -78,9 +78,9 @@ def _print_summary(console: Console, ev: TournamentEnded) -> None:
 
 
 def _match_line(ev: MatchResolved) -> str:
-    if ev.by == "draw":
+    if not ev.winner:
         return f"[dim]{ev.match_id}[/dim] 🤝 draw"
-    return f"[dim]{ev.match_id}[/dim] {ev.winner} beats {ev.loser} ({ev.by})"
+    return f"[dim]{ev.match_id}[/dim] {ev.winner} beats {ev.loser}"
 
 
 async def consume_events(
@@ -148,7 +148,6 @@ async def run_headless(
     dataset: dict | None = None,
 ) -> dict[str, float]:
     console = Console(file=sys.stdout)
-    cfg.match.verdict_hold_s = 0.0  # no screen to hold a beat for
     events: asyncio.Queue = asyncio.Queue()
 
     from .preflight import call_counts

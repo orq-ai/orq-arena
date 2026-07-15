@@ -48,8 +48,8 @@ async def test_fight_screen_full_match_lifecycle():
         # KO path + void + draw banner
         screen.apply_damage(100, 0, "A", 30, "b")
         screen.round_voided("Snot: stream failed after retry, boom")
-        screen.match_resolved("Grak", "ko")
-        screen.match_resolved("", "draw")
+        screen.match_resolved("Grak", ko=True)
+        screen.match_resolved("")
         await pilot.pause()
 
         assert screen._card_b.has_class("ko")

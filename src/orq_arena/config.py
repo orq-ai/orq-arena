@@ -12,14 +12,13 @@ from .roster import CandidateSpec
 
 
 class MatchRules(BaseModel):
-    starting_hp: int = 100
     max_rounds: int = 5
+    # HP + damage tiers are TUI presentation only (the live show's health bars);
+    # the rating never sees them, it's fed per-round verdicts. The TUI derives
+    # damage from the judged verdicts using these knobs.
+    starting_hp: int = 100
     damage_unanimous: int = 30
     damage_majority: int = 15
-    damage_tie: int = 0
-    # Seconds the TUI holds each verdict on screen before the next round.
-    # Headless runs set this to 0.
-    verdict_hold_s: float = 2.5
 
 
 class GatewayConfig(BaseModel):
