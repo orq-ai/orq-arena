@@ -7,12 +7,42 @@ from loguru import logger
 
 from .config import load_config
 from .data.prompts import load_prompts
-from .tui.app import ArenaApp
 
 DEFAULT_CONFIG = "orq_arena.yaml"
 DEFAULT_PROMPTS = "prompts/starter.jsonl"
 DEFAULT_OUTPUT = "battles.jsonl"
 DEFAULT_FIXTURE = "fixtures/demo_tournament.json"
+
+
+def _arena_app_cls(hint: str):
+    """Import ArenaApp lazily so the core CLI runs without the [tui] extra.
+
+    A missing textual becomes a friendly install hint; a real bug inside
+    orq_arena.tui still tracebacks.
+    """
+    try:
+        from .tui.app import ArenaApp
+    except ModuleNotFoundError as exc:
+        if exc.name and exc.name.split(".")[0] == "textual":
+            raise click.ClickException(hint) from exc
+        raise
+    return ArenaApp
+
+
+_PICKER_HINT = (
+    "The interactive roster picker needs the TUI. Install it with: "
+    "pip install 'orq-arena[tui]' (or uv sync --extra tui), or pass "
+    "--config <yaml> to run headless with a fixed roster."
+)
+_TUI_HINT = (
+    "The live TUI show needs the extra. Install it with: "
+    "pip install 'orq-arena[tui]' (or uv sync --extra tui), or drop --tui "
+    "to run headless."
+)
+_DEMO_HINT = (
+    "orq-arena demo replays inside the TUI. Install it with: "
+    "pip install 'orq-arena[tui]' (or uv sync --extra tui)."
+)
 
 
 def _quiet_logs() -> None:
@@ -87,6 +117,10 @@ def run(config_path: str | None, prompts_path: str, output_path: str, rounds: in
             "Pass a fresh --output, or --overwrite to replace it."
         )
     pick_roster = config_path is None
+    # Fail fast on a missing TUI extra before any preflight work.
+    arena_app_cls = _arena_app_cls(_PICKER_HINT if pick_roster else _TUI_HINT) if (
+        pick_roster or tui
+    ) else None
     cfg = load_config(config_path or DEFAULT_CONFIG)
     prompts = load_prompts(prompts_path, api_key_env=cfg.gateway.api_key_env)
     if rounds is not None:
@@ -111,7 +145,7 @@ def run(config_path: str | None, prompts_path: str, output_path: str, rounds: in
         raise click.ClickException("--tui and --headless contradict each other")
     if pick_roster:
         # The picker is a TUI screen, so this path always runs the live show.
-        app = ArenaApp(
+        app = arena_app_cls(
             cfg=cfg, prompts=prompts, battle_log_path=output_path, live=True,
             pick_roster=True, dataset=dataset,
         )
@@ -169,7 +203,7 @@ def run(config_path: str | None, prompts_path: str, output_path: str, rounds: in
         click.confirm("Proceed?", abort=True)
 
     if tui:
-        app = ArenaApp(
+        app = arena_app_cls(
             cfg=cfg, prompts=prompts, battle_log_path=output_path, live=True,
             preflight=preflight_data, dataset=dataset,
         )
@@ -208,7 +242,9 @@ def demo(fixture_path: str, config_path: str) -> None:
     """Replay a recorded tournament from a fixture file (no API calls)."""
     _quiet_logs()
     cfg = load_config(config_path)
-    app = ArenaApp(cfg=cfg, prompts=[], battle_log_path="", live=False, fixture=fixture_path)
+    app = _arena_app_cls(_DEMO_HINT)(
+        cfg=cfg, prompts=[], battle_log_path="", live=False, fixture=fixture_path
+    )
     app.run()
 
 

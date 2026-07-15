@@ -15,7 +15,6 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
-    "textual>=0.83",
     "click>=8.1",
     "pydantic>=2.7",
     "pyyaml>=6.0",
@@ -28,6 +27,11 @@ dependencies = [
     "loguru>=0.7",
     "rich>=13.7",
 ]
+
+[project.optional-dependencies]
+# The live TUI show (orq-arena --tui, the interactive roster picker, and
+# orq-arena demo). The benchmark, report, and rejudge work without it.
+tui = ["textual>=0.83"]
 
 [project.urls]
 Homepage = "https://github.com/orq-ai/orq-arena"
@@ -63,6 +67,8 @@ docs = [
 dev = [
     "pytest>=8",
     "pytest-asyncio>=0.23",
+    # TUI render tests need textual directly; don't ride on textual-dev's pin.
+    "textual>=0.83",
     "textual-dev>=1.6",
     "ruff>=0.6",
     "pre-commit>=3.5",
