@@ -1,0 +1,20 @@
+# Ruff lint + format on staged Python files. Uses the project's own ruff
+# (from the dev dependency group) via uv, so the version tracks pyproject
+# rather than a separately pinned hook rev.
+#
+# Enable once per clone:  uv run pre-commit install
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: uv run ruff check --fix
+        language: system
+        types: [python]
+        require_serial: true
+      - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format
+        language: system
+        types: [python]
+        require_serial: true
