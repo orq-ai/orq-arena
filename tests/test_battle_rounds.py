@@ -23,7 +23,6 @@ def _cfg() -> ArenaConfig:
                 {"name": "Beta", "model_id": "x/beta"},
             ],
             "judges": ["x/j1", "x/j2", "x/j3"],
-            "match": {"verdict_hold_s": 0},
         }
     )
 
@@ -88,8 +87,6 @@ async def test_stream_failure_voids_round_without_judging(monkeypatch):
     rec = result.battles[0]
     assert rec.winner == "void"
     assert rec.error and "stream failed after retry" in rec.error
-    assert rec.damage_dealt == 0
-    assert (rec.hp_a_after, rec.hp_b_after) == (100, 100)
 
     evs = _drain(events)
     assert any(isinstance(e, RoundVoided) for e in evs)
@@ -97,7 +94,7 @@ async def test_stream_failure_voids_round_without_judging(monkeypatch):
     assert not any(isinstance(e, TurnResolved) for e in evs)
 
 
-async def test_happy_path_judges_and_applies_damage(monkeypatch):
+async def test_happy_path_judges_and_records_winner(monkeypatch):
     comparison = PairwiseComparison(
         winner="A",
         votes=[
@@ -113,8 +110,7 @@ async def test_happy_path_judges_and_applies_damage(monkeypatch):
     rec = result.battles[0]
     assert rec.majority_verdict == "A"
     assert rec.winner == "alpha"
-    assert rec.damage_dealt == 30  # two decisive agreeing votes = unanimous
-    assert rec.hp_b_after == 70
+    assert result.winner is b.a and result.draw is False
     assert len(rec.judge_votes) == 3
     assert rec.tokens_a_out == 5 and rec.finish_reason_a == "stop"
 
@@ -143,9 +139,8 @@ async def test_all_judges_contestants_raises(monkeypatch):
         )
 
 
-async def test_ko_does_not_stop_the_judging(monkeypatch):
-    # 30 HP, 30-damage unanimous verdicts: Beta is KO'd in round 1, but both
-    # remaining prompts are still judged, KO is rendering, not sampling.
+async def test_every_prompt_is_judged(monkeypatch):
+    # All three prompts are judged; the winner is whoever won more rounds.
     comparison = PairwiseComparison(
         winner="A",
         votes=[PairwiseVote(model="x/j1", vote="A"), PairwiseVote(model="x/j2", vote="A")],
@@ -153,9 +148,7 @@ async def test_ko_does_not_stop_the_judging(monkeypatch):
     jury = FakeJury(comparison)
     monkeypatch.setattr(battle_mod, "llm_jury_pairwise", lambda **kw: jury)
     cfg = _cfg()
-    cfg.match.starting_hp = 30
     cfg.match.max_rounds = 3
-    cfg.match.verdict_hold_s = 0
     events: asyncio.Queue = asyncio.Queue()
     b = Battle(
         cfg=cfg, gateway=FakeGateway(),
@@ -165,12 +158,11 @@ async def test_ko_does_not_stop_the_judging(monkeypatch):
     )
     result = await b.run()
     assert len(result.battles) == 3          # all prompts judged
-    assert result.by == "ko"
-    assert result.final_hp_b == 0
+    assert result.winner is b.a and result.draw is False
     assert jury.calls == 3
 
 
-async def test_equal_hp_is_a_draw(monkeypatch):
+async def test_no_round_wins_is_a_draw(monkeypatch):
     comparison = PairwiseComparison(
         winner="tie",
         votes=[PairwiseVote(model="x/j1", vote="tie"), PairwiseVote(model="x/j2", vote="tie")],
@@ -178,8 +170,8 @@ async def test_equal_hp_is_a_draw(monkeypatch):
     jury = FakeJury(comparison)
     b, events = _build_battle(monkeypatch, FakeGateway(), jury)
     result = await b.run()
-    assert result.by == "draw"
+    assert result.draw is True
     evs = _drain(events)
     from orq_arena.events import MatchResolved
     resolved = [e for e in evs if isinstance(e, MatchResolved)]
-    assert resolved and resolved[0].by == "draw" and resolved[0].winner == ""
+    assert resolved and resolved[0].winner == ""

@@ -50,6 +50,16 @@ def test_elo_by_category_respects_floor():
 
     # 25 code outcomes (passes the 20 floor), 3 math (skipped)
     outcomes = [("a", "b", "winner", "code")] * 25 + [("b", "a", "winner", "math")] * 3
-    sliced = elo_by_category(outcomes, ["a", "b"])
+    sliced = elo_by_category(outcomes)
     assert "code" in sliced and "math" not in sliced
     assert sliced["code"]["a"] > sliced["code"]["b"]
+
+
+def test_elo_by_category_excludes_absent_models():
+    from orq_arena.tournament.driver import elo_by_category
+
+    # 'c' never plays in code; it must not appear seeded at 1000.
+    outcomes = [("a", "b", "winner", "code")] * 20 + [("c", "a", "winner", "math")] * 20
+    sliced = elo_by_category(outcomes)
+    assert set(sliced["code"]) == {"a", "b"}
+    assert "c" not in sliced["code"]

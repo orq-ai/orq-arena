@@ -105,9 +105,7 @@ class BattleBrowserScreen(Screen):
         else:
             outcome = (
                 f"verdict [b]{r.majority_verdict}[/b] → winner [b]{escape(r.winner)}[/b]"
-                f"   [dim]damage {r.damage_dealt} · HP {r.hp_a_before}→{r.hp_a_after} / "
-                f"{r.hp_b_before}→{r.hp_b_after} · "
-                f"tokens {r.tokens_a_out}/{r.tokens_b_out}"
+                f"   [dim]tokens {r.tokens_a_out}/{r.tokens_b_out}"
                 + (f" · 🧠 {r.tokens_a_reasoning}/{r.tokens_b_reasoning}"
                    if r.tokens_a_reasoning or r.tokens_b_reasoning else "")
                 + "[/dim]"

@@ -1,0 +1,118 @@
+{
+  "tournament_id": "tour-1784139842",
+  "started_at": 1784139842.121768,
+  "seed": 42,
+  "config_sha256": "83ce3f5dea7d2453",
+  "prompts_sha256": "08a73bd44a661254",
+  "prompt_count": 30,
+  "candidates": {
+    "gpt-5.4-mini": {
+      "model": "openai/gpt-5.4-mini",
+      "reasoning": "vendor-default"
+    },
+    "claude-sonnet-4-6": {
+      "model": "anthropic/claude-sonnet-4-6",
+      "reasoning": "vendor-default"
+    },
+    "gemini-3.5-flash": {
+      "model": "google/gemini-3.5-flash",
+      "reasoning": {
+        "thinking": {
+          "type": "disabled"
+        }
+      }
+    },
+    "mistral-medium-2604": {
+      "model": "mistral/mistral-medium-2604",
+      "reasoning": "vendor-default"
+    }
+  },
+  "judges": [
+    "anthropic/claude-haiku-4-5-20251001",
+    "google/gemini-2.5-flash-lite",
+    "openai/gpt-5.4-nano"
+  ],
+  "replacement_judges": [
+    "mistral/mistral-small-2603"
+  ],
+  "min_successful_judges": 2,
+  "evaluatorq_version": "1.8.0",
+  "finished_at": 1784140052.9328,
+  "preflight": {
+    "counts": {
+      "matches": 6,
+      "rounds_per_match": 5,
+      "model_streams": 60,
+      "judge_calls": 180,
+      "probe_calls": 4
+    },
+    "family_overlaps": [
+      "anthropic/claude-haiku-4-5-20251001",
+      "google/gemini-2.5-flash-lite",
+      "openai/gpt-5.4-nano"
+    ],
+    "cost_ceiling": {
+      "total_usd": 2.30881875,
+      "models_usd": 1.1097674999999998,
+      "judges_usd": 1.163004,
+      "probe_usd": 0.03604725,
+      "unpriced": []
+    },
+    "thinking_probe": {
+      "gpt-5.4-mini": {
+        "model": "openai/gpt-5.4-mini",
+        "reasoning_tokens": 0,
+        "cot_chunks": 0,
+        "thinks": false,
+        "configured": false,
+        "error": null
+      },
+      "claude-sonnet-4-6": {
+        "model": "anthropic/claude-sonnet-4-6",
+        "reasoning_tokens": 0,
+        "cot_chunks": 0,
+        "thinks": false,
+        "configured": false,
+        "error": null
+      },
+      "gemini-3.5-flash": {
+        "model": "google/gemini-3.5-flash",
+        "reasoning_tokens": 0,
+        "cot_chunks": 0,
+        "thinks": false,
+        "configured": false,
+        "error": null
+      },
+      "mistral-medium-2604": {
+        "model": "mistral/mistral-medium-2604",
+        "reasoning_tokens": 0,
+        "cot_chunks": 0,
+        "thinks": false,
+        "configured": false,
+        "error": null
+      }
+    }
+  },
+  "mean_agreement": 0.9523809523809523,
+  "error_rounds": 0,
+  "rated_rounds": 19,
+  "category_counts": {
+    "general": 11,
+    "creative": 5,
+    "math": 1,
+    "code": 2
+  },
+  "fleiss": {
+    "kappa": 1.0,
+    "label": "almost perfect",
+    "rounds_used": 8,
+    "rounds_total": 30
+  },
+  "tokens": {
+    "models_in": 1728,
+    "models_out": 51324,
+    "judges_in": 349228,
+    "judges_out": 23643
+  },
+  "length_coef": 2.328920681492266
+}

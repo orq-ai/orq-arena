@@ -97,3 +97,46 @@ def test_bootstrap_ci_brackets_the_point_estimate():
     lo, hi = ci["a"]
     assert lo <= ratings["a"] <= hi
     assert lo < hi  # a real interval, not a point
+
+
+def test_bootstrap_ci_percentile_indices_are_symmetric():
+    # The percentile picks the nearest-rank index on (n-1) at both tails,
+    # not -1 on the low side only. For n=50: floor(0.025*49)=1, floor(0.975*49)=47.
+    from orq_arena.tournament import elo as elo_mod
+
+    class _Fixed:
+        def __init__(self, vals):
+            self._vals = vals
+
+        def randrange(self, _n):  # unused; monkeypatched refit ignores resample
+            return 0
+
+    fixed = [float(i) for i in range(50)]  # 0..49, already sorted
+    orig_mle = elo_mod.bradley_terry_mle
+    # Force each bootstrap iteration to yield a distinct known rating for 'a'.
+    seq = iter(fixed)
+
+    def fake_mle(_wins, models, iterations=100):
+        return {m: (next(seq) if m == "a" else 1000.0) for m in models}
+
+    elo_mod.bradley_terry_mle = fake_mle
+    try:
+        ci = elo_mod.bootstrap_ci([("a", "b", "winner")], ["a", "b"], iterations=50)
+    finally:
+        elo_mod.bradley_terry_mle = orig_mle
+    # sorted vals = 0..49 -> lo index 1 (=1.0), hi index 47 (=47.0)
+    assert ci["a"] == (1.0, 47.0)
+
+
+def test_elo_is_anchored_at_1000_mean():
+    from orq_arena.tournament.elo import style_controlled_elo
+
+    # A balanced cycle (a>b>c>a) keeps every rating finite so the anchoring
+    # convention is what's tested, not the log-strength clamp on a sweep.
+    matches = [("a", "b", "winner"), ("b", "c", "winner"), ("c", "a", "winner")]
+    bt = bradley_terry_mle(build_wins_matrix(matches), ["a", "b", "c"])
+    # Both fits anchor mean log-strength to 0, i.e. mean ELO == 1000.
+    assert abs(sum(bt.values()) / len(bt) - 1000.0) < 1e-6
+    rows = [("a", "b", 1.0, 100, 100), ("b", "c", 1.0, 100, 100), ("c", "a", 1.0, 100, 100)]
+    sc, _gamma = style_controlled_elo(rows, ["a", "b", "c"])
+    assert abs(sum(sc.values()) / len(sc) - 1000.0) < 1e-6

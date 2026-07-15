@@ -201,14 +201,14 @@ class FightScreen(Screen):
     def round_voided(self, reason: str) -> None:
         self._status.update(f"[yellow]⚠ round void, {reason}[/yellow]")
 
-    def match_resolved(self, winner: str, by: str) -> None:
-        if by == "draw":
-            self._status.update("[b]🤝 DRAW[/b], even on HP; the rating heard every round anyway")
-        elif by == "ko":
+    def match_resolved(self, winner: str, *, ko: bool = False) -> None:
+        if not winner:
+            self._status.update("[b]🤝 DRAW[/b], even on rounds; the rating heard every round anyway")
+        elif ko:
             self.app.bell()
             self._status.update(f"[b red]💀 K.O.![/b red]  [b]{winner}[/b] wins!")
         else:
-            self._status.update(f"[b]🏁 {winner}[/b] wins on points ({by})")
+            self._status.update(f"[b]🏁 {winner}[/b] wins on points")
 
     def action_quit(self) -> None:
         self.app.exit()

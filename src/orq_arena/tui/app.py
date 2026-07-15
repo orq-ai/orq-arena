@@ -38,6 +38,7 @@ from ..events import (
 )
 from ..roster import CandidateSpec, assign_candidates
 from ..tournament.driver import run_tournament
+from .hp import VERDICT_HOLD_S, HPTracker
 from .screens.cta_modal import CTAModalScreen
 from .screens.fight import FightScreen
 from .screens.leaderboard import LeaderboardScreen
@@ -85,6 +86,12 @@ class ArenaApp(App):
         self._dispatcher_task: asyncio.Task | None = None
         self._by_name = {w.name: w for w in cfg.candidates}
         self._fight_screen: FightScreen | None = None
+        # HP is a TUI-side show, derived from the judged verdicts.
+        self._hp = HPTracker(
+            starting_hp=cfg.match.starting_hp,
+            damage_unanimous=cfg.match.damage_unanimous,
+            damage_majority=cfg.match.damage_majority,
+        )
 
     # ----- lifecycle -----
 
@@ -127,7 +134,11 @@ class ArenaApp(App):
                 severity="warning", timeout=10,
             )
         counts = call_counts(self.cfg, self._prompts)
-        self._preflight = {**(self._preflight or {}), "counts": counts.__dict__}
+        self._preflight = {
+            **(self._preflight or {}),
+            "counts": counts.__dict__,
+            "family_overlaps": overlap,
+        }
         try:
             ceiling = cost_ceiling(
                 self.cfg, self._prompts, counts, await fetch_price_map(self.cfg.gateway)
@@ -201,6 +212,10 @@ class ArenaApp(App):
         while True:
             ev = await self._events.get()
             self._handle_event(ev)
+            # Live runs pace themselves here (the engine no longer sleeps);
+            # fixture replay keeps its own recorded per-event delays.
+            if self._live and isinstance(ev, TurnResolved):
+                await asyncio.sleep(VERDICT_HOLD_S)
             if isinstance(ev, TournamentEnded):
                 self.push_screen(
                     LeaderboardScreen(
@@ -229,12 +244,14 @@ class ArenaApp(App):
             # instead of silently blanking the cards.
             w_a = self._by_name.get(ev.model_a) or CandidateSpec(model_id=ev.model_a)
             w_b = self._by_name.get(ev.model_b) or CandidateSpec(model_id=ev.model_b)
+            self._hp.start_match()
             fs.start_match(
                 w_a.name, w_a.model_id, w_a.emblem, w_a.thinking_enabled,
                 w_b.name, w_b.model_id, w_b.emblem, w_b.thinking_enabled,
                 self.cfg.match.starting_hp,
             )
         elif isinstance(ev, TurnPrompt):
+            self._hp.clear_votes()  # defensive: fresh round, fresh vote buffer
             fs.set_prompt(ev.round_number, ev.prompt)
         elif isinstance(ev, ResponseChunk):
             fs.append_response(ev.side, ev.text)
@@ -249,16 +266,19 @@ class ArenaApp(App):
                 error=ev.error,
             )
         elif isinstance(ev, JudgeVerdictEvent):
+            self._hp.note_vote(ev.verdict)
             fs.set_judge_verdict(
                 ev.judge_name, ev.verdict, ev.reasoning,
                 flipped=ev.flipped, replacement=ev.replacement,
             )
         elif isinstance(ev, RoundVoided):
+            self._hp.clear_votes()
             fs.round_voided(ev.reason)
         elif isinstance(ev, TurnResolved):
-            fs.apply_damage(ev.hp_a, ev.hp_b, ev.majority, ev.damage_dealt, ev.loser_side)
+            out = self._hp.resolve_turn(ev.majority)
+            fs.apply_damage(out.hp_a, out.hp_b, ev.majority, out.damage, out.loser_side)
         elif isinstance(ev, MatchResolved):
-            fs.match_resolved(ev.winner, ev.by)
+            fs.match_resolved(ev.winner, ko=self._hp.ko_side != "none")
 
 
 def _event_from_dict(raw: dict[str, Any]) -> ArenaEvent:

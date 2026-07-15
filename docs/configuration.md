@@ -39,37 +39,12 @@ Notes:
 
 ### `.env` loading
 
-`.env` is read by a small stdlib-only loader in `src/orq_arena/cli.py` (`_load_dotenv`), called
-once at the top of every CLI invocation (the `@click.group()` `cli()` entry point), before any
-subcommand runs:
+Every CLI invocation reads `./.env` once before any subcommand runs. It parses `KEY=VALUE`
+lines (skipping blanks and `#` comments, stripping surrounding quotes) and loads them with
+`os.environ.setdefault`, so **the real shell environment always wins**; `.env` only fills in
+what the shell hasn't set. A missing `.env` is silently fine.
 
-```python
-def _load_dotenv() -> None:
-    """Read KEY=VALUE lines from ./.env into the env (never overriding it)."""
-    import os
-    from pathlib import Path
-
-    env = Path(".env")
-    if not env.is_file():
-        return
-    for line in env.read_text().splitlines():
-        line = line.strip()
-        if line and not line.startswith("#") and "=" in line:
-            key, _, value = line.partition("=")
-            os.environ.setdefault(key.strip(), value.strip().strip("'\""))
-```
-
-Behavior worth knowing:
-
-- No `python-dotenv` dependency, this is a ~10-line stdlib parser.
-- Reads `./.env` relative to the current working directory; silently does nothing if the file
-  is absent (no error on a missing `.env`).
-- Parses `KEY=VALUE` lines, skips blank lines and lines starting with `#`, and strips
-  surrounding single/double quotes from the value.
-- Uses `os.environ.setdefault`, **a variable already present in the real shell environment is
-  never overridden by `.env`.** `.env` only fills in what the shell hasn't already set.
-- `.env` is git-ignored (`.gitignore`); `.env.example` is the committed template with
-  `ORQ_API_KEY=` blank.
+`.env` is git-ignored; `.env.example` is the committed template with `ORQ_API_KEY=` blank.
 
 ---
 
@@ -79,6 +54,7 @@ Behavior worth knowing:
 |---|---|
 | `orq_arena.yaml` | The default roster + rules, shipped at the project root. Loaded whenever `--config` is omitted or points here, `DEFAULT_CONFIG = "orq_arena.yaml"` in `src/orq_arena/cli.py`. Ships 8 candidates, uniform thinking-**OFF**, so the ELO compares models rather than vendor default reasoning settings. |
 | `configs/reasoning_arena.yaml` | Uniform thinking-**ON** counterpart of the default file, the "does thinking help?" benchmark. Not loaded automatically; run it explicitly with `--config configs/reasoning_arena.yaml`. |
+| `configs/frontier_8.yaml`, `configs/budget_8.yaml`, `configs/frontier_16.yaml` | Ready-made pools tiered by the Artificial Analysis intelligence index (frontier ~40-56, budget ~12-25, 16-model stress test). See [`configs/README.md`](https://github.com/orq-ai/orq-arena/blob/master/configs/README.md). |
 
 Any YAML path can be passed to `--config`; `load_config()` (`src/orq_arena/config.py`) reads it
 with `yaml.safe_load` and validates it into an `ArenaConfig` via
@@ -105,12 +81,12 @@ shipped file):
 
 ```yaml
 match:
-  starting_hp: 100
   max_rounds: 5
+  # starting_hp / damage_unanimous / damage_majority are TUI-presentation-only
+  # knobs (the rating never sees them); they take code defaults if omitted.
+  starting_hp: 100
   damage_unanimous: 30
   damage_majority: 15
-  damage_tie: 0
-  # verdict_hold_s not set here - code default 2.5
 
 gateway:
   base_url: https://api.orq.ai/v3/router
@@ -120,8 +96,8 @@ gateway:
   stream_read_timeout_s: 1200
   judge_timeout_ms: 90000
 
-# preflight, headless_concurrency, swiss_rounds, analyzer_model not set
-# in the shipped file - all four take their code defaults (see tables below).
+# preflight, headless_concurrency, analyzer_model not set in the shipped
+# file - all three take their code defaults (see tables below).
 
 candidates:
   - model_id: anthropic/claude-opus-4-8
@@ -136,7 +112,7 @@ judges:
   - openai/gpt-5.4-nano
 
 replacement_judges:
-  - mistral/mistral-small-2603
+  - mistral/mistral-medium-2604
 
 criteria: >-
   Accuracy and correctness, helpfulness and completeness, clarity, and
@@ -147,18 +123,24 @@ min_successful_judges: 2
 
 ### `match` (`MatchRules`)
 
+Only `max_rounds` affects what gets rated. `starting_hp`, `damage_unanimous`, and
+`damage_majority` are **TUI-presentation-only** knobs: the engine no longer tracks HP, so they
+feed nothing but the live show's health bars. The TUI recomputes HP, damage tiers, and KO
+client-side from the judged verdicts (`src/orq_arena/tui/hp.py::HPTracker`); the rating never
+sees any of them.
+
 | Key | Type | Default | Effect |
 |---|---|---|---|
-| `starting_hp` | `int` | `100` | HP each candidate starts a match with. |
-| `max_rounds` | `int` | `5` | Prompt cap per match. The actual number of rounds run is `min(max_rounds, len(prompts))` (`preflight.call_counts`), a smaller prompts file also shortens matches. |
-| `damage_unanimous` | `int` | `30` | HP dealt to the loser when a round's decisive votes agree unanimously. "Unanimous" requires **at least 2 decisive votes** (`A`/`B`/`tie`) that all agree with the panel's reconciled winner (`compute_damage`, `src/orq_arena/arena/damage.py`), a single surviving vote can never trigger this tier, even if evaluatorq reports it as the consensus. |
-| `damage_majority` | `int` | `15` | HP dealt to the loser on a decisive but non-unanimous (split) verdict. |
-| `damage_tie` | `int` | `0` | HP dealt when the round's consensus is `tie` or `inconclusive`. A `tie`/`inconclusive` round also does **not** count toward `max_rounds` (`counts_toward_cap=False` in `compute_damage`), it doesn't shorten the match. |
-| `verdict_hold_s` | `float` | `2.5` | Seconds the TUI pauses on each verdict before starting the next round (`Battle.run`, `src/orq_arena/arena/battle.py`). `orq-arena run --headless` forces this to `0.0` at startup (`run_headless`, `src/orq_arena/headless.py`), no screen to hold a beat for. |
+| `max_rounds` | `int` | `5` | Prompt cap per match. The actual number of rounds run is `min(max_rounds, len(prompts))` (`preflight.call_counts`), a smaller prompts file also shortens matches. **The only match key that affects the rating.** |
+| `starting_hp` | `int` | `100` | **TUI-only.** HP each candidate's health bar starts a match with, in the live show (`HPTracker`). Never read by the rating. |
+| `damage_unanimous` | `int` | `30` | **TUI-only.** HP the show's bar subtracts when a round's decisive votes agree unanimously. Presentation drama only; the rating is decided by judged round wins, not HP. |
+| `damage_majority` | `int` | `15` | **TUI-only.** HP the show's bar subtracts on a decisive but non-unanimous (split) verdict. Presentation drama only. |
 
-KO is presentation only: every prompt in the drawn slice is always judged, regardless of
-whether HP already reached 0, the rating never depends on when the HP bar happened to empty
-(comment in `Battle.run`).
+Verdict pacing is no longer a config key: the seconds the TUI holds on each verdict before the
+next round is a code constant, `VERDICT_HOLD_S` in `src/orq_arena/tui/hp.py` (headless runs never
+pause). The match winner is the side with more judged round wins (equal round wins is a draw, an
+empty winner), and every prompt in the drawn slice is always judged regardless of where the
+on-screen HP bar happens to sit.
 
 ### `gateway` (`GatewayConfig`)
 
@@ -175,6 +157,17 @@ Not configurable via YAML: `connect=10.0`, `write=60.0`, and `pool=60.0` second 
 hardcoded in `OrqGateway.__init__` alongside `stream_read_timeout_s`, only the read-gap timeout
 is exposed as a config key. The preflight probe call (see below) also uses a hardcoded
 `max_tokens=1000`, independent of `candidate_max_tokens`/`judge_max_tokens`.
+
+!!! info "Credential/host resolution at defaults"
+
+    When `base_url` and `api_key_env` are left at their defaults, `OrqGateway` delegates
+    credential and host resolution to evaluatorq's `resolve_llm_client` (the company-wide
+    single source of truth). That path **honors the `ORQ_BASE_URL` environment variable**
+    (host plus `/v3/router`, the way to point at a staging host) and **requires an ORQ
+    key**, it will not silently fall back to `OPENAI_API_KEY`. Setting either `base_url` or
+    `api_key_env` in the YAML is a **bring-your-own-endpoint opt-out**: the run then uses
+    the config verbatim with no environment-variable precedence, so `ORQ_BASE_URL` is
+    ignored and only the named `api_key_env` variable is read.
 
 #### Bring your own endpoint
 
@@ -204,7 +197,6 @@ pool a one-command run. It is the recommended path, not the only one.
 | Key | Type | Default | Effect |
 |---|---|---|---|
 | `headless_concurrency` | `int` | `4` | Matches run in parallel under an `asyncio.Semaphore(max(1, headless_concurrency))`, for `orq-arena run --headless` only (`run_headless` → `run_tournament(concurrency=...)`, `src/orq_arena/headless.py`). The TUI always passes `concurrency=1` internally so the live show stays one fight at a time, this key has no effect on non-headless runs. |
-| `swiss_rounds` | `int` | `6` | Number of **Swiss pairing rounds**, used only when the roster exceeds 8 candidates (`use_swiss = len(cfg.candidates) > 8`, `src/orq_arena/tournament/driver.py`). This is distinct from `match.max_rounds` (prompts per match), `swiss_rounds` is how many times the whole pool gets re-paired by score group. Pools of 8 or fewer candidates ignore this key and run a full round-robin instead. |
 | `analyzer_model` | `str` | `"openai/gpt-5.4-mini"` | Router model id used to generate the per-model post-mortem ("coach notes": strengths, weaknesses, judge patterns) when `M` is pressed on the final leaderboard (`src/orq_arena/tui/screens/postmortem.py` → `src/orq_arena/analysis/postmortem.py`). Output is cached in `analysis.jsonl` next to the battle log, so re-opening the post-mortem screen doesn't re-spend tokens. |
 
 ### `candidates` (the roster)
@@ -259,7 +251,7 @@ in that file), those belong in `configs/reasoning_arena.yaml` instead.
 | `judges` | `list[str]` |, (required, non-empty) | Router model ids forming the base judge panel handed to evaluatorq's `llm_jury_pairwise(judges=...)`. Must be non-empty, `ArenaConfig._validate` raises `ValueError("Judge panel is empty")` otherwise. Each judge votes on both seat orderings of every round. |
 | `replacement_judges` | `list[str]` | `[]` | Neutral stand-ins promoted when a primary judge errors mid-run (`llm_jury_pairwise(replacement_judges=...)`). |
 | `criteria` | `str` | `"Accuracy and correctness, helpfulness and completeness, clarity, and relevance to the prompt."` | Free-text criteria string every judge is given, what the jury is asked to judge on. Can be overridden for a single re-judge without editing the YAML via `orq-arena rejudge ... --criteria "..."`. |
-| `min_successful_judges` | `int` | `2` | Minimum number of decisive reconciled votes required for a round to produce a real verdict. Fewer than this, and the round is `inconclusive` (`damage_tie` HP, doesn't count toward `max_rounds`), a guard against a "jury of one" deciding a round. |
+| `min_successful_judges` | `int` | `2` | Minimum number of decisive reconciled votes required for a round to produce a real verdict. Fewer than this, and the round is `inconclusive` (dropped from the rating, doesn't count toward `max_rounds`), a guard against a "jury of one" deciding a round. |
 
 **Self-judge exclusion:** per match, any judge whose `model_id` matches either contestant's
 `model_id` is filtered out of that match's panel (`panel = [m for m in cfg.judges if m not in
@@ -334,12 +326,10 @@ Everything else is a Pydantic default and safe to omit from the YAML entirely:
 
 | Key | Default |
 |---|---|
-| `match.starting_hp` | `100` |
 | `match.max_rounds` | `5` |
-| `match.damage_unanimous` | `30` |
-| `match.damage_majority` | `15` |
-| `match.damage_tie` | `0` |
-| `match.verdict_hold_s` | `2.5` |
+| `match.starting_hp` (TUI-only) | `100` |
+| `match.damage_unanimous` (TUI-only) | `30` |
+| `match.damage_majority` (TUI-only) | `15` |
 | `gateway.base_url` | `https://api.orq.ai/v3/router` |
 | `gateway.api_key_env` | `ORQ_API_KEY` |
 | `gateway.candidate_max_tokens` | `2048` |
@@ -348,7 +338,6 @@ Everything else is a Pydantic default and safe to omit from the YAML entirely:
 | `gateway.judge_timeout_ms` | `90000` |
 | `preflight.thinking_probe` | `true` |
 | `headless_concurrency` | `4` |
-| `swiss_rounds` | `6` |
 | `replacement_judges` | `[]` |
 | `criteria` | `"Accuracy and correctness, helpfulness and completeness, clarity, and relevance to the prompt."` |
 | `min_successful_judges` | `2` |
@@ -388,6 +377,6 @@ git-ignored (`.gitignore`):
 | File | Written by |
 |---|---|
 | `.env` | Hand-authored from `.env.example`; never committed. |
-| `battles.jsonl` | `orq-arena run`, one row per judged round (`BattleRecord`, schema v2; includes per-model `ttft_a_ms`/`ttft_b_ms` and `duration_a_ms`/`duration_b_ms` timing fields). |
+| `battles.jsonl` | `orq-arena run`, one row per judged round (`BattleRecord`, schema v3; includes per-model `ttft_a_ms`/`ttft_b_ms` and `duration_a_ms`/`duration_b_ms` timing fields). |
 | `battles.run.json` | `orq-arena run`, the run manifest (config + prompt hashes, panel, seed, agreement stats; also a `dataset` key with id, name, and studio URL for dataset-sourced runs). |
 | `analysis.jsonl` | The post-mortem screen (`M` on the leaderboard), cached analyzer output, written next to the battle log. |

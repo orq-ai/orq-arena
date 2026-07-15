@@ -151,7 +151,9 @@ def bootstrap_ci(
     out: dict[str, tuple[float, float]] = {}
     for m, vals in samples.items():
         vals.sort()
-        lo = vals[max(0, int(0.025 * len(vals)) - 1)]
-        hi = vals[min(len(vals) - 1, int(0.975 * len(vals)))]
+        n = len(vals)
+        # Nearest-rank percentiles on (n-1), symmetric at both tails.
+        lo = vals[int(0.025 * (n - 1))]
+        hi = vals[int(0.975 * (n - 1))]
         out[m] = (lo, hi)
     return out

@@ -111,6 +111,31 @@ def test_report_renders_every_section():
     assert not any(d in html for d in ("—", "&mdash;", "&#8212;", "&#x2014;"))
 
 
+def test_report_family_overlap_badge_from_manifest():
+    records = [_record("A"), _record("A")]
+    manifest = MANIFEST | {"preflight": {"family_overlaps": ["prov/judge-1"]}}
+    html = build_report_html(
+        cfg=CFG,
+        records=records,
+        elo={"model-a": 1100.0, "model-b": 900.0},
+        report=REPORT,
+        manifest=manifest,
+    )
+    # Rendered as a Confidence-stats caveat row (favoring master's drawer design).
+    assert "family overlap" in html.lower()
+    assert "provider family" in html
+    assert "prov/judge-1" in html
+    # empty list renders no caveat
+    clean = build_report_html(
+        cfg=CFG,
+        records=records,
+        elo={"model-a": 1100.0, "model-b": 900.0},
+        report=REPORT,
+        manifest=MANIFEST | {"preflight": {"family_overlaps": []}},
+    )
+    assert "provider family" not in clean
+
+
 def test_report_path_convention(tmp_path):
     assert report_path_for(tmp_path / "battles.jsonl").name == "battles.report.html"
 

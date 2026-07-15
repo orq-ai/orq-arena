@@ -15,10 +15,8 @@ ANSI = re.compile(r"\x1b\[[0-9;?]*[a-zA-Z]")
 
 def _events():
     return [
-        TurnResolved(match_id="M1", round_number=1, majority="A", damage_dealt=15,
-                     loser_side="b", hp_a=100, hp_b=85),
-        MatchResolved(match_id="M1", winner="model-a", loser="model-b", by="round_cap",
-                      final_hp_a=85, final_hp_b=40),
+        TurnResolved(match_id="M1", round_number=1, majority="A"),
+        MatchResolved(match_id="M1", winner="model-a", loser="model-b"),
         StandingsUpdated(elo={"model-a": 1050.0, "model-b": 950.0},
                          matches_done=1, matches_total=1),
         TournamentEnded(champion="model-a", elo={"model-a": 1050.0, "model-b": 950.0},
@@ -38,7 +36,7 @@ def test_pipe_mode_prints_plain_lines():
     console = Console(file=buf, force_terminal=False, width=100)
     asyncio.run(_drive(console))
     out = buf.getvalue()
-    assert "model-a beats model-b (round_cap)" in out
+    assert "model-a beats model-b" in out
     assert "match 1/1 done" in out
     assert "FINAL STANDINGS" in out
     assert "battle log" in out
@@ -50,5 +48,19 @@ def test_terminal_mode_shows_progress_and_leader():
     asyncio.run(_drive(console))
     out = ANSI.sub("", buf.getvalue())
     assert "rounds" in out and "leader model-a 1050" in out
-    assert "model-a beats model-b (round_cap)" in out  # match line above the bar
+    assert "model-a beats model-b" in out  # match line above the bar
     assert "FINAL STANDINGS" in out
+
+
+def test_draw_prints_a_draw_line():
+    buf = io.StringIO()
+    console = Console(file=buf, force_terminal=False, width=100)
+
+    async def _drive_draw() -> None:
+        q: asyncio.Queue = asyncio.Queue()
+        q.put_nowait(MatchResolved(match_id="M1", winner="", loser=""))
+        q.put_nowait(TournamentEnded(champion="", elo={}, battle_log_path="x.jsonl"))
+        await consume_events(q, console=console, total_rounds=1)
+
+    asyncio.run(_drive_draw())
+    assert "draw" in buf.getvalue()

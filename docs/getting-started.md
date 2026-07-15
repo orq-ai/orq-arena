@@ -16,9 +16,11 @@ Every command below runs through the **`orq-arena`** CLI (installed by the steps
 [1. Install](#1-install)). Run `uv run orq-arena --help` to list every subcommand. The full
 subcommand and flag reference is in **[cli.md](cli.md)**.
 
-> **No API key yet?** Skip straight to [2. Try it now](#2-try-it-now--no-api-key-needed),
-> `orq-arena demo` replays a full recorded tournament with no network calls. Come back to
-> step 3 when you're ready to point at real models.
+!!! tip "No API key yet?"
+
+    Skip straight to [2. Try it now](#2-try-it-now-no-api-key-needed),
+    `orq-arena demo` replays a full recorded tournament with no network calls. Come back to
+    step 3 when you're ready to point at real models.
 
 ---
 
@@ -49,11 +51,23 @@ cd orq-arena
 uv sync
 ```
 
-`uv sync` creates a `.venv` and installs orq-arena plus its dependencies (`textual`, `click`,
+`uv sync` creates a `.venv` and installs orq-arena plus its core dependencies (`click`,
 `pydantic`, `pyyaml`, `openai`, `httpx`, `evaluatorq`) resolved against `uv.lock`. This
 registers the **`orq-arena`** console script (entry point `orq_arena.cli:cli` in
 `pyproject.toml`'s `[project.scripts]`), every command below is run through `uv run` so this
 is the only setup step.
+
+The core install runs the benchmark, the HTML report, and `rejudge`. The Textual live show,
+though, is an **optional extra**: the interactive roster picker (the no-`--config` path), the
+`--tui` live run, and `orq-arena demo` need `textual`, which is not in the core dependencies.
+Add it with:
+
+```bash
+uv sync --extra tui
+```
+
+Without the extra, those three commands print a friendly install hint instead of running. If
+you only intend to run headless benchmarks (with `--config`), the plain `uv sync` is enough.
 
 ---
 
@@ -68,10 +82,14 @@ voting, from `fixtures/demo_tournament.json` through the exact same TUI screens 
 uses: streaming responses, judge verdicts, HP drama, and the final leaderboard. No network
 calls, no API key. Press `q` to quit, `s` to save a screenshot.
 
-`demo` still loads `orq_arena.yaml` (only for cosmetic labels like the judge names in the
-fight-screen header), it ships in the repo, so this works immediately after `uv sync` with no
-edits needed. `demo` also takes `--fixture` and `--config` if you want to point it elsewhere;
-see [cli.md](cli.md).
+![The live fight screen: both candidates streaming side by side, judge cards, HP bars](assets/fight.svg)
+
+`demo` renders through the Textual TUI, so it needs the optional `[tui]` extra
+(`uv sync --extra tui`, see [1. Install](#1-install)); without it the command prints a friendly
+install hint. `demo` still loads `orq_arena.yaml` (only for cosmetic labels like the judge names
+in the fight-screen header), it ships in the repo, so this works immediately after
+`uv sync --extra tui` with no edits needed. `demo` also takes `--fixture` and `--config` if you
+want to point it elsewhere; see [cli.md](cli.md).
 
 ---
 
@@ -106,7 +124,9 @@ existing cache, else an empty list (the YAML-roster fallback belongs to `run`'s 
 uv run orq-arena run
 ```
 
-Without `--config`, this opens the roster picker over your workspace-enabled model catalog:
+Without `--config`, this opens the roster picker over your workspace-enabled model catalog (the
+picker is part of the live TUI, so it needs the optional `[tui]` extra, `uv sync --extra tui`;
+without it `orq-arena run` with no `--config` prints an install hint):
 
 1. **Pick your pool.** The picker fetches your workspace's chat-capable models (cached 24h at
    `~/.cache/orq-arena/models.json`) into a searchable, provider-filterable list. Toggle
@@ -118,14 +138,15 @@ Without `--config`, this opens the roster picker over your workspace-enabled mod
    the single word: ok") to catch vendor-default thinking that contradicts your config. If a
    model reasons despite being configured off, you'll see a toast:
    `🧠 thinks despite config: ..., ranking will be footnoted`.
-3. **The fight.** Every pair of candidates meets once (round-robin up to 8 candidates; Swiss
-   pairing engages automatically above that, never a flag you set). For each prompt, both
-   candidates stream side by side, the jury votes in both seat orders, HP drops, and the round
-   is logged.
+3. **The fight.** Every pair of candidates meets once (a full round-robin over the pool). For
+   each prompt, both candidates stream side by side, the jury votes in both seat orders, HP
+   drops on the TUI health bars, and the round is logged.
 4. **The leaderboard.** Once every match finishes, the final Bradley-Terry ELO leaderboard
    opens with bootstrap 95% CIs. Press `B` to browse every judged round (prompt, both
    responses, per-judge votes with flip badges), `M` to generate per-model coach notes, `S` to
    save a screenshot, `ENTER`/`SPACE`/`Q` to exit.
+
+![The final leaderboard: ELO with 95% CIs and the len-ctrl column, per-judge behaviour, win grid](assets/leaderboard.svg)
 
 If your workspace catalog can't be reached, orq-arena degrades in two stages: a plain network
 hiccup keeps the picker open but limits it to the models already in your YAML roster (a red
@@ -163,20 +184,35 @@ from your workspace, same API key.
 With `--config` the run is headless by default: matches run in parallel under
 `headless_concurrency` (default 4) through a Rich one-liner printer, and the HTML report
 opens in your browser when the run ends (`--no-open` to skip; it never opens in CI). Pass
-`--tui` to watch the live Textual show instead. Without `--config` the roster picker opens,
-which needs the TUI. Full flag reference for `run` and every other subcommand (`demo`, `rejudge`, `jury-compare`, `report`, `annotate`, `anchor`, `list-models`,
-`refresh-models`): **[cli.md](cli.md)**.
+`--tui` to watch the live Textual show instead (it needs the optional `[tui]` extra,
+`uv sync --extra tui`). Without `--config` the roster picker opens, which needs that same extra.
+Full flag reference for `run` and every other subcommand (`demo`, `rejudge` with `--compare`,
+`report`, `annotate`, `anchor`, `list-models`, `refresh-models`): **[cli.md](cli.md)**.
 
 ---
 
 ## Where results land
 
 Every live run, TUI or headless, writes to the same three files, all in the current working
-directory by default:
+directory by default. Everything downstream, re-judging, reporting, human annotation, works
+from the battle log alone, with no further model regeneration:
+
+```mermaid
+flowchart LR
+    run["orq-arena run"] --> log["battles.jsonl<br/>(one row per judged round)"]
+    run --> manifest["battles.run.json<br/>(seeded manifest)"]
+    run --> html["battles.report.html"]
+    log --> report["orq-arena report"] --> html
+    log --> rejudge["orq-arena rejudge --judge …<br/>(new jury, judge tokens only)"]
+    rejudge --> compare["rejudge --compare<br/>(jury selection table)"]
+    log --> annotate["orq-arena annotate<br/>(blind rating page)"] --> votes["votes.json"]
+    votes --> anchor["orq-arena anchor<br/>(κ vs humans)"]
+    log --> anchor
+```
 
 | File | Contents |
 |---|---|
-| `battles.jsonl` | One JSON line per judged (or voided) round, `BattleRecord`, schema v2: both responses, reconciled per-judge votes, token/TTFT accounting, HP before/after. |
+| `battles.jsonl` | One JSON line per judged (or voided) round, `BattleRecord`, schema v3: both responses, reconciled per-judge votes, token/TTFT accounting. (v3 drops the old HP/damage columns, HP is now a TUI-only presentation.) |
 | `battles.run.json` | The run manifest, written next to the log, config/prompt hashes, roster, judge panel, seed, and (once finished) agreement stats. |
 | `battles.report.html` | A single-file HTML report, no server, no external assets. The verdict banner leads with the top 3 models (win rate, ELO score, total cost); a value map plots ELO against cost per model on a log scale; a Speed section (tokens per second, time to first token) appears whenever the log carries per-side durations. Runs sourced from an orq.ai Dataset (`--prompts orq:<dataset_id>`) link the dataset by name in the report. |
 
@@ -191,39 +227,44 @@ page on demand.
 
 ## Troubleshooting
 
-**`RuntimeError: ORQ_API_KEY is not set. Export it before running orq-arena.`**
-`.env` is missing, empty, or still the blank template. Run `cp .env.example .env`, fill in a
-real key from [my.orq.ai](https://my.orq.ai) > workspace settings > API keys, and re-run. This
-only fires on `run` or `rejudge`, `demo`, `list-models`, and `refresh-models` never
-construct a gateway client, so they run with no key at all (`refresh-models` just falls back
-to cached results, or an empty list).
+??? failure "`RuntimeError: ORQ_API_KEY is not set. Export it before running orq-arena.`"
 
-**`Error: --tui and --headless contradict each other`**
-Both flags were passed to `orq-arena run`; drop one. `--headless` is a deprecated no-op
-(headless is already the default with `--config`); `--tui` opts into the live show.
+    `.env` is missing, empty, or still the blank template. Run `cp .env.example .env`, fill in a
+    real key from [my.orq.ai](https://my.orq.ai) > workspace settings > API keys, and re-run. This
+    only fires on `run` or `rejudge`, `demo`, `list-models`, and `refresh-models` never
+    construct a gateway client, so they run with no key at all (`refresh-models` just falls back
+    to cached results, or an empty list).
 
-**`catalog load failed: ...` toast, then dropped back to the title screen**
-The picker's catalog load raised an unexpected error. Note this is rare by design: HTTP
-failures, a bad `ORQ_API_KEY`, an unreachable gateway, a flaky network, are swallowed
-inside the fetch and degrade to a cached or YAML-only roster, shown as a `FALLBACK` badge in
-the picker instead of this toast. Pressing `ENTER` on the title screen still runs the roster
-already in `orq_arena.yaml`. `orq-arena refresh-models` reports which source the catalog came
-from (live, cache, or fallback, it does not print the underlying HTTP error), and `--config`
-skips the picker altogether.
+??? failure "`Error: --tui and --headless contradict each other`"
 
-**A response panel shows `✂ truncated`**
-The candidate hit its output cap (`gateway.candidate_max_tokens`, default `2048`) before
-finishing, judges tend to penalize a cut-off answer. Raise `gateway.candidate_max_tokens` in
-your YAML, or set a higher per-candidate `max_tokens` on that one entry. See
-[configuration.md](configuration.md#gateway-gatewayconfig).
+    Both flags were passed to `orq-arena run`; drop one. `--headless` is a deprecated no-op
+    (headless is already the default with `--config`); `--tui` opts into the live show.
 
-**A model you expected in the default pool isn't there**
-`orq_arena.yaml` deliberately excludes models the router can't disable thinking for, the
-shipped file's own comment names `moonshotai/kimi-k2.6`, `deepseek/deepseek-v4-pro`, and
-`alibaba/qwen3.5-flash` as excluded for this reason. Mixing an always-thinking model into the
-uniform thinking-**OFF** pool would compare reasoning tokens no config could turn off. Add
-them to `configs/reasoning_arena.yaml` (the thinking-**ON** preset) instead, or pick them
-explicitly in the roster picker if a mixed pool is what you want.
+??? warning "`catalog load failed: ...` toast, then dropped back to the title screen"
+
+    The picker's catalog load raised an unexpected error. Note this is rare by design: HTTP
+    failures, a bad `ORQ_API_KEY`, an unreachable gateway, a flaky network, are swallowed
+    inside the fetch and degrade to a cached or YAML-only roster, shown as a `FALLBACK` badge in
+    the picker instead of this toast. Pressing `ENTER` on the title screen still runs the roster
+    already in `orq_arena.yaml`. `orq-arena refresh-models` reports which source the catalog came
+    from (live, cache, or fallback, it does not print the underlying HTTP error), and `--config`
+    skips the picker altogether.
+
+??? warning "A response panel shows `✂ truncated`"
+
+    The candidate hit its output cap (`gateway.candidate_max_tokens`, default `2048`) before
+    finishing, judges tend to penalize a cut-off answer. Raise `gateway.candidate_max_tokens` in
+    your YAML, or set a higher per-candidate `max_tokens` on that one entry. See
+    [configuration.md](configuration.md#gateway-gatewayconfig).
+
+??? question "A model you expected in the default pool isn't there"
+
+    `orq_arena.yaml` deliberately excludes models the router can't disable thinking for, the
+    shipped file's own comment names `moonshotai/kimi-k2.6`, `deepseek/deepseek-v4-pro`, and
+    `alibaba/qwen3.5-flash` as excluded for this reason. Mixing an always-thinking model into the
+    uniform thinking-**OFF** pool would compare reasoning tokens no config could turn off. Add
+    them to `configs/reasoning_arena.yaml` (the thinking-**ON** preset) instead, or pick them
+    explicitly in the roster picker if a mixed pool is what you want.
 
 ---
 
@@ -233,8 +274,6 @@ explicitly in the roster picker if a mixed pool is what you want.
 |---|---|
 | See every subcommand and flag | [cli.md](cli.md) |
 | Understand every `orq_arena.yaml` key | [configuration.md](configuration.md) |
-| See how the toolkit is structured | [architecture.md](architecture.md) |
 | Understand the scoring methodology | [methodology.md](methodology.md) |
-| Run and write tests | [testing.md](testing.md) |
-| Set up a local development environment | [development.md](development.md) |
-| Back to the project overview | [README.md](../README.md) |
+| Contribute to the project | [CONTRIBUTING.md](https://github.com/orq-ai/orq-arena/blob/master/CONTRIBUTING.md) |
+| Back to the project overview | [README.md](https://github.com/orq-ai/orq-arena/blob/master/README.md) |

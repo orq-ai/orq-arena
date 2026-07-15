@@ -3,11 +3,10 @@
 # Run: orq-arena run --config configs/reasoning_arena.yaml
 
 match:
-  starting_hp: 100
   max_rounds: 5
+  starting_hp: 100        # TUI health-bar knobs only; the rating ignores them
   damage_unanimous: 30
   damage_majority: 15
-  damage_tie: 0
 
 gateway:
   base_url: https://api.orq.ai/v3/router
@@ -32,7 +31,7 @@ candidates:
   - model_id: moonshotai/kimi-k2.6      # always-thinking by model design
 
   - model_id: deepseek/deepseek-reasoner   # always-thinking model
-  - model_id: moonshotai/kimi-k2-thinking  # always-thinking model
+  - model_id: deepseek/deepseek-v4-pro     # reasoning-native (kimi-k2-thinking was 404 in-workspace)
 
 judges:
   - anthropic/claude-haiku-4-5-20251001
@@ -40,7 +39,7 @@ judges:
   - openai/gpt-5.4-nano
 
 replacement_judges:
-  - mistral/mistral-small-2603
+  - mistral/mistral-medium-2604
 
 criteria: >-
   Accuracy and correctness, depth and soundness of reasoning, helpfulness and

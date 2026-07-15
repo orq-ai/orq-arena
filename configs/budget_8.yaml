@@ -1,0 +1,35 @@
+# Budget pool: 8 small/fast models, one per provider. "Which cheap model wins
+# on my prompts?" for the workloads where you won't pay frontier prices.
+#
+# Coherent tier: the small/fast end of the Artificial Analysis intelligence
+# index (source: orquesta-web autorouter-intelligence). Maximum provider
+# diversity, one model each from openai, google, deepseek, mistral, xai, cohere,
+# alibaba, anthropic. Every id is verified to actually respond in the reference
+# workspace. The preflight thinking-probe reports each model's reasoning status.
+#
+# Run: orq-arena run --config configs/budget_8.yaml --prompts your_prompts.jsonl
+
+candidates:
+  - model_id: openai/gpt-5.4-mini                       # AA 16.6 (non-reasoning)
+  - model_id: google/gemini-2.5-flash                   # AA ~mid, fast
+  - model_id: deepseek/deepseek-chat                    # AA ~14-24 (V3 family)
+  - model_id: mistral/mistral-small-2603                # AA ~12-20
+  - model_id: xai/grok-4-1-fast                         # AA 16.9 (non-reasoning)
+  - model_id: cohere/command-a-03-2025                  # AA ~8-29 (Command A)
+  - model_id: alibaba/qwen3.5-flash                     # small alibaba; thinks by design
+  - model_id: anthropic/claude-haiku-4-5-20251001       # also the anthropic judge below;
+    # self-judge exclusion drops it from the panel for its own matches only.
+
+judges:
+  - anthropic/claude-haiku-4-5-20251001
+  - google/gemini-2.5-flash-lite
+  - openai/gpt-5.4-nano
+
+replacement_judges:
+  - mistral/mistral-medium-2604   # AA ~30, above the candidate pool
+
+criteria: >-
+  Accuracy and correctness, helpfulness and completeness, clarity, and
+  relevance to the prompt.
+
+min_successful_judges: 2

@@ -1,8 +1,9 @@
 """Per-match battle engine.
 
-One ``Battle`` owns a single fight: it drives the turn loop, tracks HP,
-invokes the evaluatorq pairwise jury, and pushes typed events onto an
-``asyncio.Queue`` that the TUI subscribes to.
+One ``Battle`` owns a single fight: it drives the turn loop, invokes the
+evaluatorq pairwise jury, and pushes typed events onto an ``asyncio.Queue``
+that the TUI subscribes to. The match winner is whoever won more judged
+rounds; HP/damage is a TUI-only show derived from those same verdicts.
 
 Judging: each round's A/B pair goes through ``llm_jury_pairwise``, every
 judge sees both orderings, a judge that flips abstains (and is recorded), and
@@ -38,16 +39,13 @@ from ..events import (
 )
 from ..roster import CandidateSpec
 from ..providers.orq_gateway import OrqGateway
-from .damage import compute_damage
 
 
 @dataclass
 class MatchResult:
     winner: CandidateSpec
     loser: CandidateSpec
-    by: str  # 'ko' | 'round_cap'
-    final_hp_a: int
-    final_hp_b: int
+    draw: bool
     battles: list[BattleRecord] = field(default_factory=list)
 
 
@@ -180,7 +178,7 @@ class Battle:
 
     async def _void_round(
         self, *, round_number: int, item: PromptItem, reason: str,
-        res_a: SideResult, res_b: SideResult, hp_a: int, hp_b: int,
+        res_a: SideResult, res_b: SideResult,
     ) -> BattleRecord:
         await self.events.put(
             RoundVoided(match_id=self.match_id, round_number=round_number, reason=reason)
@@ -199,14 +197,13 @@ class Battle:
             tournament_id=self.tournament_id,
             match_id=self.match_id,
             round_number=round_number,
-            hp_a_before=hp_a, hp_b_before=hp_b, hp_a_after=hp_a, hp_b_after=hp_b,
         )
 
     async def run(self) -> MatchResult:
         rules = self.cfg.match
-        hp_a = hp_b = rules.starting_hp
         battles: list[BattleRecord] = []
         rounds_counted = 0
+        wins_a = wins_b = 0
 
         await self.events.put(
             MatchStarted(
@@ -217,8 +214,8 @@ class Battle:
             )
         )
 
-        # KO is presentation, not termination: every prompt is judged so the
-        # rating never depends on when the HP bar happened to empty.
+        # The round cap counts decisive rounds; ties/inconclusive keep drawing
+        # more prompts so the rating gets ``max_rounds`` real comparisons.
         prompt_iter = iter(self.prompts)
         while rounds_counted < rules.max_rounds:
             try:
@@ -250,7 +247,7 @@ class Battle:
                 reason = f"{failed}: stream failed after retry, {res_a.error or res_b.error}"
                 battles.append(await self._void_round(
                     round_number=round_number, item=item, reason=reason,
-                    res_a=res_a, res_b=res_b, hp_a=hp_a, hp_b=hp_b,
+                    res_a=res_a, res_b=res_b,
                 ))
                 continue
 
@@ -262,7 +259,7 @@ class Battle:
                 battles.append(await self._void_round(
                     round_number=round_number, item=item,
                     reason=f"jury failed: {exc}",
-                    res_a=res_a, res_b=res_b, hp_a=hp_a, hp_b=hp_b,
+                    res_a=res_a, res_b=res_b,
                 ))
                 continue
 
@@ -278,15 +275,13 @@ class Battle:
                     )
                 )
 
-            damage = compute_damage(comparison=comparison, rules=rules)
-            hp_a_before, hp_b_before = hp_a, hp_b
-            if damage.loser_side == "a":
-                hp_a = max(0, hp_a - damage.damage)
-            elif damage.loser_side == "b":
-                hp_b = max(0, hp_b - damage.damage)
-
-            if damage.counts_toward_cap:
+            if comparison.winner == "A":
+                wins_a += 1
                 rounds_counted += 1
+            elif comparison.winner == "B":
+                wins_b += 1
+                rounds_counted += 1
+            # tie/inconclusive: judged and recorded, but no round-cap credit.
 
             judge_usage = comparison.token_usage
             battles.append(
@@ -322,11 +317,6 @@ class Battle:
                     tournament_id=self.tournament_id,
                     match_id=self.match_id,
                     round_number=round_number,
-                    damage_dealt=damage.damage,
-                    hp_a_before=hp_a_before,
-                    hp_b_before=hp_b_before,
-                    hp_a_after=hp_a,
-                    hp_b_after=hp_b,
                 )
             )
 
@@ -335,37 +325,23 @@ class Battle:
                     match_id=self.match_id,
                     round_number=round_number,
                     majority=comparison.winner,
-                    damage_dealt=damage.damage,
-                    loser_side=damage.loser_side,
-                    hp_a=hp_a,
-                    hp_b=hp_b,
                 )
             )
-            # Let the verdict land on screen before the next round starts.
-            if rules.verdict_hold_s > 0:
-                await asyncio.sleep(rules.verdict_hold_s)
 
-        # Resolve the match for the show. The rating ignores this entirely,
-        # ELO is fed per-round verdicts, so an HP tie is simply a draw.
-        if hp_a == hp_b:
-            winner, loser, by = self.a, self.b, "draw"
-        elif hp_a > hp_b:
-            winner, loser, by = self.a, self.b, "ko" if hp_b <= 0 else "round_cap"
+        # Match winner = more judged round wins; equal is a draw. The rating
+        # ignores this entirely (it's fed per-round verdicts).
+        draw = wins_a == wins_b
+        if wins_a >= wins_b:
+            winner, loser = self.a, self.b
         else:
-            winner, loser, by = self.b, self.a, "ko" if hp_a <= 0 else "round_cap"
+            winner, loser = self.b, self.a
 
         await self.events.put(
             MatchResolved(
                 match_id=self.match_id,
-                winner="" if by == "draw" else winner.name,
-                loser="" if by == "draw" else loser.name,
-                by=by,
-                final_hp_a=hp_a,
-                final_hp_b=hp_b,
+                winner="" if draw else winner.name,
+                loser="" if draw else loser.name,
             )
         )
 
-        return MatchResult(
-            winner=winner, loser=loser, by=by,
-            final_hp_a=hp_a, final_hp_b=hp_b, battles=battles,
-        )
+        return MatchResult(winner=winner, loser=loser, draw=draw, battles=battles)

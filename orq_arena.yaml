@@ -1,13 +1,14 @@
 # orq-arena default configuration.
 # All candidate + judge calls route through the orq.ai router gateway.
 
-# Match rules (hybrid: HP + round cap)
+# Match rules. max_rounds caps the decisive rounds per match; starting_hp and
+# the damage_* tiers drive the live TUI health bars only (the rating never
+# sees them, it's fed per-round verdicts).
 match:
-  starting_hp: 100
   max_rounds: 5
+  starting_hp: 100
   damage_unanimous: 30    # all decisive votes agree (minimum 2)
   damage_majority: 15     # split decision
-  damage_tie: 0           # tie/inconclusive doesn't count toward the round cap
 
 # Orq.ai gateway
 gateway:
@@ -71,9 +72,12 @@ judges:
   - google/gemini-2.5-flash-lite
   - openai/gpt-5.4-nano
 
-# Neutral stand-ins promoted when a primary judge errors.
+# Neutral stand-ins promoted when a primary judge errors. Kept above the primary
+# panel on the Artificial Analysis intelligence index (mistral-medium-2604 ~30,
+# vs the cheap trio ~12-18) so a stand-in never weakens a verdict. NB: don't
+# reach for mistral-large-2411 here, it's the old Large 2 (AA ~9), weaker.
 replacement_judges:
-  - mistral/mistral-small-2603
+  - mistral/mistral-medium-2604
 
 # What the jury judges on (feeds evaluatorq's pairwise criteria).
 criteria: >-

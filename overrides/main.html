@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{#- Machine-discoverable pointer to /llms.txt (agent-readable docs) plus basic
+    og:/twitter: meta; Material emits neither on its own. -#}
+{% block extrahead %}
+  <link rel="alternate" type="text/markdown" href="{{ 'llms.txt' | url }}" title="llms.txt (agent-readable docs)">
+  {% set page_title = (page.title if page and page.title else config.site_name) | striptags %}
+  {% set page_desc = (page.meta.description if page and page.meta.description else config.site_description) %}
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="{{ page_title }}">
+  <meta property="og:description" content="{{ page_desc }}">
+  <meta property="og:url" content="{{ page.canonical_url if page else config.site_url }}">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="{{ page_title }}">
+  <meta name="twitter:description" content="{{ page_desc }}">
+{% endblock %}

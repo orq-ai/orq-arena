@@ -8,15 +8,17 @@
 
 An arena benchmark for LLMs on **your own prompts**. It answers the question every model pool raises: **"which of these models actually wins on *my* prompts, and can I trust the ranking?"**
 
-One headless command runs a round-robin over your pool: an LLM jury judges every round from both seat orders, a **Bradley-Terry ELO leaderboard** with confidence intervals comes out the other end, and the run finishes by opening a self-contained **HTML report** you can hand to anyone. A live terminal show ships too, as the bonus.
+One command runs a round-robin tournament over your models. A panel of LLM judges compares every pair of answers blind, in both orders so no judge can favor "whichever answer came first". Out the other end: a chess-style **ELO leaderboard** with confidence intervals, and a self-contained **HTML report** you can send to anyone. A live terminal show ships too, as the bonus.
 
 ![HTML report page: verdict banner with the top three models, badges, ELO leaderboard with CI bars, and the ELO-vs-cost value map](media/report-page.png)
 
 ## Why orq-arena?
 
-Scoring one model against a rubric is a solved problem; that is [evaluatorq](https://github.com/orq-ai/evaluatorq). What it doesn't give you is a **ranking of a whole pool**: when five models all pass your evals, which one should be the default? Absolute scores saturate; pairwise preference under a bias-controlled jury still separates them.
+Public leaderboards rank models on someone else's prompts. Your eval suite scores models one at a time, and once several models all pass, the scores stop telling them apart: everything gets a 9/10.
 
-orq-arena is that missing layer. It runs a round-robin over any pool of models reachable through the [orq.ai router gateway](https://docs.orq.ai/docs/ai-gateway) (one OpenAI-compatible client, one API key, every provider) and hands every verdict to evaluatorq's pairwise jury: each judge sees the pair in *both orders*; a judge that contradicts itself abstains and is recorded as position-biased; a degraded panel yields `inconclusive` rather than a fake verdict.
+Comparison still works where scores saturate. Show a judge two answers to the same prompt and ask which is better; that's how [LMArena](https://lmarena.ai) ranks models with human voters. orq-arena runs the same protocol on **your prompts** with an LLM jury instead of a crowd, and guards the verdicts: every pair is judged twice with the answers swapped, a judge that changes its vote when only the order changed is discarded for that round, and if too few trustworthy votes remain the round counts as `inconclusive` rather than a coin flip.
+
+Models are called through the [orq.ai router gateway](https://docs.orq.ai/docs/ai-gateway), so one API key covers every provider; judging is [evaluatorq](https://github.com/orq-ai/evaluatorq), our library for exactly this kind of jury.
 
 **Use it when you want to:**
 
@@ -27,13 +29,15 @@ orq-arena is that missing layer. It runs a round-robin over any pool of models r
 
 ## What you get
 
-- **A defensible ranking**: pairwise judging in both seat orders, per-round Bradley-Terry with ties, bootstrap 95% CIs, Fleiss'/Cohen's κ, and a seeded manifest per run.
-- **A report you can forward**: every run ends with a self-contained HTML page: a plain-words verdict, the ELO ladder with error bars, an ELO-vs-cost value map, speed, token and dollar accounting.
-- **Real benchmark data out the back**: every round lands in `battles.jsonl` (schema v2) with both responses, reconciled per-judge votes, exact token/reasoning-token usage, per-response timing.
-- **Headless by default**: plain log lines on pipes, a progress bar on terminals, matches in parallel; drop it in CI or cron as-is.
-- **Jury swaps without regeneration**: re-judge any recorded run with a different panel and get a rank-stability answer (Spearman).
-- **A human anchor in one file**: `annotate` renders any recorded run into a blind browser page (no names, no jury votes, seeded side swaps); send it to raters, feed their `votes.json` to `anchor`, and get panel-vs-human κ plus rank correlation.
-- **A live show when you want one**: `--tui` streams the same run as a CRT-neon arena: side-by-side responses, judge cards calling out position-biased votes, HP drama. `orq-arena demo` replays one with no API key.
+- **A ranking you can defend.** The rating is [Bradley-Terry](https://en.wikipedia.org/wiki/Bradley%E2%80%93Terry_model), the statistical model behind chess-style ratings, fit over every judged round with bootstrapped 95% confidence intervals. When two models are statistically tied, the report says so instead of hiding it. Judge-agreement stats ship with the standings.
+- **A report you can forward.** One self-contained HTML file per run. Plain-words verdict up top, then the ELO ladder with error bars, a quality-vs-cost chart, latency, and the exact dollar spend.
+- **Raw data out the back.** Every judged round lands in `battles.jsonl`: both responses, each judge's vote, exact token counts, per-response timing. Real pairwise preference data for whatever you want to do next.
+- **Headless by default.** Plain log lines on pipes, a progress bar on terminals, matches in parallel. Drop it in CI or cron with `-y`.
+- **Cheap jury swaps.** The responses are already recorded, so re-judging with a different panel costs judge tokens only, and tells you how much the ranking depends on who judged it.
+- **Human spot-checks.** `annotate` renders a run into a blind page (no model names, no jury votes) you can send to human raters; `anchor` compares their votes with the panel's. (The mechanism ships; no published study against it yet, see [Methodology](docs/methodology.md#current-limitations).)
+- **A live show when you want one.** `--tui` (optional extra) streams the run as a CRT-neon arena with health bars and judge cards. `orq-arena demo` replays one with no API key.
+
+Don't take the bullets' word for it: a real recorded run is committed at [`examples/quickstart/`](examples/quickstart/) (a small 4-model pool). Inspect the raw `battles.jsonl` and its manifest, or regenerate the report yourself: `uv run orq-arena report examples/quickstart/battles.jsonl`.
 
 ## Installation
 
@@ -45,6 +49,11 @@ cd orq-arena
 uv sync
 ```
 
+`uv sync` (or `pip install orq-arena`) installs the core: the benchmark, the HTML report, and
+`rejudge` all run on this. The live `--tui` show, the interactive roster picker (the no-`--config`
+path), and `orq-arena demo` need the optional `tui` extra: `uv sync --extra tui` (or
+`pip install "orq-arena[tui]"`). Without it those commands print a friendly install hint.
+
 ## Quick start
 
 1. Get an API key from your [orq.ai](https://my.orq.ai) workspace: `cp .env.example .env`, then fill in `ORQ_API_KEY` (loaded automatically).
@@ -54,7 +63,13 @@ uv sync
 uv run orq-arena run --config orq_arena.yaml --prompts your_prompts.jsonl
 ```
 
-The preflight prints exact call counts and a spend ceiling, asks once, then matches run in parallel with plain log lines. When the last round lands, the **HTML report opens in your browser** (`--no-open` to skip, `--yes` to skip the pause; both make it CI-ready).
+Before spending anything, the preflight prints the exact number of API calls and a worst-case dollar ceiling, then asks once. Matches run in parallel with plain log lines. When the last round lands, the **HTML report opens in your browser**.
+
+```bash
+# CI/cron-ready: -y skips the confirmation (required in a non-interactive
+# shell, where the prompt would abort), --no-open skips the browser
+uv run orq-arena run --config orq_arena.yaml --prompts your_prompts.jsonl -y --no-open
+```
 
 Bring your prompts either way:
 
@@ -77,11 +92,11 @@ No key yet? Watch a recorded tournament first: `uv run orq-arena demo` (zero API
 
 ## Usage
 
-**Run the benchmark**: `uv run orq-arena run --config orq_arena.yaml` (headless, parallel, report at the end). Without `--config` the interactive roster picker opens over your workspace-enabled catalog, which runs the live TUI. Full flag reference: **[docs/cli.md](docs/cli.md)**.
+**Run the benchmark**: `uv run orq-arena run --config orq_arena.yaml` (headless, parallel, report at the end). Without `--config`, an interactive picker opens over the models enabled in your workspace and the run plays live in the TUI. Full flag reference: **[docs/cli.md](docs/cli.md)**.
 
-**Share the result**: the report (`<log>.report.html`) is one self-contained file: a verdict banner naming the top three models with win rate, ELO score, and total cost, the ELO ladder with CI bars, len-ctrl column, an ELO-vs-cost value map, a Speed section (tok/s, time-to-first-token), win grid, jury behaviour, and a link back to the source Dataset on Dataset-backed runs. Regenerate any time with `uv run orq-arena report battles.jsonl`; no model calls (one catalog read prices the cost section when a key is present).
+**Share the result**: the report (`<log>.report.html`) is one self-contained file. It opens with a verdict banner naming the top three models (win rate, ELO, total cost), then the full ladder with error bars, a quality-vs-cost chart, speed, the win grid, and how the jury behaved. Regenerate it any time with `uv run orq-arena report battles.jsonl`, no model calls needed.
 
-**Re-judge with a different jury**: the responses are already in `battles.jsonl`, so swapping the panel costs judge tokens only: `uv run orq-arena rejudge battles.jsonl --judge mistral/mistral-small-2603`. Prints the new jury's behaviour and the Spearman correlation against the recorded ranking. Multi-judge example: **[docs/cli.md](docs/cli.md)**.
+**Re-judge with a different jury**: the responses are already in `battles.jsonl`, so swapping the panel costs judge tokens only: `uv run orq-arena rejudge battles.jsonl --judge mistral/mistral-small-2603`. It reports how the new jury behaved and how much the ranking moved. Multi-judge example: **[docs/cli.md](docs/cli.md)**.
 
 ## The live show (bonus)
 
@@ -93,7 +108,7 @@ From the final leaderboard, `B` pages through every judged round (prompt, both r
 
 ## Configuration
 
-Everything lives in `orq_arena.yaml`, no flags to remember. The default pool is **uniform thinking-OFF** (verified per model against the live router) so the ELO compares models, not vendor defaults; `configs/reasoning_arena.yaml` is the thinking-ON counterpart. Reasoning recipes per provider, replacement judges, and every other key: **[docs/configuration.md](docs/configuration.md)**.
+Everything lives in `orq_arena.yaml`, no flags to remember. The default pool runs every model with extended reasoning ("thinking") turned **off**, and verifies that against the live router, so the ELO compares models on equal footing rather than whatever each vendor enables by default. `configs/reasoning_arena.yaml` is the thinking-ON counterpart, and [`configs/`](configs/) has ready-made frontier, budget, and 16-model pools. Per-provider reasoning settings, replacement judges, and every other key: **[docs/configuration.md](docs/configuration.md)**.
 
 **Not locked to orq.ai.** The engine speaks plain OpenAI-compatible chat: point `gateway.base_url` at any endpoint that speaks that format and set `api_key_env` to match. The orq.ai router is the default because one key covers every provider (and powers the roster picker); it is the recommended path, not the only one. Details: [docs/configuration.md](docs/configuration.md#bring-your-own-endpoint).
 
@@ -111,33 +126,26 @@ min_successful_judges: 2   # jury-of-one -> inconclusive, never a verdict
 
 ## How the number is made
 
-- **Pairwise, same prompt, both seat orders**: the Chatbot-Arena family of methodology, with evaluatorq's consistency gate on top.
-- **Per-round Bradley-Terry MLE with bootstrap 95% CIs**: a default run rates on up to 140 comparisons, not 7 knockouts; overlapping intervals are the honest output on small runs.
-- **Length-controlled rating alongside the raw one**: the LMArena / length-controlled-AlpacaEval move. Bradley-Terry refit with a normalized length-difference covariate, the jury's length coefficient reported in public, and the ELO shown with that preference priced out. A model can still win by being longer; it can't do it invisibly.
-- **A model loses on its words, never on its network**: a dead stream retries once, then the round is voided; read-gap timeouts (default 20 min of silence) never penalize slow thinkers.
-- **Self-aware and reproducible**: Fleiss'/Cohen's κ and per-judge flip rates ship with the standings; every run writes a seeded manifest (config/prompt hashes, panel, evaluatorq version). Full methodology, bias controls, tie handling, voided-round bookkeeping, manifest schema: **[docs/methodology.md](docs/methodology.md)**.
+- **Same prompt, both orders.** Every pair of answers is judged twice with positions swapped, the LMArena family of methodology. A judge that picks A in one order and B in the other was voting on position, not content; its vote is thrown out for that round and the flip is counted against it.
+- **Ratings from every round, not from knockouts.** The ELO is a Bradley-Terry fit over all judged rounds (a default 8-model run rates on up to 140 comparisons, not 7 match wins), with bootstrapped 95% confidence intervals. On small runs the intervals overlap; the report says so rather than pretending precision.
+- **Length preference is priced out, in public.** LLM judges tend to favor longer answers. The rating is also refit with that preference removed, and both numbers are shown side by side. A model can still win by being longer; it can't do it invisibly.
+- **A model loses on its words, never on its network.** A dead stream retries once, then the round is voided, never judged, never scored. Timeouts fire on silence between tokens, not total duration, so slow-thinking models aren't penalized for being slow.
+- **Self-aware and reproducible.** Judge-agreement statistics and per-judge flip rates ship with the standings. Every run writes a manifest with the random seed, config and prompt hashes, and the exact panel, enough to rerun or audit it. Full details: **[docs/methodology.md](docs/methodology.md)**.
 
 ## Documentation
 
-Full guides live in [`docs/`](docs/); start with the [docs index](docs/README.md) for a reading order tailored to your goal.
+Full guides live at **[orq-ai.github.io/orq-arena](https://orq-ai.github.io/orq-arena/)** (source in [`docs/`](docs/)); start with the [docs index](docs/index.md) for a reading order tailored to your goal.
 
 | Guide | Description |
 |-------|-------------|
 | [Getting Started](docs/getting-started.md) | Prerequisites, install, first live run, common setup issues |
-| [CLI Reference](docs/cli.md) | Every command and flag, `run`, `demo`, `rejudge`, `jury-compare`, `report`, `annotate`, `anchor`, `list-models`, `refresh-models` |
+| [CLI Reference](docs/cli.md) | Every command and flag, `run`, `demo`, `rejudge` (with `--compare`), `report`, `annotate`, `anchor`, `list-models`, `refresh-models` |
 | [Configuration](docs/configuration.md) | Every `orq_arena.yaml` key, reasoning recipes, defaults |
-| [Methodology](docs/methodology.md) | Bradley-Terry scoring, bias controls, confidence intervals, reproducibility |
-| [Architecture](docs/architecture.md) | Component overview, data flow, key abstractions |
-| [Testing](docs/testing.md) | Running the suite and writing new tests |
-| [Development](docs/development.md) | Local dev setup, code style, contribution workflow |
-
-## Running tests
-
-Run the full suite with `uv run pytest`. See [docs/testing.md](docs/testing.md) for coverage requirements and how to write new tests.
+| [Methodology](docs/methodology.md) | How the ranking is made, bias controls, confidence intervals, reproducibility |
 
 ## Contributing
 
-Bug reports, feature ideas, documentation fixes, and pull requests are all welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
+Bug reports, feature ideas, documentation fixes, and pull requests are all welcome; see [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup, project shape, and conventions. Run the test suite with `uv run pytest`.
 
 ## Related projects
 

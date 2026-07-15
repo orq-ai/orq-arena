@@ -61,16 +61,22 @@ def _triples(outcomes: list[Outcome]) -> list[tuple[str, str, str]]:
 MIN_CATEGORY_COMPARISONS = 20
 
 
-def elo_by_category(outcomes: list[Outcome], names: list[str]) -> dict[str, dict[str, float]]:
-    """Bradley-Terry per prompt category, skipping under-sampled slices."""
+def elo_by_category(outcomes: list[Outcome]) -> dict[str, dict[str, float]]:
+    """Bradley-Terry per prompt category, skipping under-sampled slices.
+
+    Each slice rates only the models that actually appear in it; a model
+    absent from a category is left out, not seeded at 1000.
+    """
     by_cat: dict[str, list[Outcome]] = {}
     for o in outcomes:
         by_cat.setdefault(o[3], []).append(o)
-    return {
-        cat: bradley_terry_mle(build_wins_matrix(_triples(rows)), names)
-        for cat, rows in sorted(by_cat.items())
-        if len(rows) >= MIN_CATEGORY_COMPARISONS
-    }
+    out: dict[str, dict[str, float]] = {}
+    for cat, rows in sorted(by_cat.items()):
+        if len(rows) < MIN_CATEGORY_COMPARISONS:
+            continue
+        cat_names = sorted({x for a, b, _kind, _cat in rows for x in (a, b)})
+        out[cat] = bradley_terry_mle(build_wins_matrix(_triples(rows)), cat_names)
+    return out
 
 
 def _rebuild_comparisons(records: list[BattleRecord]) -> list[PairwiseComparison]:
@@ -153,7 +159,7 @@ def _final_report(
         "elo_ci": bootstrap_ci(_triples(outcomes), names),
         "elo_style_controlled": elo_sc if style_rows else None,
         "length_coef": length_coef if style_rows else None,
-        "elo_by_category": elo_by_category(outcomes, names),
+        "elo_by_category": elo_by_category(outcomes),
         "category_counts": cat_counts,
         "tokens": {
             "models_in": model_in,
@@ -294,10 +300,8 @@ async def run_tournament(
     manifest_path = Path(battle_log_path).with_suffix(".run.json")
 
     names = [w.name for w in cfg.candidates]
-    candidate_by_name = {w.name: w for w in cfg.candidates}
-    use_swiss = len(cfg.candidates) > 8
-    schedule = [] if use_swiss else round_robin_schedule(cfg.candidates, seed)
-    matches_total = cfg.swiss_rounds * (len(names) // 2) if use_swiss else len(schedule)
+    schedule = round_robin_schedule(cfg.candidates, seed)
+    matches_total = len(schedule)
     started_at = time.time()
     tournament_id = f"bench-{int(started_at)}"
     _write_manifest(
@@ -354,43 +358,17 @@ async def run_tournament(
                 )
             return result
 
-    if not use_swiss:
-        # Slices pre-drawn so the schedule is seed-stable regardless of
-        # completion order under concurrency.
-        slices = [_draw_slice() for _ in schedule]
-        if concurrency <= 1:
-            for i, (w_a, w_b) in enumerate(schedule, 1):
-                await _run_match(i, w_a, w_b, slices[i - 1])
-        else:
-            await asyncio.gather(
-                *(
-                    _run_match(i, w_a, w_b, slices[i - 1])
-                    for i, (w_a, w_b) in enumerate(schedule, 1)
-                )
-            )
+    # Slices pre-drawn so the schedule is seed-stable regardless of
+    # completion order under concurrency.
+    slices = [_draw_slice() for _ in schedule]
+    if concurrency <= 1:
+        for i, (w_a, w_b) in enumerate(schedule, 1):
+            await _run_match(i, w_a, w_b, slices[i - 1])
     else:
-        # Pools >8: Swiss, pair by score group between rounds (decision 15:
-        # pairing consumes match winners; the rating stays per-round).
-        from .swiss import SwissScheduler
-
-        scheduler = SwissScheduler(names)
-        match_no = 0
-        for _swiss_round in range(1, cfg.swiss_rounds + 1):
-            pairs = scheduler.next_round_pairs()
-            if not pairs:
-                break
-            tasks = []
-            for a, b in pairs:
-                match_no += 1
-                tasks.append(
-                    _run_match(match_no, candidate_by_name[a], candidate_by_name[b], _draw_slice())
-                )
-            results = await asyncio.gather(*tasks)
-            for res in results:
-                if res.by == "draw":
-                    scheduler.record_outcome(res.winner.name, res.loser.name, tie=True)
-                else:
-                    scheduler.record_outcome(res.winner.name, res.loser.name)
+        await asyncio.gather(*(
+            _run_match(i, w_a, w_b, slices[i - 1])
+            for i, (w_a, w_b) in enumerate(schedule, 1)
+        ))
 
     report = _final_report(cfg, all_records, outcomes, names, preflight=preflight)
     _write_manifest(

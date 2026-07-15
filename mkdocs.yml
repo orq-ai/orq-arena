@@ -1,0 +1,88 @@
+site_name: orq-arena
+site_description: "LLM arena benchmark on your own prompts: pairwise jury judging, Bradley-Terry ELO with confidence intervals, every token through the orq.ai router."
+site_url: https://orq-ai.github.io/orq-arena/
+repo_url: https://github.com/orq-ai/orq-arena
+repo_name: orq-ai/orq-arena
+docs_dir: docs
+copyright: "© 2026 Orq AI · MIT License"
+
+theme:
+  name: material
+  custom_dir: overrides   # overrides/main.html: og:/twitter: meta + llms.txt alternate link
+  logo: assets/orq-mark-white.svg
+  favicon: assets/orq-favicon.svg
+  # Self-host the Orq brand fonts (Avio Sans / Kurrent), see stylesheets/extra.css.
+  # `false` stops Material fetching Google Fonts; @font-face + var overrides do the rest.
+  font: false
+  features:
+    - content.code.annotate
+    - content.code.copy
+    - content.tooltips
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.sections
+    - navigation.top
+    - toc.follow
+    - search.highlight
+  # 3-way auto / light / dark toggle, Orq palette (defined in stylesheets/extra.css).
+  palette:
+    - scheme: default
+      primary: custom
+      accent: custom
+      toggle: { icon: material/brightness-7, name: Switch dark mode }
+    - scheme: slate
+      primary: custom
+      accent: custom
+      toggle: { icon: material/brightness-4, name: Switch light mode }
+
+extra_css:
+  - stylesheets/extra.css
+
+plugins:
+  - search
+  # Agent-browsable docs: /llms.txt (curated markdown index) and /llms-full.txt
+  # (all docs as one markdown file) per the llms.txt convention.
+  - llmstxt:
+      markdown_description: |
+        This is the curated docs index. For the complete docs as one Markdown file, use
+        [llms-full.txt](llms-full.txt).
+      full_output: llms-full.txt
+      sections:
+        Getting started:
+          - index.md: Docs overview and suggested reading order.
+          - getting-started.md: Install, run the zero-key demo, first live tournament.
+        Reference:
+          - cli.md: Every command and flag.
+          - configuration.md: Every orq_arena.yaml key, reasoning recipes, defaults.
+        Trust the number:
+          - methodology.md: How the ranking is made, bias controls, confidence intervals, reproducibility.
+
+markdown_extensions:
+  - tables
+  - attr_list
+  - md_in_html
+  - admonition
+  - footnotes
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - CLI Reference: cli.md
+  - Configuration: configuration.md
+  - Methodology: methodology.md
