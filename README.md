@@ -104,7 +104,7 @@ The same run, projected: `uv run orq-arena run --config orq_arena.yaml --tui` st
 
 ![orq-arena demo: a replayed match streaming side by side, judge cards calling out flipped votes, and the final leaderboard](media/demo.gif)
 
-From the final leaderboard, `B` pages through every judged round (prompt, both responses, per-judge votes with flip badges); `M` generates per-model coach notes from an analyzer model. Screenshots and keys: [docs/cli.md](docs/cli.md).
+From the final leaderboard, `B` pages through every judged round (prompt, both responses, per-judge votes with flip badges). Screenshots and keys: [docs/cli.md](docs/cli.md).
 
 ## Configuration
 

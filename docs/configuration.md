@@ -96,8 +96,8 @@ gateway:
   stream_read_timeout_s: 1200
   judge_timeout_ms: 90000
 
-# preflight, headless_concurrency, analyzer_model not set in the shipped
-# file - all three take their code defaults (see tables below).
+# preflight and headless_concurrency not set in the shipped
+# file - both take their code defaults (see tables below).
 
 candidates:
   - model_id: anthropic/claude-opus-4-8
@@ -197,7 +197,6 @@ pool a one-command run. It is the recommended path, not the only one.
 | Key | Type | Default | Effect |
 |---|---|---|---|
 | `headless_concurrency` | `int` | `4` | Matches run in parallel under an `asyncio.Semaphore(max(1, headless_concurrency))`, for `orq-arena run --headless` only (`run_headless` → `run_tournament(concurrency=...)`, `src/orq_arena/headless.py`). The TUI always passes `concurrency=1` internally so the live show stays one fight at a time, this key has no effect on non-headless runs. |
-| `analyzer_model` | `str` | `"openai/gpt-5.4-mini"` | Router model id used to generate the per-model post-mortem ("coach notes": strengths, weaknesses, judge patterns) when `M` is pressed on the final leaderboard (`src/orq_arena/tui/screens/postmortem.py` → `src/orq_arena/analysis/postmortem.py`). Output is cached in `analysis.jsonl` next to the battle log, so re-opening the post-mortem screen doesn't re-spend tokens. |
 
 ### `candidates` (the roster)
 
@@ -341,7 +340,6 @@ Everything else is a Pydantic default and safe to omit from the YAML entirely:
 | `replacement_judges` | `[]` |
 | `criteria` | `"Accuracy and correctness, helpfulness and completeness, clarity, and relevance to the prompt."` |
 | `min_successful_judges` | `2` |
-| `analyzer_model` | `openai/gpt-5.4-mini` |
 | `candidates[].name` | short model id |
 | `candidates[].emblem` | `""` |
 | `candidates[].reasoning` | `null` |
@@ -379,4 +377,3 @@ git-ignored (`.gitignore`):
 | `.env` | Hand-authored from `.env.example`; never committed. |
 | `battles.jsonl` | `orq-arena run`, one row per judged round (`BattleRecord`, schema v3; includes per-model `ttft_a_ms`/`ttft_b_ms` and `duration_a_ms`/`duration_b_ms` timing fields). |
 | `battles.run.json` | `orq-arena run`, the run manifest (config + prompt hashes, panel, seed, agreement stats; also a `dataset` key with id, name, and studio URL for dataset-sourced runs). |
-| `analysis.jsonl` | The post-mortem screen (`M` on the leaderboard), cached analyzer output, written next to the battle log. |

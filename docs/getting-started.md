@@ -143,8 +143,8 @@ without it `orq-arena run` with no `--config` prints an install hint):
    drops on the TUI health bars, and the round is logged.
 4. **The leaderboard.** Once every match finishes, the final Bradley-Terry ELO leaderboard
    opens with bootstrap 95% CIs. Press `B` to browse every judged round (prompt, both
-   responses, per-judge votes with flip badges), `M` to generate per-model coach notes, `S` to
-   save a screenshot, `ENTER`/`SPACE`/`Q` to exit.
+   responses, per-judge votes with flip badges), `S` to save a screenshot,
+   `ENTER`/`SPACE`/`Q` to exit.
 
 ![The final leaderboard: ELO with 95% CIs and the len-ctrl column, per-judge behaviour, win grid](assets/leaderboard.svg)
 

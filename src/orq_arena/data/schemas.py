@@ -9,6 +9,7 @@ the judged verdicts. Old v2 logs still load (the dropped fields are ignored).
 from __future__ import annotations
 
 import time
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -59,3 +60,18 @@ class BattleRecord(BaseModel):
     tournament_id: str = ""
     match_id: str = ""
     round_number: int = 0
+
+
+def load_records(log_path: str | Path) -> list[BattleRecord]:
+    """Every record in a battle log, voided rounds included (unlike
+    rejudge's judgeable-only loader). Missing file -> empty list."""
+    records: list[BattleRecord] = []
+    p = Path(log_path)
+    if not p.exists():
+        return records
+    with p.open(encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if line:
+                records.append(BattleRecord.model_validate_json(line))
+    return records

@@ -67,8 +67,6 @@ class ArenaConfig(BaseModel):
     # Fewer decisive reconciled votes than this -> round is \'inconclusive\',
     # never a verdict. Guards against jury-of-one "unanimous" hits.
     min_successful_judges: int = 2
-    # Cheap model for the post-run per-model post-mortems (leaderboard "M").
-    analyzer_model: str = "openai/gpt-5.4-mini"
 
     @model_validator(mode="after")
     def _validate(self) -> "ArenaConfig":
@@ -81,8 +79,7 @@ class ArenaConfig(BaseModel):
             cap = c.max_tokens or self.gateway.candidate_max_tokens
             if isinstance(budget, int) and budget >= cap:
                 raise ValueError(
-                    f"{c.name}: thinking budget_tokens ({budget}) must be < "
-                    f"max_tokens ({cap})"
+                    f"{c.name}: thinking budget_tokens ({budget}) must be < max_tokens ({cap})"
                 )
         return self
 
