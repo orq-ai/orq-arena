@@ -218,7 +218,7 @@ def test_report_links_orq_dataset():
 
 
 def test_report_with_custom_display_names():
-    """Records store short model names; a roster with custom display names must
+    """Records store short model names; a pool with custom display names must
     still price, rank, and render (regression: KeyError / blank cost column)."""
     from orq_arena.tournament.driver import rebuild_from_log
 

@@ -57,7 +57,7 @@ print a friendly install hint.
 ## Quick start
 
 1. Get an API key from your [orq.ai](https://my.orq.ai) workspace: `cp .env.example .env`, then fill in `ORQ_API_KEY` (loaded automatically).
-2. Point the roster at your pool (or keep the shipped 8-model `orq_arena.yaml`) and run:
+2. Point the `candidates` list at your model pool (or keep the shipped 8-model `orq_arena.yaml`) and run:
 
 ```bash
 uv run orq-arena run --config orq_arena.yaml --prompts your_prompts.jsonl

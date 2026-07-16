@@ -33,7 +33,7 @@ Commands:
   anchor          Merge human vote files against a recorded run: κ + rank...
   annotate        Render a blinded human-annotation page from a recorded...
   demo            Replay a recorded tournament from a fixture file (no...
-  list-models     Print the configured candidate roster.
+  list-models     Print the configured candidate pool.
   refresh-models  Re-fetch the workspace-enabled chat model list from...
   rejudge         Re-judge a recorded run with a different panel, zero...
   report          Render the single-file HTML report page from a recorded...
@@ -59,7 +59,7 @@ full `orq_arena.yaml` key reference, see [configuration.md](configuration.md).
 |---|---|
 | [`run`](#run) | Round-robin benchmark via the orq.ai router: headless by default, HTML report opens at the end, `--tui` for the live show. |
 | [`demo`](#demo) | Replay a recorded tournament fixture, zero API calls, zero key. |
-| [`list-models`](#list-models) | Print the configured roster (seed, name, model id). |
+| [`list-models`](#list-models) | Print the configured candidate pool (seed, name, model id). |
 | [`rejudge`](#rejudge) | Re-score a recorded `battles.jsonl` with a different judge panel, zero regeneration; or, with [`--compare`](#rejudge-compare), tabulate saved rejudge reports side by side. |
 | [`report`](#report) | Render the single-file HTML report page from a recorded run; no model calls, one optional catalog read for prices. |
 | [`annotate`](#annotate) | Render a blinded human-annotation page from a recorded run; no API calls. |
@@ -116,7 +116,7 @@ A few things apply across every subcommand and are only documented once, here:
 
 ## `run`
 
-Run the benchmark (a full round-robin over the pool), hits orq.ai. The roster
+Run the benchmark (a full round-robin over the pool), hits orq.ai. The model pool
 comes from the YAML as-is (`--config` defaults to `orq_arena.yaml`). The run is
 headless: matches in parallel, plain log lines on pipes, a progress bar on
 terminals, and the HTML report opens in your browser at the end. `--tui` runs
@@ -131,7 +131,7 @@ orq-arena run [--config PATH] [--prompts PATH] [--output PATH] [--rounds N]
 
 | Flag | Default | Effect |
 |---|---|---|
-| `--config PATH` | `orq_arena.yaml` | YAML roster + rules (candidates, judges, match, gateway), used exactly as written. |
+| `--config PATH` | `orq_arena.yaml` | YAML config: candidates (the model pool), judges, match, gateway; used exactly as written. |
 | `--prompts PATH` | `prompts/starter.jsonl` | JSONL prompt file, see [Prompts file format](configuration.md#prompts-file-format), or `orq:<dataset_id>` to pull an [orq.ai Dataset](https://docs.orq.ai/docs/ai-studio/optimize/datasets): each datapoint's last user message becomes a prompt, `{{var}}` placeholders filled from its `inputs`; datapoints without a user message are skipped. Uses the same API key as the gateway. When the prompts come from a Dataset, the run manifest records its id, display name, and studio URL, and the HTML report links the dataset by name. |
 | `--output PATH` | `battles.jsonl` | Where the battle log (schema v3) is written as rounds complete. |
 | `--rounds N` | `match.max_rounds` from the YAML | Rounds per match. The preflight warns when this samples a subset of your prompts. |
@@ -143,7 +143,7 @@ orq-arena run [--config PATH] [--prompts PATH] [--output PATH] [--rounds N]
 
 **Behavior notes:**
 
-- **The roster is the YAML's `candidates` list, verbatim.** Preflight and the confirmation
+- **The model pool is the YAML's `candidates` list, verbatim.** Preflight and the confirmation
   prompt happen up front in the terminal, before the TUI (or headless run) even starts. To
   discover which model ids your workspace can fight, see
   [`refresh-models`](#refresh-models) (`--show` lists them grouped by provider).
@@ -167,7 +167,7 @@ orq-arena run [--config PATH] [--prompts PATH] [--output PATH] [--rounds N]
   It is an upper bound, the number the run cannot exceed, not a prediction; the judge-input
   term assumes both responses hit the model output cap. Models missing from the catalog are
   excluded and listed on a `⚠ no catalog price for: …` line; if pricing is entirely
-  unreachable that warning lists the whole roster and the spend-ceiling line is the one
+  unreachable that warning lists the whole pool and the spend-ceiling line is the one
   skipped (pricing never blocks the run). The ceiling is also recorded in the run
   manifest under `preflight.cost_ceiling`. If `preflight.thinking_probe`
   is enabled (default `true`), a `thinking probe…` line follows, then one line per candidate that
@@ -190,7 +190,7 @@ orq-arena run [--config PATH] [--prompts PATH] [--output PATH] [--rounds N]
 **Examples:**
 
 ```bash
-# Fight the shipped roster (orq_arena.yaml), confirm the preflight interactively
+# Fight the shipped pool (orq_arena.yaml), confirm the preflight interactively
 uv run orq-arena run
 
 # Same, skipping the confirmation prompt
@@ -199,7 +199,7 @@ uv run orq-arena run --yes
 # CI/cron -- headless is the default; matches run in parallel (headless_concurrency)
 uv run orq-arena run --yes
 
-# Custom prompt set and output path, with an alternate roster
+# Custom prompt set and output path, with an alternate pool
 uv run orq-arena run --config configs/reasoning_arena.yaml --prompts prompts/starter.jsonl --output reasoning_battles.jsonl
 ```
 
@@ -266,7 +266,7 @@ orq-arena demo [--fixture PATH] [--config PATH]
 | Flag | Default | Effect |
 |---|---|---|
 | `--fixture PATH` | `fixtures/demo_tournament.json` | Recorded arena events to replay. |
-| `--config PATH` | `orq_arena.yaml` | Used only for its rules/roster labels in the replay, no live calls are made, so `ORQ_API_KEY` is not required. |
+| `--config PATH` | `orq_arena.yaml` | Used only for its rules/candidate labels in the replay, no live calls are made, so `ORQ_API_KEY` is not required. |
 
 **Behavior notes:**
 
@@ -293,7 +293,7 @@ flip badges; `s` saves an SVG screenshot; `q` quits.
 
 ## `list-models`
 
-Print the configured roster, no API calls, no key required.
+Print the configured candidate pool, no API calls, no key required.
 
 ```text
 orq-arena list-models [--config PATH] [--json]
@@ -301,14 +301,14 @@ orq-arena list-models [--config PATH] [--json]
 
 | Flag | Default | Effect |
 |---|---|---|
-| `--config PATH` | `orq_arena.yaml` | YAML roster to print. |
-| `--json` | off | Print the roster as a JSON array of `{seed, name, model_id}` objects instead of the table. |
+| `--config PATH` | `orq_arena.yaml` | YAML config whose `candidates` are printed. |
+| `--json` | off | Print the pool as a JSON array of `{seed, name, model_id}` objects instead of the table. |
 
 **Behavior notes:**
 
 - Prints a fixed-width table, seed number, `name` (falls back to the model's short name,
-  see [configuration.md](configuration.md#candidates-the-roster)), and the full `model_id`, in
-  roster order, 1-indexed. Format string: `f"{'Seed':<5} {'Name':<26} Model ID"` for the
+  see [configuration.md](configuration.md#candidates-the-model-pool)), and the full `model_id`, in
+  config order, 1-indexed. Format string: `f"{'Seed':<5} {'Name':<26} Model ID"` for the
   header, `f"{i:<5} {w.name:<26} {w.model_id}"` per row.
 
 **Expected output**, against the shipped `orq_arena.yaml` (8 candidates, none with a custom `name`):
@@ -370,7 +370,7 @@ orq-arena rejudge --compare REPORT_JSON [--compare REPORT_JSON ...]
   pair, any `--judge` that *is* one of the contestants is dropped from that pair's panel, the
   same rule live matches apply, re-evaluated per pair since one rejudge panel is fixed but
   contestants vary round to round. Records store short names, so contestants are resolved to
-  full model ids using the `<log>.run.json` manifest's roster — the roster the run actually
+  full model ids using the `<log>.run.json` manifest's candidate pool, the pool the run actually
   used — never the current YAML, which may have drifted since. Without a manifest the CLI
   warns and falls back to `--config`; a contestant unresolvable either way is excluded on its
   short name, the safe direction. If exclusion empties the panel for a pair, `rejudge_run`
@@ -720,7 +720,7 @@ cp .env.example .env   # fill in ORQ_API_KEY
 uv run orq-arena run
 ```
 
-Fights the shipped `orq_arena.yaml` roster headless; edit its `candidates` list to change the
+Fights the shipped `orq_arena.yaml` pool headless; edit its `candidates` list to change the
 pool. Confirm the preflight to spend tokens.
 
 ### Run for CI/cron
@@ -741,7 +741,7 @@ uv run orq-arena rejudge battles.jsonl --judge mistral/mistral-small-2603 --judg
 Costs judge tokens only, the responses already in `battles.jsonl` are reused as-is. Prints
 the changed-verdict count and the Spearman rank correlation against the original ranking.
 
-### Discover model ids for your roster
+### Discover model ids for your model pool
 
 ```bash
 uv run orq-arena refresh-models --show

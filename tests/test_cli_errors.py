@@ -30,8 +30,8 @@ def test_list_models_json_is_parseable(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     result = CliRunner().invoke(cli, ["list-models", "--config", str(yaml), "--json"])
     assert result.exit_code == 0, result.output
-    roster = json.loads(result.stdout)
-    assert roster and {"seed", "name", "model_id"} <= set(roster[0])
+    pool = json.loads(result.stdout)
+    assert pool and {"seed", "name", "model_id"} <= set(pool[0])
 
 
 def test_run_without_yes_fails_fast_on_non_tty(tmp_path, monkeypatch):

@@ -18,7 +18,7 @@ from typing import Any
 
 from .config import ArenaConfig
 from .data.prompts import PromptItem
-from .roster import CandidateSpec
+from .candidates import CandidateSpec
 from .providers.orq_gateway import OrqGateway
 
 _PROBE_PROMPT = "Reply with the single word: ok"
@@ -103,9 +103,9 @@ def cost_ceiling(
             unpriced.append(j)
             continue
         cin, cout = prices[j]
-        judges_usd += calls_per_judge * (
-            cin * judge_in_tok + cout * cfg.gateway.judge_max_tokens
-        ) / 1e6
+        judges_usd += (
+            calls_per_judge * (cin * judge_in_tok + cout * cfg.gateway.judge_max_tokens) / 1e6
+        )
 
     probe_usd = 0.0
     if counts.probe_calls:
@@ -171,7 +171,8 @@ async def thinking_probe(cfg: ArenaConfig) -> dict[str, dict[str, Any]]:
 def surprises(probe: dict[str, dict[str, Any]]) -> list[str]:
     """Candidates whose observed thinking contradicts their config."""
     return [
-        name for name, r in probe.items()
+        name
+        for name, r in probe.items()
         if r["error"] is None and r["thinks"] and not r["configured"]
     ]
 
@@ -185,6 +186,7 @@ def judge_family_overlaps(judges: list[str], candidates: list[CandidateSpec]) ->
     excluded per match; this flags the family-level residue so the ranking
     ships with a warning instead of a hidden thumb on the scale.
     """
+
     # ponytail: provider prefix as family proxy; per-provider lineage tables
     # if one provider ever hosts unrelated model families
     def fam(model_id: str) -> str:

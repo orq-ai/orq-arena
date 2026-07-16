@@ -68,7 +68,7 @@ def panel_excluding_contestants(
     unresolved_short = {m for m in contestant_shorts if m not in short_to_full}
 
     def is_contestant(j: str) -> bool:
-        # Same short-name convention as roster.short_model: strip the first
+        # Same short-name convention as candidates.short_model: strip the first
         # segment only, so multi-segment ids keep their tail intact.
         return j in contestants_full or j.split("/", 1)[-1] in unresolved_short
 
@@ -78,8 +78,8 @@ def panel_excluding_contestants(
 def short_map_from_manifest(log_path: str | Path) -> dict[str, str] | None:
     """{short_model: model_id} from the run's own manifest, if it exists.
 
-    The manifest records the exact roster the run used, so self-judge
-    exclusion stays correct even after the YAML roster drifts. Returns None
+    The manifest records the exact candidate pool the run used, so self-judge
+    exclusion stays correct even after the YAML candidates drift. Returns None
     when the manifest (or its candidates map) is missing or unreadable.
     """
     manifest_path = Path(log_path).with_suffix(".run.json")
@@ -118,7 +118,7 @@ async def rejudge_run(
 
     # Records carry short names; resolve to full model ids so self-judge
     # exclusion matches the live run (battle.py excludes by model_id).
-    # Prefer the run's own manifest roster (passed in by the CLI); the live
+    # Prefer the run's own manifest pool (passed in by the CLI); the live
     # YAML is only a fallback and may have drifted since the run.
     if short_to_full is None:
         short_to_full = {c.short_model: c.model_id for c in cfg.candidates}

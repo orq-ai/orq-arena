@@ -33,7 +33,7 @@ class CTAModalScreen(ModalScreen):
                     "Run it live with your own pool, every model on the orq.ai "
                     "router, judged by evaluatorq's pairwise jury:\n\n"
                     "  export ORQ_API_KEY=…   # get one at orq.ai\n"
-                    "  uv run orq-arena run   # fights the YAML roster (edit it, any 2+ models)",
+                    "  uv run orq-arena run   # fights the YAML candidates (edit it, any 2+ models)",
                     classes="cta-body",
                 )
                 yield Static("ENTER see the standings · Q quit", classes="cta-hint")

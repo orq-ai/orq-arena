@@ -23,7 +23,7 @@ from ..data.log import BattleLog
 from ..data.prompts import PromptItem
 from ..data.schemas import BattleRecord
 from ..events import ArenaEvent, StandingsUpdated, TournamentEnded
-from ..roster import CandidateSpec
+from ..candidates import CandidateSpec
 from ..providers.orq_gateway import OrqGateway
 from .elo import bootstrap_ci, bradley_terry_mle, build_wins_matrix, style_controlled_elo
 
@@ -365,10 +365,9 @@ async def run_tournament(
         for i, (w_a, w_b) in enumerate(schedule, 1):
             await _run_match(i, w_a, w_b, slices[i - 1])
     else:
-        await asyncio.gather(*(
-            _run_match(i, w_a, w_b, slices[i - 1])
-            for i, (w_a, w_b) in enumerate(schedule, 1)
-        ))
+        await asyncio.gather(
+            *(_run_match(i, w_a, w_b, slices[i - 1]) for i, (w_a, w_b) in enumerate(schedule, 1))
+        )
 
     report = _final_report(cfg, all_records, outcomes, names, preflight=preflight)
     _write_manifest(

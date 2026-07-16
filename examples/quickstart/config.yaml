@@ -1,4 +1,4 @@
-# Example roster for the committed quickstart run (examples/quickstart/).
+# Example model pool for the committed quickstart run (examples/quickstart/).
 # A small 4-model, thinking-OFF pool so the example is fast and cheap to
 # reproduce. Regenerate with:
 #   orq-arena run --config examples/quickstart/config.yaml \

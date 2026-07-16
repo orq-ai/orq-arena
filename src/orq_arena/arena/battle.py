@@ -37,7 +37,7 @@ from ..events import (
     TurnPrompt,
     TurnResolved,
 )
-from ..roster import CandidateSpec
+from ..candidates import CandidateSpec
 from ..providers.orq_gateway import OrqGateway
 
 
@@ -127,8 +127,13 @@ async def _generate_side(
                 error=None,
             )
         )
-        return SideResult(text=full, error=None, usage=usage, ttft_ms=ttft_ms,
-                          duration_ms=int((time.monotonic() - t0) * 1000))
+        return SideResult(
+            text=full,
+            error=None,
+            usage=usage,
+            ttft_ms=ttft_ms,
+            duration_ms=int((time.monotonic() - t0) * 1000),
+        )
     raise AssertionError("unreachable")
 
 
@@ -177,8 +182,13 @@ class Battle:
         )
 
     async def _void_round(
-        self, *, round_number: int, item: PromptItem, reason: str,
-        res_a: SideResult, res_b: SideResult,
+        self,
+        *,
+        round_number: int,
+        item: PromptItem,
+        reason: str,
+        res_a: SideResult,
+        res_b: SideResult,
     ) -> BattleRecord:
         await self.events.put(
             RoundVoided(match_id=self.match_id, round_number=round_number, reason=reason)
@@ -231,24 +241,37 @@ class Battle:
 
             res_a, res_b = await asyncio.gather(
                 _generate_side(
-                    gateway=self.gateway, candidate=self.a, prompt=prompt,
+                    gateway=self.gateway,
+                    candidate=self.a,
+                    prompt=prompt,
                     default_max_tokens=self.cfg.gateway.candidate_max_tokens,
-                    events=self.events, match_id=self.match_id, side="a",
+                    events=self.events,
+                    match_id=self.match_id,
+                    side="a",
                 ),
                 _generate_side(
-                    gateway=self.gateway, candidate=self.b, prompt=prompt,
+                    gateway=self.gateway,
+                    candidate=self.b,
+                    prompt=prompt,
                     default_max_tokens=self.cfg.gateway.candidate_max_tokens,
-                    events=self.events, match_id=self.match_id, side="b",
+                    events=self.events,
+                    match_id=self.match_id,
+                    side="b",
                 ),
             )
 
             if res_a.error or res_b.error:
                 failed = self.a.name if res_a.error else self.b.name
                 reason = f"{failed}: stream failed after retry, {res_a.error or res_b.error}"
-                battles.append(await self._void_round(
-                    round_number=round_number, item=item, reason=reason,
-                    res_a=res_a, res_b=res_b,
-                ))
+                battles.append(
+                    await self._void_round(
+                        round_number=round_number,
+                        item=item,
+                        reason=reason,
+                        res_a=res_a,
+                        res_b=res_b,
+                    )
+                )
                 continue
 
             try:
@@ -256,11 +279,15 @@ class Battle:
                     question=prompt, response_a=res_a.text, response_b=res_b.text
                 )
             except Exception as exc:
-                battles.append(await self._void_round(
-                    round_number=round_number, item=item,
-                    reason=f"jury failed: {exc}",
-                    res_a=res_a, res_b=res_b,
-                ))
+                battles.append(
+                    await self._void_round(
+                        round_number=round_number,
+                        item=item,
+                        reason=f"jury failed: {exc}",
+                        res_a=res_a,
+                        res_b=res_b,
+                    )
+                )
                 continue
 
             for vote in comparison.votes:
@@ -296,8 +323,10 @@ class Battle:
                     judge_votes=[v.model_dump() for v in comparison.votes],
                     majority_verdict=comparison.winner,
                     winner=(
-                        self.a.short_model if comparison.winner == "A"
-                        else self.b.short_model if comparison.winner == "B"
+                        self.a.short_model
+                        if comparison.winner == "A"
+                        else self.b.short_model
+                        if comparison.winner == "B"
                         else comparison.winner  # 'tie' | 'inconclusive'
                     ),
                     tokens_a_in=res_a.usage.get("input_tokens", 0),

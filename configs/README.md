@@ -1,6 +1,6 @@
 # Example configs
 
-Ready-to-run rosters. Point `--config` at any of them; bring your own prompts
+Ready-to-run model pools. Point `--config` at any of them; bring your own prompts
 with `--prompts`. Tiers are drawn from the Artificial Analysis intelligence
 index (via orquesta-web `autorouter-intelligence`) so each pool is internally
 coherent, no makeweights padding a "frontier" field, no giants lurking in a

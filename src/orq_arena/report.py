@@ -486,7 +486,7 @@ def _empty_report_html(manifest: dict[str, Any], n_records: int) -> str:
 <div class="verdict tied"><p class="eyebrow">&#9888; NO RATED MODELS</p>
 <h1>Nothing to rank.</h1>
 <p class="expl">This run produced no rated models: all {n_records} rounds errored, or no
-candidates were configured. Check the roster and the run log, then re-run.</p></div>
+candidates were configured. Check the candidates in the YAML and the run log, then re-run.</p></div>
 </div></body></html>
 """
 
@@ -685,7 +685,7 @@ def build_report_html(
     panel = ", ".join(str(j).split("/")[-1] for j in manifest.get("judges", cfg.judges))
 
     # Records store short model names; elo/manifest/report are keyed by display
-    # name (name). Identical unless the roster sets custom names.
+    # name (name). Identical unless the config sets custom names.
     alias = report.get("by_model_names") or {w.short_model: w.name for w in cfg.candidates}
     stats_all = _speed_stats(records, alias)
     speed = _speed_svg(stats_all)
