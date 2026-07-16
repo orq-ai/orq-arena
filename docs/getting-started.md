@@ -213,7 +213,7 @@ page on demand.
 ??? failure "`Error: --tui and --headless contradict each other`"
 
     Both flags were passed to `orq-arena run`; drop one. `--headless` is a deprecated no-op
-    (headless is already the default with `--config`); `--tui` opts into the live show.
+    (headless is already the default); `--tui` opts into the live show.
 
 ??? warning "A response panel shows `✂ truncated`"
 
