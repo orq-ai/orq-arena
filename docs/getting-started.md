@@ -38,7 +38,7 @@ live, you need:
 
 - A workspace **API key** (`ORQ_API_KEY`) from [my.orq.ai](https://my.orq.ai) > workspace
   settings > API keys (per `.env.example`). It's the only secret orq-arena needs, every
-  candidate, judge, analyzer, and preflight-probe call goes through the orq.ai router gateway
+  candidate, judge, and preflight-probe call goes through the orq.ai router gateway
   with this one key.
 
 ---
@@ -131,7 +131,8 @@ is headless by default and walks through three stages:
 1. **Preflight.** The CLI prints the exact call counts and a spend ceiling up front, runs a
    thinking probe, one tiny call per candidate ("Reply with the single word: ok") to catch
    vendor-default reasoning that contradicts your config (`🧠 thinks despite config: ...,
-   ranking will be footnoted`), then asks `Proceed?` before spending anything, pass
+   ranking will be footnoted`), then asks `Proceed?` before any battle or judge call
+   (the probe itself has already made one paid call per candidate), pass
    `--yes`/`-y` to skip the prompt for CI or scripts. For the shipped `orq_arena.yaml` (8
    candidates) against the default `prompts/starter.jsonl` (30 prompts, capped at
    `match.max_rounds` = 5 per match), that preflight line reads exactly:

@@ -109,7 +109,7 @@ def cli() -> None:
     "--headless",
     is_flag=True,
     default=False,
-    help="Deprecated: headless is already the default with --config.",
+    help="Deprecated no-op: headless is already the default.",
 )
 @click.option(
     "--no-open",

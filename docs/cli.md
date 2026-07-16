@@ -86,16 +86,15 @@ A few things apply across every subcommand and are only documented once, here:
 
   | Constant | Value | Used by |
   |---|---|---|
-  | `DEFAULT_CONFIG` | `orq_arena.yaml` | `--config` on every subcommand |
+  | `DEFAULT_CONFIG` | `orq_arena.yaml` | `--config` on `run`, `demo`, `list-models`, `rejudge`, `report`, and `refresh-models` (`annotate` and `anchor` take no config) |
   | `DEFAULT_PROMPTS` | `prompts/starter.jsonl` | `run --prompts` |
-  | `DEFAULT_OUTPUT` | `battles.jsonl` | `run --output`, and `rejudge`'s `log_path` positional |
+  | `DEFAULT_OUTPUT` | `battles.jsonl` | `run --output`, and the `LOG_PATH` positional on `rejudge` and `report` |
   | `DEFAULT_FIXTURE` | `fixtures/demo_tournament.json` | `demo --fixture` |
 
   All are relative to the current working directory, not the package install location.
 - **Log quieting**: `run`, `demo`, and `rejudge` redirect evaluatorq's `loguru` output to
   stderr at `ERROR` level only (`_quiet_logs()`), so library logging never corrupts the TUI or
-  interleaves with `rejudge`'s Rich tables. `list-models` and `refresh-models` don't touch
-  logging config.
+  interleaves with `rejudge`'s Rich tables. The other commands don't touch logging config.
 - **Which commands need `ORQ_API_KEY`:**
 
   | Command | Needs a live API key? |
@@ -104,6 +103,8 @@ A few things apply across every subcommand and are only documented once, here:
   | `demo` | No, replays a JSON fixture, zero network calls. |
   | `list-models` | No, prints the parsed config only. |
   | `rejudge` | Yes, re-scores recorded responses with a live judge panel. |
+  | `report` | No, one optional catalog read prices the cost section when a key (or cache) is present. |
+  | `annotate` / `anchor` | No, both work entirely from the recorded log and vote files. |
   | `refresh-models` | Effectively yes, without it, falls back to any existing cache, then an empty result. See [`refresh-models`](#refresh-models). |
 
 ---
@@ -154,7 +155,7 @@ orq-arena run [--config PATH] [--prompts PATH] [--output PATH] [--rounds N]
   rounds × 2`, `judge_calls = matches × rounds × len(judges) × 2`. Next, a spend ceiling:
 
   ```text
-  spend ceiling ≈ ${total} (candidates ${w} + judges ${j}[ + probe ${p}]; every output cap fully hit, live runs land under)
+  spend ceiling ≈ ${total} (models ${m} + judges ${j}[ + probe ${p}]; every output cap fully hit, live runs land under)
   ```
 
   computed by `preflight.cost_ceiling` from those exact counts, the config's output caps
@@ -533,6 +534,7 @@ API calls. This is the front half of the human-anchor workflow (the back half is
 
 ```text
 orq-arena annotate BATTLE_LOG [--out PATH] [--sample N] [--seed N] [--criteria TEXT]
+                  [--exclude VOTES_JSON ...] [--serve] [--port N]
 ```
 
 | Flag / arg | Default | Effect |
