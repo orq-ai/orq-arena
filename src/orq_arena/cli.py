@@ -90,7 +90,7 @@ def cli() -> None:
     "config_path",
     default=DEFAULT_CONFIG,
     show_default=True,
-    help="YAML roster + rules (candidates, judges, match, gateway).",
+    help="YAML config: candidates (the model pool), judges, match, gateway.",
 )
 @click.option(
     "--prompts",
@@ -162,7 +162,7 @@ def run(
     """Run the arena benchmark (hits orq.ai): headless logs by default,
     then the HTML report opens in your browser.
 
-    The YAML roster is used as-is (default orq_arena.yaml); matches run in
+    The YAML candidates are used as-is (default orq_arena.yaml); matches run in
     parallel. Pass --tui to watch the live show instead.
 
     \b
@@ -329,7 +329,7 @@ def _open_report(battle_log_path: str, no_open: bool) -> None:
     "config_path",
     default=DEFAULT_CONFIG,
     show_default=True,
-    help="YAML roster + rules (candidates, judges, match, gateway).",
+    help="YAML config: candidates (the model pool), judges, match, gateway.",
 )
 def demo(fixture_path: str, config_path: str) -> None:
     """Replay a recorded tournament from a fixture file (no API calls)."""
@@ -347,20 +347,22 @@ def demo(fixture_path: str, config_path: str) -> None:
     "config_path",
     default=DEFAULT_CONFIG,
     show_default=True,
-    help="YAML roster + rules (candidates, judges, match, gateway).",
+    help="YAML config: candidates (the model pool), judges, match, gateway.",
 )
-@click.option("--json", "as_json", is_flag=True, default=False, help="Print the roster as JSON.")
+@click.option(
+    "--json", "as_json", is_flag=True, default=False, help="Print the candidate pool as JSON."
+)
 def list_models(config_path: str, as_json: bool) -> None:
-    """Print the configured candidate roster."""
+    """Print the configured candidate pool."""
     cfg = _load_config(config_path)
     if as_json:
         import json
 
-        roster = [
+        pool = [
             {"seed": i, "name": w.name, "model_id": w.model_id}
             for i, w in enumerate(cfg.candidates, 1)
         ]
-        click.echo(json.dumps(roster, indent=2))
+        click.echo(json.dumps(pool, indent=2))
         return
     click.echo(f"{'Seed':<5} {'Name':<26} Model ID")
     click.echo("-" * 70)
@@ -377,7 +379,7 @@ def list_models(config_path: str, as_json: bool) -> None:
     "config_path",
     default=DEFAULT_CONFIG,
     show_default=True,
-    help="YAML roster + rules (candidates, judges, match, gateway).",
+    help="YAML config: candidates (the model pool), judges, match, gateway.",
 )
 @click.option("--output", "output_path", default=None, help="Write re-judged rounds to this JSONL.")
 @click.option("--report-json", default=None, help="Write the summary as JSON.")
@@ -475,7 +477,7 @@ def rejudge(
     "config_path",
     default=DEFAULT_CONFIG,
     show_default=True,
-    help="YAML roster + rules (candidates, judges, match, gateway).",
+    help="YAML config: candidates (the model pool), judges, match, gateway.",
 )
 @click.option(
     "--output",
@@ -549,7 +551,7 @@ def report_cmd(log_path: str, config_path: str, output_path: str | None) -> None
     "config_path",
     default=DEFAULT_CONFIG,
     show_default=True,
-    help="YAML roster + rules (candidates, judges, match, gateway).",
+    help="YAML config: candidates (the model pool), judges, match, gateway.",
 )
 @click.option("--show/--no-show", default=False, help="Print model ids grouped by provider.")
 def refresh_models(config_path: str, show: bool) -> None:

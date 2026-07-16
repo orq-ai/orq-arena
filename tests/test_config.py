@@ -9,7 +9,7 @@ from orq_arena.config import load_config
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def test_default_config_loads_with_full_roster() -> None:
+def test_default_config_loads_with_full_pool() -> None:
     cfg = load_config(ROOT / "orq_arena.yaml")
     assert len(cfg.candidates) == 8
     assert len(cfg.judges) == 3

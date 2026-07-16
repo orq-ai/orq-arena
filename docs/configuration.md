@@ -1,17 +1,17 @@
 # Configuration Reference
 
 Complete reference for every configuration surface in orq-arena: the one environment variable
-it reads, the YAML roster/rules files under the project root and `configs/`, and the prompts
+it reads, the YAML config files under the project root and `configs/`, and the prompts
 file format. The tool is configured by two layers:
 
 1. A `.env` file holding the single secret orq-arena needs (`ORQ_API_KEY`), loaded at CLI
    startup.
 2. A YAML file (`orq_arena.yaml` by default) describing match rules, the gateway client, the
-   candidate roster, and the judge panel, parsed and validated into an `ArenaConfig` Pydantic
+   candidate pool, and the judge panel, parsed and validated into an `ArenaConfig` Pydantic
    model.
 
 The source of truth for every key below is `src/orq_arena/config.py` (models `MatchRules`,
-`GatewayConfig`, `PreflightConfig`, `ArenaConfig`) and `src/orq_arena/roster.py`
+`GatewayConfig`, `PreflightConfig`, `ArenaConfig`) and `src/orq_arena/candidates.py`
 (`CandidateSpec`). All file paths in this document are relative to the project root.
 
 ---
@@ -35,7 +35,7 @@ Notes:
   below). Changing `api_key_env` changes which environment variable orq-arena reads; it does not
   set a key.
 - `ORQ_API_KEY` is **not** required for `orq-arena demo` (replays a recorded fixture, no API
-  calls) or `orq-arena list-models` (prints the roster, never constructs a gateway).
+  calls) or `orq-arena list-models` (prints the candidate pool, never constructs a gateway).
 
 ### `.env` loading
 
@@ -52,7 +52,7 @@ what the shell hasn't set. A missing `.env` is silently fine.
 
 | File | Purpose |
 |---|---|
-| `orq_arena.yaml` | The default roster + rules, shipped at the project root. Loaded whenever `--config` is omitted or points here, `DEFAULT_CONFIG = "orq_arena.yaml"` in `src/orq_arena/cli.py`. Ships 8 candidates, uniform thinking-**OFF**, so the ELO compares models rather than vendor default reasoning settings. |
+| `orq_arena.yaml` | The default model pool + rules, shipped at the project root. Loaded whenever `--config` is omitted or points here, `DEFAULT_CONFIG = "orq_arena.yaml"` in `src/orq_arena/cli.py`. Ships 8 candidates, uniform thinking-**OFF**, so the ELO compares models rather than vendor default reasoning settings. |
 | `configs/reasoning_arena.yaml` | Uniform thinking-**ON** counterpart of the default file, the "does thinking help?" benchmark. Not loaded automatically; run it explicitly with `--config configs/reasoning_arena.yaml`. |
 | `configs/frontier_8.yaml`, `configs/budget_8.yaml`, `configs/frontier_16.yaml` | Ready-made pools tiered by the Artificial Analysis intelligence index (frontier ~40-56, budget ~12-25, 16-model stress test). See [`configs/README.md`](https://github.com/orq-ai/orq-arena/blob/master/configs/README.md). |
 
@@ -65,9 +65,9 @@ the YAML, every value is literal.
 
 | Command | `--config` behavior |
 |---|---|
-| `orq-arena run` | Defaults to `orq_arena.yaml`. The YAML roster is used as-is; the run is headless by default (`--tui` opts into the live show). |
-| `orq-arena demo` | Defaults to `orq_arena.yaml`. Only used for its rules/roster labels, the fixture replay makes no API calls. |
-| `orq-arena list-models` | Defaults to `orq_arena.yaml`. Prints the configured roster. |
+| `orq-arena run` | Defaults to `orq_arena.yaml`. The YAML candidates are used as-is; the run is headless by default (`--tui` opts into the live show). |
+| `orq-arena demo` | Defaults to `orq_arena.yaml`. Only used for its rules/candidate labels, the fixture replay makes no API calls. |
+| `orq-arena list-models` | Defaults to `orq_arena.yaml`. Prints the configured candidate pool. |
 | `orq-arena rejudge` | Defaults to `orq_arena.yaml`. Supplies `gateway` and (unless `--criteria` overrides it) `criteria`. |
 | `orq-arena report` | Defaults to `orq_arena.yaml`. Supplies the judge panel and model-name mapping for the statistics rebuild. |
 | `orq-arena refresh-models` | Defaults to `orq_arena.yaml`. Only `gateway` is used, to re-fetch the workspace model catalog. |
@@ -200,7 +200,7 @@ pool a one-command run. It is the recommended path, not the only one.
 |---|---|---|---|
 | `headless_concurrency` | `int` | `4` | Matches run in parallel under an `asyncio.Semaphore(max(1, headless_concurrency))` on headless runs, the default (`run_headless` → `run_tournament(concurrency=...)`, `src/orq_arena/headless.py`). The TUI (`--tui`) always passes `concurrency=1` internally so the live show stays one fight at a time. |
 
-### `candidates` (the roster)
+### `candidates` (the model pool)
 
 `candidates: list[CandidateSpec]`: required at the top level, and the parsed list must contain at
 least 2 entries (`ArenaConfig._validate`: `"Need at least 2 candidates, got {n}"`).
@@ -208,7 +208,7 @@ least 2 entries (`ArenaConfig._validate`: `"Need at least 2 candidates, got {n}"
 | Key | Type | Default | Effect |
 |---|---|---|---|
 | `model_id` | `str` |, (required) | orq.ai router gateway model slug, e.g. `anthropic/claude-opus-4-8`. The only required field per candidate entry. |
-| `name` | `str` | `""` → falls back to `short_model` | Display name used on the leaderboard, TUI cards, and arena events (`MatchStarted`/`MatchResolved`). Defaults to `model_id` with the provider prefix stripped (`"anthropic/claude-opus-4-8"` → `"claude-opus-4-8"`) and is **never auto-generated beyond that**: a custom name is allowed but not invented (`src/orq_arena/roster.py` docstring: "Display name defaults to the model's short name... A custom `name` is still allowed but never generated."). Note: `battles.jsonl` records (`BattleRecord.model_a`/`model_b`) always store `short_model`, not `name`; `name` is presentation-only. |
+| `name` | `str` | `""` → falls back to `short_model` | Display name used on the leaderboard, TUI cards, and arena events (`MatchStarted`/`MatchResolved`). Defaults to `model_id` with the provider prefix stripped (`"anthropic/claude-opus-4-8"` → `"claude-opus-4-8"`) and is **never auto-generated beyond that**: a custom name is allowed but not invented (`src/orq_arena/candidates.py` docstring: "Display name defaults to the model's short name... A custom `name` is still allowed but never generated."). Note: `battles.jsonl` records (`BattleRecord.model_a`/`model_b`) always store `short_model`, not `name`; `name` is presentation-only. |
 | `emblem` | `str` | `""` | Optional glyph/emoji shown before the orc name on the TUI candidate card (`src/orq_arena/tui/widgets/model_card.py`). Purely cosmetic. |
 | `reasoning` | `dict \| null` | `None` | Raw router reasoning-control object, forwarded verbatim as `extra_body` on the completion request (`stream_completion`, `src/orq_arena/providers/orq_gateway.py`). Not interpreted beyond the `budget_tokens` cross-check below, the router normalizes it per provider. |
 | `max_tokens` | `int \| null` | `None` → falls back to `gateway.candidate_max_tokens` | Per-candidate override of the response output cap. |
@@ -253,7 +253,7 @@ in that file), those belong in `configs/reasoning_arena.yaml` instead.
 contestants]`, `Battle.__init__`). If that empties the panel entirely, `Battle.__init__` raises
 `ValueError("Every judge is a contestant in ..., add a neutral judge to the config.")`: a
 small `judges` list can strand a specific pairing if both models in that match are also
-configured as judges elsewhere in the roster.
+configured as judges elsewhere in the config.
 
 ---
 

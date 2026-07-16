@@ -8,7 +8,7 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, Field, model_validator
 
-from .roster import CandidateSpec
+from .candidates import CandidateSpec
 
 
 class MatchRules(BaseModel):

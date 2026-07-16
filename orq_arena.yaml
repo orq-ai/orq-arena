@@ -27,7 +27,7 @@ gateway:
   stream_read_timeout_s: 1200
   judge_timeout_ms: 90000
 
-# The roster, any pool size >= 2. Default pool is uniform thinking-OFF for a
+# The model pool, any size >= 2. Default pool is uniform thinking-OFF for a
 # fair apples-to-apples ELO; see configs/reasoning_arena.yaml for the
 # uniform thinking-ON counterpart.
 #

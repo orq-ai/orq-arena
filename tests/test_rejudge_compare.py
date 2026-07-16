@@ -75,7 +75,7 @@ def test_compare_reports_rows(tmp_path):
     assert rows[1]["panel"] == "j1"
 
 
-def test_short_map_from_manifest_prefers_run_roster(tmp_path):
+def test_short_map_from_manifest_prefers_run_pool(tmp_path):
     from orq_arena.rejudge import short_map_from_manifest
 
     log = tmp_path / "battles.jsonl"
@@ -105,7 +105,7 @@ def test_short_map_from_manifest_missing_or_broken(tmp_path):
     assert short_map_from_manifest(log) is None
 
 
-def test_manifest_roster_beats_drifted_config():
+def test_manifest_pool_beats_drifted_config():
     # Run recorded openai/gpt-x; the YAML has since drifted to azure/gpt-x.
     # Exclusion must use the manifest's id: judging with openai/gpt-x is
     # self-judging and must be filtered.

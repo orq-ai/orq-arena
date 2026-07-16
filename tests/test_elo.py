@@ -48,9 +48,7 @@ def test_style_control_absorbs_pure_length_wins():
     rows = [("a", "b", 1.0, 400, 100)] * 10 + [("b", "a", 0.0, 100, 400)] * 10
     elo, gamma = style_controlled_elo(rows, ["a", "b"])
     assert gamma > 0  # the jury's length preference is exposed
-    raw = bradley_terry_mle(
-        build_wins_matrix([("a", "b", "winner")] * 20), ["a", "b"]
-    )
+    raw = bradley_terry_mle(build_wins_matrix([("a", "b", "winner")] * 20), ["a", "b"])
     # pricing length out shrinks the gap vs the raw fit
     assert abs(elo["a"] - elo["b"]) < abs(raw["a"] - raw["b"])
 
@@ -74,7 +72,7 @@ def test_style_control_empty_rows_is_flat():
 
 
 def test_judge_family_overlap_flags_shared_provider():
-    from orq_arena.roster import CandidateSpec
+    from orq_arena.candidates import CandidateSpec
     from orq_arena.preflight import judge_family_overlaps
 
     candidates = [
@@ -82,9 +80,7 @@ def test_judge_family_overlap_flags_shared_provider():
         CandidateSpec(model_id="google/gemini-3.1-pro-preview"),
     ]
     judges = ["anthropic/claude-haiku-4-5-20251001", "mistral/mistral-small-2603"]
-    assert judge_family_overlaps(judges, candidates) == [
-        "anthropic/claude-haiku-4-5-20251001"
-    ]
+    assert judge_family_overlaps(judges, candidates) == ["anthropic/claude-haiku-4-5-20251001"]
     assert judge_family_overlaps(["mistral/mistral-small-2603"], candidates) == []
 
 

@@ -36,7 +36,7 @@ from ..events import (
     TurnPrompt,
     TurnResolved,
 )
-from ..roster import CandidateSpec
+from ..candidates import CandidateSpec
 from ..tournament.driver import run_tournament
 from .hp import VERDICT_HOLD_S, HPTracker
 from .screens.cta_modal import CTAModalScreen
@@ -169,7 +169,7 @@ class ArenaApp(App):
         if isinstance(ev, StandingsUpdated):
             fs.set_standings(ev.elo, ev.matches_done, ev.matches_total)
         elif isinstance(ev, MatchStarted):
-            # Fall back to a bare spec so a name the roster doesn't know
+            # Fall back to a bare spec so a name the pool does not know
             # (e.g. a fixture recorded with another pool) still renders
             # instead of silently blanking the cards.
             w_a = self._by_name.get(ev.model_a) or CandidateSpec(model_id=ev.model_a)

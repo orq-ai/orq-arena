@@ -123,7 +123,7 @@ existing cache, else an empty list. Full variable reference:
 uv run orq-arena run
 ```
 
-The roster comes straight from the YAML (`--config` defaults to the shipped `orq_arena.yaml`;
+The model pool comes straight from the YAML's `candidates` list (`--config` defaults to the shipped `orq_arena.yaml`;
 edit its `candidates` list, or point at `configs/reasoning_arena.yaml`, the uniform
 thinking-**ON** counterpart of the default thinking-**OFF** pool, or your own file). The run
 is headless by default and walks through three stages:
@@ -189,7 +189,7 @@ flowchart LR
 | File | Contents |
 |---|---|
 | `battles.jsonl` | One JSON line per judged (or voided) round, `BattleRecord`, schema v3: both responses, reconciled per-judge votes, token/TTFT accounting. (v3 drops the old HP/damage columns, HP is now a TUI-only presentation.) |
-| `battles.run.json` | The run manifest, written next to the log, config/prompt hashes, roster, judge panel, seed, and (once finished) agreement stats. |
+| `battles.run.json` | The run manifest, written next to the log, config/prompt hashes, candidate pool, judge panel, seed, and (once finished) agreement stats. |
 | `battles.report.html` | A single-file HTML report, no server, no external assets. The verdict banner leads with the top 3 models (win rate, ELO score, total cost); a value map plots ELO against cost per model on a log scale; a Speed section (tokens per second, time to first token) appears whenever the log carries per-side durations. Runs sourced from an orq.ai Dataset (`--prompts orq:<dataset_id>`) link the dataset by name in the report. |
 
 Pass `--output path/to/file.jsonl` to move all three, the manifest and report page always sit

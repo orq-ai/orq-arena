@@ -42,7 +42,7 @@ uv run orq-arena run --config examples/quickstart/config.yaml \
 
 | File | What it is |
 |------|-----------|
-| `config.yaml` | The 4-model roster + judge panel this run used |
+| `config.yaml` | The 4-model pool + judge panel this run used |
 | `battles.jsonl` | One JSONL row per judged round (schema v3): both responses, per-judge votes, token usage, timing |
 | `battles.run.json` | Seeded manifest: config/prompt hashes, panel, evaluatorq version, preflight (incl. `family_overlaps`) |
 | `battles.report.html` | The self-contained HTML report |
