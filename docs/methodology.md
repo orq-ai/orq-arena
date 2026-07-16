@@ -5,7 +5,7 @@ protocol, the scoring math, the confidence intervals, the agreement and bias met
 audit the panel, the reliability and reproducibility policies, and what the committed example run
 demonstrates.
 
-## Plain-English summary
+## How it works
 
 For every round, one prompt, two candidates, in a tournament:
 
@@ -272,7 +272,7 @@ Every run is seeded and manifested so its rating can be audited or re-derived af
 - **Seeded schedule and prompt slices**: the pairing order and every match's prompt slice are drawn
   from one seeded random generator (default `seed=42`). Every slice is pre-drawn before any match starts, so the schedule stays stable regardless
   of completion order under concurrency.
-- **A run manifest, written twice**: the run writes `<output>.run.json` immediately at tournament start (config hash, prompt hash, roster, judge
+- **A run manifest, written twice**: the run writes `<output>.run.json` immediately at tournament start (config hash, prompt hash, candidate pool, judge
   panel, replacement judges, quorum, the installed `evaluatorq` version, `started_at`) and
   rewrites it at the end with `finished_at` plus the closing report's `mean_agreement`,
   `error_rounds`, `rated_rounds`, `category_counts`, `fleiss`, `length_coef` (the jury's fitted
@@ -354,7 +354,7 @@ and cheap to regenerate rather than to be a rigorous benchmark.
 
 What the committed run lets you see end to end, on real data:
 
-- **The full pipeline on committed artifacts**: `config.yaml` (the roster and rules),
+- **The full pipeline on committed artifacts**: `config.yaml` (the model pool and rules),
   `battles.jsonl` (one row per judged round, both responses and per-judge reconciled votes),
   `battles.run.json` (the seeded manifest, config/prompt hashes, panel, agreement stats), and the
   regenerable HTML report. Nothing here is simulated.
