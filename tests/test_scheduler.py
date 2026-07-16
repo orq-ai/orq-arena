@@ -10,8 +10,8 @@ def _w(i: int) -> CandidateSpec:
 
 
 def test_every_pair_exactly_once():
-    warriors = [_w(i) for i in range(8)]
-    schedule = round_robin_schedule(warriors)
+    candidates = [_w(i) for i in range(8)]
+    schedule = round_robin_schedule(candidates)
     assert len(schedule) == 28  # C(8,2)
     pairs = {frozenset((a.name, b.name)) for a, b in schedule}
     assert len(pairs) == 28
@@ -19,24 +19,32 @@ def test_every_pair_exactly_once():
 
 
 def test_schedule_is_seed_stable():
-    warriors = [_w(i) for i in range(6)]
-    s1 = round_robin_schedule(warriors, seed=7)
-    s2 = round_robin_schedule(warriors, seed=7)
-    assert [(a.name, b.name) for a, b in s1] == [
-        (a.name, b.name) for a, b in s2
-    ]
+    candidates = [_w(i) for i in range(6)]
+    s1 = round_robin_schedule(candidates, seed=7)
+    s2 = round_robin_schedule(candidates, seed=7)
+    assert [(a.name, b.name) for a, b in s1] == [(a.name, b.name) for a, b in s2]
 
 
 def _rec(majority: str, error: str | None = None, category: str = "code") -> BattleRecord:
     return BattleRecord(
-        prompt_hash="h", prompt_text="p", model_a="ma", model_b="mb",
-        majority_verdict=majority, error=error, prompt_category=category,
+        prompt_hash="h",
+        prompt_text="p",
+        model_a="ma",
+        model_b="mb",
+        majority_verdict=majority,
+        error=error,
+        prompt_category=category,
     )
 
 
 def test_outcomes_include_wins_and_ties_skip_rest():
-    records = [_rec("A"), _rec("B"), _rec("tie"), _rec("inconclusive"),
-               _rec("inconclusive", error="void")]
+    records = [
+        _rec("A"),
+        _rec("B"),
+        _rec("tie"),
+        _rec("inconclusive"),
+        _rec("inconclusive", error="void"),
+    ]
     out = outcomes_from_records(records, "Alpha", "Beta")
     assert out == [
         ("Alpha", "Beta", "winner", "code"),

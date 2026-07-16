@@ -88,8 +88,8 @@ class LeaderboardScreen(Screen):
 
             tok = r.get("tokens") or {}
             if tok:
-                wi = tok.get("models_in", tok.get("warriors_in", 0))
-                wo = tok.get("models_out", tok.get("warriors_out", 0))
+                wi = tok.get("models_in", 0)
+                wo = tok.get("models_out", 0)
                 ji, jo = tok.get("judges_in", 0), tok.get("judges_out", 0)
                 jury_share = (ji + jo) / max(1, wi + wo + ji + jo)
                 yield Static(

@@ -210,11 +210,6 @@ page on demand.
     construct a gateway client, so they run with no key at all (`refresh-models` just falls back
     to cached results, or an empty list).
 
-??? failure "`Error: --tui and --headless contradict each other`"
-
-    Both flags were passed to `orq-arena run`; drop one. `--headless` is a deprecated no-op
-    (headless is already the default); `--tui` opts into the live show.
-
 ??? warning "A response panel shows `✂ truncated`"
 
     The candidate hit its output cap (`gateway.candidate_max_tokens`, default `2048`) before

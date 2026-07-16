@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import AliasChoices, BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from .roster import CandidateSpec
 
@@ -24,11 +24,7 @@ class MatchRules(BaseModel):
 class GatewayConfig(BaseModel):
     base_url: str = "https://api.orq.ai/v3/router"
     api_key_env: str = "ORQ_API_KEY"
-    # ``warrior_max_tokens`` accepted as a deprecated YAML alias.
-    candidate_max_tokens: int = Field(
-        default=2048,
-        validation_alias=AliasChoices("candidate_max_tokens", "warrior_max_tokens"),
-    )
+    candidate_max_tokens: int = 2048
     # A cap, not a target, free headroom for judges that think by default
     # (G1 finding: 512 starved gemini-2.5-flash's reasoning and killed every
     # one of its votes with LengthFinishReasonError).
@@ -54,10 +50,7 @@ class ArenaConfig(BaseModel):
     # Parallel matches for headless runs only; the TUI is always sequential.
     headless_concurrency: int = 4
     gateway: GatewayConfig = Field(default_factory=GatewayConfig)
-    # ``warriors`` accepted as a deprecated YAML alias.
-    candidates: list[CandidateSpec] = Field(
-        validation_alias=AliasChoices("candidates", "warriors"),
-    )
+    candidates: list[CandidateSpec]
     judges: list[str] = Field(description="Judge panel, router model ids")
     replacement_judges: list[str] = Field(default_factory=list)
     criteria: str = (

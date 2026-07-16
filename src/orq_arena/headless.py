@@ -17,14 +17,19 @@ import sys
 from typing import Any
 
 from rich.console import Console
-from rich.progress import (BarColumn, MofNCompleteColumn, Progress,
-                           SpinnerColumn, TextColumn, TimeElapsedColumn)
+from rich.progress import (
+    BarColumn,
+    MofNCompleteColumn,
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    TimeElapsedColumn,
+)
 from rich.table import Table
 
 from .config import ArenaConfig
 from .data.prompts import PromptItem
-from .events import (MatchResolved, RoundVoided, StandingsUpdated,
-                     TournamentEnded, TurnResolved)
+from .events import MatchResolved, RoundVoided, StandingsUpdated, TournamentEnded, TurnResolved
 from .tournament.driver import run_tournament
 
 
@@ -34,8 +39,7 @@ def _final_table(ended: TournamentEnded) -> Table:
     sc = r.get("elo_style_controlled") or {}
     thinking = r.get("thinking") or {}
     table = Table(title="FINAL STANDINGS")
-    cols = (["#", "Model", "ELO"] + (["95% CI"] if ci else [])
-            + (["len-ctrl"] if sc else []))
+    cols = ["#", "Model", "ELO"] + (["95% CI"] if ci else []) + (["len-ctrl"] if sc else [])
     for c in cols:
         table.add_column(c)
     ranked = sorted(ended.elo.items(), key=lambda kv: kv[1], reverse=True)
@@ -65,8 +69,8 @@ def _print_summary(console: Console, ev: TournamentEnded) -> None:
     tok = r.get("tokens") or {}
     if tok:
         console.print(
-            f"tokens, models {tok.get('models_in', tok.get('warriors_in', 0)):,} in "
-            f"/ {tok.get('models_out', tok.get('warriors_out', 0)):,} out"
+            f"tokens, models {tok.get('models_in', 0):,} in "
+            f"/ {tok.get('models_out', 0):,} out"
             f" · jury {tok['judges_in']:,} in / {tok['judges_out']:,} out"
         )
     console.print(f"battle log → {ev.battle_log_path}")
@@ -83,9 +87,7 @@ def _match_line(ev: MatchResolved) -> str:
     return f"[dim]{ev.match_id}[/dim] {ev.winner} beats {ev.loser}"
 
 
-async def consume_events(
-    events: asyncio.Queue, *, console: Console, total_rounds: int
-) -> None:
+async def consume_events(events: asyncio.Queue, *, console: Console, total_rounds: int) -> None:
     """Drain the event queue until TournamentEnded.
 
     On a terminal, a pinned progress bar counts rounds while match results
@@ -129,10 +131,13 @@ async def consume_events(
                     progress.console.print(_match_line(ev))
                 elif isinstance(ev, StandingsUpdated):
                     leader = max(ev.elo, key=ev.elo.get) if ev.elo else ""
-                    progress.update(task, description=(
-                        f"rounds · {ev.matches_done}/{ev.matches_total} matches"
-                        + (f" · leader {leader} {ev.elo[leader]:.0f}" if leader else "")
-                    ))
+                    progress.update(
+                        task,
+                        description=(
+                            f"rounds · {ev.matches_done}/{ev.matches_total} matches"
+                            + (f" · leader {leader} {ev.elo[leader]:.0f}" if leader else "")
+                        ),
+                    )
                 elif isinstance(ev, TournamentEnded):
                     progress.update(task, completed=total_rounds)
                     break

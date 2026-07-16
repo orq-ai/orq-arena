@@ -202,9 +202,7 @@ pool a one-command run. It is the recommended path, not the only one.
 ### `candidates` (the roster)
 
 `candidates: list[CandidateSpec]`: required at the top level, and the parsed list must contain at
-least 2 entries (`ArenaConfig._validate`: `"Need at least 2 candidates, got {n}"`). Configs from
-before the rename keep working: `warriors:` is accepted as a deprecated alias for `candidates:`,
-`warrior_max_tokens` for `gateway.candidate_max_tokens`, and `orc_name` for a candidate's `name`.
+least 2 entries (`ArenaConfig._validate`: `"Need at least 2 candidates, got {n}"`).
 
 | Key | Type | Default | Effect |
 |---|---|---|---|

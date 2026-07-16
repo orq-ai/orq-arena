@@ -6,7 +6,7 @@ from orq_arena.report import build_report_html, report_path_for
 
 CFG = ArenaConfig.model_validate(
     {
-        "warriors": [{"model_id": "prov/model-a"}, {"model_id": "prov/model-b"}],
+        "candidates": [{"model_id": "prov/model-a"}, {"model_id": "prov/model-b"}],
         "judges": ["prov/judge-1", "prov/judge-2"],
     }
 )
@@ -45,7 +45,7 @@ REPORT = {
     "elo_ci": {"model-a": (900.0, 1300.0), "model-b": (700.0, 1100.0)},
     "elo_by_category": {},
     "category_counts": {"general": 3},
-    "tokens": {"warriors_in": 40, "warriors_out": 90, "judges_in": 400, "judges_out": 120},
+    "tokens": {"models_in": 40, "models_out": 90, "judges_in": 400, "judges_out": 120},
     "jury": {
         "per_judge": [
             {
@@ -70,7 +70,7 @@ REPORT = {
 }
 
 MANIFEST = {
-    "tournament_id": "tour-1",
+    "tournament_id": "bench-1",
     "started_at": 1000.0,
     "finished_at": 1600.0,
     "seed": 42,
@@ -224,7 +224,7 @@ def test_report_with_custom_display_names():
 
     cfg = ArenaConfig.model_validate(
         {
-            "warriors": [
+            "candidates": [
                 {"model_id": "prov/model-a", "name": "Alpha"},
                 {"model_id": "prov/model-b", "name": "Beta"},
             ],
@@ -236,7 +236,7 @@ def test_report_with_custom_display_names():
     assert set(elo) == {"Alpha", "Beta"}
     assert set(rep["verbosity"]) == {"Alpha", "Beta"}
     manifest = MANIFEST | {
-        "warriors": {"Alpha": {"model": "prov/model-a"}, "Beta": {"model": "prov/model-b"}}
+        "candidates": {"Alpha": {"model": "prov/model-a"}, "Beta": {"model": "prov/model-b"}}
     }
     prices = {
         "prov/model-a": (1.0, 2.0),

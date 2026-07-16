@@ -133,7 +133,6 @@ orq-arena run [--config PATH] [--prompts PATH] [--output PATH] [--rounds N]
 | `--overwrite` | off | Allow replacing an existing non-empty battle log at `--output`; without it the run refuses rather than erase a recorded run. |
 | `--tui` | off | Watch the live TUI show instead of headless logs. Headless runs use `headless_concurrency` (default `4`, see [configuration.md](configuration.md)) to parallelize matches. |
 | `--no-open` | off | Do not open the HTML report in a browser when the run ends (it never opens on non-TTY stdout or when `CI` is set). |
-| `--headless` | off | Deprecated no-op: headless is already the default. |
 | `--yes`, `-y` | off | Skip the preflight confirmation pause. |
 
 **Behavior notes:**
@@ -142,8 +141,6 @@ orq-arena run [--config PATH] [--prompts PATH] [--output PATH] [--rounds N]
   prompt happen up front in the terminal, before the TUI (or headless run) even starts. To
   discover which model ids your workspace can fight, see
   [`refresh-models`](#refresh-models) (`--show` lists them grouped by provider).
-- **Flag conflicts.** `--tui --headless` raises immediately (a clean `click.ClickException`,
-  exit code 1, not a traceback).
 - **Preflight output.** First, exact call counts:
 
   ```text

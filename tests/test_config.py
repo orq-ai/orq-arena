@@ -18,7 +18,7 @@ def test_default_config_loads_with_full_roster() -> None:
     assert cfg.gateway.base_url.startswith("https://api.orq.ai")
 
 
-def test_warrior_short_model_strips_provider_prefix() -> None:
+def test_candidate_short_model_strips_provider_prefix() -> None:
     cfg = load_config(ROOT / "orq_arena.yaml")
     assert cfg.candidates[0].short_model == "claude-opus-4-8"
     assert "/" not in cfg.candidates[0].short_model
@@ -42,7 +42,7 @@ def test_thinking_budget_must_fit_max_tokens() -> None:
     from orq_arena.config import ArenaConfig
 
     bad = {
-        "warriors": [
+        "candidates": [
             {"name": "A", "model_id": "x/a"},
             {
                 "name": "B",
@@ -55,23 +55,3 @@ def test_thinking_budget_must_fit_max_tokens() -> None:
     }
     with pytest.raises(ValueError, match="budget_tokens"):
         ArenaConfig.model_validate(bad)
-
-
-def test_deprecated_warriors_yaml_alias_still_loads(tmp_path) -> None:
-    """Pre-rename configs keep working: warriors/warrior_max_tokens/orc_name."""
-    legacy = tmp_path / "legacy.yaml"
-    legacy.write_text(
-        """
-gateway:
-  warrior_max_tokens: 1024
-warriors:
-  - model_id: prov/model-a
-    orc_name: Alpha
-  - model_id: prov/model-b
-judges: [prov/judge-1]
-""",
-        encoding="utf-8",
-    )
-    cfg = load_config(legacy)
-    assert [c.name for c in cfg.candidates] == ["Alpha", "model-b"]
-    assert cfg.gateway.candidate_max_tokens == 1024

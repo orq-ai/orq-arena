@@ -106,12 +106,6 @@ def cli() -> None:
     help="Watch the live TUI show instead of the default headless logs.",
 )
 @click.option(
-    "--headless",
-    is_flag=True,
-    default=False,
-    help="Deprecated no-op: headless is already the default.",
-)
-@click.option(
     "--no-open",
     "no_open",
     is_flag=True,
@@ -133,7 +127,6 @@ def run(
     rounds: int | None,
     overwrite: bool,
     tui: bool,
-    headless: bool,
     no_open: bool,
     assume_yes: bool,
 ) -> None:
@@ -181,9 +174,6 @@ def run(
         from .data.prompts import orq_dataset_meta
 
         dataset = orq_dataset_meta(prompts_path[len("orq:") :], api_key_env=cfg.gateway.api_key_env)
-
-    if tui and headless:
-        raise click.ClickException("--tui and --headless contradict each other")
 
     counts = call_counts(cfg, prompts)
     click.echo(
@@ -579,15 +569,6 @@ def anchor(battle_log: str, vote_files: tuple[str, ...]) -> None:
     from .rejudge import load_records
 
     render_anchor_result(anchor_result(load_records(battle_log), load_votes(list(vote_files))))
-
-
-@cli.command("list-warriors", hidden=True)
-@click.option("--config", "config_path", default=DEFAULT_CONFIG, show_default=True)
-@click.pass_context
-def list_warriors(ctx: click.Context, config_path: str) -> None:
-    """Deprecated alias for list-models."""
-    click.echo("list-warriors is deprecated; use list-models", err=True)
-    ctx.invoke(list_models, config_path=config_path)
 
 
 if __name__ == "__main__":
