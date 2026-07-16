@@ -88,6 +88,8 @@ uv run orq-arena run --config orq_arena.yaml --prompts orq:<dataset_id>
 
 Dataset-backed runs record the [Dataset](https://docs.orq.ai/docs/ai-studio/optimize/datasets)'s id, name, and studio URL in the manifest, and the report links it by name. If each match should see every prompt, pass `--rounds <n>`; the preflight warns when it samples a subset.
 
+Set expectations for the out-of-the-box run: the shipped 30-prompt bank and cheap default judge trio are a **smoke test** that exercises every mechanism, not a benchmark. Expect wide, overlapping error bars and a judge/candidate family-overlap caveat on the report; both are the honest output at that scale. A ranking you intend to defend takes your own prompt set (hundreds of rounds) and judges from families outside the pool ([Methodology](docs/methodology.md#current-limitations)).
+
 No key yet? Watch a recorded tournament first: `uv run orq-arena demo` (zero API calls).
 
 ## Usage
@@ -110,7 +112,7 @@ From the final leaderboard, `B` pages through every judged round (prompt, both r
 
 Everything lives in `orq_arena.yaml`, no flags to remember. The default pool runs every model with extended reasoning ("thinking") turned **off**, and verifies that against the live router, so the ELO compares models on equal footing rather than whatever each vendor enables by default. `configs/reasoning_arena.yaml` is the thinking-ON counterpart, and [`configs/`](configs/) has ready-made frontier, budget, and 16-model pools. Per-provider reasoning settings, replacement judges, and every other key: **[docs/configuration.md](docs/configuration.md)**.
 
-**Not locked to orq.ai.** The engine speaks plain OpenAI-compatible chat: point `gateway.base_url` at any endpoint that speaks that format and set `api_key_env` to match. The orq.ai router is the default because one key covers every provider; it is the recommended path, not the only one. Details: [docs/configuration.md](docs/configuration.md#bring-your-own-endpoint).
+**Not locked to orq.ai.** The engine speaks plain OpenAI-compatible chat: point `gateway.base_url` at any endpoint that speaks that format and set `api_key_env` to match. A ready-made example against OpenRouter ships in the repo, `orq-arena run --config configs/byok_openrouter.yaml` — off the router you lose catalog pricing (spend ceiling, report cost section), nothing else. The orq.ai router is the default because one key covers every provider; it is the recommended path, not the only one. Details: [docs/configuration.md](docs/configuration.md#bring-your-own-endpoint).
 
 ```yaml
 candidates:

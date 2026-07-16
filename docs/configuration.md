@@ -174,7 +174,8 @@ is exposed as a config key. The preflight probe call (see below) also uses a har
 
 The gateway client is a plain `AsyncOpenAI` client: nothing in the tournament engine is
 orq.ai-specific. Point `base_url` at any OpenAI-compatible chat endpoint and set `api_key_env`
-to whatever variable holds that endpoint's key.
+to whatever variable holds that endpoint's key. A ready-made example against OpenRouter ships
+at [`configs/byok_openrouter.yaml`](https://github.com/orq-ai/orq-arena/blob/master/configs/byok_openrouter.yaml).
 Two features do depend on the orq.ai router and degrade cleanly without it:
 
 - **`refresh-models` and catalog pricing** read the workspace model catalog from the router.

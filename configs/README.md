@@ -13,6 +13,7 @@ coherent, no makeweights padding a "frontier" field, no giants lurking in a
 | [`frontier_8.yaml`](frontier_8.yaml) | 8 | 5 | ~40-56 | The strongest models, each at its best |
 | [`budget_8.yaml`](budget_8.yaml) | 8 | 8 | ~12-25 | Which cheap/fast model wins on your prompts |
 | [`frontier_16.yaml`](frontier_16.yaml) | 16 | 8 | ~29-56 | Big-field stress test + preference-data generation |
+| [`byok_openrouter.yaml`](byok_openrouter.yaml) | 4 | 4 | example | The engine on a non-orq endpoint (bring your own key) |
 
 Pool size drives cost: an N-model pool runs C(N,2) matches (28 for 8, 120 for
 16), each `match.max_rounds` rounds. Every run prints an exact spend ceiling and
