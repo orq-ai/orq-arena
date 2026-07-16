@@ -40,6 +40,17 @@ _DEMO_HINT = (
 )
 
 
+def _load_config(path: str):
+    """load_config with a clean CLI error when the YAML isn't there."""
+    try:
+        return load_config(path)
+    except FileNotFoundError:
+        raise click.ClickException(
+            f"{path} not found. Run from a checkout that has it, or pass "
+            "--config <your.yaml> (see docs/configuration.md for the format)."
+        ) from None
+
+
 def _quiet_logs() -> None:
     """evaluatorq logs via loguru to stderr, which would corrupt the TUI."""
     import sys
@@ -157,7 +168,7 @@ def run(
         )
     # Fail fast on a missing TUI extra before any preflight work.
     arena_app_cls = _arena_app_cls(_TUI_HINT) if tui else None
-    cfg = load_config(config_path)
+    cfg = _load_config(config_path)
     prompts = load_prompts(prompts_path, api_key_env=cfg.gateway.api_key_env)
     if rounds is not None:
         if rounds < 1:
@@ -272,10 +283,10 @@ def _open_report(battle_log_path: str, no_open: bool) -> None:
 def demo(fixture_path: str, config_path: str) -> None:
     """Replay a recorded tournament from a fixture file (no API calls)."""
     _quiet_logs()
-    cfg = load_config(config_path)
-    app = _arena_app_cls(_DEMO_HINT)(
-        cfg=cfg, prompts=[], battle_log_path="", live=False, fixture=fixture_path
-    )
+    # TUI-extra check first: the friendly hint must beat any config error.
+    arena_app_cls = _arena_app_cls(_DEMO_HINT)
+    cfg = _load_config(config_path)
+    app = arena_app_cls(cfg=cfg, prompts=[], battle_log_path="", live=False, fixture=fixture_path)
     app.run()
 
 
@@ -283,7 +294,7 @@ def demo(fixture_path: str, config_path: str) -> None:
 @click.option("--config", "config_path", default=DEFAULT_CONFIG, show_default=True)
 def list_models(config_path: str) -> None:
     """Print the configured candidate roster."""
-    cfg = load_config(config_path)
+    cfg = _load_config(config_path)
     click.echo(f"{'Seed':<5} {'Name':<26} Model ID")
     click.echo("-" * 70)
     for i, w in enumerate(cfg.candidates, 1):
@@ -341,7 +352,7 @@ def rejudge(
 
     from .rejudge import load_records, rejudge_run, render_result, save_report_json, write_rejudged
 
-    cfg = load_config(config_path)
+    cfg = _load_config(config_path)
     records = load_records(log_path)
     if not records:
         raise click.ClickException(f"no judgeable rounds in {log_path}")
@@ -388,7 +399,7 @@ def report_cmd(log_path: str, config_path: str, output_path: str | None) -> None
     from .report import build_report_html, report_path_for
     from .tournament.driver import rebuild_from_log
 
-    cfg = load_config(config_path)
+    cfg = _load_config(config_path)
     log = Path(log_path)
     if not log.exists():
         raise click.ClickException(f"{log_path} not found")
@@ -441,7 +452,7 @@ def refresh_models(config_path: str, show: bool) -> None:
 
     from .providers.models_list import CACHE_FILE, fetch_chat_models
 
-    cfg = load_config(config_path)
+    cfg = _load_config(config_path)
     ml = asyncio.run(fetch_chat_models(cfg.gateway, force_refresh=True))
     age = _time.time() - ml.fetched_at
     click.echo(f"{len(ml.models)} models (source={ml.source}, age={age:.0f}s, cache={CACHE_FILE})")
