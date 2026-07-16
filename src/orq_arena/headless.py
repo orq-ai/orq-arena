@@ -1,13 +1,15 @@
 """Headless runner, the same tournament, no TUI, matches in parallel.
 
-For CI/cron benchmark generation. Consumes the event queue two ways,
-picked by where stdout goes (the sibling repos' treatment):
+For CI/cron benchmark generation. Progress and match chatter go to
+stderr so stdout stays pipeable; the queue is consumed two ways, picked
+by where stderr goes (the sibling repos' treatment):
 
 * a terminal: a pinned Rich progress bar over rounds (spinner, M-of-N,
   elapsed, current leader) with completed-match one-liners above it;
 * a pipe or CI log: plain line-per-match output, no ANSI redraw noise.
 
-Both end with the full statistical leaderboard and the report-page path.
+Both end with the full statistical leaderboard and the report-page path
+on stdout.
 """
 
 from __future__ import annotations
@@ -87,22 +89,38 @@ def _match_line(ev: MatchResolved) -> str:
     return f"[dim]{ev.match_id}[/dim] {ev.winner} beats {ev.loser}"
 
 
-async def consume_events(events: asyncio.Queue, *, console: Console, total_rounds: int) -> None:
+async def consume_events(
+    events: asyncio.Queue,
+    *,
+    console: Console,
+    err_console: Console,
+    total_rounds: int,
+    quiet: bool = False,
+) -> None:
     """Drain the event queue until TournamentEnded.
 
-    On a terminal, a pinned progress bar counts rounds while match results
-    print above it; on a pipe, the plain line-per-match output survives
-    grep and CI logs.
+    Progress and match chatter go to err_console (stderr) so stdout stays
+    pipeable; the final summary goes to console (stdout). On a terminal,
+    a pinned progress bar counts rounds while match results print above
+    it; on a pipe, the plain line-per-match output survives grep and CI
+    logs. quiet drops everything but the summary.
     """
-    if not console.is_terminal:
+    if quiet:
+        while True:
+            ev = await events.get()
+            if isinstance(ev, TournamentEnded):
+                _print_summary(console, ev)
+                return
+
+    if not err_console.is_terminal:
         while True:
             ev = await events.get()
             if isinstance(ev, MatchResolved):
-                console.print(_match_line(ev))
+                err_console.print(_match_line(ev))
             elif isinstance(ev, RoundVoided):
-                console.print(f"[yellow]{ev.match_id} round void, {ev.reason}[/yellow]")
+                err_console.print(f"[yellow]{ev.match_id} round void, {ev.reason}[/yellow]")
             elif isinstance(ev, StandingsUpdated):
-                console.print(f"[dim]match {ev.matches_done}/{ev.matches_total} done[/dim]")
+                err_console.print(f"[dim]match {ev.matches_done}/{ev.matches_total} done[/dim]")
             elif isinstance(ev, TournamentEnded):
                 _print_summary(console, ev)
                 return
@@ -114,7 +132,7 @@ async def consume_events(events: asyncio.Queue, *, console: Console, total_round
             BarColumn(),
             MofNCompleteColumn(),
             TimeElapsedColumn(),
-            console=console,
+            console=err_console,
         )
         with progress:
             task = progress.add_task("rounds", total=total_rounds)
@@ -151,8 +169,10 @@ async def run_headless(
     battle_log_path: str,
     preflight: dict | None = None,
     dataset: dict | None = None,
+    quiet: bool = False,
 ) -> dict[str, float]:
     console = Console(file=sys.stdout)
+    err_console = Console(file=sys.stderr)
     events: asyncio.Queue = asyncio.Queue()
 
     from .preflight import call_counts
@@ -161,7 +181,13 @@ async def run_headless(
     total_rounds = counts.matches * counts.rounds_per_match
 
     printer_task = asyncio.create_task(
-        consume_events(events, console=console, total_rounds=total_rounds)
+        consume_events(
+            events,
+            console=console,
+            err_console=err_console,
+            total_rounds=total_rounds,
+            quiet=quiet,
+        )
     )
     elo = await run_tournament(
         cfg=cfg,

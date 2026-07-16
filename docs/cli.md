@@ -12,8 +12,8 @@ that delegate to them).
 It exposes eight subcommands: [`run`](#run), [`demo`](#demo), [`list-models`](#list-models),
 [`rejudge`](#rejudge) (including its [`--compare`](#rejudge-compare) mode), [`report`](#report),
 [`annotate`](#annotate), [`anchor`](#anchor), and [`refresh-models`](#refresh-models). The `cli` group itself defines
-no flags beyond Click's built-in `--help`; there is no `--version` option. Every flag below
-lives on a specific subcommand.
+`--version` and Click's built-in `--help`; every other flag below lives on a specific
+subcommand.
 
 ```bash
 uv run orq-arena --help              # list every subcommand
@@ -26,7 +26,8 @@ Usage: orq-arena [OPTIONS] COMMAND [ARGS]...
   orq-arena, LLM arena benchmark: orq.ai router + evaluatorq jury.
 
 Options:
-  --help  Show this message and exit.
+  --version  Show the version and exit.
+  --help     Show this message and exit.
 
 Commands:
   anchor          Merge human vote files against a recorded run: κ + rank...
@@ -95,6 +96,10 @@ A few things apply across every subcommand and are only documented once, here:
 - **Log quieting**: `run`, `demo`, and `rejudge` redirect evaluatorq's `loguru` output to
   stderr at `ERROR` level only (`_quiet_logs()`), so library logging never corrupts the TUI or
   interleaves with `rejudge`'s Rich tables. The other commands don't touch logging config.
+- **`--version`**: `orq-arena --version` prints the installed package version.
+- **Stream contract**: results go to stdout; messaging (preflight narration, warnings,
+  progress) goes to stderr. Piping stdout to `grep`, `jq`, or a file never captures
+  progress noise.
 - **Which commands need `ORQ_API_KEY`:**
 
   | Command | Needs a live API key? |
@@ -121,7 +126,7 @@ The headless run needs no extra.
 
 ```text
 orq-arena run [--config PATH] [--prompts PATH] [--output PATH] [--rounds N]
-              [--overwrite] [--tui] [--no-open] [--yes|-y]
+              [--overwrite] [--tui] [--no-open] [--yes|-y] [--quiet|-q]
 ```
 
 | Flag | Default | Effect |
@@ -133,7 +138,8 @@ orq-arena run [--config PATH] [--prompts PATH] [--output PATH] [--rounds N]
 | `--overwrite` | off | Allow replacing an existing non-empty battle log at `--output`; without it the run refuses rather than erase a recorded run. |
 | `--tui` | off | Watch the live TUI show instead of headless logs. Headless runs use `headless_concurrency` (default `4`, see [configuration.md](configuration.md)) to parallelize matches. |
 | `--no-open` | off | Do not open the HTML report in a browser when the run ends (it never opens on non-TTY stdout or when `CI` is set). |
-| `--yes`, `-y` | off | Skip the preflight confirmation pause. |
+| `--yes`, `-y` | off | Skip the preflight confirmation pause. Required when stdin is not a terminal (pipes, CI): without it the run fails fast instead of hanging on a prompt nobody can answer. |
+| `--quiet`, `-q` | off | Suppress preflight narration and progress; warnings and the final results stay. |
 
 **Behavior notes:**
 
@@ -173,6 +179,11 @@ orq-arena run [--config PATH] [--prompts PATH] [--output PATH] [--rounds N]
 - **Confirmation.** Unless `--yes`/`-y` is given, the CLI prompts `Proceed?`
   (`click.confirm(..., abort=True)`); declining aborts before any battle or judge calls
   (the thinking probe, when enabled, has already made its one probe stream per model).
+  When stdin is not an interactive terminal the run errors out with a
+  "pass `--yes`" hint instead of prompting.
+- **Streams.** Preflight narration, warnings, per-match lines, and the progress bar print to
+  stderr; the final standings, token totals, battle-log path, and report-page path print to
+  stdout. `1>results.txt` captures only the results; `2>/dev/null` silences the chatter.
 - **Output.** Every judged round is appended to `--output` (`battles.jsonl`, schema v3) as the
   run proceeds, live-run or headless alike.
 
@@ -192,7 +203,8 @@ uv run orq-arena run --yes
 uv run orq-arena run --config configs/reasoning_arena.yaml --prompts prompts/starter.jsonl --output reasoning_battles.jsonl
 ```
 
-**Expected output** (headless, piped; reconstructed from the committed
+**Expected output** (headless, piped, both streams shown interleaved; everything above
+`FINAL STANDINGS` is stderr; reconstructed from the committed
 [`examples/quickstart`](https://github.com/orq-ai/orq-arena/tree/master/examples/quickstart) run's
 recorded manifest and log, its 4-model pool against the default judge trio):
 
@@ -284,12 +296,13 @@ flip badges; `s` saves an SVG screenshot; `q` quits.
 Print the configured roster, no API calls, no key required.
 
 ```text
-orq-arena list-models [--config PATH]
+orq-arena list-models [--config PATH] [--json]
 ```
 
 | Flag | Default | Effect |
 |---|---|---|
 | `--config PATH` | `orq_arena.yaml` | YAML roster to print. |
+| `--json` | off | Print the roster as a JSON array of `{seed, name, model_id}` objects instead of the table. |
 
 **Behavior notes:**
 
@@ -534,14 +547,14 @@ API calls. This is the front half of the human-anchor workflow (the back half is
 [Methodology → Human anchor](methodology.md#human-anchor-does-the-panel-agree-with-people)).
 
 ```text
-orq-arena annotate BATTLE_LOG [--out PATH] [--sample N] [--seed N] [--criteria TEXT]
+orq-arena annotate BATTLE_LOG [--output PATH] [--sample N] [--seed N] [--criteria TEXT]
                   [--exclude VOTES_JSON ...] [--serve] [--port N]
 ```
 
 | Flag / arg | Default | Effect |
 |---|---|---|
 | `BATTLE_LOG` (positional) | required | The recorded run to annotate. |
-| `--out PATH` | `annotate.html` | Destination HTML file. |
+| `--output PATH` | `annotate.html` | Destination HTML file. |
 | `--sample N` | all rounds | Annotate a seeded random subset instead of every round. |
 | `--criteria TEXT` | the jury's default rubric | Judging guidelines shown to the rater. |
 | `--seed N` | `42` | Drives round order and per-round side flips; keep it if you want two raters on identical pages. |
@@ -569,9 +582,9 @@ order.
 
 ```bash
 uv run orq-arena annotate outputs/g1/battles.jsonl --sample 60
-uv run orq-arena annotate battles.jsonl --out rater2.html --seed 42
+uv run orq-arena annotate battles.jsonl --output rater2.html --seed 42
 # resume: only the rounds dana hasn't voted yet
-uv run orq-arena annotate battles.jsonl --exclude votes-dana.json --out dana-round2.html
+uv run orq-arena annotate battles.jsonl --exclude votes-dana.json --output dana-round2.html
 # annotate your own run locally, votes save as you click, Ctrl-C prints the numbers
 uv run orq-arena annotate outputs/g1/battles.jsonl --serve --sample 60
 ```
@@ -579,7 +592,7 @@ uv run orq-arena annotate outputs/g1/battles.jsonl --serve --sample 60
 **Expected output** (file mode; `--serve` prints the local URL instead and holds until Ctrl-C):
 
 ```text
-$ uv run orq-arena annotate examples/quickstart/battles.jsonl --out annotate.html --sample 10
+$ uv run orq-arena annotate examples/quickstart/battles.jsonl --output annotate.html --sample 10
 10 rounds -> annotate.html (blind; votes export as votes.json)
 ```
 
@@ -589,13 +602,14 @@ Merge one or more human vote files back against the recorded run and print the h
 numbers; no API calls.
 
 ```text
-orq-arena anchor BATTLE_LOG VOTES_JSON [VOTES_JSON ...]
+orq-arena anchor BATTLE_LOG VOTES_JSON [VOTES_JSON ...] [--json]
 ```
 
 | Flag / arg | Default | Effect |
 |---|---|---|
 | `BATTLE_LOG` (positional) | required | The same log the annotation page was generated from. |
 | `VOTES_JSON` (positional, repeatable) | required | Vote files exported by the annotation page, one per rater. |
+| `--json` | off | Print the same stats as one JSON object (`per_annotator`, `inter_annotator`, `panel_ranking`, `unknown_keys`) instead of the table; undefined Spearman values become `null`. |
 
 Output, per annotator: rounds voted, rounds usable for κ (the panel must have been decisive;
 inconclusive rounds are excluded from κ but still feed the human Bradley-Terry fit), Cohen's
@@ -652,7 +666,8 @@ orq-arena refresh-models [--config PATH] [--show/--no-show]
   (this command passes no fallback ids of its own).
 - Only a **successful** live fetch overwrites the cache file, without a key, or if every
   candidate URL fails, the existing cache (if any) is left untouched and simply re-reported.
-- Always prints one summary line:
+- Always prints one summary line (to stderr, per the stream contract; `--show`'s model list
+  is the stdout payload):
   `{count} models (source={live|cache|fallback}, age={seconds}s, cache={path})`.
 - `--show` additionally prints every model id grouped by provider (providers and ids both
   sorted):
@@ -734,6 +749,28 @@ uv run orq-arena refresh-models --show
 
 Forces a live re-fetch (bypassing the 24h cache) and lists every workspace-enabled chat model
 id, grouped by provider, ready to paste into your YAML's `candidates` list.
+
+---
+
+## Scripting & CI
+
+Everything you need to run `orq-arena` unattended or pipe its output:
+
+- **Confirmation**: `run` requires `--yes`/`-y` when stdin is not a terminal; without it the
+  command fails immediately with that hint instead of hanging on a prompt.
+- **Streams**: results on stdout, messaging (preflight narration, warnings, progress) on
+  stderr. `orq-arena run -y 1>results.txt 2>run.log` separates them cleanly.
+- **Quiet**: `run --quiet`/`-q` drops narration and progress; warnings and the final
+  standings still print.
+- **No animations off-TTY**: when stderr is not a terminal the progress bar is replaced by
+  plain line-per-match output, so CI logs stay readable. The HTML report never auto-opens
+  off-TTY or when `CI` is set.
+- **Machine-readable output**: `list-models --json` and `anchor --json` print JSON to stdout;
+  `rejudge --report-json <file>` writes its summary as JSON.
+- **Color**: output is colored via Rich, which honors the standard `NO_COLOR` and
+  `FORCE_COLOR` environment variables and disables color on non-TTY streams automatically.
+- **Exit codes**: `0` success, `1` any runtime error (printed as `Error: …` on stderr),
+  `2` usage error (unknown flag, bad value).
 
 ---
 

@@ -133,7 +133,8 @@ is headless by default and walks through three stages:
    vendor-default reasoning that contradicts your config (`🧠 thinks despite config: ...,
    ranking will be footnoted`), then asks `Proceed?` before any battle or judge call
    (the probe itself has already made one paid call per candidate), pass
-   `--yes`/`-y` to skip the prompt for CI or scripts. For the shipped `orq_arena.yaml` (8
+   `--yes`/`-y` to skip the prompt for CI or scripts (in a non-interactive shell the
+   run refuses up front, before any paid call, and tells you to pass it). For the shipped `orq_arena.yaml` (8
    candidates) against the default `prompts/starter.jsonl` (30 prompts, capped at
    `match.max_rounds` = 5 per match), that preflight line reads exactly:
 
