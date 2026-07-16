@@ -29,8 +29,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# The live TUI show (orq-arena --tui, the interactive roster picker, and
-# orq-arena demo). The benchmark, report, and rejudge work without it.
+# The live TUI show (orq-arena run --tui and orq-arena demo). The
+# benchmark, report, and rejudge work without it.
 tui = ["textual>=0.83"]
 
 [project.urls]

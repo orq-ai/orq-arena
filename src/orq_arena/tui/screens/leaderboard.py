@@ -18,7 +18,6 @@ class LeaderboardScreen(Screen):
         ("enter,space,q", "quit", "Quit"),
         ("s", "shot", "Screenshot"),
         ("b", "browse", "Battle browser"),
-        ("m", "postmortem", "Post-mortems"),
     ]
 
     DEFAULT_CSS = """
@@ -89,8 +88,8 @@ class LeaderboardScreen(Screen):
 
             tok = r.get("tokens") or {}
             if tok:
-                wi = tok.get("models_in", tok.get("warriors_in", 0))
-                wo = tok.get("models_out", tok.get("warriors_out", 0))
+                wi = tok.get("models_in", 0)
+                wo = tok.get("models_out", 0)
                 ji, jo = tok.get("judges_in", 0), tok.get("judges_out", 0)
                 jury_share = (ji + jo) / max(1, wi + wo + ji + jo)
                 yield Static(
@@ -123,8 +122,10 @@ class LeaderboardScreen(Screen):
                 yield Static("WIN GRID, row beats column (ties = ½)", classes="section")
                 yield DataTable(id="grid")
 
-            yield Static(f"battle log → {self._log_path}   ·   manifest → *.run.json", id="log-path")
-            yield Static("ENTER exit · B battle browser · M post-mortems · s screenshot", id="hint")
+            yield Static(
+                f"battle log → {self._log_path}   ·   manifest → *.run.json", id="log-path"
+            )
+            yield Static("ENTER exit · B battle browser · s screenshot", id="hint")
 
     def on_mount(self) -> None:
         r = self._report
@@ -196,14 +197,11 @@ class LeaderboardScreen(Screen):
             for n in names:
                 gt.add_row(
                     n[:8],
-                    *(
-                        "·" if n == m else f"{grid.get(n, {}).get(m, 0):g}"
-                        for m in names
-                    ),
+                    *("·" if n == m else f"{grid.get(n, {}).get(m, 0):g}" for m in names),
                 )
 
     def action_browse(self) -> None:
-        from ...analysis.postmortem import load_records
+        from ...data.schemas import load_records
         from .battle_browser import BattleBrowserScreen
 
         records = load_records(self._log_path)
@@ -211,14 +209,6 @@ class LeaderboardScreen(Screen):
             self.notify("no battle log to browse", severity="warning")
             return
         self.app.push_screen(BattleBrowserScreen(records))
-
-    def action_postmortem(self) -> None:
-        if self._cfg is None:
-            self.notify("post-mortems need a live run", severity="warning")
-            return
-        from .postmortem import PostmortemScreen
-
-        self.app.push_screen(PostmortemScreen(self._cfg, self._log_path))
 
     def action_shot(self) -> None:
         path = self.app.save_screenshot()

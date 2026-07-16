@@ -29,11 +29,6 @@ def _arena_app_cls(hint: str):
     return ArenaApp
 
 
-_PICKER_HINT = (
-    "The interactive roster picker needs the TUI. Install it with: "
-    "pip install 'orq-arena[tui]' (or uv sync --extra tui), or pass "
-    "--config <yaml> to run headless with a fixed roster."
-)
 _TUI_HINT = (
     "The live TUI show needs the extra. Install it with: "
     "pip install 'orq-arena[tui]' (or uv sync --extra tui), or drop --tui "
@@ -43,6 +38,17 @@ _DEMO_HINT = (
     "orq-arena demo replays inside the TUI. Install it with: "
     "pip install 'orq-arena[tui]' (or uv sync --extra tui)."
 )
+
+
+def _load_config(path: str):
+    """load_config with a clean CLI error when the YAML isn't there."""
+    try:
+        return load_config(path)
+    except FileNotFoundError:
+        raise click.ClickException(
+            f"{path} not found. Run from a checkout that has it, or pass "
+            "--config <your.yaml> (see docs/configuration.md for the format)."
+        ) from None
 
 
 def _quiet_logs() -> None:
@@ -68,7 +74,11 @@ def _load_dotenv() -> None:
             os.environ.setdefault(key.strip(), value.strip().strip("'\""))
 
 
-@click.group()
+@click.group(
+    epilog="Docs: https://github.com/orq-ai/orq-arena/tree/master/docs · "
+    "Issues: https://github.com/orq-ai/orq-arena/issues"
+)
+@click.version_option(package_name="orq-arena")
 def cli() -> None:
     """orq-arena, LLM arena benchmark: orq.ai router + evaluatorq jury."""
     _load_dotenv()
@@ -78,9 +88,9 @@ def cli() -> None:
 @click.option(
     "--config",
     "config_path",
-    default=None,
-    show_default=False,
-    help="Use this YAML roster as-is and skip the interactive picker.",
+    default=DEFAULT_CONFIG,
+    show_default=True,
+    help="YAML roster + rules (candidates, judges, match, gateway).",
 )
 @click.option(
     "--prompts",
@@ -89,7 +99,13 @@ def cli() -> None:
     show_default=True,
     help="JSONL file, or orq:<dataset_id> to pull an orq.ai Dataset.",
 )
-@click.option("--output", "output_path", default=DEFAULT_OUTPUT, show_default=True)
+@click.option(
+    "--output",
+    "output_path",
+    default=DEFAULT_OUTPUT,
+    show_default=True,
+    help="Battle log JSONL to write; the run's full record.",
+)
 @click.option(
     "--rounds",
     "rounds",
@@ -111,12 +127,6 @@ def cli() -> None:
     help="Watch the live TUI show instead of the default headless logs.",
 )
 @click.option(
-    "--headless",
-    is_flag=True,
-    default=False,
-    help="Deprecated: headless is already the default with --config.",
-)
-@click.option(
     "--no-open",
     "no_open",
     is_flag=True,
@@ -131,26 +141,37 @@ def cli() -> None:
     default=False,
     help="Skip the preflight confirmation pause.",
 )
+@click.option(
+    "--quiet",
+    "-q",
+    is_flag=True,
+    default=False,
+    help="Suppress preflight narration and progress; warnings and results stay.",
+)
 def run(
-    config_path: str | None,
+    config_path: str,
     prompts_path: str,
     output_path: str,
     rounds: int | None,
     overwrite: bool,
     tui: bool,
-    headless: bool,
     no_open: bool,
     assume_yes: bool,
+    quiet: bool,
 ) -> None:
     """Run the arena benchmark (hits orq.ai): headless logs by default,
     then the HTML report opens in your browser.
 
-    With --config the run is headless (matches in parallel); pass --tui to
-    watch the live show instead. Without --config the interactive roster
-    picker opens first, which needs the TUI. The YAML still supplies
-    judges, rules, and gateway settings.
+    The YAML roster is used as-is (default orq_arena.yaml); matches run in
+    parallel. Pass --tui to watch the live show instead.
+
+    \b
+    Examples:
+      orq-arena run -y --rounds 8
+      orq-arena run --prompts orq:my_dataset --output runs/today.jsonl
     """
     import asyncio
+    import sys
     from pathlib import Path
 
     from .preflight import (
@@ -163,25 +184,38 @@ def run(
     from .providers.models_list import fetch_price_map
 
     _quiet_logs()
+
+    # clig.dev stream contract: results on stdout, messaging on stderr.
+    def warn(msg: str) -> None:
+        click.echo(msg, err=True)
+
+    def status(msg: str) -> None:
+        if not quiet:
+            click.echo(msg, err=True)
+
     out = Path(output_path)
     if out.exists() and out.stat().st_size > 0 and not overwrite:
         raise click.ClickException(
             f"{output_path} already holds a recorded run; a new run would erase it. "
             "Pass a fresh --output, or --overwrite to replace it."
         )
-    pick_roster = config_path is None
     # Fail fast on a missing TUI extra before any preflight work.
-    arena_app_cls = (
-        _arena_app_cls(_PICKER_HINT if pick_roster else _TUI_HINT) if (pick_roster or tui) else None
-    )
-    cfg = load_config(config_path or DEFAULT_CONFIG)
+    arena_app_cls = _arena_app_cls(_TUI_HINT) if tui else None
+    # Fail before any network spend: a piped/CI stdin can never answer the
+    # preflight confirmation.
+    if not assume_yes and not sys.stdin.isatty():
+        raise click.ClickException(
+            "stdin is not interactive, so the preflight confirmation can't be "
+            "answered; pass --yes to proceed."
+        )
+    cfg = _load_config(config_path)
     prompts = load_prompts(prompts_path, api_key_env=cfg.gateway.api_key_env)
     if rounds is not None:
         if rounds < 1:
             raise click.ClickException("--rounds must be >= 1")
         cfg.match.max_rounds = rounds
     if cfg.match.max_rounds < len(prompts):
-        click.echo(
+        warn(
             f"  ⚠ each match samples {cfg.match.max_rounds} of your {len(prompts)} prompts "
             f"(a seeded random slice per match). Pass --rounds {len(prompts)} to use every "
             "prompt each match, or raise match.max_rounds in the YAML."
@@ -192,31 +226,15 @@ def run(
 
         dataset = orq_dataset_meta(prompts_path[len("orq:") :], api_key_env=cfg.gateway.api_key_env)
 
-    if tui and headless:
-        raise click.ClickException("--tui and --headless contradict each other")
-    if pick_roster:
-        # The picker is a TUI screen, so this path always runs the live show.
-        app = arena_app_cls(
-            cfg=cfg,
-            prompts=prompts,
-            battle_log_path=output_path,
-            live=True,
-            pick_roster=True,
-            dataset=dataset,
-        )
-        app.run()
-        _open_report(output_path, no_open)
-        return
-
     counts = call_counts(cfg, prompts)
-    click.echo(
+    status(
         f"preflight: {counts.matches} matches × {counts.rounds_per_match} rounds → "
         f"{counts.model_streams} model streams + {counts.judge_calls} judge calls"
         + (f" + {counts.probe_calls} probe calls" if counts.probe_calls else "")
     )
     overlap = judge_family_overlaps(list(cfg.judges), cfg.candidates)
     if overlap:
-        click.echo(
+        warn(
             f"  ⚖ judge/contestant family overlap: {', '.join(overlap)}. "
             "Self-preference bias is not corrected by seat swapping; "
             "prefer judges from families outside the pool."
@@ -227,7 +245,7 @@ def run(
     preflight_data: dict = {"counts": counts.__dict__, "family_overlaps": overlap}
     ceiling = cost_ceiling(cfg, prompts, counts, asyncio.run(fetch_price_map(cfg.gateway)))
     if ceiling.total_usd > 0:
-        click.echo(
+        status(
             f"  spend ceiling ≈ ${ceiling.total_usd:.2f} "
             f"(models ${ceiling.models_usd:.2f} + judges ${ceiling.judges_usd:.2f}"
             + (f" + probe ${ceiling.probe_usd:.2f}" if ceiling.probe_usd else "")
@@ -235,27 +253,25 @@ def run(
         )
         preflight_data["cost_ceiling"] = ceiling.__dict__
     if ceiling.unpriced:
-        click.echo(
-            f"  ⚠ no catalog price for: {', '.join(ceiling.unpriced)}; excluded from ceiling"
-        )
+        warn(f"  ⚠ no catalog price for: {', '.join(ceiling.unpriced)}; excluded from ceiling")
     if cfg.preflight.thinking_probe:
-        click.echo("thinking probe…")
+        status("thinking probe…")
         probe = asyncio.run(thinking_probe(cfg))
         preflight_data["thinking_probe"] = probe
         for name, r in probe.items():
             if r["error"]:
-                click.echo(f"  ⚠ {name} ({r['model']}): probe failed, {r['error']}")
+                warn(f"  ⚠ {name} ({r['model']}): probe failed, {r['error']}")
             elif r["thinks"] and not r["configured"]:
-                click.echo(
+                warn(
                     f"  🧠 {name} ({r['model']}): thinks despite config "
                     f"({r['reasoning_tokens']} reasoning tok), ranking will be footnoted"
                 )
         odd = surprises(probe)
         if not odd:
-            click.echo("  pool is thinking-clean ✓")
+            status("  pool is thinking-clean ✓")
 
     if not assume_yes:
-        click.confirm("Proceed?", abort=True)
+        click.confirm("Proceed?", abort=True, err=True)
 
     if tui:
         app = arena_app_cls(
@@ -277,6 +293,7 @@ def run(
                 battle_log_path=output_path,
                 preflight=preflight_data,
                 dataset=dataset,
+                quiet=quiet,
             )
         )
     _open_report(output_path, no_open)
@@ -300,23 +317,51 @@ def _open_report(battle_log_path: str, no_open: bool) -> None:
 
 
 @cli.command()
-@click.option("--fixture", "fixture_path", default=DEFAULT_FIXTURE, show_default=True)
-@click.option("--config", "config_path", default=DEFAULT_CONFIG, show_default=True)
+@click.option(
+    "--fixture",
+    "fixture_path",
+    default=DEFAULT_FIXTURE,
+    show_default=True,
+    help="Recorded tournament JSON to replay.",
+)
+@click.option(
+    "--config",
+    "config_path",
+    default=DEFAULT_CONFIG,
+    show_default=True,
+    help="YAML roster + rules (candidates, judges, match, gateway).",
+)
 def demo(fixture_path: str, config_path: str) -> None:
     """Replay a recorded tournament from a fixture file (no API calls)."""
     _quiet_logs()
-    cfg = load_config(config_path)
-    app = _arena_app_cls(_DEMO_HINT)(
-        cfg=cfg, prompts=[], battle_log_path="", live=False, fixture=fixture_path
-    )
+    # TUI-extra check first: the friendly hint must beat any config error.
+    arena_app_cls = _arena_app_cls(_DEMO_HINT)
+    cfg = _load_config(config_path)
+    app = arena_app_cls(cfg=cfg, prompts=[], battle_log_path="", live=False, fixture=fixture_path)
     app.run()
 
 
 @cli.command("list-models")
-@click.option("--config", "config_path", default=DEFAULT_CONFIG, show_default=True)
-def list_models(config_path: str) -> None:
+@click.option(
+    "--config",
+    "config_path",
+    default=DEFAULT_CONFIG,
+    show_default=True,
+    help="YAML roster + rules (candidates, judges, match, gateway).",
+)
+@click.option("--json", "as_json", is_flag=True, default=False, help="Print the roster as JSON.")
+def list_models(config_path: str, as_json: bool) -> None:
     """Print the configured candidate roster."""
-    cfg = load_config(config_path)
+    cfg = _load_config(config_path)
+    if as_json:
+        import json
+
+        roster = [
+            {"seed": i, "name": w.name, "model_id": w.model_id}
+            for i, w in enumerate(cfg.candidates, 1)
+        ]
+        click.echo(json.dumps(roster, indent=2))
+        return
     click.echo(f"{'Seed':<5} {'Name':<26} Model ID")
     click.echo("-" * 70)
     for i, w in enumerate(cfg.candidates, 1):
@@ -327,7 +372,13 @@ def list_models(config_path: str) -> None:
 @click.argument("log_path", default=DEFAULT_OUTPUT)
 @click.option("--judge", "judges", multiple=True, help="Router model id; repeat for a panel.")
 @click.option("--criteria", default=None, help="Override judging criteria.")
-@click.option("--config", "config_path", default=DEFAULT_CONFIG, show_default=True)
+@click.option(
+    "--config",
+    "config_path",
+    default=DEFAULT_CONFIG,
+    show_default=True,
+    help="YAML roster + rules (candidates, judges, match, gateway).",
+)
 @click.option("--output", "output_path", default=None, help="Write re-judged rounds to this JSONL.")
 @click.option("--report-json", default=None, help="Write the summary as JSON.")
 @click.option(
@@ -338,7 +389,12 @@ def list_models(config_path: str) -> None:
     help="Tabulate saved --report-json files side by side; no API calls. "
     "Repeat per file. Use instead of --judge.",
 )
-@click.option("--concurrency", default=4, show_default=True)
+@click.option(
+    "--concurrency",
+    default=4,
+    show_default=True,
+    help="Concurrent judge calls.",
+)
 def rejudge(
     log_path: str,
     judges: tuple[str, ...],
@@ -372,13 +428,27 @@ def rejudge(
     if not judges:
         raise click.ClickException("pass --judge <model> (repeatable), or --compare <report.json>")
 
-    from .rejudge import load_records, rejudge_run, render_result, save_report_json, write_rejudged
+    from .rejudge import (
+        load_records,
+        rejudge_run,
+        render_result,
+        save_report_json,
+        short_map_from_manifest,
+        write_rejudged,
+    )
 
-    cfg = load_config(config_path)
+    cfg = _load_config(config_path)
     records = load_records(log_path)
     if not records:
         raise click.ClickException(f"no judgeable rounds in {log_path}")
-    click.echo(f"re-judging {len(records)} rounds with panel: {', '.join(judges)}")
+    short_to_full = short_map_from_manifest(log_path)
+    if short_to_full is None:
+        click.echo(
+            f"  ⚠ no run manifest next to {log_path}; resolving contestants "
+            "against --config, which may have drifted since the run",
+            err=True,
+        )
+    click.echo(f"re-judging {len(records)} rounds with panel: {', '.join(judges)}", err=True)
     result = asyncio.run(
         rejudge_run(
             cfg=cfg,
@@ -386,6 +456,7 @@ def rejudge(
             judges=list(judges),
             criteria=criteria,
             concurrency=concurrency,
+            short_to_full=short_to_full,
         )
     )
     render_result(result)
@@ -399,7 +470,13 @@ def rejudge(
 
 @cli.command("report")
 @click.argument("log_path", default=DEFAULT_OUTPUT)
-@click.option("--config", "config_path", default=DEFAULT_CONFIG, show_default=True)
+@click.option(
+    "--config",
+    "config_path",
+    default=DEFAULT_CONFIG,
+    show_default=True,
+    help="YAML roster + rules (candidates, judges, match, gateway).",
+)
 @click.option(
     "--output",
     "output_path",
@@ -412,6 +489,11 @@ def report_cmd(log_path: str, config_path: str, output_path: str | None) -> None
     Reads battles.jsonl and its *.run.json manifest; makes no model calls
     (one catalog read prices the cost section when a key is present).
     The same page is written automatically at the end of every run.
+
+    \b
+    Examples:
+      orq-arena report battles.jsonl
+      orq-arena report runs/today.jsonl --output share/report.html
     """
     import asyncio
     import json as _json
@@ -421,7 +503,7 @@ def report_cmd(log_path: str, config_path: str, output_path: str | None) -> None
     from .report import build_report_html, report_path_for
     from .tournament.driver import rebuild_from_log
 
-    cfg = load_config(config_path)
+    cfg = _load_config(config_path)
     log = Path(log_path)
     if not log.exists():
         raise click.ClickException(f"{log_path} not found")
@@ -462,7 +544,13 @@ def report_cmd(log_path: str, config_path: str, output_path: str | None) -> None
 
 
 @cli.command("refresh-models")
-@click.option("--config", "config_path", default=DEFAULT_CONFIG, show_default=True)
+@click.option(
+    "--config",
+    "config_path",
+    default=DEFAULT_CONFIG,
+    show_default=True,
+    help="YAML roster + rules (candidates, judges, match, gateway).",
+)
 @click.option("--show/--no-show", default=False, help="Print model ids grouped by provider.")
 def refresh_models(config_path: str, show: bool) -> None:
     """Re-fetch the workspace-enabled chat model list from orq.ai.
@@ -474,10 +562,13 @@ def refresh_models(config_path: str, show: bool) -> None:
 
     from .providers.models_list import CACHE_FILE, fetch_chat_models
 
-    cfg = load_config(config_path)
+    cfg = _load_config(config_path)
     ml = asyncio.run(fetch_chat_models(cfg.gateway, force_refresh=True))
     age = _time.time() - ml.fetched_at
-    click.echo(f"{len(ml.models)} models (source={ml.source}, age={age:.0f}s, cache={CACHE_FILE})")
+    click.echo(
+        f"{len(ml.models)} models (source={ml.source}, age={age:.0f}s, cache={CACHE_FILE})",
+        err=True,
+    )
     if not show:
         return
     by_provider: dict[str, list[str]] = {}
@@ -491,14 +582,26 @@ def refresh_models(config_path: str, show: bool) -> None:
 
 @cli.command()
 @click.argument("battle_log", type=click.Path(exists=True))
-@click.option("--out", "out_path", default="annotate.html", show_default=True)
+@click.option(
+    "--output",
+    "out_path",
+    default="annotate.html",
+    show_default=True,
+    help="Destination HTML for the annotation page.",
+)
 @click.option(
     "--sample",
     type=int,
     default=None,
     help="Annotate a seeded random subset instead of every round.",
 )
-@click.option("--seed", type=int, default=42, show_default=True)
+@click.option(
+    "--seed",
+    type=int,
+    default=42,
+    show_default=True,
+    help="Seed for sampling and side-order blinding.",
+)
 @click.option(
     "--criteria",
     default=None,
@@ -541,6 +644,11 @@ def annotate(
     The page is one self-contained HTML file: open it locally or send it
     to a rater; no model names, no jury votes, seeded side order. Votes
     come back as votes.json for `orq-arena anchor`.
+
+    \b
+    Examples:
+      orq-arena annotate battles.jsonl --serve
+      orq-arena annotate battles.jsonl --sample 30 --output rater1.html
     """
     from pathlib import Path
 
@@ -566,7 +674,7 @@ def annotate(
 
         server = make_annotation_server(page, Path(battle_log).parent, port=port)
         url = f"http://127.0.0.1:{server.server_address[1]}"
-        click.echo(f"serving {len(items)} rounds at {url} (Ctrl-C when done)")
+        click.echo(f"serving {len(items)} rounds at {url} (Ctrl-C when done)", err=True)
         webbrowser.open(url)
         try:
             server.serve_forever()
@@ -591,7 +699,8 @@ def annotate(
 @cli.command()
 @click.argument("battle_log", type=click.Path(exists=True))
 @click.argument("vote_files", nargs=-1, required=True, type=click.Path(exists=True))
-def anchor(battle_log: str, vote_files: tuple[str, ...]) -> None:
+@click.option("--json", "as_json", is_flag=True, default=False, help="Print the stats as JSON.")
+def anchor(battle_log: str, vote_files: tuple[str, ...], as_json: bool) -> None:
     """Merge human vote files against a recorded run: κ + rank correlation.
 
     Prints per-annotator Cohen's κ vs the panel majority, Spearman rank
@@ -601,16 +710,17 @@ def anchor(battle_log: str, vote_files: tuple[str, ...]) -> None:
     from .anchor import anchor_result, load_votes, render_anchor_result
     from .rejudge import load_records
 
-    render_anchor_result(anchor_result(load_records(battle_log), load_votes(list(vote_files))))
+    result = anchor_result(load_records(battle_log), load_votes(list(vote_files)))
+    if as_json:
+        import json
+        import math
 
-
-@cli.command("list-warriors", hidden=True)
-@click.option("--config", "config_path", default=DEFAULT_CONFIG, show_default=True)
-@click.pass_context
-def list_warriors(ctx: click.Context, config_path: str) -> None:
-    """Deprecated alias for list-models."""
-    click.echo("list-warriors is deprecated; use list-models", err=True)
-    ctx.invoke(list_models, config_path=config_path)
+        for row in result["per_annotator"]:
+            if isinstance(row["spearman"], float) and math.isnan(row["spearman"]):
+                row["spearman"] = None
+        click.echo(json.dumps(result, indent=2))
+        return
+    render_anchor_result(result)
 
 
 if __name__ == "__main__":

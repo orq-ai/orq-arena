@@ -183,7 +183,7 @@ def _cost_lines(records, manifest, prices, alias=None):
     alias = alias or {}
     id_by_name = {
         n: (w.get("model") if isinstance(w, dict) else "")
-        for n, w in (manifest.get("candidates") or manifest.get("warriors") or {}).items()
+        for n, w in (manifest.get("candidates") or {}).items()
     }
     models_usd, unpriced = 0.0, set()
     j_in = j_out = 0
@@ -226,7 +226,7 @@ def _per_model_cost(records, manifest, prices, alias=None) -> dict[str, float]:
     alias = alias or {}
     id_by_name = {
         n: (w.get("model") if isinstance(w, dict) else "")
-        for n, w in (manifest.get("candidates") or manifest.get("warriors") or {}).items()
+        for n, w in (manifest.get("candidates") or {}).items()
     }
     out: dict[str, float] = {}
     for r in records:
@@ -476,7 +476,7 @@ def _speed_svg(stats) -> str:
 
 def _empty_report_html(manifest: dict[str, Any], n_records: int) -> str:
     """Minimal valid page when no models were rated (empty pool / all voided)."""
-    bench_id = _e(manifest.get("tournament_id", "").replace("tour-", "bench-", 1))
+    bench_id = _e(manifest.get("tournament_id", ""))
     return f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -618,8 +618,8 @@ def build_report_html(
 
     # Rounds and category accounting.
     tok = report.get("tokens") or {}
-    w_in = tok.get("models_in", tok.get("warriors_in", 0))
-    w_out = tok.get("models_out", tok.get("warriors_out", 0))
+    w_in = tok.get("models_in", 0)
+    w_out = tok.get("models_out", 0)
     j_in, j_out = tok.get("judges_in", 0), tok.get("judges_out", 0)
     total_tok = w_in + w_out + j_in + j_out
     jury_share = f"{(j_in + j_out) / total_tok:.0%}" if total_tok else "n/a"
@@ -873,8 +873,7 @@ def build_report_html(
         f"{''.join(top3)}</div>{winshare_note}</div>"
     )
 
-    # Legacy runs minted "tour-…"; display them under the current "bench-" term.
-    bench_id = _e(manifest.get("tournament_id", "").replace("tour-", "bench-", 1))
+    bench_id = _e(manifest.get("tournament_id", ""))
 
     ds = manifest.get("dataset") or {}
     dataset_frag = ""

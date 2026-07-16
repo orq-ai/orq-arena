@@ -19,25 +19,41 @@ from orq_arena.events import StandingsUpdated, TournamentEnded
 
 
 def _cfg(n: int = 3) -> ArenaConfig:
-    return ArenaConfig.model_validate({
-        "warriors": [{"name": f"C{i}", "model_id": f"x/m{i}"} for i in range(n)],
-        "judges": ["x/j1", "x/j2"],
-        "preflight": {"thinking_probe": False},
-    })
+    return ArenaConfig.model_validate(
+        {
+            "candidates": [{"name": f"C{i}", "model_id": f"x/m{i}"} for i in range(n)],
+            "judges": ["x/j1", "x/j2"],
+            "preflight": {"thinking_probe": False},
+        }
+    )
 
 
 class FakeBattle:
     """candidate_a always wins its match; deterministic given the schedule."""
 
-    def __init__(self, *, cfg, gateway, candidate_a, candidate_b, prompts,
-                 match_id, round_name, tournament_id, events):
+    def __init__(
+        self,
+        *,
+        cfg,
+        gateway,
+        candidate_a,
+        candidate_b,
+        prompts,
+        match_id,
+        round_name,
+        tournament_id,
+        events,
+    ):
         self.a, self.b = candidate_a, candidate_b
 
     async def run(self):
         rec = BattleRecord(
-            prompt_hash="h", prompt_text="p",
-            model_a=self.a.short_model, model_b=self.b.short_model,
-            majority_verdict="A", winner=self.a.short_model,
+            prompt_hash="h",
+            prompt_text="p",
+            model_a=self.a.short_model,
+            model_b=self.b.short_model,
+            majority_verdict="A",
+            winner=self.a.short_model,
         )
         return SimpleNamespace(battles=[rec], winner=self.a, loser=self.b, draw=False)
 
@@ -57,9 +73,13 @@ async def _run(cfg, tmp_path, *, concurrency=1, preflight=None):
     events: asyncio.Queue = asyncio.Queue()
     log = tmp_path / "battles.jsonl"
     elo = await driver_mod.run_tournament(
-        cfg=cfg, prompts=[PromptItem("p1"), PromptItem("p2")],
-        battle_log_path=str(log), events=events, seed=7,
-        concurrency=concurrency, preflight=preflight,
+        cfg=cfg,
+        prompts=[PromptItem("p1"), PromptItem("p2")],
+        battle_log_path=str(log),
+        events=events,
+        seed=7,
+        concurrency=concurrency,
+        preflight=preflight,
     )
     drained = []
     while not events.empty():
@@ -106,8 +126,7 @@ async def test_rebuild_from_log_matches_live_elo(monkeypatch, tmp_path):
     cfg = _cfg(3)
     elo, _events, log = await _run(cfg, tmp_path)
     records = [
-        BattleRecord.model_validate_json(ln)
-        for ln in log.read_text().splitlines() if ln.strip()
+        BattleRecord.model_validate_json(ln) for ln in log.read_text().splitlines() if ln.strip()
     ]
     rebuilt_elo, report = driver_mod.rebuild_from_log(cfg, records)
     assert rebuilt_elo == elo

@@ -2,15 +2,14 @@
 
 from orq_arena.config import ArenaConfig
 from orq_arena.data.prompts import PromptItem
-from orq_arena.preflight import (_JUDGE_WRAPPER_TOKENS, _PROBE_MAX_TOKENS,
-                                 call_counts, cost_ceiling)
+from orq_arena.preflight import _JUDGE_WRAPPER_TOKENS, _PROBE_MAX_TOKENS, call_counts, cost_ceiling
 
 PROMPTS = [PromptItem(text="x" * 400), PromptItem(text="y" * 200)]  # max = 100 tok
 
 
 def _cfg(**over) -> ArenaConfig:
     base = {
-        "warriors": [
+        "candidates": [
             {"model_id": "a/one"},
             {"model_id": "b/two", "max_tokens": 1000},
         ],
@@ -28,13 +27,13 @@ def test_ceiling_is_exact_arithmetic():
 
     cap_default = cfg.gateway.candidate_max_tokens  # 2048
     # a/one: 2 streams x (1*100 + 2*2048) / 1e6; b/two: 2 x (4*100 + 8*1000) / 1e6
-    warriors = 2 * (100 + 2 * cap_default) / 1e6 + 2 * (400 + 8000) / 1e6
+    candidates = 2 * (100 + 2 * cap_default) / 1e6 + 2 * (400 + 8000) / 1e6
     judge_in = 100 + 2 * cap_default + _JUDGE_WRAPPER_TOKENS
     judges = 4 * (10 * judge_in + 20 * cfg.gateway.judge_max_tokens) / 1e6  # 1x2x1x2 calls
-    assert abs(c.models_usd - warriors) < 1e-12
+    assert abs(c.models_usd - candidates) < 1e-12
     assert abs(c.judges_usd - judges) < 1e-12
     assert c.probe_usd == 0
-    assert abs(c.total_usd - (warriors + judges)) < 1e-12
+    assert abs(c.total_usd - (candidates + judges)) < 1e-12
     assert c.unpriced == []
 
 
@@ -53,7 +52,7 @@ def test_probe_priced_only_when_enabled():
     prices = {"a/one": (1.0, 2.0), "b/two": (4.0, 8.0), "c/judge": (10.0, 20.0)}
     c = cost_ceiling(cfg, PROMPTS, counts, prices)
     assert c.probe_usd > 0
-    # dominated by the output cap: 2 warriors x cout x _PROBE_MAX_TOKENS
+    # dominated by the output cap: 2 candidates x cout x _PROBE_MAX_TOKENS
     assert c.probe_usd < (2 + 8) * (_PROBE_MAX_TOKENS + 100) / 1e6
 
 

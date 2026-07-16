@@ -1,0 +1,40 @@
+# Bring-your-own-key example: the whole engine on a non-orq endpoint.
+#
+# Nothing in the tournament engine is orq.ai-specific: setting base_url and
+# api_key_env opts out of the orq router entirely and runs against any
+# OpenAI-compatible chat endpoint. OpenRouter is the example here because,
+# like the orq router, one key fronts many providers, which is what a mixed
+# pool needs. Swap base_url/api_key_env/model ids for any other gateway.
+#
+#   export OPENROUTER_API_KEY=sk-or-...
+#   orq-arena run --config configs/byok_openrouter.yaml --prompts your_prompts.jsonl
+#
+# What degrades off the router (documented in docs/configuration.md):
+# - No catalog pricing: the preflight spend ceiling and the report's cost
+#   section/value map are skipped (the ELO itself is unaffected).
+# - `refresh-models` reads the orq catalog only; declare candidates here.
+# - `reasoning:` blocks are forwarded verbatim; only include fields your
+#   endpoint accepts (OpenRouter accepts OpenAI-style `reasoning`).
+
+gateway:
+  base_url: https://openrouter.ai/api/v1
+  api_key_env: OPENROUTER_API_KEY
+
+candidates:
+  - model_id: openai/gpt-5.4-mini
+  - model_id: google/gemini-3.5-flash
+  - model_id: anthropic/claude-sonnet-4-6
+  - model_id: mistralai/mistral-medium-2604
+
+judges:
+  # Out-of-family where possible; with a 3-provider pool some overlap is
+  # unavoidable and the report will carry the caveat badge.
+  - deepseek/deepseek-chat
+  - qwen/qwen3.5-flash
+  - x-ai/grok-4-1-fast
+
+criteria: >-
+  Accuracy and correctness, helpfulness and completeness, clarity, and
+  relevance to the prompt.
+
+min_successful_judges: 2

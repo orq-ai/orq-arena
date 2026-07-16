@@ -15,8 +15,8 @@ import asyncio
 import json
 from pathlib import Path
 
-from orq_arena.analysis.postmortem import load_records
 from orq_arena.config import load_config
+from orq_arena.data.schemas import load_records
 from orq_arena.tournament.driver import rebuild_from_log
 from orq_arena.tui.app import ArenaApp
 from orq_arena.tui.screens.battle_browser import BattleBrowserScreen

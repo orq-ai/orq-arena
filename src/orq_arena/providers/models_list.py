@@ -20,7 +20,6 @@ import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable
 from urllib.parse import urlparse
 
 import httpx
@@ -32,9 +31,24 @@ CACHE_FILE = CACHE_DIR / "models.json"
 CACHE_TTL_SECONDS = 24 * 3600
 
 _NON_CHAT_PATTERNS: tuple[str, ...] = (
-    "embedding", "text-embedding", "-embed", "tts", "-tts-", "stt", "-stt-",
-    "whisper", "moderation", "rerank", "ocr", "dall-e", "imagen", "gpt-image",
-    "image-", "-image-", "speech-", "voice-",
+    "embedding",
+    "text-embedding",
+    "-embed",
+    "tts",
+    "-tts-",
+    "stt",
+    "-stt-",
+    "whisper",
+    "moderation",
+    "rerank",
+    "ocr",
+    "dall-e",
+    "imagen",
+    "gpt-image",
+    "image-",
+    "-image-",
+    "speech-",
+    "voice-",
 )
 _NON_CHAT_RE = re.compile("|".join(re.escape(p) for p in _NON_CHAT_PATTERNS), re.I)
 
@@ -47,10 +61,6 @@ class ModelEntry:
     provider: str
     created: int = 0
 
-    @property
-    def sort_key(self) -> tuple[str, str]:
-        return (self.provider, self.id)
-
 
 @dataclass
 class ModelList:
@@ -59,9 +69,6 @@ class ModelList:
     models: list[ModelEntry]
     source: str  # "live" | "cache" | "fallback"
     fetched_at: float = field(default_factory=time.time)
-
-    def providers(self) -> list[str]:
-        return sorted({m.provider for m in self.models})
 
 
 def _strip_noise(models: list[ModelEntry]) -> list[ModelEntry]:
@@ -93,10 +100,17 @@ def _parse_payload(data: dict) -> list[ModelEntry]:
 def _write_cache(models: list[ModelEntry]) -> None:
     try:
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        CACHE_FILE.write_text(json.dumps({
-            "fetched_at": time.time(),
-            "data": [{"id": m.id, "owned_by": m.provider, "created": m.created} for m in models],
-        }), encoding="utf-8")
+        CACHE_FILE.write_text(
+            json.dumps(
+                {
+                    "fetched_at": time.time(),
+                    "data": [
+                        {"id": m.id, "owned_by": m.provider, "created": m.created} for m in models
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
     except OSError:
         pass  # cache is advisory
 
@@ -135,8 +149,10 @@ async def _fetch_type_map(
         )
         resp.raise_for_status()
         payload = resp.json()
-        rows = payload if isinstance(payload, list) else (
-            payload.get("data") or payload.get("models") or []
+        rows = (
+            payload
+            if isinstance(payload, list)
+            else (payload.get("data") or payload.get("models") or [])
         )
         return {
             row["id"]: row.get("type", "")
@@ -172,8 +188,10 @@ async def fetch_price_map(cfg: GatewayConfig) -> dict[str, tuple[float, float]]:
             payload = resp.json()
     except (httpx.HTTPError, ValueError):
         return {}
-    rows = payload if isinstance(payload, list) else (
-        payload.get("data") or payload.get("models") or []
+    rows = (
+        payload
+        if isinstance(payload, list)
+        else (payload.get("data") or payload.get("models") or [])
     )
     prices: dict[str, tuple[float, float]] = {}
     for row in rows:
@@ -195,7 +213,6 @@ async def fetch_price_map(cfg: GatewayConfig) -> dict[str, tuple[float, float]]:
 async def fetch_chat_models(
     cfg: GatewayConfig,
     *,
-    fallback_ids: Iterable[str] = (),
     force_refresh: bool = False,
 ) -> ModelList:
     """Chat-capable, workspace-active models; cached, with graceful fallback."""
@@ -223,5 +240,4 @@ async def fetch_chat_models(
     if cached is not None:
         return ModelList(models=cached[0], source="cache", fetched_at=cached[1])
 
-    fallback = [ModelEntry(id=mid, provider=mid.split("/", 1)[0]) for mid in sorted(set(fallback_ids))]
-    return ModelList(models=fallback, source="fallback", fetched_at=now)
+    return ModelList(models=[], source="fallback", fetched_at=now)

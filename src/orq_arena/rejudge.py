@@ -32,9 +32,7 @@ def load_records(path: str | Path) -> list[BattleRecord]:
     return [r for r in records if r.error is None and r.response_a and r.response_b]
 
 
-def outcomes_from_majorities(
-    pairs: list[tuple[str, str]], majorities: list[str]
-) -> list[Outcome]:
+def outcomes_from_majorities(pairs: list[tuple[str, str]], majorities: list[str]) -> list[Outcome]:
     out: list[Outcome] = []
     for (model_a, model_b), majority in zip(pairs, majorities):
         if majority == "A":
@@ -70,9 +68,32 @@ def panel_excluding_contestants(
     unresolved_short = {m for m in contestant_shorts if m not in short_to_full}
 
     def is_contestant(j: str) -> bool:
-        return j in contestants_full or j.split("/")[-1] in unresolved_short
+        # Same short-name convention as roster.short_model: strip the first
+        # segment only, so multi-segment ids keep their tail intact.
+        return j in contestants_full or j.split("/", 1)[-1] in unresolved_short
 
     return [j for j in judges if not is_contestant(j)]
+
+
+def short_map_from_manifest(log_path: str | Path) -> dict[str, str] | None:
+    """{short_model: model_id} from the run's own manifest, if it exists.
+
+    The manifest records the exact roster the run used, so self-judge
+    exclusion stays correct even after the YAML roster drifts. Returns None
+    when the manifest (or its candidates map) is missing or unreadable.
+    """
+    manifest_path = Path(log_path).with_suffix(".run.json")
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    candidates = manifest.get("candidates") or {}
+    mapping = {}
+    for spec in candidates.values():
+        mid = (spec or {}).get("model") or ""
+        if mid:
+            mapping[mid.split("/", 1)[-1]] = mid
+    return mapping or None
 
 
 def _ranking(outcomes: list[Outcome], models: list[str]) -> list[str]:
@@ -89,14 +110,18 @@ async def rejudge_run(
     judges: list[str],
     criteria: str | None = None,
     concurrency: int = 4,
+    short_to_full: dict[str, str] | None = None,
 ) -> dict:
     """Re-score every record; return comparisons, report, and ranking delta."""
     gateway = OrqGateway(cfg.gateway)
-    sem = asyncio.Semaphore(concurrency)
+    sem = asyncio.Semaphore(max(1, concurrency))
 
     # Records carry short names; resolve to full model ids so self-judge
     # exclusion matches the live run (battle.py excludes by model_id).
-    short_to_full = {c.short_model: c.model_id for c in cfg.candidates}
+    # Prefer the run's own manifest roster (passed in by the CLI); the live
+    # YAML is only a fallback and may have drifted since the run.
+    if short_to_full is None:
+        short_to_full = {c.short_model: c.model_id for c in cfg.candidates}
 
     # One comparator per contestant pair.
     comparators: dict[frozenset[str], object] = {}
@@ -112,7 +137,8 @@ async def rejudge_run(
                 criteria=criteria or cfg.criteria,
                 replacement_judges=panel_excluding_contestants(
                     list(cfg.replacement_judges), key, short_to_full
-                ) or None,
+                )
+                or None,
                 # A 1-judge rejudge panel is legitimate; don't let the run
                 # config's quorum (sized for its own panel) reject it.
                 min_successful_judges=min(cfg.min_successful_judges, len(panel)),
@@ -139,9 +165,7 @@ async def rejudge_run(
     old_rank = _ranking(old_outcomes, models)
     new_rank = _ranking(new_outcomes, models)
 
-    changed = sum(
-        1 for rec, c in zip(records, comparisons) if rec.majority_verdict != c.winner
-    )
+    changed = sum(1 for rec, c in zip(records, comparisons) if rec.majority_verdict != c.winner)
     return {
         "comparisons": comparisons,
         "report": build_report(comparisons),
@@ -153,8 +177,9 @@ async def rejudge_run(
     }
 
 
-def write_rejudged(path: str | Path, records: list[BattleRecord],
-                   comparisons: list[PairwiseComparison]) -> None:
+def write_rejudged(
+    path: str | Path, records: list[BattleRecord], comparisons: list[PairwiseComparison]
+) -> None:
     with Path(path).open("w", encoding="utf-8") as fh:
         for rec, c in zip(records, comparisons):
             row = rec.model_copy(
@@ -162,8 +187,10 @@ def write_rejudged(path: str | Path, records: list[BattleRecord],
                     "judge_votes": [v.model_dump() for v in c.votes],
                     "majority_verdict": c.winner,
                     "winner": (
-                        rec.model_a if c.winner == "A"
-                        else rec.model_b if c.winner == "B"
+                        rec.model_a
+                        if c.winner == "A"
+                        else rec.model_b
+                        if c.winner == "B"
                         else c.winner
                     ),
                 }
@@ -183,8 +210,11 @@ def render_result(result: dict) -> None:
     )
     console.print(
         f"rank correlation (Spearman) old→new: [bold]{result['spearman']:.2f}[/bold]"
-        + (" , judge-robust ranking" if result["spearman"] >= 0.8 else
-           " , ranking is panel-sensitive; treat with care")
+        + (
+            " , judge-robust ranking"
+            if result["spearman"] >= 0.8
+            else " , ranking is panel-sensitive; treat with care"
+        )
     )
     console.print(f"old ranking: {' > '.join(result['old_ranking'])}")
     console.print(f"new ranking: {' > '.join(result['new_ranking'])}")
@@ -226,20 +256,22 @@ def compare_reports(paths: list[str | Path]) -> list[dict]:
         per_judge = jury.get("per_judge") or []
         panel = ", ".join(str(j.get("model", "?")).split("/")[-1] for j in per_judge)
         worst = max(per_judge, key=lambda j: j.get("position_bias") or 0.0, default=None)
-        rows.append({
-            "file": str(path),
-            "panel": panel or "?",
-            "inconclusive": jury.get("inconclusive_rate"),
-            "agreement": jury.get("mean_agreement"),
-            "spearman": data.get("spearman"),
-            "changed": data.get("changed_verdicts"),
-            "total": data.get("total"),
-            "tie_rate": jury.get("tie_rate"),
-            "worst_flip": None if worst is None else worst.get("position_bias"),
-            "worst_flip_judge": (
-                "" if worst is None else str(worst.get("model", "")).split("/")[-1]
-            ),
-        })
+        rows.append(
+            {
+                "file": str(path),
+                "panel": panel or "?",
+                "inconclusive": jury.get("inconclusive_rate"),
+                "agreement": jury.get("mean_agreement"),
+                "spearman": data.get("spearman"),
+                "changed": data.get("changed_verdicts"),
+                "total": data.get("total"),
+                "tie_rate": jury.get("tie_rate"),
+                "worst_flip": None if worst is None else worst.get("position_bias"),
+                "worst_flip_judge": (
+                    "" if worst is None else str(worst.get("model", "")).split("/")[-1]
+                ),
+            }
+        )
     return rows
 
 
@@ -251,14 +283,26 @@ def render_comparison(rows: list[dict]) -> None:
         return "n/a" if x is None else f"{x:.0%}"
 
     t = Table(title="jury candidates over the same recorded log")
-    for col in ("panel", "spearman vs run", "inconclusive", "agreement",
-                "worst flip (judge)", "tie rate", "changed verdicts"):
+    for col in (
+        "panel",
+        "spearman vs run",
+        "inconclusive",
+        "agreement",
+        "worst flip (judge)",
+        "tie rate",
+        "changed verdicts",
+    ):
         t.add_column(col)
     for r in rows:
         sp = "n/a" if r["spearman"] is None else f"{r['spearman']:.2f}"
         t.add_row(
-            r["panel"], sp, pct(r["inconclusive"]), pct(r["agreement"]),
-            f"{pct(r['worst_flip'])} ({r['worst_flip_judge']})" if r["worst_flip"] is not None else "n/a",
+            r["panel"],
+            sp,
+            pct(r["inconclusive"]),
+            pct(r["agreement"]),
+            f"{pct(r['worst_flip'])} ({r['worst_flip_judge']})"
+            if r["worst_flip"] is not None
+            else "n/a",
             pct(r["tie_rate"]),
             f"{r['changed']}/{r['total']}" if r["changed"] is not None else "n/a",
         )

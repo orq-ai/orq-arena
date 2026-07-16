@@ -18,7 +18,7 @@ from orq_arena.events import JudgeVerdictEvent, RoundVoided, TurnResolved
 def _cfg() -> ArenaConfig:
     return ArenaConfig.model_validate(
         {
-            "warriors": [
+            "candidates": [
                 {"name": "Alpha", "model_id": "x/alpha"},
                 {"name": "Beta", "model_id": "x/beta"},
             ],
@@ -34,14 +34,19 @@ class FakeGateway:
         self.failing = failing or set()
         self.client = object()
 
-    async def stream_completion(self, *, model, prompt, max_tokens=None,
-                                extra_body=None, usage_out=None):
+    async def stream_completion(
+        self, *, model, prompt, max_tokens=None, extra_body=None, usage_out=None
+    ):
         if model in self.failing:
             raise RuntimeError("boom: connection died")
         if usage_out is not None:
             usage_out.update(
-                {"input_tokens": 10, "output_tokens": 5, "reasoning_tokens": 0,
-                 "finish_reason": "stop"}
+                {
+                    "input_tokens": 10,
+                    "output_tokens": 5,
+                    "reasoning_tokens": 0,
+                    "finish_reason": "stop",
+                }
             )
         yield ("text", f"{model} says hi")
 
@@ -63,10 +68,15 @@ def _build_battle(monkeypatch, gateway, jury) -> tuple[Battle, asyncio.Queue]:
     cfg = _cfg()
     events: asyncio.Queue = asyncio.Queue()
     b = Battle(
-        cfg=cfg, gateway=gateway,
-        candidate_a=cfg.candidates[0], candidate_b=cfg.candidates[1],
-        prompts=[PromptItem("What is 2+2?")], match_id="M1", round_name="round",
-        tournament_id="t", events=events,
+        cfg=cfg,
+        gateway=gateway,
+        candidate_a=cfg.candidates[0],
+        candidate_b=cfg.candidates[1],
+        prompts=[PromptItem("What is 2+2?")],
+        match_id="M1",
+        round_name="round",
+        tournament_id="t",
+        events=events,
     )
     return b, events
 
@@ -123,7 +133,7 @@ async def test_happy_path_judges_and_records_winner(monkeypatch):
 async def test_all_judges_contestants_raises(monkeypatch):
     cfg = ArenaConfig.model_validate(
         {
-            "warriors": [
+            "candidates": [
                 {"name": "Alpha", "model_id": "x/j1"},
                 {"name": "Beta", "model_id": "x/j2"},
             ],
@@ -132,10 +142,15 @@ async def test_all_judges_contestants_raises(monkeypatch):
     )
     with pytest.raises(ValueError, match="neutral judge"):
         Battle(
-            cfg=cfg, gateway=FakeGateway(),
-            candidate_a=cfg.candidates[0], candidate_b=cfg.candidates[1],
-            prompts=[PromptItem("p")], match_id="M1", round_name="round",
-            tournament_id="t", events=asyncio.Queue(),
+            cfg=cfg,
+            gateway=FakeGateway(),
+            candidate_a=cfg.candidates[0],
+            candidate_b=cfg.candidates[1],
+            prompts=[PromptItem("p")],
+            match_id="M1",
+            round_name="round",
+            tournament_id="t",
+            events=asyncio.Queue(),
         )
 
 
@@ -151,13 +166,18 @@ async def test_every_prompt_is_judged(monkeypatch):
     cfg.match.max_rounds = 3
     events: asyncio.Queue = asyncio.Queue()
     b = Battle(
-        cfg=cfg, gateway=FakeGateway(),
-        candidate_a=cfg.candidates[0], candidate_b=cfg.candidates[1],
-        prompts=[PromptItem("p1"), PromptItem("p2"), PromptItem("p3")], match_id="M1", round_name="round",
-        tournament_id="t", events=events,
+        cfg=cfg,
+        gateway=FakeGateway(),
+        candidate_a=cfg.candidates[0],
+        candidate_b=cfg.candidates[1],
+        prompts=[PromptItem("p1"), PromptItem("p2"), PromptItem("p3")],
+        match_id="M1",
+        round_name="round",
+        tournament_id="t",
+        events=events,
     )
     result = await b.run()
-    assert len(result.battles) == 3          # all prompts judged
+    assert len(result.battles) == 3  # all prompts judged
     assert result.winner is b.a and result.draw is False
     assert jury.calls == 3
 
@@ -173,5 +193,6 @@ async def test_no_round_wins_is_a_draw(monkeypatch):
     assert result.draw is True
     evs = _drain(events)
     from orq_arena.events import MatchResolved
+
     resolved = [e for e in evs if isinstance(e, MatchResolved)]
     assert resolved and resolved[0].winner == ""

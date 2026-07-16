@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import AliasChoices, BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 
 class CandidateSpec(BaseModel):
@@ -12,12 +12,11 @@ class CandidateSpec(BaseModel):
 
     Display name defaults to the model's short name (owner decision 22:
     model names only on the leaderboard). A custom ``name`` is still
-    allowed but never generated. ``orc_name`` is accepted as a deprecated
-    YAML alias from the project's arena-theatre era.
+    allowed but never generated.
     """
 
     model_id: str = Field(description="orq.ai gateway model slug, e.g. 'anthropic/claude-opus-4-8'")
-    name: str = Field(default="", validation_alias=AliasChoices("name", "orc_name"))
+    name: str = ""
     emblem: str = Field(default="", description="Optional glyph shown before the name")
     # Raw router reasoning controls, forwarded verbatim as extra_body.
     reasoning: dict[str, Any] | None = None
@@ -53,13 +52,3 @@ class CandidateSpec(BaseModel):
         if (r.get("thinking") or {}).get("type") == "disabled":
             return True
         return r.get("reasoning_effort") == "none"
-
-
-def assign_candidates(model_ids: list[str], existing: list[CandidateSpec]) -> list[CandidateSpec]:
-    """Build CandidateSpecs for picked models.
-
-    Models already configured keep their spec (incl. reasoning blocks);
-    new models display as their model name (decision 22).
-    """
-    by_model = {c.model_id: c for c in existing}
-    return [by_model.get(mid) or CandidateSpec(model_id=mid) for mid in model_ids]

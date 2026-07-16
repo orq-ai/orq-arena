@@ -26,7 +26,7 @@ cp .env.example .env
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `ORQ_API_KEY` | Required for live runs |, | The only secret orq-arena needs. Every candidate, judge, analyzer, and preflight-probe call goes through the orq.ai router gateway with this one key. Read via `os.environ.get(cfg.api_key_env, "")` in `OrqGateway.__init__` (`src/orq_arena/providers/orq_gateway.py`); the gateway raises `RuntimeError("ORQ_API_KEY is not set. Export it before running orq-arena.")` at construction time if it is empty. Get one at [my.orq.ai](https://my.orq.ai) > workspace settings > API keys (per `.env.example`). |
+| `ORQ_API_KEY` | Required for live runs |, | The only secret orq-arena needs. Every candidate, judge, and preflight-probe call goes through the orq.ai router gateway with this one key. Resolved through evaluatorq's `resolve_llm_client` at the default `base_url`/`api_key_env`, else read directly via `os.environ.get(cfg.api_key_env, "")` (`src/orq_arena/providers/orq_gateway.py`, see [Credential/host resolution](#gateway-gatewayconfig)); the gateway raises `RuntimeError("ORQ_API_KEY is not set. Export it before running orq-arena.")` at construction time if it is empty. Get one at [my.orq.ai](https://my.orq.ai) > workspace settings > API keys (per `.env.example`). |
 
 Notes:
 
@@ -65,10 +65,11 @@ the YAML, every value is literal.
 
 | Command | `--config` behavior |
 |---|---|
-| `orq-arena run` | Optional. If omitted, `orq_arena.yaml` is still loaded (for `judges`, `match`, `gateway`, etc.) but the interactive roster picker replaces `candidates` at runtime, see the [`candidates`](#candidates-the-roster) section. If given, the YAML roster is used as-is, the picker is skipped, and the run is headless by default (`--tui` opts into the live show). |
+| `orq-arena run` | Defaults to `orq_arena.yaml`. The YAML roster is used as-is; the run is headless by default (`--tui` opts into the live show). |
 | `orq-arena demo` | Defaults to `orq_arena.yaml`. Only used for its rules/roster labels, the fixture replay makes no API calls. |
 | `orq-arena list-models` | Defaults to `orq_arena.yaml`. Prints the configured roster. |
 | `orq-arena rejudge` | Defaults to `orq_arena.yaml`. Supplies `gateway` and (unless `--criteria` overrides it) `criteria`. |
+| `orq-arena report` | Defaults to `orq_arena.yaml`. Supplies the judge panel and model-name mapping for the statistics rebuild. |
 | `orq-arena refresh-models` | Defaults to `orq_arena.yaml`. Only `gateway` is used, to re-fetch the workspace model catalog. |
 
 ---
@@ -96,8 +97,8 @@ gateway:
   stream_read_timeout_s: 1200
   judge_timeout_ms: 90000
 
-# preflight, headless_concurrency, analyzer_model not set in the shipped
-# file - all three take their code defaults (see tables below).
+# preflight and headless_concurrency not set in the shipped
+# file - both take their code defaults (see tables below).
 
 candidates:
   - model_id: anthropic/claude-opus-4-8
@@ -146,7 +147,7 @@ on-screen HP bar happens to sit.
 
 | Key | Type | Default | Effect |
 |---|---|---|---|
-| `base_url` | `str` | `"https://api.orq.ai/v3/router"` | Base URL for the `AsyncOpenAI` client (`OrqGateway.__init__`, `src/orq_arena/providers/orq_gateway.py`). One OpenAI-compatible endpoint fronts every provider, models, judges, the analyzer, and the preflight probe all share it. |
+| `base_url` | `str` | `"https://api.orq.ai/v3/router"` | Base URL for the `AsyncOpenAI` client (`OrqGateway.__init__`, `src/orq_arena/providers/orq_gateway.py`). One OpenAI-compatible endpoint fronts every provider, models, judges, and the preflight probe all share it. |
 | `api_key_env` | `str` | `"ORQ_API_KEY"` | Name of the environment variable read for the API key. Changing this changes which env var orq-arena looks for; see [Environment Variables](#environment-variables) above. |
 | `candidate_max_tokens` | `int` | `2048` | Default per-response output cap for candidate completions (`stream_completion`'s `max_tokens=max_tokens or self._cfg.candidate_max_tokens`). Too low truncates long or creative answers, a cut response is flagged `✂ truncated` in the TUI response panel (`src/orq_arena/tui/widgets/response_panel.py`) and judges tend to penalize it. Overridden per-candidate by `candidates[].max_tokens`. |
 | `judge_max_tokens` | `int` | `2048` | Output cap for judge calls, passed to evaluatorq's `llm_jury_pairwise(max_tokens=...)`. A **cap, not a target**: it costs nothing extra on frugal judges. Thinking-by-default judges (e.g. `gemini-2.5-flash`) burn reasoning tokens before writing a verdict; a low cap starves the verdict entirely and fails the vote (the codebase's own regression case: `512` produced a `LengthFinishReasonError` on every one of that judge's votes). `2048` leaves headroom without materially raising cost on the cheap default panel. |
@@ -173,12 +174,13 @@ is exposed as a config key. The preflight probe call (see below) also uses a har
 
 The gateway client is a plain `AsyncOpenAI` client: nothing in the tournament engine is
 orq.ai-specific. Point `base_url` at any OpenAI-compatible chat endpoint and set `api_key_env`
-to whatever variable holds that endpoint's key.
+to whatever variable holds that endpoint's key. A ready-made example against OpenRouter ships
+at [`configs/byok_openrouter.yaml`](https://github.com/orq-ai/orq-arena/blob/master/configs/byok_openrouter.yaml).
 Two features do depend on the orq.ai router and degrade cleanly without it:
 
-- **The roster picker and `refresh-models`** read the workspace model catalog from the router.
-  On another endpoint, declare `candidates` in the YAML and run with `--config` so the picker is
-  skipped.
+- **`refresh-models` and catalog pricing** read the workspace model catalog from the router.
+  On another endpoint, `refresh-models` degrades to any existing cache and the preflight
+  spend ceiling / report cost section are skipped when no prices resolve.
 - **Reasoning controls** (`candidates[].reasoning`) are forwarded verbatim as `extra_body`; the
   router normalizes them per provider. Other endpoints receive them as-is and may ignore or
   reject unknown fields, so on a non-router endpoint only include fields your server accepts.
@@ -190,25 +192,18 @@ pool a one-command run. It is the recommended path, not the only one.
 
 | Key | Type | Default | Effect |
 |---|---|---|---|
-| `thinking_probe` | `bool` | `True` | Before a live, non-picker run (`orq-arena run --config ...`), sends one tiny probe call (`"Reply with the single word: ok"`) per candidate to detect vendor-default thinking that contradicts its `reasoning` config (`thinking_probe`, `src/orq_arena/preflight.py`). Surfaces as `🧠 … thinks despite config` in the CLI preflight output and footnotes the leaderboard for that candidate. Adds one extra call per candidate (`probe_calls` in `preflight.CallCounts`). Set `false` to skip those extra calls. |
+| `thinking_probe` | `bool` | `True` | Before a live run, sends one tiny probe call (`"Reply with the single word: ok"`) per candidate to detect vendor-default thinking that contradicts its `reasoning` config (`thinking_probe`, `src/orq_arena/preflight.py`). Surfaces as `🧠 … thinks despite config` in the CLI preflight output and footnotes the leaderboard for that candidate. Adds one extra call per candidate (`probe_calls` in `preflight.CallCounts`). Set `false` to skip those extra calls. |
 
 ### Top-level run settings (`ArenaConfig`)
 
 | Key | Type | Default | Effect |
 |---|---|---|---|
-| `headless_concurrency` | `int` | `4` | Matches run in parallel under an `asyncio.Semaphore(max(1, headless_concurrency))`, for `orq-arena run --headless` only (`run_headless` → `run_tournament(concurrency=...)`, `src/orq_arena/headless.py`). The TUI always passes `concurrency=1` internally so the live show stays one fight at a time, this key has no effect on non-headless runs. |
-| `analyzer_model` | `str` | `"openai/gpt-5.4-mini"` | Router model id used to generate the per-model post-mortem ("coach notes": strengths, weaknesses, judge patterns) when `M` is pressed on the final leaderboard (`src/orq_arena/tui/screens/postmortem.py` → `src/orq_arena/analysis/postmortem.py`). Output is cached in `analysis.jsonl` next to the battle log, so re-opening the post-mortem screen doesn't re-spend tokens. |
+| `headless_concurrency` | `int` | `4` | Matches run in parallel under an `asyncio.Semaphore(max(1, headless_concurrency))` on headless runs, the default (`run_headless` → `run_tournament(concurrency=...)`, `src/orq_arena/headless.py`). The TUI (`--tui`) always passes `concurrency=1` internally so the live show stays one fight at a time. |
 
 ### `candidates` (the roster)
 
 `candidates: list[CandidateSpec]`: required at the top level, and the parsed list must contain at
-least 2 entries (`ArenaConfig._validate`: `"Need at least 2 candidates, got {n}"`). Configs from
-before the rename keep working: `warriors:` is accepted as a deprecated alias for `candidates:`,
-`warrior_max_tokens` for `gateway.candidate_max_tokens`, and `orc_name` for a candidate's `name`. This holds
-true even for `orq-arena run` with **no** `--config`: `orq_arena.yaml` is still loaded first (for
-`judges`, `match`, `gateway`, etc.) before the interactive picker overwrites `cfg.candidates` at
-runtime via `assign_candidates` (`src/orq_arena/tui/app.py`), so the shipped file's `candidates` list must always
-validate on its own.
+least 2 entries (`ArenaConfig._validate`: `"Need at least 2 candidates, got {n}"`).
 
 | Key | Type | Default | Effect |
 |---|---|---|---|
@@ -310,8 +305,7 @@ is not read by `load_prompts()` today and has no effect on the run.
 Settings that cause a hard failure (config load or first live call) if absent or invalid:
 
 - `candidates`: required top-level key, must parse to at least 2 `CandidateSpec` entries, and each
-  entry requires `model_id`. Missing/short lists fail `ArenaConfig` validation immediately,
-  independent of whether the interactive picker will replace the roster afterward.
+  entry requires `model_id`. Missing/short lists fail `ArenaConfig` validation immediately.
 - `judges`: required top-level key, must be a non-empty list.
 - Any `candidates[].reasoning.thinking.budget_tokens` must be strictly less than that candidate's
   effective `max_tokens` (own override or `gateway.candidate_max_tokens`), or config loading fails.
@@ -341,7 +335,6 @@ Everything else is a Pydantic default and safe to omit from the YAML entirely:
 | `replacement_judges` | `[]` |
 | `criteria` | `"Accuracy and correctness, helpfulness and completeness, clarity, and relevance to the prompt."` |
 | `min_successful_judges` | `2` |
-| `analyzer_model` | `openai/gpt-5.4-mini` |
 | `candidates[].name` | short model id |
 | `candidates[].emblem` | `""` |
 | `candidates[].reasoning` | `null` |
@@ -359,9 +352,8 @@ document. The equivalent axes for changing behavior between runs are:
   shipped presets are `orq_arena.yaml` (uniform thinking-OFF, the default) and
   `configs/reasoning_arena.yaml` (uniform thinking-ON), run the latter with
   `orq-arena run --config configs/reasoning_arena.yaml`. `load_config()` accepts any path.
-- **Ad hoc pool without editing YAML:** run `orq-arena run` with no `--config` at all, the
-  interactive roster picker opens over your workspace-enabled model catalog and replaces
-  `candidates` at runtime; `judges`, `match`, and `gateway` still come from `orq_arena.yaml`.
+  `orq-arena refresh-models --show` lists your workspace-enabled model ids to paste into the
+  `candidates` list.
 - **Different jury on an already-recorded run, no regeneration:** `orq-arena rejudge
   <log_path> --judge <id> [--judge <id> ...] [--criteria "..."]` re-scores the responses
   already in `battles.jsonl` with a new panel and/or criteria, without touching the YAML file.
@@ -379,4 +371,3 @@ git-ignored (`.gitignore`):
 | `.env` | Hand-authored from `.env.example`; never committed. |
 | `battles.jsonl` | `orq-arena run`, one row per judged round (`BattleRecord`, schema v3; includes per-model `ttft_a_ms`/`ttft_b_ms` and `duration_a_ms`/`duration_b_ms` timing fields). |
 | `battles.run.json` | `orq-arena run`, the run manifest (config + prompt hashes, panel, seed, agreement stats; also a `dataset` key with id, name, and studio URL for dataset-sourced runs). |
-| `analysis.jsonl` | The post-mortem screen (`M` on the leaderboard), cached analyzer output, written next to the battle log. |

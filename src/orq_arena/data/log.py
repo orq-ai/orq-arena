@@ -17,11 +17,6 @@ class BattleLog:
         # Truncate on open, one tournament per run.
         self.path.write_text("", encoding="utf-8")
 
-    def append(self, battle: BattleRecord) -> None:
-        line = battle.model_dump_json()
-        with self.path.open("a", encoding="utf-8") as fh:
-            fh.write(line + "\n")
-
     def append_many(self, battles: Iterable[BattleRecord]) -> None:
         with self.path.open("a", encoding="utf-8") as fh:
             for b in battles:
