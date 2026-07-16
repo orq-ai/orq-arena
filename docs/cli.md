@@ -353,11 +353,15 @@ orq-arena rejudge --compare REPORT_JSON [--compare REPORT_JSON ...]
   rows with no `error` and both `response_a`/`response_b` present, voided or errored rounds
   are silently skipped. If nothing qualifies, the command aborts cleanly with
   `no judgeable rounds in {log_path}` (`click.ClickException`, exit code 1).
-- **Self-judge exclusion by short name.** For each contestant pair, any `--judge` whose short
-  name (the segment after the last `/`, matching how `model_a`/`model_b` are stored) equals
-  either contestant is dropped from that pair's panel, the same rule live matches apply,
-  re-evaluated per pair since one rejudge panel is fixed but contestants vary round to round.
-  If this empties the panel for a pair, `rejudge_run` raises a plain `ValueError`:
+- **Self-judge exclusion, resolved against the run's own manifest.** For each contestant
+  pair, any `--judge` that *is* one of the contestants is dropped from that pair's panel, the
+  same rule live matches apply, re-evaluated per pair since one rejudge panel is fixed but
+  contestants vary round to round. Records store short names, so contestants are resolved to
+  full model ids using the `<log>.run.json` manifest's roster — the roster the run actually
+  used — never the current YAML, which may have drifted since. Without a manifest the CLI
+  warns and falls back to `--config`; a contestant unresolvable either way is excluded on its
+  short name, the safe direction. If exclusion empties the panel for a pair, `rejudge_run`
+  raises a plain `ValueError`:
   `every judge is a contestant in {sorted(pair)}`: this is **not** a `ClickException`, so it
   surfaces as a full Python traceback (unlike the clean `Error: ...` message for the
   empty-log case above). Add a neutral model to `--judge` to fix it. `replacement_judges` from

@@ -350,12 +350,25 @@ def rejudge(
     if not judges:
         raise click.ClickException("pass --judge <model> (repeatable), or --compare <report.json>")
 
-    from .rejudge import load_records, rejudge_run, render_result, save_report_json, write_rejudged
+    from .rejudge import (
+        load_records,
+        rejudge_run,
+        render_result,
+        save_report_json,
+        short_map_from_manifest,
+        write_rejudged,
+    )
 
     cfg = _load_config(config_path)
     records = load_records(log_path)
     if not records:
         raise click.ClickException(f"no judgeable rounds in {log_path}")
+    short_to_full = short_map_from_manifest(log_path)
+    if short_to_full is None:
+        click.echo(
+            f"  ⚠ no run manifest next to {log_path}; resolving contestants "
+            "against --config, which may have drifted since the run"
+        )
     click.echo(f"re-judging {len(records)} rounds with panel: {', '.join(judges)}")
     result = asyncio.run(
         rejudge_run(
@@ -364,6 +377,7 @@ def rejudge(
             judges=list(judges),
             criteria=criteria,
             concurrency=concurrency,
+            short_to_full=short_to_full,
         )
     )
     render_result(result)
