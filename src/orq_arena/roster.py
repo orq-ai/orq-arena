@@ -53,13 +53,3 @@ class CandidateSpec(BaseModel):
         if (r.get("thinking") or {}).get("type") == "disabled":
             return True
         return r.get("reasoning_effort") == "none"
-
-
-def assign_candidates(model_ids: list[str], existing: list[CandidateSpec]) -> list[CandidateSpec]:
-    """Build CandidateSpecs for picked models.
-
-    Models already configured keep their spec (incl. reasoning blocks);
-    new models display as their model name (decision 22).
-    """
-    by_model = {c.model_id: c for c in existing}
-    return [by_model.get(mid) or CandidateSpec(model_id=mid) for mid in model_ids]

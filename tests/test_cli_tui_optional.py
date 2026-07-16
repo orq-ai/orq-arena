@@ -25,14 +25,14 @@ def _hide_textual(monkeypatch):
             monkeypatch.delitem(sys.modules, mod, raising=False)
 
 
-def test_roster_picker_without_textual_gives_hint(monkeypatch, tmp_path):
+def test_run_tui_without_textual_gives_hint(monkeypatch, tmp_path):
     _hide_textual(monkeypatch)
     monkeypatch.chdir(tmp_path)
-    # no --config -> picker path (TUI); should fail with the install hint
-    result = CliRunner().invoke(cli, ["run"])
+    # --tui is the only run path that needs the extra; fails with the hint
+    result = CliRunner().invoke(cli, ["run", "--tui"])
     assert result.exit_code != 0
     assert "orq-arena[tui]" in result.output
-    assert "--config" in result.output
+    assert "--tui" in result.output
 
 
 def test_demo_without_textual_gives_hint(monkeypatch):

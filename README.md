@@ -50,9 +50,9 @@ uv sync
 ```
 
 `uv sync` (or `pip install orq-arena`) installs the core: the benchmark, the HTML report, and
-`rejudge` all run on this. The live `--tui` show, the interactive roster picker (the no-`--config`
-path), and `orq-arena demo` need the optional `tui` extra: `uv sync --extra tui` (or
-`pip install "orq-arena[tui]"`). Without it those commands print a friendly install hint.
+`rejudge` all run on this. The live `--tui` show and `orq-arena demo` need the optional `tui`
+extra: `uv sync --extra tui` (or `pip install "orq-arena[tui]"`). Without it those commands
+print a friendly install hint.
 
 ## Quick start
 
@@ -92,7 +92,7 @@ No key yet? Watch a recorded tournament first: `uv run orq-arena demo` (zero API
 
 ## Usage
 
-**Run the benchmark**: `uv run orq-arena run --config orq_arena.yaml` (headless, parallel, report at the end). Without `--config`, an interactive picker opens over the models enabled in your workspace and the run plays live in the TUI. Full flag reference: **[docs/cli.md](docs/cli.md)**.
+**Run the benchmark**: `uv run orq-arena run` (headless, parallel, report at the end; `--config` defaults to the shipped `orq_arena.yaml`, edit its `candidates` list to change the pool). Pass `--tui` to watch the fight live. Full flag reference: **[docs/cli.md](docs/cli.md)**.
 
 **Share the result**: the report (`<log>.report.html`) is one self-contained file. It opens with a verdict banner naming the top three models (win rate, ELO, total cost), then the full ladder with error bars, a quality-vs-cost chart, speed, the win grid, and how the jury behaved. Regenerate it any time with `uv run orq-arena report battles.jsonl`, no model calls needed.
 
@@ -110,7 +110,7 @@ From the final leaderboard, `B` pages through every judged round (prompt, both r
 
 Everything lives in `orq_arena.yaml`, no flags to remember. The default pool runs every model with extended reasoning ("thinking") turned **off**, and verifies that against the live router, so the ELO compares models on equal footing rather than whatever each vendor enables by default. `configs/reasoning_arena.yaml` is the thinking-ON counterpart, and [`configs/`](configs/) has ready-made frontier, budget, and 16-model pools. Per-provider reasoning settings, replacement judges, and every other key: **[docs/configuration.md](docs/configuration.md)**.
 
-**Not locked to orq.ai.** The engine speaks plain OpenAI-compatible chat: point `gateway.base_url` at any endpoint that speaks that format and set `api_key_env` to match. The orq.ai router is the default because one key covers every provider (and powers the roster picker); it is the recommended path, not the only one. Details: [docs/configuration.md](docs/configuration.md#bring-your-own-endpoint).
+**Not locked to orq.ai.** The engine speaks plain OpenAI-compatible chat: point `gateway.base_url` at any endpoint that speaks that format and set `api_key_env` to match. The orq.ai router is the default because one key covers every provider; it is the recommended path, not the only one. Details: [docs/configuration.md](docs/configuration.md#bring-your-own-endpoint).
 
 ```yaml
 candidates:

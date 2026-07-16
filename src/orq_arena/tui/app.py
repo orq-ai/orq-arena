@@ -36,13 +36,12 @@ from ..events import (
     TurnPrompt,
     TurnResolved,
 )
-from ..roster import CandidateSpec, assign_candidates
+from ..roster import CandidateSpec
 from ..tournament.driver import run_tournament
 from .hp import VERDICT_HOLD_S, HPTracker
 from .screens.cta_modal import CTAModalScreen
 from .screens.fight import FightScreen
 from .screens.leaderboard import LeaderboardScreen
-from .screens.roster_select import RosterSelectScreen
 from .screens.title import TitleScreen
 
 
@@ -69,14 +68,12 @@ class ArenaApp(App):
         live: bool = True,
         fixture: str | None = None,
         preflight: dict | None = None,
-        pick_roster: bool = False,
         dataset: dict | None = None,
     ) -> None:
         super().__init__()
         self.cfg = cfg
         self._preflight = preflight
         self._dataset = dataset
-        self._pick_roster = pick_roster
         self._prompts = prompts
         self._battle_log_path = battle_log_path
         self._live = live
@@ -100,74 +97,7 @@ class ArenaApp(App):
 
         self.register_theme(CRT_THEME)
         self.theme = "crt-neon"
-        if self._pick_roster:
-            self.push_screen(RosterSelectScreen(self.cfg, prompt_count=len(self._prompts)))
-        else:
-            self.push_screen(TitleScreen())
-
-    def on_roster_select_screen_roster_selected(
-        self, message: RosterSelectScreen.RosterSelected
-    ) -> None:
-        self.cfg.candidates = assign_candidates(message.model_ids, self.cfg.candidates)
-        self._by_name = {w.name: w for w in self.cfg.candidates}
-        self.pop_screen()
-        self.run_worker(self._probe_then_begin(), exclusive=True)
-
-    def on_roster_select_screen_load_failed(
-        self, message: RosterSelectScreen.LoadFailed
-    ) -> None:
-        self.notify(f"catalog load failed: {message.reason}", severity="warning")
-        self.pop_screen()
         self.push_screen(TitleScreen())
-
-    async def _probe_then_begin(self) -> None:
-        """Picker path: the CLI preflight didn't run, so probe here."""
-        from ..preflight import call_counts, cost_ceiling, judge_family_overlaps
-        from ..providers.models_list import fetch_price_map
-
-        overlap = judge_family_overlaps(list(self.cfg.judges), self.cfg.candidates)
-        if overlap:
-            self.notify(
-                f"⚖ judge/contestant family overlap: {', '.join(overlap)}. "
-                "Self-preference bias survives seat swapping; prefer judges "
-                "from families outside the pool.",
-                severity="warning", timeout=10,
-            )
-        counts = call_counts(self.cfg, self._prompts)
-        self._preflight = {
-            **(self._preflight or {}),
-            "counts": counts.__dict__,
-            "family_overlaps": overlap,
-        }
-        try:
-            ceiling = cost_ceiling(
-                self.cfg, self._prompts, counts, await fetch_price_map(self.cfg.gateway)
-            )
-        except Exception:
-            ceiling = None  # advisory, never blocks the show
-        if ceiling and ceiling.total_usd > 0:
-            self._preflight["cost_ceiling"] = ceiling.__dict__
-            self.notify(
-                f"{counts.model_streams} streams + {counts.judge_calls} judge "
-                f"calls; spend ceiling ≈ ${ceiling.total_usd:.2f} (caps fully hit)",
-                timeout=8,
-            )
-        if self.cfg.preflight.thinking_probe:
-            from ..preflight import surprises, thinking_probe
-
-            self.notify("probing pool for vendor-default thinking…", timeout=4)
-            try:
-                probe = await thinking_probe(self.cfg)
-                self._preflight = {**(self._preflight or {}), "thinking_probe": probe}
-                odd = surprises(probe)
-                if odd:
-                    self.notify(
-                        f"🧠 thinks despite config: {', '.join(odd)}, ranking will be footnoted",
-                        severity="warning", timeout=8,
-                    )
-            except Exception as exc:
-                self.notify(f"thinking probe failed: {exc}", severity="warning")
-        self.begin()
 
     def begin(self) -> None:
         """Called from TitleScreen when the user presses ENTER."""
@@ -246,8 +176,14 @@ class ArenaApp(App):
             w_b = self._by_name.get(ev.model_b) or CandidateSpec(model_id=ev.model_b)
             self._hp.start_match()
             fs.start_match(
-                w_a.name, w_a.model_id, w_a.emblem, w_a.thinking_enabled,
-                w_b.name, w_b.model_id, w_b.emblem, w_b.thinking_enabled,
+                w_a.name,
+                w_a.model_id,
+                w_a.emblem,
+                w_a.thinking_enabled,
+                w_b.name,
+                w_b.model_id,
+                w_b.emblem,
+                w_b.thinking_enabled,
                 self.cfg.match.starting_hp,
             )
         elif isinstance(ev, TurnPrompt):
@@ -268,8 +204,11 @@ class ArenaApp(App):
         elif isinstance(ev, JudgeVerdictEvent):
             self._hp.note_vote(ev.verdict)
             fs.set_judge_verdict(
-                ev.judge_name, ev.verdict, ev.reasoning,
-                flipped=ev.flipped, replacement=ev.replacement,
+                ev.judge_name,
+                ev.verdict,
+                ev.reasoning,
+                flipped=ev.flipped,
+                replacement=ev.replacement,
             )
         elif isinstance(ev, RoundVoided):
             self._hp.clear_votes()

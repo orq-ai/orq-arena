@@ -65,7 +65,7 @@ the YAML, every value is literal.
 
 | Command | `--config` behavior |
 |---|---|
-| `orq-arena run` | Optional. If omitted, `orq_arena.yaml` is still loaded (for `judges`, `match`, `gateway`, etc.) but the interactive roster picker replaces `candidates` at runtime, see the [`candidates`](#candidates-the-roster) section. If given, the YAML roster is used as-is, the picker is skipped, and the run is headless by default (`--tui` opts into the live show). |
+| `orq-arena run` | Defaults to `orq_arena.yaml`. The YAML roster is used as-is; the run is headless by default (`--tui` opts into the live show). |
 | `orq-arena demo` | Defaults to `orq_arena.yaml`. Only used for its rules/roster labels, the fixture replay makes no API calls. |
 | `orq-arena list-models` | Defaults to `orq_arena.yaml`. Prints the configured roster. |
 | `orq-arena rejudge` | Defaults to `orq_arena.yaml`. Supplies `gateway` and (unless `--criteria` overrides it) `criteria`. |
@@ -176,9 +176,9 @@ orq.ai-specific. Point `base_url` at any OpenAI-compatible chat endpoint and set
 to whatever variable holds that endpoint's key.
 Two features do depend on the orq.ai router and degrade cleanly without it:
 
-- **The roster picker and `refresh-models`** read the workspace model catalog from the router.
-  On another endpoint, declare `candidates` in the YAML and run with `--config` so the picker is
-  skipped.
+- **`refresh-models` and catalog pricing** read the workspace model catalog from the router.
+  On another endpoint, `refresh-models` degrades to any existing cache and the preflight
+  spend ceiling / report cost section are skipped when no prices resolve.
 - **Reasoning controls** (`candidates[].reasoning`) are forwarded verbatim as `extra_body`; the
   router normalizes them per provider. Other endpoints receive them as-is and may ignore or
   reject unknown fields, so on a non-router endpoint only include fields your server accepts.
@@ -190,24 +190,20 @@ pool a one-command run. It is the recommended path, not the only one.
 
 | Key | Type | Default | Effect |
 |---|---|---|---|
-| `thinking_probe` | `bool` | `True` | Before a live, non-picker run (`orq-arena run --config ...`), sends one tiny probe call (`"Reply with the single word: ok"`) per candidate to detect vendor-default thinking that contradicts its `reasoning` config (`thinking_probe`, `src/orq_arena/preflight.py`). Surfaces as `🧠 … thinks despite config` in the CLI preflight output and footnotes the leaderboard for that candidate. Adds one extra call per candidate (`probe_calls` in `preflight.CallCounts`). Set `false` to skip those extra calls. |
+| `thinking_probe` | `bool` | `True` | Before a live run, sends one tiny probe call (`"Reply with the single word: ok"`) per candidate to detect vendor-default thinking that contradicts its `reasoning` config (`thinking_probe`, `src/orq_arena/preflight.py`). Surfaces as `🧠 … thinks despite config` in the CLI preflight output and footnotes the leaderboard for that candidate. Adds one extra call per candidate (`probe_calls` in `preflight.CallCounts`). Set `false` to skip those extra calls. |
 
 ### Top-level run settings (`ArenaConfig`)
 
 | Key | Type | Default | Effect |
 |---|---|---|---|
-| `headless_concurrency` | `int` | `4` | Matches run in parallel under an `asyncio.Semaphore(max(1, headless_concurrency))`, for `orq-arena run --headless` only (`run_headless` → `run_tournament(concurrency=...)`, `src/orq_arena/headless.py`). The TUI always passes `concurrency=1` internally so the live show stays one fight at a time, this key has no effect on non-headless runs. |
+| `headless_concurrency` | `int` | `4` | Matches run in parallel under an `asyncio.Semaphore(max(1, headless_concurrency))` on headless runs, the default (`run_headless` → `run_tournament(concurrency=...)`, `src/orq_arena/headless.py`). The TUI (`--tui`) always passes `concurrency=1` internally so the live show stays one fight at a time. |
 
 ### `candidates` (the roster)
 
 `candidates: list[CandidateSpec]`: required at the top level, and the parsed list must contain at
 least 2 entries (`ArenaConfig._validate`: `"Need at least 2 candidates, got {n}"`). Configs from
 before the rename keep working: `warriors:` is accepted as a deprecated alias for `candidates:`,
-`warrior_max_tokens` for `gateway.candidate_max_tokens`, and `orc_name` for a candidate's `name`. This holds
-true even for `orq-arena run` with **no** `--config`: `orq_arena.yaml` is still loaded first (for
-`judges`, `match`, `gateway`, etc.) before the interactive picker overwrites `cfg.candidates` at
-runtime via `assign_candidates` (`src/orq_arena/tui/app.py`), so the shipped file's `candidates` list must always
-validate on its own.
+`warrior_max_tokens` for `gateway.candidate_max_tokens`, and `orc_name` for a candidate's `name`.
 
 | Key | Type | Default | Effect |
 |---|---|---|---|
@@ -309,8 +305,7 @@ is not read by `load_prompts()` today and has no effect on the run.
 Settings that cause a hard failure (config load or first live call) if absent or invalid:
 
 - `candidates`: required top-level key, must parse to at least 2 `CandidateSpec` entries, and each
-  entry requires `model_id`. Missing/short lists fail `ArenaConfig` validation immediately,
-  independent of whether the interactive picker will replace the roster afterward.
+  entry requires `model_id`. Missing/short lists fail `ArenaConfig` validation immediately.
 - `judges`: required top-level key, must be a non-empty list.
 - Any `candidates[].reasoning.thinking.budget_tokens` must be strictly less than that candidate's
   effective `max_tokens` (own override or `gateway.candidate_max_tokens`), or config loading fails.
@@ -357,9 +352,8 @@ document. The equivalent axes for changing behavior between runs are:
   shipped presets are `orq_arena.yaml` (uniform thinking-OFF, the default) and
   `configs/reasoning_arena.yaml` (uniform thinking-ON), run the latter with
   `orq-arena run --config configs/reasoning_arena.yaml`. `load_config()` accepts any path.
-- **Ad hoc pool without editing YAML:** run `orq-arena run` with no `--config` at all, the
-  interactive roster picker opens over your workspace-enabled model catalog and replaces
-  `candidates` at runtime; `judges`, `match`, and `gateway` still come from `orq_arena.yaml`.
+  `orq-arena refresh-models --show` lists your workspace-enabled model ids to paste into the
+  `candidates` list.
 - **Different jury on an already-recorded run, no regeneration:** `orq-arena rejudge
   <log_path> --judge <id> [--judge <id> ...] [--criteria "..."]` re-scores the responses
   already in `battles.jsonl` with a new panel and/or criteria, without touching the YAML file.

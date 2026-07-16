@@ -110,13 +110,13 @@ A few things apply across every subcommand and are only documented once, here:
 
 ## `run`
 
-Run the benchmark (a full round-robin over the pool), hits orq.ai. With
-`--config` the run is headless: matches in parallel, plain log lines on pipes, a
-progress bar on terminals, and the HTML report opens in your browser at the end.
-`--tui` runs the same tournament as the live show instead. Without `--config`
-the interactive roster picker opens first, which needs (and implies) the TUI.
-Both `--tui` and the picker require the optional `[tui]` extra (`uv sync --extra tui`);
-without it they print a friendly install hint. The headless run needs no extra.
+Run the benchmark (a full round-robin over the pool), hits orq.ai. The roster
+comes from the YAML as-is (`--config` defaults to `orq_arena.yaml`). The run is
+headless: matches in parallel, plain log lines on pipes, a progress bar on
+terminals, and the HTML report opens in your browser at the end. `--tui` runs
+the same tournament as the live show instead; it needs the optional `[tui]`
+extra (`uv sync --extra tui`) and prints a friendly install hint without it.
+The headless run needs no extra.
 
 ```text
 orq-arena run [--config PATH] [--prompts PATH] [--output PATH] [--rounds N]
@@ -125,30 +125,25 @@ orq-arena run [--config PATH] [--prompts PATH] [--output PATH] [--rounds N]
 
 | Flag | Default | Effect |
 |---|---|---|
-| `--config PATH` | none, triggers the roster picker (see Behavior below) | Use this YAML roster as-is and skip the interactive picker. |
-| `--prompts PATH` | `prompts/starter.jsonl` | JSONL prompt file, see [Prompts file format](configuration.md#prompts-file-format), or `orq:<dataset_id>` to pull an [orq.ai Dataset](https://docs.orq.ai/docs/ai-studio/optimize/datasets): each datapoint's last user message becomes a prompt, `{{var}}` placeholders filled from its `inputs`; datapoints without a user message are skipped. Uses the same API key as the gateway. Always honored, whether or not `--config` is given. When the prompts come from a Dataset, the run manifest records its id, display name, and studio URL, and the HTML report links the dataset by name. |
+| `--config PATH` | `orq_arena.yaml` | YAML roster + rules (candidates, judges, match, gateway), used exactly as written. |
+| `--prompts PATH` | `prompts/starter.jsonl` | JSONL prompt file, see [Prompts file format](configuration.md#prompts-file-format), or `orq:<dataset_id>` to pull an [orq.ai Dataset](https://docs.orq.ai/docs/ai-studio/optimize/datasets): each datapoint's last user message becomes a prompt, `{{var}}` placeholders filled from its `inputs`; datapoints without a user message are skipped. Uses the same API key as the gateway. When the prompts come from a Dataset, the run manifest records its id, display name, and studio URL, and the HTML report links the dataset by name. |
 | `--output PATH` | `battles.jsonl` | Where the battle log (schema v3) is written as rounds complete. |
 | `--rounds N` | `match.max_rounds` from the YAML | Rounds per match. The preflight warns when this samples a subset of your prompts. |
 | `--overwrite` | off | Allow replacing an existing non-empty battle log at `--output`; without it the run refuses rather than erase a recorded run. |
 | `--tui` | off | Watch the live TUI show instead of headless logs. Headless runs use `headless_concurrency` (default `4`, see [configuration.md](configuration.md)) to parallelize matches. |
 | `--no-open` | off | Do not open the HTML report in a browser when the run ends (it never opens on non-TTY stdout or when `CI` is set). |
-| `--headless` | off | Deprecated no-op: headless is already the default with `--config`. |
+| `--headless` | off | Deprecated no-op: headless is already the default. |
 | `--yes`, `-y` | off | Skip the preflight confirmation pause. |
 
 **Behavior notes:**
 
-- **Picker vs. config-supplied roster.** Without `--config`, `orq_arena.yaml` (or whatever
-  `DEFAULT_CONFIG` resolves to) is still loaded first, for `judges`, `match`, and `gateway`,
-  but the interactive TUI roster picker opens before anything runs, letting you choose any pool
-  of ≥2 models from your workspace-enabled catalog (the same fetch `refresh-models` uses). In
-  this path, the preflight (call counts + optional thinking probe) runs **in-app**, after the
-  picker closes, right before the fight starts. With `--config`, the YAML's `candidates` list is
-  used exactly as written and the picker is skipped entirely; preflight and the confirmation
-  prompt happen up front in the terminal, before the TUI (or headless run) even starts.
+- **The roster is the YAML's `candidates` list, verbatim.** Preflight and the confirmation
+  prompt happen up front in the terminal, before the TUI (or headless run) even starts. To
+  discover which model ids your workspace can fight, see
+  [`refresh-models`](#refresh-models) (`--show` lists them grouped by provider).
 - **Flag conflicts.** `--tui --headless` raises immediately (a clean `click.ClickException`,
-  exit code 1, not a traceback). Without `--config` the picker path always runs the TUI.
-- **Preflight output** (config-supplied path only, the picker path renders the same
-  information in-app instead of via these `click.echo` lines). First, exact call counts:
+  exit code 1, not a traceback).
+- **Preflight output.** First, exact call counts:
 
   ```text
   preflight: {matches} matches × {rounds_per_match} rounds → {model_streams} model streams + {judge_calls} judge calls[ + {probe_calls} probe calls]
@@ -186,14 +181,14 @@ orq-arena run [--config PATH] [--prompts PATH] [--output PATH] [--rounds N]
 **Examples:**
 
 ```bash
-# Interactive roster picker over your workspace catalog; judges/rules/gateway from orq_arena.yaml
+# Fight the shipped roster (orq_arena.yaml), confirm the preflight interactively
 uv run orq-arena run
 
-# Use the shipped roster as-is, skip the confirmation prompt
-uv run orq-arena run --config orq_arena.yaml --yes
+# Same, skipping the confirmation prompt
+uv run orq-arena run --yes
 
-# Headless for CI/cron -- no TUI, matches run in parallel (headless_concurrency)
-uv run orq-arena run --headless --config orq_arena.yaml --yes
+# CI/cron -- headless is the default; matches run in parallel (headless_concurrency)
+uv run orq-arena run --yes
 
 # Custom prompt set and output path, with an alternate roster
 uv run orq-arena run --config configs/reasoning_arena.yaml --prompts prompts/starter.jsonl --output reasoning_battles.jsonl
@@ -640,8 +635,9 @@ orq-arena refresh-models [--config PATH] [--show/--no-show]
 
 - Calls `fetch_chat_models(cfg.gateway, force_refresh=True)`, bypassing the 24h TTL cache at
   `~/.cache/orq-arena/models.json` and re-fetching the workspace-enabled, chat-capable catalog
-  live (`providers/models_list.py`). This is the same fetch path `run`'s roster picker uses,
-  running `refresh-models` first warms the cache the next picker session reads.
+  live (`providers/models_list.py`). Use `--show` to discover model ids for your YAML's
+  `candidates` list; the same catalog also prices the preflight spend ceiling and the
+  report's cost section.
 - **Endpoint strategy**, in order: `GET {host}/v2/router/models` (the workspace-enabled
   subset, primary source), falling back to `GET {host}/v3/router/models`, then the configured
   `gateway.base_url` + `/models`. Results are narrowed to `type == "chat"` via `GET
@@ -706,17 +702,17 @@ cp .env.example .env   # fill in ORQ_API_KEY
 uv run orq-arena run
 ```
 
-Opens the roster picker over your workspace-enabled catalog; `judges`, `match`, and `gateway`
-still come from `orq_arena.yaml`. Confirm the preflight to spend tokens.
+Fights the shipped `orq_arena.yaml` roster headless; edit its `candidates` list to change the
+pool. Confirm the preflight to spend tokens.
 
-### Headless run for CI/cron
+### Run for CI/cron
 
 ```bash
-uv run orq-arena run --headless --config orq_arena.yaml --yes
+uv run orq-arena run --yes
 ```
 
-No TUI; `--config` is required; `--yes` skips the confirmation prompt, safe for a
-non-interactive shell.
+`--yes` skips the confirmation prompt, safe for a non-interactive shell; plain line-per-match
+output on pipes.
 
 ### Compare two juries on the same recorded run
 
@@ -727,14 +723,14 @@ uv run orq-arena rejudge battles.jsonl --judge mistral/mistral-small-2603 --judg
 Costs judge tokens only, the responses already in `battles.jsonl` are reused as-is. Prints
 the changed-verdict count and the Spearman rank correlation against the original ranking.
 
-### Warm the model-catalog cache before a run
+### Discover model ids for your roster
 
 ```bash
 uv run orq-arena refresh-models --show
 ```
 
-Forces a live re-fetch (bypassing the 24h cache) so the next `orq-arena run` picker session
-opens with fresh data.
+Forces a live re-fetch (bypassing the 24h cache) and lists every workspace-enabled chat model
+id, grouped by provider, ready to paste into your YAML's `candidates` list.
 
 ---
 

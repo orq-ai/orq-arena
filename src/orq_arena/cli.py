@@ -29,11 +29,6 @@ def _arena_app_cls(hint: str):
     return ArenaApp
 
 
-_PICKER_HINT = (
-    "The interactive roster picker needs the TUI. Install it with: "
-    "pip install 'orq-arena[tui]' (or uv sync --extra tui), or pass "
-    "--config <yaml> to run headless with a fixed roster."
-)
 _TUI_HINT = (
     "The live TUI show needs the extra. Install it with: "
     "pip install 'orq-arena[tui]' (or uv sync --extra tui), or drop --tui "
@@ -78,9 +73,9 @@ def cli() -> None:
 @click.option(
     "--config",
     "config_path",
-    default=None,
-    show_default=False,
-    help="Use this YAML roster as-is and skip the interactive picker.",
+    default=DEFAULT_CONFIG,
+    show_default=True,
+    help="YAML roster + rules (candidates, judges, match, gateway).",
 )
 @click.option(
     "--prompts",
@@ -132,7 +127,7 @@ def cli() -> None:
     help="Skip the preflight confirmation pause.",
 )
 def run(
-    config_path: str | None,
+    config_path: str,
     prompts_path: str,
     output_path: str,
     rounds: int | None,
@@ -145,10 +140,8 @@ def run(
     """Run the arena benchmark (hits orq.ai): headless logs by default,
     then the HTML report opens in your browser.
 
-    With --config the run is headless (matches in parallel); pass --tui to
-    watch the live show instead. Without --config the interactive roster
-    picker opens first, which needs the TUI. The YAML still supplies
-    judges, rules, and gateway settings.
+    The YAML roster is used as-is (default orq_arena.yaml); matches run in
+    parallel. Pass --tui to watch the live show instead.
     """
     import asyncio
     from pathlib import Path
@@ -169,12 +162,9 @@ def run(
             f"{output_path} already holds a recorded run; a new run would erase it. "
             "Pass a fresh --output, or --overwrite to replace it."
         )
-    pick_roster = config_path is None
     # Fail fast on a missing TUI extra before any preflight work.
-    arena_app_cls = (
-        _arena_app_cls(_PICKER_HINT if pick_roster else _TUI_HINT) if (pick_roster or tui) else None
-    )
-    cfg = load_config(config_path or DEFAULT_CONFIG)
+    arena_app_cls = _arena_app_cls(_TUI_HINT) if tui else None
+    cfg = load_config(config_path)
     prompts = load_prompts(prompts_path, api_key_env=cfg.gateway.api_key_env)
     if rounds is not None:
         if rounds < 1:
@@ -194,19 +184,6 @@ def run(
 
     if tui and headless:
         raise click.ClickException("--tui and --headless contradict each other")
-    if pick_roster:
-        # The picker is a TUI screen, so this path always runs the live show.
-        app = arena_app_cls(
-            cfg=cfg,
-            prompts=prompts,
-            battle_log_path=output_path,
-            live=True,
-            pick_roster=True,
-            dataset=dataset,
-        )
-        app.run()
-        _open_report(output_path, no_open)
-        return
 
     counts = call_counts(cfg, prompts)
     click.echo(
