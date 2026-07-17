@@ -94,10 +94,7 @@ def style_controlled_elo(
     theta = {m: 0.0 for m in models}
     gamma = 0.0
     n = len(rows)
-    feats = [
-        (a, b, y, (la - lb) / (la + lb) if (la + lb) > 0 else 0.0)
-        for a, b, y, la, lb in rows
-    ]
+    feats = [(a, b, y, (la - lb) / (la + lb) if (la + lb) > 0 else 0.0) for a, b, y, la, lb in rows]
     for _ in range(iterations):
         g_theta = {m: 0.0 for m in models}
         g_gamma = 0.0

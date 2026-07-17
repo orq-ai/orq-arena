@@ -1,6 +1,6 @@
 {
-  "tournament_id": "bench-1784289186",
-  "started_at": 1784289186.209611,
+  "tournament_id": "bench-1784289730",
+  "started_at": 1784289730.318623,
   "seed": 42,
   "config_sha256": "39c2e8ec84836cd4",
   "prompts_sha256": "08a73bd44a661254",
@@ -57,7 +57,7 @@
   ],
   "min_successful_judges": 2,
   "evaluatorq_version": "1.8.0",
-  "finished_at": 1784291743.92871,
+  "finished_at": 1784290392.724629,
   "preflight": {
     "counts": {
       "matches": 28,
@@ -243,26 +243,26 @@
       }
     }
   },
-  "mean_agreement": 0.9029304029304029,
+  "mean_agreement": 0.9369918699186991,
   "error_rounds": 0,
-  "rated_rounds": 76,
+  "rated_rounds": 75,
   "category_counts": {
-    "creative": 12,
-    "general": 35,
-    "code": 18,
-    "math": 11
+    "general": 36,
+    "creative": 10,
+    "code": 17,
+    "math": 12
   },
   "fleiss": {
-    "kappa": 0.874,
+    "kappa": 0.827,
     "label": "almost perfect",
-    "rounds_used": 44,
+    "rounds_used": 39,
     "rounds_total": 140
   },
   "tokens": {
     "models_in": 8350,
-    "models_out": 220700,
-    "judges_in": 1481428,
-    "judges_out": 107697
+    "models_out": 222019,
+    "judges_in": 1489858,
+    "judges_out": 106625
   },
-  "length_coef": 3.437217581836937
+  "length_coef": 3.146522405260083
 }

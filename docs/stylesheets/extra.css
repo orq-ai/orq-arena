@@ -179,3 +179,13 @@ html { font-size: 100%; }
   border-color: var(--orq-orange);
 }
 
+
+/* --- Tables: never wrap code spans mid-token ------------------------- */
+/* Material sets word-break: break-word on code; in narrow flag/default
+   columns that shreds `--config` into `--confi\ng`. Wrapping at spaces
+   stays allowed (long error-message spans), single tokens stay whole; the
+   overflow-x wrapper absorbs anything wider than the column. */
+.md-typeset table:not([class]) code {
+  word-break: normal;
+  overflow-wrap: normal;
+}

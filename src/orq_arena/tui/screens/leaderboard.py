@@ -1,7 +1,6 @@
 """Leaderboard screen, final ELO rankings with the statistics that make
 them defensible: bootstrap CIs, per-judge jury behaviour, verbosity, and a
-win grid. Renders plain (rank/ELO only) when no report is available, e.g.
-replaying an old fixture."""
+win grid. Renders plain (rank/ELO only) when no report is supplied."""
 
 from __future__ import annotations
 
@@ -52,7 +51,7 @@ class LeaderboardScreen(Screen):
     def compose(self) -> ComposeResult:
         r = self._report
         with VerticalScroll():
-            yield Static("FINAL STANDINGS", id="title")
+            yield Static("Final Results", id="title")
             yield Static(f"🏆 Leaderboard king: {self._champion}", id="champion")
 
             agreement = r.get("mean_agreement")

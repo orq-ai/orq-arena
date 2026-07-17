@@ -85,7 +85,7 @@ def cohen_kappa_pairs(
     """Pairwise Cohen's κ over each judge pair's co-decisive rounds."""
     out: dict[str, dict[str, Any]] = {}
     for i, a in enumerate(panel):
-        for b in panel[i + 1:]:
+        for b in panel[i + 1 :]:
             pairs: list[tuple[str, str]] = []
             for votes in rounds:
                 decisive = _decisive_votes(votes)

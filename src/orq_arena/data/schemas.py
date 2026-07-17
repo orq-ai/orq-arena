@@ -23,6 +23,9 @@ class BattleRecord(BaseModel):
     prompt_hash: str
     prompt_text: str
     prompt_category: str = ""
+    # Opaque pass-through from the prompt row (extra JSONL keys, or
+    # datapoint_id on Dataset runs); joins rounds back to source data.
+    prompt_metadata: dict[str, Any] = Field(default_factory=dict)
 
     model_a: str = Field(description="Normalized name of model A (short_model).")
     model_b: str = Field(description="Normalized name of model B.")

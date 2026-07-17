@@ -39,6 +39,7 @@ def test_default_pool_is_uniform_thinking_off() -> None:
 
 def test_thinking_budget_must_fit_max_tokens() -> None:
     import pytest
+
     from orq_arena.config import ArenaConfig
 
     bad = {

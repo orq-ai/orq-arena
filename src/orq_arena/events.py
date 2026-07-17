@@ -1,6 +1,6 @@
-"""Typed events emitted by the engine and consumed by the TUI + fixture replay.
+"""Typed events emitted by the engine and consumed by the TUI.
 
-All events are ``pydantic.BaseModel`` so the ``demo`` fixture can round-trip
+All events are ``pydantic.BaseModel`` so they can round-trip
 them as JSON. The engine never calls into the TUI directly, it pushes events
 into an ``asyncio.Queue``.
 
@@ -11,7 +11,7 @@ is ``'A' | 'B' | 'tie' | 'inconclusive'``.
 
 from __future__ import annotations
 
-from typing import Any, Literal, Union
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -74,7 +74,7 @@ class JudgeVerdictEvent(BaseModel):
     judge_name: str
     verdict: str  # 'A' | 'B' | 'tie' | 'abstain'
     reasoning: str
-    flipped: bool = False      # judge contradicted itself across orderings
+    flipped: bool = False  # judge contradicted itself across orderings
     replacement: bool = False  # stand-in for a failed judge
 
 
@@ -111,16 +111,16 @@ class TournamentEnded(BaseModel):
     report: dict[str, Any] = {}
 
 
-ArenaEvent = Union[
-    StandingsUpdated,
-    MatchStarted,
-    TurnPrompt,
-    ResponseChunk,
-    ThinkingChunk,
-    ResponseComplete,
-    JudgeVerdictEvent,
-    RoundVoided,
-    TurnResolved,
-    MatchResolved,
-    TournamentEnded,
-]
+ArenaEvent = (
+    StandingsUpdated
+    | MatchStarted
+    | TurnPrompt
+    | ResponseChunk
+    | ThinkingChunk
+    | ResponseComplete
+    | JudgeVerdictEvent
+    | RoundVoided
+    | TurnResolved
+    | MatchResolved
+    | TournamentEnded
+)

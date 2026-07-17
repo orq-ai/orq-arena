@@ -45,7 +45,7 @@ def test_pipe_mode_prints_plain_lines():
     out = out_buf.getvalue()
     assert "model-a beats model-b" in err
     assert "match 1/1 done" in err
-    assert "FINAL STANDINGS" in out
+    assert "Final Results" in out
     assert "battle log" in out
 
 
@@ -58,7 +58,7 @@ def test_terminal_mode_shows_progress_and_leader():
     out = ANSI.sub("", out_buf.getvalue())
     assert "rounds" in err and "leader model-a 1050" in err
     assert "model-a beats model-b" in err  # match line above the bar
-    assert "FINAL STANDINGS" in out
+    assert "Final Results" in out
 
 
 def test_quiet_mode_only_prints_summary():
@@ -67,7 +67,7 @@ def test_quiet_mode_only_prints_summary():
     err_console = Console(file=err_buf, force_terminal=False, width=100)
     asyncio.run(_drive(console, err_console, quiet=True))
     assert err_buf.getvalue() == ""
-    assert "FINAL STANDINGS" in out_buf.getvalue()
+    assert "Final Results" in out_buf.getvalue()
 
 
 def test_draw_prints_a_draw_line():

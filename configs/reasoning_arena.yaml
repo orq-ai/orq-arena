@@ -10,7 +10,6 @@ match:
 
 gateway:
   base_url: https://api.orq.ai/v3/router
-  api_key_env: ORQ_API_KEY
   # Thinking eats output budget on some providers; give answers headroom.
   candidate_max_tokens: 16000
   judge_max_tokens: 2048

@@ -13,7 +13,6 @@ match:
 # Orq.ai gateway
 gateway:
   base_url: https://api.orq.ai/v3/router
-  api_key_env: ORQ_API_KEY
   # Per-response output cap. Creative prompts overflow 1024 easily; a cut
   # response shows as ✂ truncated and judges punish it. Per-candidate
   # max_tokens overrides this.

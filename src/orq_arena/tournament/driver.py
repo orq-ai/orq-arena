@@ -18,12 +18,12 @@ from pathlib import Path
 from evaluatorq import PairwiseComparison, build_report
 
 from ..arena.battle import Battle
+from ..candidates import CandidateSpec
 from ..config import ArenaConfig
 from ..data.log import BattleLog
 from ..data.prompts import PromptItem
 from ..data.schemas import BattleRecord
 from ..events import ArenaEvent, StandingsUpdated, TournamentEnded
-from ..candidates import CandidateSpec
 from ..providers.orq_gateway import OrqGateway
 from .elo import bootstrap_ci, bradley_terry_mle, build_wins_matrix, style_controlled_elo
 
@@ -84,7 +84,11 @@ def _rebuild_comparisons(records: list[BattleRecord]) -> list[PairwiseComparison
     for rec in records:
         if rec.error is not None:
             continue
-        comps.append(PairwiseComparison(winner=rec.majority_verdict, votes=rec.judge_votes))
+        comps.append(
+            PairwiseComparison.model_validate(
+                {"winner": rec.majority_verdict, "votes": rec.judge_votes}
+            )
+        )
     return comps
 
 

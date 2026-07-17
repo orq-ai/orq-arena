@@ -17,11 +17,13 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Any, Iterable
+from typing import Any, Literal
 
 from evaluatorq import llm_jury_pairwise
 
+from ..candidates import CandidateSpec
 from ..config import ArenaConfig
 from ..data.prompts import PromptItem
 from ..data.schemas import BattleRecord
@@ -37,7 +39,6 @@ from ..events import (
     TurnPrompt,
     TurnResolved,
 )
-from ..candidates import CandidateSpec
 from ..providers.orq_gateway import OrqGateway
 
 
@@ -70,7 +71,7 @@ async def _generate_side(
     default_max_tokens: int,
     events: asyncio.Queue[ArenaEvent],
     match_id: str,
-    side: str,  # 'a' | 'b'
+    side: Literal["a", "b"],
 ) -> SideResult:
     """Stream one model's response; one silent-ish retry, then error out."""
     last_error = ""
@@ -88,27 +89,23 @@ async def _generate_side(
                 usage_out=usage,
             ):
                 if kind == "think":
-                    await events.put(
-                        ThinkingChunk(match_id=match_id, side=side, text=piece)  # type: ignore[arg-type]
-                    )
+                    await events.put(ThinkingChunk(match_id=match_id, side=side, text=piece))
                     continue
                 if not chunks:
                     ttft_ms = int((time.monotonic() - t0) * 1000)
                 chunks.append(piece)
-                await events.put(
-                    ResponseChunk(match_id=match_id, side=side, text=piece)  # type: ignore[arg-type]
-                )
+                await events.put(ResponseChunk(match_id=match_id, side=side, text=piece))
         except Exception as exc:
             last_error = str(exc)
             if attempt == 1:
                 await events.put(
-                    ResponseChunk(  # type: ignore[arg-type]
+                    ResponseChunk(
                         match_id=match_id, side=side, text="\n⟲ stream failed, retrying…\n"
                     )
                 )
                 continue
             await events.put(
-                ResponseComplete(  # type: ignore[arg-type]
+                ResponseComplete(
                     match_id=match_id, side=side, full_text="".join(chunks), error=last_error
                 )
             )
@@ -116,7 +113,7 @@ async def _generate_side(
 
         full = "".join(chunks)
         await events.put(
-            ResponseComplete(  # type: ignore[arg-type]
+            ResponseComplete(
                 match_id=match_id,
                 side=side,
                 full_text=full,
@@ -197,6 +194,7 @@ class Battle:
             prompt_hash=_prompt_hash(item.text),
             prompt_text=item.text,
             prompt_category=item.category,
+            prompt_metadata=item.metadata,
             model_a=self.a.short_model,
             model_b=self.b.short_model,
             response_a=res_a.text,
@@ -316,6 +314,7 @@ class Battle:
                     prompt_hash=_prompt_hash(prompt),
                     prompt_text=prompt,
                     prompt_category=item.category,
+                    prompt_metadata=item.metadata,
                     model_a=self.a.short_model,
                     model_b=self.b.short_model,
                     response_a=res_a.text,

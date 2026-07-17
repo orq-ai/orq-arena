@@ -23,8 +23,14 @@ async def test_fight_screen_full_match_lifecycle():
         await pilot.pause()
 
         screen.start_match(
-            "Grak", "anthropic/claude-opus-4-8", "⚔", False,
-            "Snot", "openai/gpt-5.4-mini", "🏹", True,
+            "Grak",
+            "anthropic/claude-opus-4-8",
+            "⚔",
+            False,
+            "Snot",
+            "openai/gpt-5.4-mini",
+            "🏹",
+            True,
             100,
         )
         screen.set_standings({"Grak": 1010.0, "Snot": 990.0}, 1, 28)

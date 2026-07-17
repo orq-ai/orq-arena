@@ -24,7 +24,7 @@ from urllib.parse import urlparse
 
 import httpx
 
-from ..config import GatewayConfig
+from ..config import ORQ_API_KEY_ENV, OrqAIGatewayConfig
 
 CACHE_DIR = Path.home() / ".cache" / "orq-arena"
 CACHE_FILE = CACHE_DIR / "models.json"
@@ -125,12 +125,12 @@ def _read_cache() -> tuple[list[ModelEntry], float] | None:
     return _parse_payload(raw), float(raw.get("fetched_at") or 0.0)
 
 
-def _host(cfg: GatewayConfig) -> str:
+def _host(cfg: OrqAIGatewayConfig) -> str:
     parsed = urlparse(cfg.base_url)
     return f"{parsed.scheme}://{parsed.netloc}"
 
 
-def _catalog_urls(cfg: GatewayConfig) -> list[str]:
+def _catalog_urls(cfg: OrqAIGatewayConfig) -> list[str]:
     host = _host(cfg)
     urls = [f"{host}/v2/router/models", f"{host}/v3/router/models"]
     configured = cfg.base_url.rstrip("/") + "/models"
@@ -140,7 +140,7 @@ def _catalog_urls(cfg: GatewayConfig) -> list[str]:
 
 
 async def _fetch_type_map(
-    client: httpx.AsyncClient, cfg: GatewayConfig, api_key: str
+    client: httpx.AsyncClient, cfg: OrqAIGatewayConfig, api_key: str
 ) -> dict[str, str]:
     """``{model_id: type}`` from the Model Garden; empty dict on failure."""
     try:
@@ -169,14 +169,14 @@ def _filter_by_type(entries: list[ModelEntry], type_map: dict[str, str]) -> list
     return [m for m in entries if not type_map.get(m.id) or type_map[m.id] == "chat"]
 
 
-async def fetch_price_map(cfg: GatewayConfig) -> dict[str, tuple[float, float]]:
+async def fetch_price_map(cfg: OrqAIGatewayConfig) -> dict[str, tuple[float, float]]:
     """``{router_id: ($/M input, $/M output)}`` from the Model Garden.
 
     Garden rows key as ``provider/model_id``, which is exactly the router
     slug (verified 12/12 against the shipped config). Empty dict on any
     failure; pricing is advisory, never blocks a run.
     """
-    api_key = os.environ.get(cfg.api_key_env, "")
+    api_key = os.environ.get(ORQ_API_KEY_ENV, "")
     if not api_key:
         return {}
     try:
@@ -211,12 +211,12 @@ async def fetch_price_map(cfg: GatewayConfig) -> dict[str, tuple[float, float]]:
 
 
 async def fetch_chat_models(
-    cfg: GatewayConfig,
+    cfg: OrqAIGatewayConfig,
     *,
     force_refresh: bool = False,
 ) -> ModelList:
     """Chat-capable, workspace-active models; cached, with graceful fallback."""
-    api_key = os.environ.get(cfg.api_key_env, "")
+    api_key = os.environ.get(ORQ_API_KEY_ENV, "")
     now = time.time()
 
     cached = _read_cache()

@@ -62,3 +62,37 @@ def test_empty_price_map_prices_nothing():
     c = cost_ceiling(cfg, PROMPTS, counts, {})
     assert c.total_usd == 0
     assert set(c.unpriced) == {"a/one", "b/two", "c/judge"}
+
+
+def test_rows_sum_to_totals():
+    cfg = _cfg(preflight={"thinking_probe": True})
+    counts = call_counts(cfg, PROMPTS)
+    prices = {"a/one": (1.0, 2.0), "b/two": (4.0, 8.0), "c/judge": (10.0, 20.0)}
+    c = cost_ceiling(cfg, PROMPTS, counts, prices)
+
+    by_role = lambda role: [r for r in c.rows if r.role == role]  # noqa: E731
+    assert abs(sum(r.usd for r in by_role("candidate")) - c.models_usd) < 1e-12
+    assert abs(sum(r.usd for r in by_role("judge")) - c.judges_usd) < 1e-12
+    (probe,) = by_role("probe")
+    assert probe.usd == c.probe_usd
+    assert probe.calls == counts.probe_calls
+
+
+def test_unpriced_model_gets_row_with_none_usd():
+    cfg = _cfg()
+    counts = call_counts(cfg, PROMPTS)
+    c = cost_ceiling(cfg, PROMPTS, counts, {"a/one": (1.0, 2.0)})
+    rows = {r.model_id: r for r in c.rows}
+    assert rows["b/two"].usd is None
+    assert rows["b/two"].price_in is None
+    assert rows["b/two"].calls == 2  # still shows what it will do
+    assert rows["c/judge"].usd is None
+    assert "b/two" in c.unpriced and "c/judge" in c.unpriced
+
+
+def test_no_probe_row_when_probe_disabled():
+    cfg = _cfg()  # thinking_probe False
+    counts = call_counts(cfg, PROMPTS)
+    prices = {"a/one": (1.0, 2.0), "b/two": (4.0, 8.0), "c/judge": (10.0, 20.0)}
+    c = cost_ceiling(cfg, PROMPTS, counts, prices)
+    assert not [r for r in c.rows if r.role == "probe"]

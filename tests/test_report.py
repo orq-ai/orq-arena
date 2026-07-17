@@ -265,5 +265,5 @@ def test_orq_dataset_meta_offline_fallback(monkeypatch):
         raise RuntimeError("no network in tests")
 
     monkeypatch.setattr(orq_ai_sdk, "Orq", _boom)
-    meta = orq_dataset_meta("ds_42", api_key_env="ORQ_API_KEY")
+    meta = orq_dataset_meta("ds_42")
     assert meta == {"id": "ds_42", "name": "ds_42", "url": "https://my.orq.ai/datasets/ds_42"}

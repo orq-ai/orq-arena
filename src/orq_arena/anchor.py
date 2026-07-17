@@ -14,15 +14,15 @@ import hashlib
 import json
 import random
 import re
+from collections.abc import Collection
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Collection
-
 
 from .analysis.kappa import cohen_kappa_pairs
 from .data.schemas import BattleRecord
 from .rejudge import outcomes_from_majorities, spearman
+from .report import _MARK, _ROOT_CSS
 from .tournament.elo import bradley_terry_mle, build_wins_matrix
 
 
@@ -33,7 +33,10 @@ def record_key(rec: BattleRecord) -> str:
 
 
 def annotation_items(
-    records: list[BattleRecord], *, seed: int = 42, sample: int | None = None,
+    records: list[BattleRecord],
+    *,
+    seed: int = 42,
+    sample: int | None = None,
     exclude: Collection[str] = (),
 ) -> list[dict]:
     """Blinded page payload: canonical responses + per-round display flip.
@@ -48,66 +51,69 @@ def annotation_items(
         key = record_key(rec)
         if key in excluded:
             continue
-        items.append({
-            "k": key,
-            "q": rec.prompt_text,
-            "a": rec.response_a,
-            "b": rec.response_b,
-            "f": random.Random(f"{seed}:{key}").random() < 0.5,
-        })
+        items.append(
+            {
+                "k": key,
+                "q": rec.prompt_text,
+                "a": rec.response_a,
+                "b": rec.response_b,
+                "f": random.Random(f"{seed}:{key}").random() < 0.5,
+            }
+        )
     random.Random(seed).shuffle(items)
     return items[:sample] if sample else items
 
 
-_PAGE_CSS = """
-:root { --ink:#141319; --paper:#faf8f3; --card:#fff; --line:#e6e1d6;
-  --teal:#00342d; --muted:#7a766c; --a:#c8189e; --b:#0092ab;
-  --mono:"SF Mono","JetBrains Mono",ui-monospace,Menlo,monospace;
-  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; }
+_PAGE_CSS = (
+    _ROOT_CSS
+    + """
 *{box-sizing:border-box} body{margin:0;background:var(--paper);color:var(--ink);
-  font-family:var(--sans);line-height:1.55}
+  font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}
 .wrap{max-width:1200px;margin:0 auto;padding:0 24px 90px}
-header{display:flex;gap:14px;align-items:center;padding:18px 0;border-bottom:2px solid var(--teal)}
+header{display:flex;gap:10px;align-items:center;padding:26px 0 14px;border-bottom:1px solid var(--line)}
+header .brand{font-weight:600;font-size:17px;letter-spacing:-0.3px}
+header .kind{font-family:var(--mono);font-size:12px;color:var(--muted)}
 header .prog{font-family:var(--mono);font-size:13px;color:var(--muted);margin-left:auto}
-header input{font:inherit;padding:4px 8px;border:1px solid var(--line);border-radius:6px}
-.prompt{background:var(--card);border:1px solid var(--line);border-radius:10px;
-  padding:14px 18px;margin:18px 0;font-size:15px}
+header input{font:inherit;padding:4px 8px;border:1px solid var(--line);border-radius:var(--r-sm)}
+.prompt{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);
+  padding:14px 18px;margin:18px 0;font-size:15px;box-shadow:var(--shadow-xs)}
 .duel{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media(max-width:900px){.duel{grid-template-columns:1fr}}
-.resp{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:4px 18px 14px;
-  overflow-wrap:break-word}
+.resp{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);padding:4px 18px 14px;
+  overflow-wrap:break-word;box-shadow:var(--shadow-xs)}
 .resp h3{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.08em}
 .resp.left h3{color:var(--a)} .resp.right h3{color:var(--b)}
-.resp.voted{outline:3px solid var(--teal)}
-.resp pre{background:#f0ede4;padding:10px;border-radius:6px;overflow-x:auto}
-.resp code{font-family:var(--mono);font-size:12.5px;background:#f0ede4;padding:1px 4px;border-radius:3px}
+.resp.voted{outline:3px solid var(--indigo)}
+.resp pre{background:var(--surface);padding:10px;border-radius:var(--r-md);overflow-x:auto}
+.resp code{font-family:var(--mono);font-size:12.5px;background:var(--surface);padding:1px 4px;border-radius:var(--r-sm)}
 .bar{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--line);
-  display:flex;gap:10px;justify-content:center;padding:12px;flex-wrap:wrap}
-.bar button{font:inherit;padding:8px 18px;border:1px solid var(--line);border-radius:8px;
-  background:var(--paper);cursor:pointer}
-.bar button:hover{border-color:var(--teal)}
+  display:flex;gap:10px;justify-content:center;padding:12px;flex-wrap:wrap;box-shadow:var(--shadow-sm)}
+.bar button{font:inherit;padding:8px 18px;border:1px solid var(--line);border-radius:var(--r-md);
+  background:var(--surface);color:var(--ink);cursor:pointer}
+.bar button:hover{border-color:var(--indigo)}
 .bar .key{font-family:var(--mono);font-size:11px;color:var(--muted)}
 .gate{max-width:640px;margin:48px auto;background:var(--card);border:1px solid var(--line);
-  border-radius:12px;padding:28px 34px}
-.gate h2{margin-top:0;color:var(--teal)}
+  border-radius:var(--r-xl);padding:28px 34px;box-shadow:var(--shadow-sm)}
+.gate h2{margin-top:0;color:var(--ink)}
 .gate ul{padding-left:20px} .gate li{margin-bottom:6px}
 .gate .stats{font-family:var(--mono);font-size:13px;color:var(--muted);margin:14px 0}
-.gate input{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;
-  width:100%;margin:6px 0 16px}
-.gate button{font:inherit;padding:10px 22px;border:none;border-radius:8px;
-  background:var(--teal);color:#fff;cursor:pointer}
+.gate input{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:var(--r-md);
+  width:100%;margin:6px 0 16px;background:var(--surface);color:var(--ink)}
+.gate button{font:inherit;padding:10px 22px;border:none;border-radius:var(--r-md);
+  background:var(--indigo);color:#fff;cursor:pointer}
 .gate button:disabled{opacity:.4;cursor:default}
 .gate .big{font-size:17px}
 .hidden{display:none}
 .nav{display:flex;flex-wrap:wrap;gap:4px;padding:10px 0 2px}
-.dot{width:13px;height:13px;border-radius:4px;cursor:pointer;
-  background:#e6e1d6;border:1px solid #d5cfc0}
-.dot.seen{background:#b3ac9c;border-color:#b3ac9c}
-.dot.voted{background:var(--teal);border-color:var(--teal)}
-.dot.tie{background:#c99a2e;border-color:#c99a2e}
+.dot{width:13px;height:13px;border-radius:var(--r-sm);cursor:pointer;
+  background:var(--surface);border:1px solid var(--line)}
+.dot.seen{background:var(--muted);border-color:var(--muted)}
+.dot.voted{background:var(--indigo);border-color:var(--indigo)}
+.dot.tie{background:var(--warn);border-color:var(--warn)}
 .dot.cur{outline:2px solid var(--a);outline-offset:1px}
 .legend{font-family:var(--mono);font-size:10.5px;color:var(--muted);padding-bottom:6px}
 """
+)
 
 _PAGE_JS = r"""
 const D = JSON.parse(document.getElementById('data').textContent);
@@ -285,8 +291,7 @@ show('intro');
 
 
 DEFAULT_CRITERIA = (
-    "Accuracy and correctness, helpfulness and completeness, "
-    "clarity, and relevance to the prompt."
+    "Accuracy and correctness, helpfulness and completeness, clarity, and relevance to the prompt."
 )
 
 
@@ -299,22 +304,20 @@ def render_annotate_page(
     rater name), the annotation duel, and a done screen with an explicit
     download step; no surprise auto-download.
     """
-    payload = json.dumps(
-        {"seed": seed, "source": source, "criteria": criteria, "items": items}
-    )
+    payload = json.dumps({"seed": seed, "source": source, "criteria": criteria, "items": items})
     payload = payload.replace("</", "<\\/")  # keep the closing script tag inert
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>orq-arena blind annotation</title>
+<title>orq-arena human annotation</title>
 <style>{_PAGE_CSS}</style></head><body>
 <div class="wrap">
-<header><b>blind annotation</b>
+<header>{_MARK}<span class="brand">orq.ai</span><span class="kind">human annotation</span>
 <input id="annotator" type="hidden">
 <span class="prog" id="prog"></span></header>
 <div class="nav hidden" id="nav"></div>
-<div class="legend hidden" id="legend">■ voted · <span style="color:#c99a2e">■</span> tie ·
-<span style="color:#b3ac9c">■</span> skipped · □ unseen · click any dot to jump ·
+<div class="legend hidden" id="legend">■ voted · <span style="color:var(--warn)">■</span> tie ·
+<span style="color:var(--muted)">■</span> skipped · □ unseen · click any dot to jump ·
 <b>n</b> = next unvoted</div>
 
 <div id="view-intro" class="gate">
@@ -386,15 +389,15 @@ def load_votes(paths: list[str | Path]) -> list[VoteSet]:
     sets: list[VoteSet] = []
     for p in paths:
         data = json.loads(Path(p).read_text(encoding="utf-8"))
-        votes = {
-            k: v for k, v in (data.get("votes") or {}).items() if v in _DECISIVE
-        }
-        sets.append(VoteSet(
-            annotator=str(data.get("annotator") or Path(p).stem),
-            seed=int(data.get("seed") or 0),
-            source=str(data.get("source") or ""),
-            votes=votes,
-        ))
+        votes = {k: v for k, v in (data.get("votes") or {}).items() if v in _DECISIVE}
+        sets.append(
+            VoteSet(
+                annotator=str(data.get("annotator") or Path(p).stem),
+                seed=int(data.get("seed") or 0),
+                source=str(data.get("source") or ""),
+                votes=votes,
+            )
+        )
     return sets
 
 
@@ -408,8 +411,10 @@ def _ranking(records, majorities, models) -> list[str]:
 
 
 def _pair_kappa(rounds: list, a: str, b: str) -> dict:
-    return next(iter(cohen_kappa_pairs(rounds, [a, b]).values()),
-                {"kappa": None, "label": "n/a", "rounds": 0})
+    return next(
+        iter(cohen_kappa_pairs(rounds, [a, b]).values()),
+        {"kappa": None, "label": "n/a", "rounds": 0},
+    )
 
 
 def anchor_result(records, votesets: list[VoteSet]) -> dict:
@@ -427,40 +432,51 @@ def anchor_result(records, votesets: list[VoteSet]) -> dict:
         label = vs.annotator if vs.annotator != _PANEL else vs.annotator + "*"
         # kappa vs panel over rounds where the panel was decisive
         rounds = [
-            [{"model": _PANEL, "vote": keyed[k].majority_verdict},
-             {"model": label, "vote": v}]
-            for k, v in co.items() if keyed[k].majority_verdict in _DECISIVE
+            [{"model": _PANEL, "vote": keyed[k].majority_verdict}, {"model": label, "vote": v}]
+            for k, v in co.items()
+            if keyed[k].majority_verdict in _DECISIVE
         ]
         pair = _pair_kappa(rounds, _PANEL, label)
         recs = [keyed[k] for k in co]
         human_rank = _ranking(recs, list(co.values()), models)
-        per_annotator.append({
-            "annotator": vs.annotator,
-            "n_voted": len(co),
-            "n_kappa": pair["rounds"],
-            "kappa": pair["kappa"],
-            "kappa_label": pair["label"],
-            # no co-voted rounds -> no ranking claim, not an alphabetical one
-            "spearman": spearman(panel_rank, human_rank) if co else float("nan"),
-        })
+        per_annotator.append(
+            {
+                "annotator": vs.annotator,
+                "n_voted": len(co),
+                "n_kappa": pair["rounds"],
+                "kappa": pair["kappa"],
+                "kappa_label": pair["label"],
+                # no co-voted rounds -> no ranking claim, not an alphabetical one
+                "spearman": spearman(panel_rank, human_rank) if co else float("nan"),
+            }
+        )
 
     inter = []
     for i, va in enumerate(votesets):
-        for vb in votesets[i + 1:]:
+        for vb in votesets[i + 1 :]:
             shared = [k for k in va.votes if k in vb.votes and k in keyed]
             rounds = [
-                [{"model": va.annotator, "vote": va.votes[k]},
-                 {"model": vb.annotator + " (2)" if vb.annotator == va.annotator
-                  else vb.annotator, "vote": vb.votes[k]}]
+                [
+                    {"model": va.annotator, "vote": va.votes[k]},
+                    {
+                        "model": vb.annotator + " (2)"
+                        if vb.annotator == va.annotator
+                        else vb.annotator,
+                        "vote": vb.votes[k],
+                    },
+                ]
                 for k in shared
             ]
             b_label = va.annotator + " (2)" if vb.annotator == va.annotator else vb.annotator
             pair = _pair_kappa(rounds, va.annotator, b_label)
-            inter.append({
-                "pair": f"{va.annotator} × {vb.annotator}",
-                "kappa": pair["kappa"], "kappa_label": pair["label"],
-                "rounds": pair["rounds"],
-            })
+            inter.append(
+                {
+                    "pair": f"{va.annotator} × {vb.annotator}",
+                    "kappa": pair["kappa"],
+                    "kappa_label": pair["label"],
+                    "rounds": pair["rounds"],
+                }
+            )
 
     return {
         "per_annotator": per_annotator,
@@ -508,13 +524,11 @@ def make_annotation_server(
                 return
             try:
                 data = json.loads(self.rfile.read(size))
-                votes = {
-                    str(k): v for k, v in (data.get("votes") or {}).items()
-                    if v in _DECISIVE
-                }
-                slug = re.sub(
-                    r"[^a-z0-9-]+", "-", str(data.get("annotator") or "").lower()
-                ).strip("-") or "anonymous"
+                votes = {str(k): v for k, v in (data.get("votes") or {}).items() if v in _DECISIVE}
+                slug = (
+                    re.sub(r"[^a-z0-9-]+", "-", str(data.get("annotator") or "").lower()).strip("-")
+                    or "anonymous"
+                )
             except (ValueError, AttributeError):
                 self.send_error(400)
                 return
@@ -543,7 +557,9 @@ def render_anchor_result(result: dict) -> None:
         t.add_column(col)
     for row in result["per_annotator"]:
         t.add_row(
-            row["annotator"], str(row["n_voted"]), str(row["n_kappa"]),
+            row["annotator"],
+            str(row["n_voted"]),
+            str(row["n_kappa"]),
             "n/a" if row["kappa"] is None else f"{row['kappa']:.2f}",
             row["kappa_label"],
             "n/a" if row["spearman"] != row["spearman"] else f"{row['spearman']:.2f}",

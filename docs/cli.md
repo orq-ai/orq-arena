@@ -1,23 +1,18 @@
 # CLI Reference
 
-`orq-arena` is the single console-script entry point for this project, a `click.group()`
-defined in [`src/orq_arena/cli.py`](https://github.com/orq-ai/orq-arena/blob/master/src/orq_arena/cli.py) and registered as
-`orq-arena = "orq_arena.cli:cli"` under `[project.scripts]` in
-[`pyproject.toml`](https://github.com/orq-ai/orq-arena/blob/master/pyproject.toml). `cli.py` is the sole source of truth for this page;
-every flag, default, and behavior documented below is read directly from it (plus
-[`rejudge.py`](https://github.com/orq-ai/orq-arena/blob/master/src/orq_arena/rejudge.py) and
-[`providers/models_list.py`](https://github.com/orq-ai/orq-arena/blob/master/src/orq_arena/providers/models_list.py) for the two commands
-that delegate to them).
+`orq-arena` is the command-line tool for everything in this project: running the
+benchmark, replaying it, re-judging it, and turning a recorded run into reports and
+human-annotation pages.
 
-It exposes eight subcommands: [`run`](#run), [`demo`](#demo), [`list-models`](#list-models),
+It has seven subcommands: [`run`](#run), [`pool`](#pool),
 [`rejudge`](#rejudge) (including its [`--compare`](#rejudge-compare) mode), [`report`](#report),
-[`annotate`](#annotate), [`anchor`](#anchor), and [`refresh-models`](#refresh-models). The `cli` group itself defines
-`--version` and Click's built-in `--help`; every other flag below lives on a specific
-subcommand.
+[`annotate`](#annotate), [`anchor`](#anchor), and [`refresh-catalog`](#refresh-catalog).
+`--version` and `--help` work at the top level; every other flag below belongs to a
+specific subcommand.
 
 ```bash
-uv run orq-arena --help              # list every subcommand
-uv run orq-arena <command> --help    # per-command flag help
+orq-arena --help              # list every subcommand
+orq-arena <command> --help    # per-command flag help
 ```
 
 ```text
@@ -30,25 +25,14 @@ Options:
   --help     Show this message and exit.
 
 Commands:
-  anchor          Merge human vote files against a recorded run: κ + rank...
-  annotate        Render a blinded human-annotation page from a recorded...
-  demo            Replay a recorded tournament from a fixture file (no...
-  list-models     Print the configured candidate pool.
-  refresh-models  Re-fetch the workspace-enabled chat model list from...
-  rejudge         Re-judge a recorded run with a different panel, zero...
-  report          Render the single-file HTML report page from a recorded...
-  run             Run the arena benchmark (hits orq.ai): headless logs by...
+  anchor           Merge human vote files against a recorded run: κ +...
+  annotate         Render a blinded human-annotation page from a recorded...
+  pool             Print the configured candidate pool.
+  refresh-catalog  Re-fetch the workspace-enabled chat model catalog from...
+  rejudge          Re-judge a recorded run with a different panel, zero...
+  report           Render the single-file HTML report page from a...
+  run              Run the arena benchmark (hits orq.ai): headless logs...
 ```
-
-!!! info "About the output blocks on this page"
-
-    The *Expected output* blocks below are captured from real invocations
-    against the committed example run at
-    [`examples/quickstart/`](https://github.com/orq-ai/orq-arena/tree/master/examples/quickstart),
-    keyless wherever the command makes no API calls. The two blocks that need
-    live judge calls (`run`, `rejudge --judge`) are reconstructed from that
-    same run's recorded numbers and marked as such. Your model names and
-    numbers will differ; the shape won't.
 
 For installation and your first run, see [getting-started.md](getting-started.md). For the
 full `orq_arena.yaml` key reference, see [configuration.md](configuration.md).
@@ -57,14 +41,13 @@ full `orq_arena.yaml` key reference, see [configuration.md](configuration.md).
 
 | Command | Purpose |
 |---|---|
-| [`run`](#run) | Round-robin benchmark via the orq.ai router: headless by default, HTML report opens at the end, `--tui` for the live show. |
-| [`demo`](#demo) | Replay a recorded tournament fixture, zero API calls, zero key. |
-| [`list-models`](#list-models) | Print the configured candidate pool (seed, name, model id). |
+| [`run`](#run) | Round-robin benchmark via the orq.ai router: headless by default, HTML report written next to the log (`--open` to view), `--tui` for the live show. |
+| [`pool`](#pool) | Print the configured candidate pool (seed, name, model id). |
 | [`rejudge`](#rejudge) | Re-score a recorded `battles.jsonl` with a different judge panel, zero regeneration; or, with [`--compare`](#rejudge-compare), tabulate saved rejudge reports side by side. |
 | [`report`](#report) | Render the single-file HTML report page from a recorded run; no model calls, one optional catalog read for prices. |
 | [`annotate`](#annotate) | Render a blinded human-annotation page from a recorded run; no API calls. |
 | [`anchor`](#anchor) | Merge human vote files back against a run: panel↔human κ + rank correlation; no API calls. |
-| [`refresh-models`](#refresh-models) | Force re-fetch of the 24h workspace model-catalog cache. |
+| [`refresh-catalog`](#refresh-catalog) | Force re-fetch of the 24h workspace model-catalog cache. |
 
 ---
 
@@ -72,30 +55,24 @@ full `orq_arena.yaml` key reference, see [configuration.md](configuration.md).
 
 A few things apply across every subcommand and are only documented once, here:
 
-- **`.env` loading**: every invocation reads `./.env` once, at the top of the `cli` group
-  (`_load_dotenv`, called before any subcommand body runs), via a small stdlib-only `KEY=VALUE`
-  parser that uses `os.environ.setdefault`, **a variable already set in your shell always wins
-  over `.env`.** `ORQ_API_KEY` is the only variable read anywhere in the codebase. Full loader
-  behavior (quoting, comments, missing-file handling): [configuration.md](configuration.md#environment-variables).
-- **Config validation is all-or-nothing**: `load_config()` parses `--config` (or the default
-  `orq_arena.yaml`) and validates the *entire* file into an `ArenaConfig` (≥2 `candidates`,
-  non-empty `judges`, thinking-budget cross-checks, etc.) regardless of which fields a given
-  subcommand actually uses. An invalid config file fails the same way for `list-models` or
-  `refresh-models` as it does for `run`, see
-  [Required vs Optional Settings](configuration.md#required-vs-optional-settings).
-- **Default paths**: four constants in `cli.py` supply every default in the tables below:
+- **`.env` loading**: every invocation reads `./.env` from the current directory before
+  doing anything else. **A variable already set in your shell always wins over `.env`.**
+  `ORQ_API_KEY` is the only variable the tool reads. Details (quoting, comments,
+  missing-file handling): [configuration.md](configuration.md#environment-variables).
+- **Config validation is all-or-nothing**: the *entire* `--config` file
+  is validated (≥2 `candidates`, non-empty `judges`, thinking-budget
+  cross-checks, etc.) regardless of which fields a given subcommand actually uses. An
+  invalid config file fails the same way for `pool` or `refresh-catalog` as it does for
+  `run`, see [Required vs Optional Settings](configuration.md#required-vs-optional-settings).
+- **Default paths**: every default path in the tables below is one of these four, all
+  relative to the current working directory:
 
-  | Constant | Value | Used by |
-  |---|---|---|
-  | `DEFAULT_CONFIG` | `orq_arena.yaml` | `--config` on `run`, `demo`, `list-models`, `rejudge`, `report`, and `refresh-models` (`annotate` and `anchor` take no config) |
-  | `DEFAULT_PROMPTS` | `prompts/starter.jsonl` | `run --prompts` |
-  | `DEFAULT_OUTPUT` | `battles.jsonl` | `run --output`, and the `LOG_PATH` positional on `rejudge` and `report` |
-  | `DEFAULT_FIXTURE` | `fixtures/demo_tournament.json` | `demo --fixture` |
+  | Value | Used by |
+  |---|---|
+  | `orq_arena.yaml` | `--config` default on `rejudge`, `report`, and `refresh-catalog`; `run` and `pool` require an explicit `--config` (`annotate` and `anchor` take no config) |
+  | `prompts/starter.jsonl` | `run --prompts` |
+  | `battles.jsonl` | `run --output`, and the `LOG_PATH` positional on `rejudge` and `report` |
 
-  All are relative to the current working directory, not the package install location.
-- **Log quieting**: `run`, `demo`, and `rejudge` redirect evaluatorq's `loguru` output to
-  stderr at `ERROR` level only (`_quiet_logs()`), so library logging never corrupts the TUI or
-  interleaves with `rejudge`'s Rich tables. The other commands don't touch logging config.
 - **`--version`**: `orq-arena --version` prints the installed package version.
 - **Stream contract**: results go to stdout; messaging (preflight narration, warnings,
   progress) goes to stderr. Piping stdout to `grep`, `jq`, or a file never captures
@@ -105,216 +82,246 @@ A few things apply across every subcommand and are only documented once, here:
   | Command | Needs a live API key? |
   |---|---|
   | `run` | Yes, model streams, judge calls, and (if enabled) the thinking probe all call the gateway. |
-  | `demo` | No, replays a JSON fixture, zero network calls. |
-  | `list-models` | No, prints the parsed config only. |
+  | `pool` | No, prints the parsed config only. |
   | `rejudge` | Yes, re-scores recorded responses with a live judge panel. |
   | `report` | No, one optional catalog read prices the cost section when a key (or cache) is present. |
   | `annotate` / `anchor` | No, both work entirely from the recorded log and vote files. |
-  | `refresh-models` | Effectively yes, without it, falls back to any existing cache, then an empty result. See [`refresh-models`](#refresh-models). |
+  | `refresh-catalog` | Effectively yes, without it, falls back to any existing cache, then an empty result. See [`refresh-catalog`](#refresh-catalog). |
 
 ---
 
 ## `run`
 
 Run the benchmark (a full round-robin over the pool), hits orq.ai. The model pool
-comes from the YAML as-is (`--config` defaults to `orq_arena.yaml`). The run is
+comes from the YAML you point `--config` at, as-is. The run is
 headless: matches in parallel, plain log lines on pipes, a progress bar on
-terminals, and the HTML report opens in your browser at the end. `--tui` runs
+terminals, and the HTML report is written next to the battle log at the end
+(`--open` to view it in your browser). `--tui` runs
 the same tournament as the live show instead; it needs the optional `[tui]`
-extra (`uv sync --extra tui`) and prints a friendly install hint without it.
+extra and prints a friendly install hint without it.
 The headless run needs no extra.
 
 ```text
-orq-arena run [--config PATH] [--prompts PATH] [--output PATH] [--rounds N]
-              [--overwrite] [--tui] [--no-open] [--yes|-y] [--quiet|-q]
+orq-arena run --config PATH [--prompts PATH] [--output PATH] [--rounds N]
+              [--overwrite] [--tui] [--open] [--yes|-y] [--quiet|-q]
 ```
 
 | Flag | Default | Effect |
 |---|---|---|
-| `--config PATH` | `orq_arena.yaml` | YAML config: candidates (the model pool), judges, match, gateway; used exactly as written. |
+| `--config PATH` | (required) | YAML config: candidates (the model pool), judges, match, gateway; used exactly as written. |
 | `--prompts PATH` | `prompts/starter.jsonl` | JSONL prompt file, see [Prompts file format](configuration.md#prompts-file-format), or `orq:<dataset_id>` to pull an [orq.ai Dataset](https://docs.orq.ai/docs/ai-studio/optimize/datasets): each datapoint's last user message becomes a prompt, `{{var}}` placeholders filled from its `inputs`; datapoints without a user message are skipped. Uses the same API key as the gateway. When the prompts come from a Dataset, the run manifest records its id, display name, and studio URL, and the HTML report links the dataset by name. |
 | `--output PATH` | `battles.jsonl` | Where the battle log (schema v3) is written as rounds complete. |
 | `--rounds N` | `match.max_rounds` from the YAML | Rounds per match. The preflight warns when this samples a subset of your prompts. |
 | `--overwrite` | off | Allow replacing an existing non-empty battle log at `--output`; without it the run refuses rather than erase a recorded run. |
 | `--tui` | off | Watch the live TUI show instead of headless logs. Headless runs use `headless_concurrency` (default `4`, see [configuration.md](configuration.md)) to parallelize matches. |
-| `--no-open` | off | Do not open the HTML report in a browser when the run ends (it never opens on non-TTY stdout or when `CI` is set). |
+| `--open` | off | Open the HTML report in a browser when the run ends (ignored on non-TTY stdout or when `CI` is set). |
 | `--yes`, `-y` | off | Skip the preflight confirmation pause. Required when stdin is not a terminal (pipes, CI): without it the run fails fast instead of hanging on a prompt nobody can answer. |
 | `--quiet`, `-q` | off | Suppress preflight narration and progress; warnings and the final results stay. |
 
-**Behavior notes:**
+### How a run behaves
 
-- **The model pool is the YAML's `candidates` list, verbatim.** Preflight and the confirmation
-  prompt happen up front in the terminal, before the TUI (or headless run) even starts. To
-  discover which model ids your workspace can fight, see
-  [`refresh-models`](#refresh-models) (`--show` lists them grouped by provider).
-- **Preflight output.** First, exact call counts:
+**The model pool is the YAML's `candidates` list, verbatim.** Preflight and the confirmation
+prompt happen up front in the terminal, before the TUI (or headless run) even starts. To
+discover which model ids your workspace can fight, see
+[`refresh-catalog`](#refresh-catalog) (`--show` lists them grouped by provider).
 
-  ```text
-  preflight: {matches} matches × {rounds_per_match} rounds → {model_streams} model streams + {judge_calls} judge calls[ + {probe_calls} probe calls]
-  ```
+**Preflight: call counts.** The first line is exact arithmetic, not an estimate:
 
-  computed by `preflight.call_counts`: `matches = C(len(candidates), 2)`,
-  `rounds_per_match = min(match.max_rounds, len(prompts))`, `model_streams = matches ×
-  rounds × 2`, `judge_calls = matches × rounds × len(judges) × 2`. Next, a spend ceiling:
+```text
+preflight: {matches} matches × {rounds_per_match} rounds → {model_streams} model streams + {judge_calls} judge calls[ + {probe_calls} probe calls]
+```
 
-  ```text
-  spend ceiling ≈ ${total} (models ${m} + judges ${j}[ + probe ${p}]; every output cap fully hit, live runs land under)
-  ```
+Every pair of candidates plays one match, each match runs `min(--rounds, number of prompts)`
+rounds, every round streams both contestants once and is scored by each judge twice (once
+per seat order).
 
-  computed by `preflight.cost_ceiling` from those exact counts, the config's output caps
-  (`candidate_max_tokens` / per-candidate `max_tokens`, `judge_max_tokens`), and per-model prices
-  fetched live from the router's Model Garden catalog (`providers.models_list.fetch_price_map`).
-  It is an upper bound, the number the run cannot exceed, not a prediction; the judge-input
-  term assumes both responses hit the model output cap. Models missing from the catalog are
-  excluded and listed on a `⚠ no catalog price for: …` line; if pricing is entirely
-  unreachable that warning lists the whole pool and the spend-ceiling line is the one
-  skipped (pricing never blocks the run). The ceiling is also recorded in the run
-  manifest under `preflight.cost_ceiling`. If `preflight.thinking_probe`
-  is enabled (default `true`), a `thinking probe…` line follows, then one line per candidate that
-  either failed the probe (`⚠ {name} ({model}): probe failed, {error}`) or thinks despite
-  being configured off (`🧠 {name} ({model}): thinks despite config ({reasoning_tokens}
-  reasoning tok), ranking will be footnoted`). If no candidate thinks despite being configured
-  off, a `pool is thinking-clean ✓` line prints (probe-failure warnings, if any, still appear
-  above it).
-- **Confirmation.** Unless `--yes`/`-y` is given, the CLI prompts `Proceed?`
-  (`click.confirm(..., abort=True)`); declining aborts before any battle or judge calls
-  (the thinking probe, when enabled, has already made its one probe stream per model).
-  When stdin is not an interactive terminal the run errors out with a
-  "pass `--yes`" hint instead of prompting.
-- **Streams.** Preflight narration, warnings, per-match lines, and the progress bar print to
-  stderr; the final standings, token totals, battle-log path, and report-page path print to
-  stdout. `1>results.txt` captures only the results; `2>/dev/null` silences the chatter.
-- **Output.** Every judged round is appended to `--output` (`battles.jsonl`, schema v3) as the
-  run proceeds, live-run or headless alike.
+**Preflight: the RUN PLAN table** (see the expected output below). One row per candidate and
+judge (call count, catalog price in $/M in / $/M out, worst-case cost), closing with a bold
+`MAXIMUM SPEND ≤ $X` row.
+
+- The total is an **upper bound**, not a prediction: it assumes every response hits its
+  output token cap. Prices come from the router's Model Garden catalog.
+- **Unpriced models** (normal for self-hosted) keep their row with `n/a` prices and a `?`
+  cost; the total renders `≤ $X + ?` with a `no catalog price (self-hosted or unpriced): …`
+  note below. If pricing is entirely unreachable the table is skipped. Pricing never blocks
+  the run.
+- **`--quiet`** suppresses the table but a one-line `maximum spend ≤ $X (worst case)` still
+  prints, cost survives quiet mode.
+- The ceiling and its per-row breakdown land in the run manifest under
+  `preflight.cost_ceiling`.
+
+**Preflight: the thinking probe** (`preflight.thinking_probe`, default `true`). A
+`thinking probe…` line, then one line per candidate that failed
+(`⚠ {name} ({model}): probe failed, {error}`) or thinks despite being configured off
+(`🧠 {name} ({model}): thinks despite config …, ranking will be footnoted`). No surprises →
+`pool is thinking-clean ✓`.
+
+**Confirmation.** Unless `--yes`/`-y` is given, the CLI prompts `Proceed (spends up to $X)?`,
+so the dollar bound sits in the approval question itself (plain `Proceed?` when nothing could
+be priced). Declining aborts before any battle or judge calls (the thinking probe, when
+enabled, has already made its one probe stream per model). When stdin is not an interactive
+terminal the run errors out with a "pass `--yes`" hint instead of prompting.
+
+**Streams.** Preflight narration, warnings, per-match lines, and the progress bar print to
+stderr; the Final Results, token totals, battle-log path, and report-page path print to
+stdout. `1>results.txt` captures only the results; `2>/dev/null` silences the chatter.
+
+**Output.** Every judged round is appended to `--output` (`battles.jsonl`, schema v3) as the
+run proceeds, live-run or headless alike.
 
 **Examples:**
 
 ```bash
-# Fight the shipped pool (orq_arena.yaml), confirm the preflight interactively
-uv run orq-arena run
+# Fight the shipped pool, confirm the preflight interactively
+orq-arena run --config orq_arena.yaml
 
 # Same, skipping the confirmation prompt
-uv run orq-arena run --yes
+orq-arena run --config orq_arena.yaml --yes
 
 # CI/cron -- headless is the default; matches run in parallel (headless_concurrency)
-uv run orq-arena run --yes
+orq-arena run --config orq_arena.yaml --yes
 
 # Custom prompt set and output path, with an alternate pool
-uv run orq-arena run --config configs/reasoning_arena.yaml --prompts prompts/starter.jsonl --output reasoning_battles.jsonl
+orq-arena run --config configs/reasoning_arena.yaml --prompts prompts/starter.jsonl --output reasoning_battles.jsonl
 ```
 
 **Expected output** (headless, piped, both streams shown interleaved; everything above
-`FINAL STANDINGS` is stderr; reconstructed from the committed
+`Final Results` is stderr; reconstructed from the committed
 [`examples/quickstart`](https://github.com/orq-ai/orq-arena/tree/master/examples/quickstart) run's
-recorded manifest and log, its 4-model pool against the default judge trio):
+recorded manifest and log, its 8-model pool against the default judge trio):
 
 ```text
-$ uv run orq-arena run --config examples/quickstart/config.yaml -y --no-open \
+$ orq-arena run --config examples/quickstart/config.yaml -y \
     --output examples/quickstart/battles.jsonl
-preflight: 6 matches × 5 rounds → 60 model streams + 180 judge calls + 4 probe calls
+preflight: 28 matches × 5 rounds → 280 model streams + 840 judge calls + 8 probe calls
   ⚖ judge/contestant family overlap: anthropic/claude-haiku-4-5-20251001, google/gemini-2.5-flash-lite, openai/gpt-5.4-nano. Self-preference bias is not corrected by seat swapping; prefer judges from families outside the pool.
-  spend ceiling ≈ $2.31 (models $1.11 + judges $1.16 + probe $0.04; every output cap fully hit, live runs land under)
+                                   RUN PLAN
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━┓
+┃ Model                                 ┃ Calls ┃ $/M in ┃ $/M out ┃ Ceiling  ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━┩
+│ Candidates                            │       │        │         │          │
+│   anthropic/claude-opus-4-8           │    35 │   5.00 │   25.00 │   $1.80  │
+│   anthropic/claude-sonnet-4-6         │    35 │   3.00 │   15.00 │   $1.08  │
+│   openai/gpt-5.4                      │    35 │   2.50 │   15.00 │   $1.08  │
+│   openai/gpt-5.4-mini                 │    35 │   0.75 │    4.50 │   $0.32  │
+│   google/gemini-3.1-pro-preview       │    35 │   2.00 │   12.00 │   $0.86  │
+│   google/gemini-3.5-flash             │    35 │   1.50 │    9.00 │   $0.65  │
+│   deepseek/deepseek-chat              │    35 │   0.14 │    0.28 │   $0.02  │
+│   mistral/mistral-medium-2604         │    35 │   1.50 │    7.50 │   $0.54  │
+│ Judges (×2 seat orders)               │       │        │         │          │
+│   anthropic/claude-haiku-4-5-20251001 │   280 │   1.00 │    5.00 │   $4.11  │
+│   google/gemini-2.5-flash-lite        │   280 │   0.10 │    0.40 │   $0.35  │
+│   openai/gpt-5.4-nano                 │   280 │   0.20 │    1.25 │   $0.97  │
+│ Thinking probe                        │     8 │        │         │   $0.09  │
+├───────────────────────────────────────┼───────┼────────┼─────────┼──────────┤
+│ MAXIMUM SPEND                         │       │        │         │ ≤ $11.87 │
+└───────────────────────────────────────┴───────┴────────┴─────────┴──────────┘
+     worst case: every response maxed out at its token cap; typical runs
+         cost noticeably less. Exact spend is reported after the run.
 thinking probe…
   pool is thinking-clean ✓
-M1 🤝 draw
-match 1/6 done
-M2 gemini-3.5-flash beats gpt-5.4-mini
-match 2/6 done
-M4 claude-sonnet-4-6 beats mistral-medium-2604
-match 3/6 done
-M3 gpt-5.4-mini beats mistral-medium-2604
-match 4/6 done
-M5 claude-sonnet-4-6 beats gpt-5.4-mini
-match 5/6 done
-M6 gemini-3.5-flash beats mistral-medium-2604
-match 6/6 done
-      FINAL STANDINGS
-┏━━━┳━━━━━━━━━━━━━━━━━━━━━┳━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━┓
-┃ # ┃ Model               ┃ ELO  ┃ 95% CI    ┃ len-ctrl ┃
-┡━━━╇━━━━━━━━━━━━━━━━━━━━━╇━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━┩
-│ 1 │ gemini-3.5-flash    │ 1572 │ 1259–5000 │ 1301     │
-│ 2 │ claude-sonnet-4-6   │ 1572 │ 1238–4803 │ 1371     │
-│ 3 │ gpt-5.4-mini        │ 489  │ -3000–1810│ 717      │
-│ 4 │ mistral-medium-2604 │ 367  │ -3000–1686│ 611      │
-└───┴─────────────────────┴──────┴───────────┴──────────┘
-mean inter-judge agreement: 95%
-style control: jury length coefficient +2.33 (leaned longer); len-ctrl column prices it out
-tokens, models 1,728 in / 51,324 out · jury 349,228 in / 23,643 out
+M1 round 1: inconclusive
+M1 round 1: A
+M1 round 2: inconclusive
+M1 round 2: B
+M1 round 3: A
+M1 gpt-5.4-mini beats gemini-3.1-pro-preview
+match 1/28 done
+M2 round 1: A
+… (one line per judged round; A/B are the round's seat labels; an
+inconclusive round redraws a prompt, so round numbers can repeat)
+M2 gpt-5.4 beats deepseek-chat
+match 2/28 done
+M3 🤝 draw
+match 3/28 done
+…
+M28 🤝 draw
+match 28/28 done
+
+🏆 gemini-3.5-flash leads, but claude-sonnet-4-6 is statistically tied (CIs
+overlap at 76 rated rounds; the report page has the tie-breakers)
+
+                    Final Results
+┏━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━┳━━━━━━━━━━━┳━━━━━━┓
+┃ # ┃ Model                  ┃ ELO  ┃ 95% CI    ┃ win% ┃
+┡━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━╇━━━━━━━━━━━╇━━━━━━┩
+│ 1 │ gemini-3.5-flash       │ 1374 │ 1218–2162 │ 86%  │
+│ 2 │ claude-sonnet-4-6      │ 1196 │ 1016–1897 │ 79%  │
+│ 3 │ gpt-5.4                │ 1174 │ 997–1893  │ 76%  │
+│ 4 │ claude-opus-4-8        │ 1072 │ 905–1737  │ 61%  │
+│ 5 │ deepseek-chat          │ 1016 │ 870–1627  │ 52%  │
+│ 6 │ mistral-medium-2604    │ 901  │ 665–1531  │ 40%  │
+│ 7 │ gpt-5.4-mini           │ 805  │ 421–1410  │ 27%  │
+│ 8 │ gemini-3.1-pro-preview │ 463  │ -3000–603 │ 5%   │
+└───┴────────────────────────┴──────┴───────────┴──────┘
+
+jury: 90% mean agreement · leaned longer (+3.44); the report prices it out
+rounds: 76 rated · 0 voided
+tokens, models 8,350 in / 220,700 out · jury 1,481,428 in / 107,697 out
+
 battle log → examples/quickstart/battles.jsonl
 report page → examples/quickstart/battles.report.html
 ```
 
-On a terminal (not piped) the per-match lines print above a pinned progress bar
-(spinner, rounds M-of-N, elapsed, current leader), and without `-y` the run pauses
-at `Proceed? [y/N]` after the preflight, before any battle or judge call.
+On a terminal (not piped) the per-round heartbeat lines are replaced by a pinned
+progress bar (spinner, rounds M-of-N, elapsed, current leader) that advances once per
+round, with the per-match lines printing above it; without `-y` the run pauses at
+`Proceed (spends up to $11.87)? [y/N]` after the preflight, before any battle or
+judge call.
 
 See [Match rules, gateway, candidates, and judges](configuration.md) for every YAML key this
 command reads, and [methodology.md](methodology.md) for how matches are scheduled and scored.
 
 ---
 
-## `demo`
+## The `--tui` live show
 
-Replay a recorded tournament from a fixture file, no API calls, no key required. `demo`
-renders through the Textual TUI, so it needs the optional `[tui]` extra (`uv sync --extra tui`);
-without it the command prints a friendly install hint instead of a traceback.
+`orq-arena run --tui` opens on the **RUN PLAN screen**: the branding, the prompt set and its
+size, and the full per-model cost table (every candidate and judge listed, worst-case ceiling
+per row), ending in the run's one confirmation, `ENTER fight (spends up to $X)` / `Q quit`.
+Nothing has been spent when it renders except the tiny thinking-probe calls; `-y` skips the
+screen and starts the fight directly. On endpoints without catalog pricing the table keeps
+its call counts and the ceiling reads `unavailable`.
 
-```text
-orq-arena demo [--fixture PATH] [--config PATH]
-```
+![RUN PLAN screen: prompts block, per-model cost table, consent bar](assets/run-plan.svg)
 
-| Flag | Default | Effect |
-|---|---|---|
-| `--fixture PATH` | `fixtures/demo_tournament.json` | Recorded arena events to replay. |
-| `--config PATH` | `orq_arena.yaml` | Used only for its rules/candidate labels in the replay, no live calls are made, so `ORQ_API_KEY` is not required. |
+The run ends on the **Final Results screen**: ELO with its 95% CI and len-ctrl rating per
+model, the per-category slices, per-judge behaviour (A/B lean, flip rate, tie rate, Fleiss'
+κ), and the win grid.
 
-**Behavior notes:**
+![Final Results: ELO ladder with CIs and len-ctrl, per-judge behaviour, win grid](assets/leaderboard.svg)
 
-- **Zero-key replay.** Loads a JSON fixture of previously recorded arena events and re-emits
-  them through the same TUI (`ArenaApp(..., live=False, fixture=fixture_path)`), so the show
-  renders identically to a live run with no network calls and no `ORQ_API_KEY` needed.
-- There is no `--prompts` flag on this command, `demo` runs with `prompts=[]`; every prompt
-  shown comes from the fixture's recorded events, not from a prompts file.
-
-**Examples:**
-
-```bash
-uv run orq-arena demo
-uv run orq-arena demo --fixture fixtures/demo_tournament.json --config orq_arena.yaml
-```
-
-**From the final leaderboard** (live TUI runs and `demo` alike): `B` opens the battle browser,
-paging through every judged round with the prompt, both responses, and per-judge votes with
-flip badges; `s` saves an SVG screenshot; `q` quits.
+**From the final leaderboard**: `B` opens the battle browser, paging through every judged
+round with the prompt, both responses, and per-judge votes with flip badges; `s` saves an
+SVG screenshot; `q` quits.
 
 ![Battle browser: prompt, both responses, per-judge votes with flip badges](assets/battle-browser.svg)
 
 ---
 
-## `list-models`
+## `pool`
 
 Print the configured candidate pool, no API calls, no key required.
 
 ```text
-orq-arena list-models [--config PATH] [--json]
+orq-arena pool --config PATH [--json]
 ```
 
 | Flag | Default | Effect |
 |---|---|---|
-| `--config PATH` | `orq_arena.yaml` | YAML config whose `candidates` are printed. |
+| `--config PATH` | (required) | YAML config whose `candidates` are printed. |
 | `--json` | off | Print the pool as a JSON array of `{seed, name, model_id}` objects instead of the table. |
 
 **Behavior notes:**
 
-- Prints a fixed-width table, seed number, `name` (falls back to the model's short name,
-  see [configuration.md](configuration.md#candidates-the-model-pool)), and the full `model_id`, in
-  config order, 1-indexed. Format string: `f"{'Seed':<5} {'Name':<26} Model ID"` for the
-  header, `f"{i:<5} {w.name:<26} {w.model_id}"` per row.
+- Prints a fixed-width table: seed number, `name` (falls back to the model's short name,
+  see [configuration.md](configuration.md#candidates-the-model-pool)), and the full `model_id`,
+  in config order, 1-indexed.
 
 **Expected output**, against the shipped `orq_arena.yaml` (8 candidates, none with a custom `name`):
 
 ```bash
-uv run orq-arena list-models
+orq-arena pool --config orq_arena.yaml
 ```
 
 ```text
@@ -331,7 +338,7 @@ Seed  Name                       Model ID
 ```
 
 ```bash
-uv run orq-arena list-models --config configs/reasoning_arena.yaml
+orq-arena pool --config configs/reasoning_arena.yaml
 ```
 
 ---
@@ -354,48 +361,38 @@ orq-arena rejudge --compare REPORT_JSON [--compare REPORT_JSON ...]
 | `log_path` (positional) | `battles.jsonl` | Recorded battle log to re-judge (schema v3 JSONL). Optional, omit it to re-judge the default log in the current directory. Ignored in `--compare` mode. |
 | `--judge MODEL_ID` | none, **required unless `--compare`, repeatable** | Router model id for the new panel; pass `--judge` multiple times for a multi-judge panel. Mutually exclusive with `--compare`. |
 | `--compare REPORT_JSON` | none, **repeatable** | Switches to compare mode: tabulate the given saved rejudge report JSONs side by side (see [`rejudge --compare`](#rejudge-compare)). Mutually exclusive with `--judge`; makes no API calls. |
-| `--criteria TEXT` | `cfg.criteria` from `--config` | Override the judging criteria for this rejudge only, doesn't touch the YAML file. |
+| `--criteria TEXT` | `criteria` from `--config` | Override the judging criteria for this rejudge only, doesn't touch the YAML file. |
 | `--config PATH` | `orq_arena.yaml` | Supplies `gateway`, and (unless overridden) `criteria`, `replacement_judges`, and `min_successful_judges`. |
 | `--output PATH` | none, result only printed | Write the re-judged rounds to this JSONL path. |
 | `--report-json PATH` | none, result only printed | Write the run summary as JSON. |
-| `--concurrency N` | `4` | Max concurrent judge calls, via `asyncio.Semaphore(concurrency)`. |
+| `--concurrency N` | `4` | Max concurrent judge calls. |
 
 **Behavior notes:**
 
-- **Loading.** `load_records(log_path)` parses every line as a `BattleRecord` and keeps only
-  rows with no `error` and both `response_a`/`response_b` present, voided or errored rounds
-  are silently skipped. If nothing qualifies, the command aborts cleanly with
-  `no judgeable rounds in {log_path}` (`click.ClickException`, exit code 1).
-- **Self-judge exclusion, resolved against the run's own manifest.** For each contestant
-  pair, any `--judge` that *is* one of the contestants is dropped from that pair's panel, the
-  same rule live matches apply, re-evaluated per pair since one rejudge panel is fixed but
-  contestants vary round to round. Records store short names, so contestants are resolved to
-  full model ids using the `<log>.run.json` manifest's candidate pool, the pool the run actually
-  used — never the current YAML, which may have drifted since. Without a manifest the CLI
-  warns and falls back to `--config`; a contestant unresolvable either way is excluded on its
-  short name, the safe direction. If exclusion empties the panel for a pair, `rejudge_run`
-  raises a plain `ValueError`:
-  `every judge is a contestant in {sorted(pair)}`: this is **not** a `ClickException`, so it
-  surfaces as a full Python traceback (unlike the clean `Error: ...` message for the
-  empty-log case above). Add a neutral model to `--judge` to fix it. `replacement_judges` from
-  the config are filtered the same way (dropped to `None` if that empties the list too).
-- **Quorum clamp to panel size.** Each pair's jury is built with
-  `min_successful_judges=min(cfg.min_successful_judges, len(panel))`: the YAML's quorum
-  (sized for the original run's, typically larger, panel) is clamped down per pair so a
-  legitimate 1- or 2-judge rejudge panel is never rejected by a quorum meant for a bigger jury.
-- One `llm_jury_pairwise` comparator is built and cached per unique contestant pair
-  (`frozenset`), not per round, repeated pairs reuse the same comparator instance.
-- **Report contents**, printed by `render_result`:
+- **Which rounds are re-judged.** Only complete rounds: rows with both responses present
+  and no recorded error. Voided or errored rounds are silently skipped. If nothing
+  qualifies, the command exits with `no judgeable rounds in {log_path}`.
+- **Self-judge exclusion.** For each contestant pair, any `--judge` that *is* one of the
+  contestants is dropped from that pair's panel, the same rule live matches apply.
+  Contestants are matched against the pool recorded in the `<log>.run.json` manifest, the
+  pool the run actually used, never the current YAML, which may have drifted since.
+  Without a manifest the CLI warns and falls back to `--config`. If exclusion leaves a
+  pair with no judges at all, the command errors with
+  `every judge is a contestant in {pair}`; add a neutral model to `--judge` to fix it.
+- **Small panels are fine.** The YAML's `min_successful_judges` quorum (sized for the
+  original run's, typically larger, panel) is clamped down to the rejudge panel's size, so
+  a legitimate 1- or 2-judge rejudge is never rejected by a quorum meant for a bigger jury.
+- **Report contents:**
   - `re-judged {N} rounds, {M} verdicts changed` (vs. the recorded `majority_verdict`)
   - Spearman rank correlation between the old and new Bradley-Terry rankings, labeled
     `judge-robust ranking` at `>= 0.8`, otherwise `ranking is panel-sensitive; treat with care`
   - `old ranking: A > B > C ...` and `new ranking: ...` strings
   - a **"new jury behaviour"** table, one row per judge: `A-lean`, `B-lean`, `flip rate`
     (position bias, how often a judge's verdict flips depending on seat order), `tie rate`
-  - `mean inter-judge agreement`, if the underlying evaluatorq report provides it
+  - `mean inter-judge agreement`, when the panel has more than one judge
 - **`--output`** writes one JSONL row per input record with `judge_votes`, `majority_verdict`,
-  and `winner` replaced by the new panel's verdict, every other field (prompt, both
-  responses, tokens, timings) is copied through unchanged via `model_copy`.
+  and `winner` replaced by the new panel's verdict; every other field (prompt, both
+  responses, tokens, timings) is copied through unchanged.
 - **`--report-json`** writes:
 
   ```json
@@ -413,27 +410,27 @@ orq-arena rejudge --compare REPORT_JSON [--compare REPORT_JSON ...]
 
 ```bash
 # Single-judge rejudge of the default log against the default config
-uv run orq-arena rejudge battles.jsonl --judge mistral/mistral-small-2603
+orq-arena rejudge battles.jsonl --judge mistral/mistral-small-2603
 
 # Multi-judge panel
-uv run orq-arena rejudge battles.jsonl --judge mistral/mistral-small-2603 --judge anthropic/claude-haiku-4-5-20251001
+orq-arena rejudge battles.jsonl --judge mistral/mistral-small-2603 --judge anthropic/claude-haiku-4-5-20251001
 
 # Override criteria, write both the rejudged log and a JSON summary
-uv run orq-arena rejudge battles.jsonl \
+orq-arena rejudge battles.jsonl \
   --judge mistral/mistral-small-2603 \
   --criteria "Correctness only; ignore style." \
   --output battles.rejudged.jsonl \
   --report-json rejudge_report.json
 
 # Higher concurrency against a non-default log
-uv run orq-arena rejudge my_battles.jsonl --judge openai/gpt-5.4-nano --concurrency 8
+orq-arena rejudge my_battles.jsonl --judge openai/gpt-5.4-nano --concurrency 8
 ```
 
 **Expected output** (illustrative; the table shape and labels are exact, the numbers are
 from a single-judge rejudge of the committed example run):
 
 ```text
-$ uv run orq-arena rejudge examples/quickstart/battles.jsonl --judge openai/gpt-5.1
+$ orq-arena rejudge examples/quickstart/battles.jsonl --judge openai/gpt-5.1
 
 re-judged 30 rounds, 6 verdicts changed
 rank correlation (Spearman) old→new: 0.80 , judge-robust ranking
@@ -477,10 +474,10 @@ jury?), inconclusive rate (decisiveness), mean agreement, worst per-judge flip r
 which jury is *right* needs gold pairs or a human anchor (see [`annotate`](#annotate) and [`anchor`](#anchor)).
 
 ```bash
-uv run orq-arena rejudge battles.jsonl --judge openai/gpt-5.1 --report-json solo.json
-uv run orq-arena rejudge battles.jsonl --judge anthropic/claude-haiku-4-5-20251001 \
+orq-arena rejudge battles.jsonl --judge openai/gpt-5.1 --report-json solo.json
+orq-arena rejudge battles.jsonl --judge anthropic/claude-haiku-4-5-20251001 \
   --judge openai/gpt-5.1 --report-json panel.json
-uv run orq-arena rejudge --compare solo.json --compare panel.json
+orq-arena rejudge --compare solo.json --compare panel.json
 ```
 
 **Expected output** (the report JSONs carry the numbers; the compare step itself makes no API calls):
@@ -526,15 +523,15 @@ one catalog read, never completion spend), and the
 manifest hashes for reproducibility.
 
 ```bash
-uv run orq-arena report outputs/g1/battles.jsonl
-uv run orq-arena report battles.jsonl --output /tmp/run.html
+orq-arena report outputs/g1/battles.jsonl
+orq-arena report battles.jsonl --output /tmp/run.html
 ```
 
 **Expected output** (one line; without a key the page's cost section is simply omitted,
 nothing warns or fails):
 
 ```text
-$ uv run orq-arena report examples/quickstart/battles.jsonl
+$ orq-arena report examples/quickstart/battles.jsonl
 report page -> examples/quickstart/battles.report.html
 ```
 
@@ -581,18 +578,18 @@ un-flipped to the canonical A/B frame, so the vote file is independent of presen
 order.
 
 ```bash
-uv run orq-arena annotate outputs/g1/battles.jsonl --sample 60
-uv run orq-arena annotate battles.jsonl --output rater2.html --seed 42
+orq-arena annotate outputs/g1/battles.jsonl --sample 60
+orq-arena annotate battles.jsonl --output rater2.html --seed 42
 # resume: only the rounds dana hasn't voted yet
-uv run orq-arena annotate battles.jsonl --exclude votes-dana.json --output dana-round2.html
+orq-arena annotate battles.jsonl --exclude votes-dana.json --output dana-round2.html
 # annotate your own run locally, votes save as you click, Ctrl-C prints the numbers
-uv run orq-arena annotate outputs/g1/battles.jsonl --serve --sample 60
+orq-arena annotate outputs/g1/battles.jsonl --serve --sample 60
 ```
 
 **Expected output** (file mode; `--serve` prints the local URL instead and holds until Ctrl-C):
 
 ```text
-$ uv run orq-arena annotate examples/quickstart/battles.jsonl --output annotate.html --sample 10
+$ orq-arena annotate examples/quickstart/battles.jsonl --output annotate.html --sample 10
 10 rounds -> annotate.html (blind; votes export as votes.json)
 ```
 
@@ -619,7 +616,7 @@ each rater pair's inter-annotator κ over their shared rounds. Votes whose key m
 round in the log are counted and warned, never crash.
 
 ```bash
-uv run orq-arena anchor outputs/g1/battles.jsonl votes-h1.json votes-h2.json
+orq-arena anchor outputs/g1/battles.jsonl votes-h1.json votes-h2.json
 ```
 
 **Expected output** (two raters over the committed example run):
@@ -635,12 +632,12 @@ uv run orq-arena anchor outputs/g1/battles.jsonl votes-h1.json votes-h2.json
 inter-annotator h1 × h2: κ=0.44 (moderate, 26 rounds)
 ```
 
-## `refresh-models`
+## `refresh-catalog`
 
-Re-fetch the workspace-enabled chat model list from orq.ai, bypassing the cache.
+Re-fetch the workspace-enabled chat model catalog from orq.ai, bypassing the cache.
 
 ```text
-orq-arena refresh-models [--config PATH] [--show/--no-show]
+orq-arena refresh-catalog [--config PATH] [--show/--no-show]
 ```
 
 | Flag | Default | Effect |
@@ -650,17 +647,11 @@ orq-arena refresh-models [--config PATH] [--show/--no-show]
 
 **Behavior notes:**
 
-- Calls `fetch_chat_models(cfg.gateway, force_refresh=True)`, bypassing the 24h TTL cache at
-  `~/.cache/orq-arena/models.json` and re-fetching the workspace-enabled, chat-capable catalog
-  live (`providers/models_list.py`). Use `--show` to discover model ids for your YAML's
-  `candidates` list; the same catalog also prices the preflight spend ceiling and the
-  report's cost section.
-- **Endpoint strategy**, in order: `GET {host}/v2/router/models` (the workspace-enabled
-  subset, primary source), falling back to `GET {host}/v3/router/models`, then the configured
-  `gateway.base_url` + `/models`. Results are narrowed to `type == "chat"` via `GET
-  {host}/v2/models` when that endpoint is reachable; non-chat ids (embeddings, TTS/STT, image,
-  rerank, moderation, etc.) are always stripped by a regex safety net regardless of whether
-  that type lookup succeeds.
+- Bypasses the 24h cache at `~/.cache/orq-arena/models.json` and re-fetches the
+  workspace-enabled, chat-capable catalog live from orq.ai. Non-chat models (embeddings,
+  TTS/STT, image, rerank, moderation, etc.) are filtered out. Use `--show` to discover
+  model ids for your YAML's `candidates` list; the same catalog also prices the preflight
+  spend ceiling and the report's cost section.
 - **Without `ORQ_API_KEY`:** the command doesn't error, it skips the live fetch and falls
   back to any existing cache; with no cache either, it prints `0 models (source=fallback, ...)`
   (this command passes no fallback ids of its own).
@@ -687,16 +678,16 @@ orq-arena refresh-models [--config PATH] [--show/--no-show]
 **Examples:**
 
 ```bash
-uv run orq-arena refresh-models
-uv run orq-arena refresh-models --show
-uv run orq-arena refresh-models --config configs/reasoning_arena.yaml --show
+orq-arena refresh-catalog
+orq-arena refresh-catalog --show
+orq-arena refresh-catalog --config configs/reasoning_arena.yaml --show
 ```
 
 **Expected output** (here keyless, so the live fetch is skipped and the cache re-reported;
 with a key, `source=live` and `age=0s`):
 
 ```text
-$ uv run orq-arena refresh-models
+$ orq-arena refresh-catalog
 137 models (source=cache, age=4528s, cache=/Users/you/.cache/orq-arena/models.json)
 ```
 
@@ -706,18 +697,21 @@ $ uv run orq-arena refresh-models
 
 ### See it work with zero setup
 
+No key yet? Open the committed example run's report,
+[`examples/quickstart/battles.report.html`](https://github.com/orq-ai/orq-arena/tree/master/examples/quickstart),
+or regenerate it keyless from the committed log:
+
 ```bash
-uv run orq-arena demo
+orq-arena report examples/quickstart/battles.jsonl
 ```
 
-No `ORQ_API_KEY`, no network calls, replays `fixtures/demo_tournament.json` through the real
-TUI.
+Then get a key: https://docs.orq.ai/docs/ai-studio/organization/api-keys.
 
 ### First live run
 
 ```bash
 cp .env.example .env   # fill in ORQ_API_KEY
-uv run orq-arena run
+orq-arena run --config orq_arena.yaml
 ```
 
 Fights the shipped `orq_arena.yaml` pool headless; edit its `candidates` list to change the
@@ -726,7 +720,7 @@ pool. Confirm the preflight to spend tokens.
 ### Run for CI/cron
 
 ```bash
-uv run orq-arena run --yes
+orq-arena run --config orq_arena.yaml --yes
 ```
 
 `--yes` skips the confirmation prompt, safe for a non-interactive shell; plain line-per-match
@@ -735,7 +729,7 @@ output on pipes.
 ### Compare two juries on the same recorded run
 
 ```bash
-uv run orq-arena rejudge battles.jsonl --judge mistral/mistral-small-2603 --judge anthropic/claude-haiku-4-5-20251001
+orq-arena rejudge battles.jsonl --judge mistral/mistral-small-2603 --judge anthropic/claude-haiku-4-5-20251001
 ```
 
 Costs judge tokens only, the responses already in `battles.jsonl` are reused as-is. Prints
@@ -744,7 +738,7 @@ the changed-verdict count and the Spearman rank correlation against the original
 ### Discover model ids for your model pool
 
 ```bash
-uv run orq-arena refresh-models --show
+orq-arena refresh-catalog --show
 ```
 
 Forces a live re-fetch (bypassing the 24h cache) and lists every workspace-enabled chat model
@@ -759,16 +753,16 @@ Everything you need to run `orq-arena` unattended or pipe its output:
 - **Confirmation**: `run` requires `--yes`/`-y` when stdin is not a terminal; without it the
   command fails immediately with that hint instead of hanging on a prompt.
 - **Streams**: results on stdout, messaging (preflight narration, warnings, progress) on
-  stderr. `orq-arena run -y 1>results.txt 2>run.log` separates them cleanly.
+  stderr. `orq-arena run --config orq_arena.yaml -y 1>results.txt 2>run.log` separates them cleanly.
 - **Quiet**: `run --quiet`/`-q` drops narration and progress; warnings and the final
   standings still print.
 - **No animations off-TTY**: when stderr is not a terminal the progress bar is replaced by
   plain line-per-match output, so CI logs stay readable. The HTML report never auto-opens
   off-TTY or when `CI` is set.
-- **Machine-readable output**: `list-models --json` and `anchor --json` print JSON to stdout;
+- **Machine-readable output**: `pool --json` and `anchor --json` print JSON to stdout;
   `rejudge --report-json <file>` writes its summary as JSON.
-- **Color**: output is colored via Rich, which honors the standard `NO_COLOR` and
-  `FORCE_COLOR` environment variables and disables color on non-TTY streams automatically.
+- **Color**: output honors the standard `NO_COLOR` and `FORCE_COLOR` environment
+  variables and disables color on non-TTY streams automatically.
 - **Exit codes**: `0` success, `1` any runtime error (printed as `Error: …` on stderr),
   `2` usage error (unknown flag, bad value).
 

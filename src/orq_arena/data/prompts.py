@@ -2,7 +2,9 @@
 
 JSONL format: one JSON object per line with at least a ``prompt`` key;
 optional ``category`` feeds the per-category ELO slices (untagged rows land
-in ``"general"``).
+in ``"general"``). Any other keys ride along as ``metadata`` and are carried
+onto every battle record for that prompt, so rounds in ``battles.jsonl`` can
+be joined back to the source data.
 
 ``orq:<dataset_id>`` instead of a file path pulls the datapoints of an
 orq.ai Dataset via the orq-python SDK (same API key as the gateway): the
@@ -14,21 +16,25 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
+
+from ..config import ORQ_API_KEY_ENV
 
 
 @dataclass(frozen=True)
 class PromptItem:
     text: str
     category: str = "general"
+    # Opaque pass-through: never sliced or judged on, only carried to the log.
+    metadata: dict = field(default_factory=dict)
 
 
-def load_prompts(path: str | Path, api_key_env: str = "ORQ_API_KEY") -> list[PromptItem]:
+def load_prompts(path: str | Path) -> list[PromptItem]:
     """Return the prompts in file (or dataset) order."""
     if str(path).startswith("orq:"):
-        return _load_orq_dataset(str(path)[len("orq:"):], api_key_env)
+        return _load_orq_dataset(str(path)[len("orq:") :])
     p = Path(path)
     out: list[PromptItem] = []
     with p.open(encoding="utf-8") as fh:
@@ -40,7 +46,10 @@ def load_prompts(path: str | Path, api_key_env: str = "ORQ_API_KEY") -> list[Pro
             text = row.get("prompt") or row.get("text")
             if not text:
                 continue
-            out.append(PromptItem(text=text, category=row.get("category") or "general"))
+            meta = {k: v for k, v in row.items() if k not in ("prompt", "text", "category")}
+            out.append(
+                PromptItem(text=text, category=row.get("category") or "general", metadata=meta)
+            )
     return out
 
 
@@ -73,14 +82,17 @@ def datapoint_to_prompt(inputs: dict | None, messages: list | None) -> PromptIte
     if not text:
         return None
     for key, value in (inputs or {}).items():
-        # lambda replacement: dataset values are literals, not regex templates
-        # (a backslash in code/LaTeX inputs must not become a group reference)
-        text = re.sub(r"\{\{\s*" + re.escape(str(key)) + r"\s*\}\}",
-                      lambda _m, v=str(value): v, text)
+        text = _fill_placeholder(text, str(key), str(value))
     return PromptItem(text=text)
 
 
-def orq_dataset_meta(dataset_id: str, api_key_env: str = "ORQ_API_KEY") -> dict:
+def _fill_placeholder(text: str, key: str, value: str) -> str:
+    # lambda replacement: dataset values are literals, not regex templates
+    # (a backslash in code/LaTeX inputs must not become a group reference)
+    return re.sub(r"\{\{\s*" + re.escape(key) + r"\s*\}\}", lambda _m: value, text)
+
+
+def orq_dataset_meta(dataset_id: str) -> dict:
     """Report metadata for an orq.ai Dataset: id, display name, studio URL.
 
     The name fetch is best-effort; on any failure the id doubles as the name
@@ -92,7 +104,7 @@ def orq_dataset_meta(dataset_id: str, api_key_env: str = "ORQ_API_KEY") -> dict:
     try:
         from orq_ai_sdk import Orq
 
-        with Orq(api_key=os.environ.get(api_key_env, "")) as client:
+        with Orq(api_key=os.environ.get(ORQ_API_KEY_ENV, "")) as client:
             name = client.datasets.retrieve(dataset_id=dataset_id).display_name
     except Exception:
         pass
@@ -103,15 +115,15 @@ def orq_dataset_meta(dataset_id: str, api_key_env: str = "ORQ_API_KEY") -> dict:
     }
 
 
-def _load_orq_dataset(dataset_id: str, api_key_env: str) -> list[PromptItem]:
+def _load_orq_dataset(dataset_id: str) -> list[PromptItem]:
     import os
 
     from orq_ai_sdk import Orq
 
-    api_key = os.environ.get(api_key_env, "")
+    api_key = os.environ.get(ORQ_API_KEY_ENV, "")
     if not api_key:
         raise RuntimeError(
-            f"{api_key_env} is not set; it is needed to fetch dataset {dataset_id!r}."
+            f"{ORQ_API_KEY_ENV} is not set; it is needed to fetch dataset {dataset_id!r}."
         )
     out: list[PromptItem] = []
     skipped = 0
@@ -127,7 +139,8 @@ def _load_orq_dataset(dataset_id: str, api_key_env: str) -> list[PromptItem]:
                     getattr(dp, "inputs", None), getattr(dp, "messages", None)
                 )
                 if item:
-                    out.append(item)
+                    dp_id = getattr(dp, "id", None)
+                    out.append(replace(item, metadata={"datapoint_id": dp_id} if dp_id else {}))
                 else:
                     skipped += 1
             if not rows or not getattr(page, "has_more", False):

@@ -11,8 +11,10 @@ PANEL = ["j1", "j2", "j3"]
 
 
 def test_perfect_agreement_is_kappa_one():
-    rounds = [_round([("j1", "A"), ("j2", "A"), ("j3", "A")]),
-              _round([("j1", "B"), ("j2", "B"), ("j3", "B")])]
+    rounds = [
+        _round([("j1", "A"), ("j2", "A"), ("j3", "A")]),
+        _round([("j1", "B"), ("j2", "B"), ("j3", "B")]),
+    ]
     r = fleiss_kappa(rounds, PANEL)
     assert r["kappa"] == 1.0 and r["label"] == "almost perfect"
     assert r["rounds_used"] == 2
@@ -21,7 +23,7 @@ def test_perfect_agreement_is_kappa_one():
 def test_partial_panels_are_excluded_from_fleiss():
     rounds = [
         _round([("j1", "A"), ("j2", "A"), ("j3", "A")]),
-        _round([("j1", "A"), ("j2", None), ("j3", "A")]),   # abstention -> excluded
+        _round([("j1", "A"), ("j2", None), ("j3", "A")]),  # abstention -> excluded
         _round([("j1", "A"), ("j2", "A"), ("j3", "A")]),
     ]
     r = fleiss_kappa(rounds, PANEL)
@@ -29,9 +31,11 @@ def test_partial_panels_are_excluded_from_fleiss():
 
 
 def test_cohen_pairs_cover_covoted_rounds():
-    rounds = [_round([("j1", "A"), ("j2", "A"), ("j3", "B")]),
-              _round([("j1", "B"), ("j2", "B"), ("j3", "B")]),
-              _round([("j1", "tie"), ("j2", "tie"), ("j3", "tie")])]
+    rounds = [
+        _round([("j1", "A"), ("j2", "A"), ("j3", "B")]),
+        _round([("j1", "B"), ("j2", "B"), ("j3", "B")]),
+        _round([("j1", "tie"), ("j2", "tie"), ("j3", "tie")]),
+    ]
     pairs = cohen_kappa_pairs(rounds, PANEL)
     assert pairs["j1 × j2"]["kappa"] == 1.0
     assert pairs["j1 × j2"]["rounds"] == 3

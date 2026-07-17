@@ -29,8 +29,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# The live TUI show (orq-arena run --tui and orq-arena demo). The
-# benchmark, report, and rejudge work without it.
+# The live TUI show (orq-arena run --tui). The benchmark, report, and
+# rejudge work without it.
 tui = ["textual>=0.83"]
 
 [project.urls]
@@ -53,6 +53,19 @@ packages = ["src/orq_arena"]
 line-length = 100
 target-version = "py310"
 
+[tool.ruff.lint]
+extend-select = [
+    "I",  # import sorting
+    "B",  # bugbear
+    "UP", # pyupgrade
+]
+
+[tool.mypy]
+python_version = "3.10"
+files = ["src/orq_arena"]
+ignore_missing_imports = true
+check_untyped_defs = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
@@ -71,6 +84,7 @@ dev = [
     "textual>=0.83",
     "textual-dev>=1.6",
     "ruff>=0.6",
+    "mypy>=1.10",
     "pre-commit>=3.5",
 ]
 

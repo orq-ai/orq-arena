@@ -106,8 +106,11 @@ class BattleBrowserScreen(Screen):
             outcome = (
                 f"verdict [b]{r.majority_verdict}[/b] → winner [b]{escape(r.winner)}[/b]"
                 f"   [dim]tokens {r.tokens_a_out}/{r.tokens_b_out}"
-                + (f" · 🧠 {r.tokens_a_reasoning}/{r.tokens_b_reasoning}"
-                   if r.tokens_a_reasoning or r.tokens_b_reasoning else "")
+                + (
+                    f" · 🧠 {r.tokens_a_reasoning}/{r.tokens_b_reasoning}"
+                    if r.tokens_a_reasoning or r.tokens_b_reasoning
+                    else ""
+                )
                 + "[/dim]"
             )
         self._outcome.update(outcome)
