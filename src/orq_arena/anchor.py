@@ -14,11 +14,10 @@ import hashlib
 import json
 import random
 import re
+from collections.abc import Collection
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Collection
-
 
 from .analysis.kappa import cohen_kappa_pairs
 from .data.schemas import BattleRecord

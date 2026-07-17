@@ -196,7 +196,7 @@ async def consume_events(
                 elif isinstance(ev, MatchResolved):
                     progress.console.print(_match_line(ev))
                 elif isinstance(ev, StandingsUpdated):
-                    leader = max(ev.elo, key=ev.elo.get) if ev.elo else ""
+                    leader = max(ev.elo.items(), key=lambda kv: kv[1])[0] if ev.elo else ""
                     progress.update(
                         task,
                         description=(

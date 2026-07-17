@@ -11,7 +11,7 @@ is ``'A' | 'B' | 'tie' | 'inconclusive'``.
 
 from __future__ import annotations
 
-from typing import Any, Literal, Union
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -111,16 +111,16 @@ class TournamentEnded(BaseModel):
     report: dict[str, Any] = {}
 
 
-ArenaEvent = Union[
-    StandingsUpdated,
-    MatchStarted,
-    TurnPrompt,
-    ResponseChunk,
-    ThinkingChunk,
-    ResponseComplete,
-    JudgeVerdictEvent,
-    RoundVoided,
-    TurnResolved,
-    MatchResolved,
-    TournamentEnded,
-]
+ArenaEvent = (
+    StandingsUpdated
+    | MatchStarted
+    | TurnPrompt
+    | ResponseChunk
+    | ThinkingChunk
+    | ResponseComplete
+    | JudgeVerdictEvent
+    | RoundVoided
+    | TurnResolved
+    | MatchResolved
+    | TournamentEnded
+)

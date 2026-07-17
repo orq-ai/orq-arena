@@ -34,7 +34,7 @@ def load_records(path: str | Path) -> list[BattleRecord]:
 
 def outcomes_from_majorities(pairs: list[tuple[str, str]], majorities: list[str]) -> list[Outcome]:
     out: list[Outcome] = []
-    for (model_a, model_b), majority in zip(pairs, majorities):
+    for (model_a, model_b), majority in zip(pairs, majorities, strict=True):
         if majority == "A":
             out.append((model_a, model_b, "winner"))
         elif majority == "B":
@@ -165,7 +165,9 @@ async def rejudge_run(
     old_rank = _ranking(old_outcomes, models)
     new_rank = _ranking(new_outcomes, models)
 
-    changed = sum(1 for rec, c in zip(records, comparisons) if rec.majority_verdict != c.winner)
+    changed = sum(
+        1 for rec, c in zip(records, comparisons, strict=True) if rec.majority_verdict != c.winner
+    )
     return {
         "comparisons": comparisons,
         "report": build_report(comparisons),
@@ -181,7 +183,7 @@ def write_rejudged(
     path: str | Path, records: list[BattleRecord], comparisons: list[PairwiseComparison]
 ) -> None:
     with Path(path).open("w", encoding="utf-8") as fh:
-        for rec, c in zip(records, comparisons):
+        for rec, c in zip(records, comparisons, strict=True):
             row = rec.model_copy(
                 update={
                     "judge_votes": [v.model_dump() for v in c.votes],

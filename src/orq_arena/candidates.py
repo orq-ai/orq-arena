@@ -24,7 +24,7 @@ class CandidateSpec(BaseModel):
     max_tokens: int | None = None
 
     @model_validator(mode="after")
-    def _default_name(self) -> "CandidateSpec":
+    def _default_name(self) -> CandidateSpec:
         if not self.name:
             self.name = self.short_model
         return self

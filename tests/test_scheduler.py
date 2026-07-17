@@ -1,7 +1,7 @@
 """Round-robin scheduler + per-round outcome feed."""
 
-from orq_arena.data.schemas import BattleRecord
 from orq_arena.candidates import CandidateSpec
+from orq_arena.data.schemas import BattleRecord
 from orq_arena.tournament.driver import outcomes_from_records, round_robin_schedule
 
 

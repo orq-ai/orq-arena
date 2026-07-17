@@ -25,7 +25,10 @@ jobs:
         run: uv sync --frozen
 
       - name: Lint
-        run: uvx ruff check src/ tests/
+        run: uv run ruff check src/ tests/
+
+      - name: Type check
+        run: uv run mypy
 
       - name: Run unit tests
         run: uv run pytest -q

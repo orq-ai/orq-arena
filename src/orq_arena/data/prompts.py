@@ -17,10 +17,10 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field, replace
-
-from ..config import ORQ_API_KEY_ENV
 from pathlib import Path
 from typing import Any
+
+from ..config import ORQ_API_KEY_ENV
 
 
 @dataclass(frozen=True)
@@ -82,12 +82,14 @@ def datapoint_to_prompt(inputs: dict | None, messages: list | None) -> PromptIte
     if not text:
         return None
     for key, value in (inputs or {}).items():
-        # lambda replacement: dataset values are literals, not regex templates
-        # (a backslash in code/LaTeX inputs must not become a group reference)
-        text = re.sub(
-            r"\{\{\s*" + re.escape(str(key)) + r"\s*\}\}", lambda _m, v=str(value): v, text
-        )
+        text = _fill_placeholder(text, str(key), str(value))
     return PromptItem(text=text)
+
+
+def _fill_placeholder(text: str, key: str, value: str) -> str:
+    # lambda replacement: dataset values are literals, not regex templates
+    # (a backslash in code/LaTeX inputs must not become a group reference)
+    return re.sub(r"\{\{\s*" + re.escape(key) + r"\s*\}\}", lambda _m: value, text)
 
 
 def orq_dataset_meta(dataset_id: str) -> dict:

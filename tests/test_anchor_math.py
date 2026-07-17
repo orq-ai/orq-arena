@@ -43,9 +43,13 @@ def test_unknown_keys_are_reported_not_crashed():
 
 
 def test_two_annotators_get_inter_annotator_kappa():
-    res = anchor_result(RECORDS, [
-        _vs("h1", {k: "A" for k in KEYS}), _vs("h2", {k: "A" for k in KEYS}),
-    ])
+    res = anchor_result(
+        RECORDS,
+        [
+            _vs("h1", {k: "A" for k in KEYS}),
+            _vs("h2", {k: "A" for k in KEYS}),
+        ],
+    )
     assert len(res["inter_annotator"]) == 1
     assert res["inter_annotator"][0]["kappa"] == 1.0
 
@@ -57,10 +61,17 @@ def test_annotator_named_panel_does_not_collide():
 
 def test_load_votes_roundtrip(tmp_path):
     p = tmp_path / "votes.json"
-    p.write_text(json.dumps({
-        "schema": 1, "seed": 42, "source": "x", "annotator": "h1",
-        "votes": {KEYS[0]: "A", KEYS[1]: "tie"},
-    }))
+    p.write_text(
+        json.dumps(
+            {
+                "schema": 1,
+                "seed": 42,
+                "source": "x",
+                "annotator": "h1",
+                "votes": {KEYS[0]: "A", KEYS[1]: "tie"},
+            }
+        )
+    )
     (vs,) = load_votes([p])
     assert vs.annotator == "h1" and vs.votes[KEYS[1]] == "tie"
 

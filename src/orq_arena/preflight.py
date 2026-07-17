@@ -16,9 +16,9 @@ from dataclasses import dataclass
 from itertools import combinations
 from typing import Any
 
+from .candidates import CandidateSpec
 from .config import ArenaConfig
 from .data.prompts import PromptItem
-from .candidates import CandidateSpec
 from .providers.orq_gateway import OrqGateway
 
 _PROBE_PROMPT = "Reply with the single word: ok"

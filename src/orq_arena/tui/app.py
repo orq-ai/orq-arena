@@ -14,7 +14,9 @@ import asyncio
 
 from textual.app import App
 
+from ..candidates import CandidateSpec
 from ..config import ArenaConfig
+from ..data.prompts import PromptItem
 from ..events import (
     ArenaEvent,
     JudgeVerdictEvent,
@@ -29,7 +31,6 @@ from ..events import (
     TurnPrompt,
     TurnResolved,
 )
-from ..candidates import CandidateSpec
 from ..tournament.driver import run_tournament
 from .hp import VERDICT_HOLD_S, HPTracker
 from .screens.fight import FightScreen
@@ -55,7 +56,7 @@ class ArenaApp(App):
         self,
         *,
         cfg: ArenaConfig,
-        prompts: list[str],
+        prompts: list[PromptItem],
         battle_log_path: str,
         preflight: dict | None = None,
         dataset: dict | None = None,

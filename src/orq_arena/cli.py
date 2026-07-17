@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 import click
 from loguru import logger
 
@@ -301,6 +303,7 @@ def run(
             "prompt_categories": dict(Counter(pr.category for pr in prompts)),
             "log_path": output_path,
         }
+        assert arena_app_cls is not None  # narrowed by the tui branch
         app = arena_app_cls(
             cfg=cfg,
             prompts=prompts,
@@ -350,13 +353,14 @@ def _print_run_plan(ceiling) -> None:
             "cost noticeably less. Exact spend is reported after the run."
         ),
     )
-    for col, justify in (
+    columns: list[tuple[str, Literal["left", "right"]]] = [
         ("Model", "left"),
         ("Calls", "right"),
         ("$/M in", "right"),
         ("$/M out", "right"),
         ("Ceiling", "right"),
-    ):
+    ]
+    for col, justify in columns:
         table.add_column(col, justify=justify)
 
     def price(v: float | None) -> str:

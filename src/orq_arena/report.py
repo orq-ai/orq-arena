@@ -283,7 +283,7 @@ def _value_map_svg(points, champion: str, size_label: str = "average response le
         return T + (1 - (e - e_lo) / (e_hi - e_lo)) * (H - T - B)
 
     frontier, best = [], float("-inf")
-    for name, c, e, _r, _t in sorted(points, key=lambda p: p[1]):
+    for _name, c, e, _r, _t in sorted(points, key=lambda p: p[1]):
         if e > best:
             frontier.append((px(c), py(e)))
             best = e
@@ -617,8 +617,8 @@ def build_report_html(
             f"<td class='n'>{_pct(j.get('tie_rate'))}</td></tr>"
         )
     cohen = report.get("cohen") or {}
-    _ks = [v.get("kappa") if isinstance(v, dict) else v for v in cohen.values()]
-    _ks = [k for k in _ks if isinstance(k, (int, float))]
+    _raw_ks = [v.get("kappa") if isinstance(v, dict) else v for v in cohen.values()]
+    _ks = [k for k in _raw_ks if isinstance(k, (int, float))]
     cohen_range = (
         f"{min(_ks):.2f} to {max(_ks):.2f}" if len(_ks) > 1 else (f"{_ks[0]:.2f}" if _ks else "")
     )

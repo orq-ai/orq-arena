@@ -66,9 +66,7 @@ class HPTracker:
             self._hp_a = max(0, self._hp_a - damage)
         else:
             self._hp_b = max(0, self._hp_b - damage)
-        return TurnOutcome(
-            damage=damage, loser_side=loser_side, hp_a=self._hp_a, hp_b=self._hp_b
-        )
+        return TurnOutcome(damage=damage, loser_side=loser_side, hp_a=self._hp_a, hp_b=self._hp_b)
 
     @property
     def ko_side(self) -> Literal["a", "b", "none"]:

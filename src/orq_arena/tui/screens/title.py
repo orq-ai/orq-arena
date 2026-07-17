@@ -91,7 +91,7 @@ class RunPlanScreen(Screen):
                 )
 
             yield Static("RUN PLAN", classes="section")
-            yield DataTable(id="plan", cursor_type=None, zebra_stripes=False)
+            yield DataTable(id="plan", cursor_type="none", zebra_stripes=False)
             ceiling = p["ceiling"]
             if ceiling.unpriced:
                 yield Static(
@@ -166,7 +166,7 @@ class RunPlanScreen(Screen):
         return f"[ {fight} ]      [ Q  quit ]"
 
     def action_fight(self) -> None:
-        self.app.begin()
+        self.app.begin()  # type: ignore[attr-defined]
 
     def action_quit(self) -> None:
         self.app.exit()

@@ -65,7 +65,7 @@ class ArenaConfig(BaseModel):
     min_successful_judges: int = 2
 
     @model_validator(mode="after")
-    def _validate(self) -> "ArenaConfig":
+    def _validate(self) -> ArenaConfig:
         if len(self.candidates) < 2:
             raise ValueError(f"Need at least 2 candidates, got {len(self.candidates)}")
         if not self.judges:
