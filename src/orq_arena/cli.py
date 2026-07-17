@@ -11,7 +11,6 @@ from .data.prompts import load_prompts
 DEFAULT_CONFIG = "orq_arena.yaml"
 DEFAULT_PROMPTS = "prompts/starter.jsonl"
 DEFAULT_OUTPUT = "battles.jsonl"
-DEFAULT_FIXTURE = "fixtures/demo_tournament.json"
 
 
 def _arena_app_cls(hint: str):
@@ -33,10 +32,6 @@ _TUI_HINT = (
     "The live TUI show needs the extra. Install it with: "
     "pip install 'orq-arena[tui]' (or uv sync --extra tui), or drop --tui "
     "to run headless."
-)
-_DEMO_HINT = (
-    "orq-arena demo replays inside the TUI. Install it with: "
-    "pip install 'orq-arena[tui]' (or uv sync --extra tui)."
 )
 
 
@@ -127,11 +122,11 @@ def cli() -> None:
     help="Watch the live TUI show instead of the default headless logs.",
 )
 @click.option(
-    "--no-open",
-    "no_open",
+    "--open",
+    "open_browser",
     is_flag=True,
     default=False,
-    help="Do not open the HTML report in a browser when the run ends.",
+    help="Open the HTML report in a browser when the run ends.",
 )
 @click.option(
     "--yes",
@@ -155,12 +150,12 @@ def run(
     rounds: int | None,
     overwrite: bool,
     tui: bool,
-    no_open: bool,
+    open_browser: bool,
     assume_yes: bool,
     quiet: bool,
 ) -> None:
     """Run the arena benchmark (hits orq.ai): headless logs by default,
-    then the HTML report opens in your browser.
+    then the HTML report is written next to the battle log (--open to view it).
 
     The YAML candidates are used as-is (default orq_arena.yaml); matches run in
     parallel. Pass --tui to watch the live show instead.
@@ -186,11 +181,14 @@ def run(
     _quiet_logs()
 
     # clig.dev stream contract: results on stdout, messaging on stderr.
+    # With --tui the RUN PLAN screen carries the whole preflight, so the
+    # terminal stays silent; the same data is computed either way.
     def warn(msg: str) -> None:
-        click.echo(msg, err=True)
+        if not tui:
+            click.echo(msg, err=True)
 
     def status(msg: str) -> None:
-        if not quiet:
+        if not quiet and not tui:
             click.echo(msg, err=True)
 
     out = Path(output_path)
@@ -202,8 +200,8 @@ def run(
     # Fail fast on a missing TUI extra before any preflight work.
     arena_app_cls = _arena_app_cls(_TUI_HINT) if tui else None
     # Fail before any network spend: a piped/CI stdin can never answer the
-    # preflight confirmation.
-    if not assume_yes and not sys.stdin.isatty():
+    # preflight confirmation (the TUI path confirms in-app instead).
+    if not tui and not assume_yes and not sys.stdin.isatty():
         raise click.ClickException(
             "stdin is not interactive, so the preflight confirmation can't be "
             "answered; pass --yes to proceed."
@@ -244,43 +242,74 @@ def run(
     # just this console line (the report is the thing users hand to others).
     preflight_data: dict = {"counts": counts.__dict__, "family_overlaps": overlap}
     ceiling = cost_ceiling(cfg, prompts, counts, asyncio.run(fetch_price_map(cfg.gateway)))
+    unpriced_suffix = " + unpriced" if ceiling.unpriced else ""
     if ceiling.total_usd > 0:
-        status(
-            f"  spend ceiling ≈ ${ceiling.total_usd:.2f} "
-            f"(models ${ceiling.models_usd:.2f} + judges ${ceiling.judges_usd:.2f}"
-            + (f" + probe ${ceiling.probe_usd:.2f}" if ceiling.probe_usd else "")
-            + "; every output cap fully hit, live runs land under)"
-        )
-        preflight_data["cost_ceiling"] = ceiling.__dict__
+        from dataclasses import asdict
+
+        preflight_data["cost_ceiling"] = asdict(ceiling)
+        # Cost is warning-class, not narration: --quiet drops the table but
+        # never the number. Silent-until-invoice is the failure mode.
+        if quiet:
+            warn(f"maximum spend ≤ ${ceiling.total_usd:.2f}{unpriced_suffix} (worst case)")
+        elif not tui:
+            _print_run_plan(ceiling)
     if ceiling.unpriced:
-        warn(f"  ⚠ no catalog price for: {', '.join(ceiling.unpriced)}; excluded from ceiling")
+        warn(
+            f"  no catalog price (self-hosted or unpriced): "
+            f"{', '.join(ceiling.unpriced)}; excluded from total"
+        )
+    probe_lines: list[str] = []
     if cfg.preflight.thinking_probe:
         status("thinking probe…")
         probe = asyncio.run(thinking_probe(cfg))
         preflight_data["thinking_probe"] = probe
         for name, r in probe.items():
             if r["error"]:
-                warn(f"  ⚠ {name} ({r['model']}): probe failed, {r['error']}")
+                probe_lines.append(f"⚠ {name} ({r['model']}): probe failed, {r['error']}")
             elif r["thinks"] and not r["configured"]:
-                warn(
-                    f"  🧠 {name} ({r['model']}): thinks despite config "
+                probe_lines.append(
+                    f"🧠 {name} ({r['model']}): thinks despite config "
                     f"({r['reasoning_tokens']} reasoning tok), ranking will be footnoted"
                 )
+        for line in probe_lines:
+            warn(f"  {line}")
         odd = surprises(probe)
         if not odd:
             status("  pool is thinking-clean ✓")
 
-    if not assume_yes:
-        click.confirm("Proceed?", abort=True, err=True)
+    if not tui and not assume_yes:
+        question = "Proceed?"
+        if ceiling.total_usd > 0:
+            question = f"Proceed (spends up to ${ceiling.total_usd:.2f}{unpriced_suffix})?"
+        click.confirm(question, abort=True, err=True)
 
     if tui:
+        from collections import Counter
+
+        if dataset:
+            prompts_label = f'orq.ai Dataset "{dataset.get("name") or dataset.get("id")}"'
+        else:
+            prompts_label = prompts_path
+        plan = {
+            "counts": counts,
+            "ceiling": ceiling,
+            "overlap": overlap,
+            "probe_lines": probe_lines,
+            "n_candidates": len(cfg.candidates),
+            "n_judges": len(cfg.judges),
+            "n_prompts": len(prompts),
+            "prompts_label": prompts_label,
+            "prompt_categories": dict(Counter(pr.category for pr in prompts)),
+            "log_path": output_path,
+        }
         app = arena_app_cls(
             cfg=cfg,
             prompts=prompts,
             battle_log_path=output_path,
-            live=True,
             preflight=preflight_data,
             dataset=dataset,
+            plan=plan,
+            auto_start=assume_yes,
         )
         app.run()
     else:
@@ -296,11 +325,73 @@ def run(
                 quiet=quiet,
             )
         )
-    _open_report(output_path, no_open)
+    _open_report(output_path, open_browser)
 
 
-def _open_report(battle_log_path: str, no_open: bool) -> None:
-    """Point the user at the finished report; open it when a human is watching."""
+def _print_run_plan(ceiling) -> None:
+    """Run-plan cost table on stderr; the approval decision reads off this.
+
+    Every candidate and judge gets a row (unpriced ones show n/a and ?, they
+    are a normal state for self-hosted models, not an error), and the total
+    self-caveats with "+ ?" whenever anything is unpriced so the one number
+    people quote carries its own asterisk.
+    """
+    import sys
+
+    from rich.console import Console
+    from rich.table import Table
+
+    total = f"≤ ${ceiling.total_usd:.2f}" + (" + ?" if ceiling.unpriced else "")
+    table = Table(
+        title="RUN PLAN",
+        caption=(
+            "worst case: every response maxed out at its token cap; typical runs\n"
+            "cost noticeably less. Exact spend is reported after the run."
+        ),
+    )
+    for col, justify in (
+        ("Model", "left"),
+        ("Calls", "right"),
+        ("$/M in", "right"),
+        ("$/M out", "right"),
+        ("Ceiling", "right"),
+    ):
+        table.add_column(col, justify=justify)
+
+    def price(v: float | None) -> str:
+        return "n/a" if v is None else f"{v:.2f}"
+
+    def money(v: float | None) -> str:
+        return "?" if v is None else f"${v:.2f}"
+
+    for role, header in (
+        ("candidate", "Candidates"),
+        ("judge", "Judges (×2 seat orders)"),
+        ("probe", None),
+    ):
+        rows = [r for r in ceiling.rows if r.role == role]
+        if not rows:
+            continue
+        if header:
+            table.add_row(f"[dim]{header}[/dim]", "", "", "", "")
+        for r in rows:
+            if role == "probe":
+                table.add_row("Thinking probe", str(r.calls), "", "", money(r.usd))
+            else:
+                table.add_row(
+                    f"  {r.model_id}",
+                    str(r.calls),
+                    price(r.price_in),
+                    price(r.price_out),
+                    money(r.usd),
+                )
+    table.add_section()
+    table.add_row("[bold]MAXIMUM SPEND[/bold]", "", "", "", f"[bold]{total}[/bold]")
+    Console(file=sys.stderr).print(table)
+
+
+def _open_report(battle_log_path: str, open_browser: bool) -> None:
+    """Point the user at the finished report; open it only on request (--open)."""
     import os
     import sys
     import webbrowser
@@ -312,36 +403,11 @@ def _open_report(battle_log_path: str, no_open: bool) -> None:
     if not page.exists():
         return
     click.echo(f"report page -> {page}")
-    if not no_open and sys.stdout.isatty() and not os.environ.get("CI"):
+    if open_browser and sys.stdout.isatty() and not os.environ.get("CI"):
         webbrowser.open(page.resolve().as_uri())
 
 
-@cli.command()
-@click.option(
-    "--fixture",
-    "fixture_path",
-    default=DEFAULT_FIXTURE,
-    show_default=True,
-    help="Recorded tournament JSON to replay.",
-)
-@click.option(
-    "--config",
-    "config_path",
-    default=DEFAULT_CONFIG,
-    show_default=True,
-    help="YAML config: candidates (the model pool), judges, match, gateway.",
-)
-def demo(fixture_path: str, config_path: str) -> None:
-    """Replay a recorded tournament from a fixture file (no API calls)."""
-    _quiet_logs()
-    # TUI-extra check first: the friendly hint must beat any config error.
-    arena_app_cls = _arena_app_cls(_DEMO_HINT)
-    cfg = _load_config(config_path)
-    app = arena_app_cls(cfg=cfg, prompts=[], battle_log_path="", live=False, fixture=fixture_path)
-    app.run()
-
-
-@cli.command("list-models")
+@cli.command("pool")
 @click.option(
     "--config",
     "config_path",
@@ -352,7 +418,7 @@ def demo(fixture_path: str, config_path: str) -> None:
 @click.option(
     "--json", "as_json", is_flag=True, default=False, help="Print the candidate pool as JSON."
 )
-def list_models(config_path: str, as_json: bool) -> None:
+def pool(config_path: str, as_json: bool) -> None:
     """Print the configured candidate pool."""
     cfg = _load_config(config_path)
     if as_json:
@@ -409,7 +475,7 @@ def rejudge(
 ) -> None:
     """Re-judge a recorded run with a different panel, zero regeneration.
 
-    The evaluatorq demo inside the demo: the responses are already on disk,
+    The responses are already on disk,
     so swapping the jury costs judge tokens only. Prints the new jury's
     behaviour and the Spearman correlation against the recorded ranking.
 
@@ -545,7 +611,7 @@ def report_cmd(log_path: str, config_path: str, output_path: str | None) -> None
     click.echo(f"report page -> {out}")
 
 
-@cli.command("refresh-models")
+@cli.command("refresh-catalog")
 @click.option(
     "--config",
     "config_path",
@@ -555,7 +621,7 @@ def report_cmd(log_path: str, config_path: str, output_path: str | None) -> None
 )
 @click.option("--show/--no-show", default=False, help="Print model ids grouped by provider.")
 def refresh_models(config_path: str, show: bool) -> None:
-    """Re-fetch the workspace-enabled chat model list from orq.ai.
+    """Re-fetch the workspace-enabled chat model catalog from orq.ai.
 
     Bypasses the 24h cache at ~/.cache/orq-arena/models.json.
     """
@@ -631,6 +697,13 @@ def refresh_models(config_path: str, show: bool) -> None:
     show_default=True,
     help="Port for --serve (0 picks a free one).",
 )
+@click.option(
+    "--no-open",
+    "no_open",
+    is_flag=True,
+    default=False,
+    help="Do not open the annotation page in a browser once it's written.",
+)
 def annotate(
     battle_log: str,
     out_path: str,
@@ -640,6 +713,7 @@ def annotate(
     exclude_files: tuple[str, ...],
     serve: bool,
     port: int,
+    no_open: bool,
 ) -> None:
     """Render a blinded human-annotation page from a recorded run.
 
@@ -652,6 +726,9 @@ def annotate(
       orq-arena annotate battles.jsonl --serve
       orq-arena annotate battles.jsonl --sample 30 --output rater1.html
     """
+    import os
+    import sys
+    import webbrowser
     from pathlib import Path
 
     from .anchor import DEFAULT_CRITERIA, annotation_items, load_votes, render_annotate_page
@@ -670,8 +747,6 @@ def annotate(
         items, seed=seed, source=Path(battle_log).name, criteria=criteria or DEFAULT_CRITERIA
     )
     if serve:
-        import webbrowser
-
         from .anchor import anchor_result, make_annotation_server, render_anchor_result
 
         server = make_annotation_server(page, Path(battle_log).parent, port=port)
@@ -696,6 +771,8 @@ def annotate(
         f"{len(items)} rounds -> {out_path} (blind; votes export as votes.json)"
         + (f", {len(excluded)} already-voted excluded" if excluded else "")
     )
+    if not no_open and sys.stdout.isatty() and not os.environ.get("CI"):
+        webbrowser.open(Path(out_path).resolve().as_uri())
 
 
 @cli.command()

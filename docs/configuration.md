@@ -26,7 +26,7 @@ cp .env.example .env
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `ORQ_API_KEY` | Required for live runs |, | The only secret orq-arena needs. Every candidate, judge, and preflight-probe call goes through the orq.ai router gateway with this one key. Resolved through evaluatorq's `resolve_llm_client` at the default `base_url`/`api_key_env`, else read directly via `os.environ.get(cfg.api_key_env, "")` (`src/orq_arena/providers/orq_gateway.py`, see [Credential/host resolution](#gateway-gatewayconfig)); the gateway raises `RuntimeError("ORQ_API_KEY is not set. Export it before running orq-arena.")` at construction time if it is empty. Get one at [my.orq.ai](https://my.orq.ai) > workspace settings > API keys (per `.env.example`). |
+| `ORQ_API_KEY` | Required for live runs |, | The only secret orq-arena needs. Every candidate, judge, and preflight-probe call goes through the orq.ai router gateway with this one key. Resolved through evaluatorq's `resolve_llm_client` at the default `base_url`/`api_key_env`, else read directly via `os.environ.get(cfg.api_key_env, "")` (`src/orq_arena/providers/orq_gateway.py`, see [Credential/host resolution](#gateway-gatewayconfig)); the gateway raises `RuntimeError("ORQ_API_KEY is not set. Export it before running orq-arena.")` at construction time if it is empty. Create one per the [API keys guide](https://docs.orq.ai/docs/ai-studio/organization/api-keys) (per `.env.example`). |
 
 Notes:
 
@@ -34,8 +34,8 @@ Notes:
   `gateway.api_key_env` (default `"ORQ_API_KEY"`, see the [`gateway` table](#gateway-gatewayconfig)
   below). Changing `api_key_env` changes which environment variable orq-arena reads; it does not
   set a key.
-- `ORQ_API_KEY` is **not** required for `orq-arena demo` (replays a recorded fixture, no API
-  calls) or `orq-arena list-models` (prints the candidate pool, never constructs a gateway).
+- `ORQ_API_KEY` is **not** required for `orq-arena pool` (prints the candidate pool, never
+  constructs a gateway) or the log-reading commands (`report`, `annotate`, `anchor`).
 
 ### `.env` loading
 
@@ -66,11 +66,10 @@ the YAML, every value is literal.
 | Command | `--config` behavior |
 |---|---|
 | `orq-arena run` | Defaults to `orq_arena.yaml`. The YAML candidates are used as-is; the run is headless by default (`--tui` opts into the live show). |
-| `orq-arena demo` | Defaults to `orq_arena.yaml`. Only used for its rules/candidate labels, the fixture replay makes no API calls. |
-| `orq-arena list-models` | Defaults to `orq_arena.yaml`. Prints the configured candidate pool. |
+| `orq-arena pool` | Defaults to `orq_arena.yaml`. Prints the configured candidate pool. |
 | `orq-arena rejudge` | Defaults to `orq_arena.yaml`. Supplies `gateway` and (unless `--criteria` overrides it) `criteria`. |
 | `orq-arena report` | Defaults to `orq_arena.yaml`. Supplies the judge panel and model-name mapping for the statistics rebuild. |
-| `orq-arena refresh-models` | Defaults to `orq_arena.yaml`. Only `gateway` is used, to re-fetch the workspace model catalog. |
+| `orq-arena refresh-catalog` | Defaults to `orq_arena.yaml`. Only `gateway` is used, to re-fetch the workspace model catalog. |
 
 ---
 
@@ -174,12 +173,11 @@ is exposed as a config key. The preflight probe call (see below) also uses a har
 
 The gateway client is a plain `AsyncOpenAI` client: nothing in the tournament engine is
 orq.ai-specific. Point `base_url` at any OpenAI-compatible chat endpoint and set `api_key_env`
-to whatever variable holds that endpoint's key. A ready-made example against OpenRouter ships
-at [`configs/byok_openrouter.yaml`](https://github.com/orq-ai/orq-arena/blob/master/configs/byok_openrouter.yaml).
+to whatever variable holds that endpoint's key.
 Two features do depend on the orq.ai router and degrade cleanly without it:
 
-- **`refresh-models` and catalog pricing** read the workspace model catalog from the router.
-  On another endpoint, `refresh-models` degrades to any existing cache and the preflight
+- **`refresh-catalog` and catalog pricing** read the workspace model catalog from the router.
+  On another endpoint, `refresh-catalog` degrades to any existing cache and the preflight
   spend ceiling / report cost section are skipped when no prices resolve.
 - **Reasoning controls** (`candidates[].reasoning`) are forwarded verbatim as `extra_body`; the
   router normalizes them per provider. Other endpoints receive them as-is and may ignore or
@@ -271,6 +269,8 @@ Mapping per datapoint: the last `user` message becomes the prompt text, `{{var}}
 are filled from the datapoint's `inputs`, multi-part content is joined, and datapoints without
 a user message are skipped (the count is reported if the dataset yields nothing usable).
 Dataset prompts all land in the `general` category; `expected_output` is not read today.
+Each prompt carries its source `datapoint_id` in `prompt_metadata`, so every round in
+`battles.jsonl` joins back to the exact datapoint that produced it.
 
 When `--prompts orq:<dataset_id>` is used, the run also captures the dataset's identity:
 `orq_dataset_meta()` (`src/orq_arena/data/prompts.py`) returns `{id, name, url}`, an orq.ai
@@ -284,9 +284,10 @@ only for dataset-sourced runs, and `battles.report.html` links the dataset by th
 | `prompt` | `str` | Required (or `text`, see below) | The prompt text, becomes `PromptItem.text`. |
 | `text` | `str` | Fallback for `prompt` | Read only if `prompt` is absent (`row.get("prompt") or row.get("text")`). A row with neither key is silently skipped. |
 | `category` | `str` | Optional, default `"general"` | Feeds the per-category ELO slices on the leaderboard. Untagged rows land in `"general"`. |
+| any other key | any | Optional | Carried verbatim as `prompt_metadata` on every battle record for that prompt in `battles.jsonl` — opaque pass-through for joining rounds back to your source data (never sliced or judged on). |
 
-`PromptItem` itself (`src/orq_arena/data/prompts.py`) is a frozen dataclass with exactly two
-fields: `text: str` and `category: str = "general"`.
+`PromptItem` itself (`src/orq_arena/data/prompts.py`) is a frozen dataclass with three
+fields: `text: str`, `category: str = "general"`, and `metadata: dict = {}`.
 
 The shipped `prompts/starter.jsonl` has 30 prompts across four categories: `code` (8), `general`
 (11), `math` (6), and `creative` (5). Example row:
@@ -311,8 +312,8 @@ Settings that cause a hard failure (config load or first live call) if absent or
   effective `max_tokens` (own override or `gateway.candidate_max_tokens`), or config loading fails.
 - `ORQ_API_KEY` (or whatever `gateway.api_key_env` names) must be set in the real environment,
   not required to *load* the YAML, but the gateway raises `RuntimeError` the moment any live
-  call is attempted (`orq-arena run`, `rejudge`, `refresh-models`). Not needed for `orq-arena
-  demo` or `list-models`.
+  call is attempted (`orq-arena run`, `rejudge`, `refresh-catalog`). Not needed for
+  `orq-arena pool`, `report`, `annotate`, or `anchor`.
 - At least one configured judge must not be a contestant in a given match, or that match raises
   `ValueError` at battle start.
 
@@ -352,7 +353,7 @@ document. The equivalent axes for changing behavior between runs are:
   shipped presets are `orq_arena.yaml` (uniform thinking-OFF, the default) and
   `configs/reasoning_arena.yaml` (uniform thinking-ON), run the latter with
   `orq-arena run --config configs/reasoning_arena.yaml`. `load_config()` accepts any path.
-  `orq-arena refresh-models --show` lists your workspace-enabled model ids to paste into the
+  `orq-arena refresh-catalog --show` lists your workspace-enabled model ids to paste into the
   `candidates` list.
 - **Different jury on an already-recorded run, no regeneration:** `orq-arena rejudge
   <log_path> --judge <id> [--judge <id> ...] [--criteria "..."]` re-scores the responses

@@ -1,26 +1,21 @@
 # Getting Started
 
-This guide takes you from a fresh clone to a live tournament, a round-robin of LLMs
-streaming answers side by side, judged in both seat orders by an evaluatorq pairwise jury,
-ranked by Bradley-Terry ELO with confidence intervals attached.
+This guide takes you from a fresh clone to your first benchmark: a round-robin tournament
+over your model pool, judged in both seat orders by an evaluatorq pairwise jury, ranked by
+Bradley-Terry ELO with confidence intervals attached.
 
-The end-to-end path is:
+The path is five steps:
 
-1. Install the toolkit (`uv sync`).
-2. Try the zero-key demo, see the whole show with no credentials.
-3. Add your orq.ai API key (`.env`).
-4. Run a live tournament, clear the preflight, watch the fight, read the leaderboard.
-5. Know where your results land, and what to do if something goes wrong.
+1. [Install](#1-install) the CLI (`uv sync`).
+2. [Add your orq.ai API key](#2-add-your-orqai-credentials) (`.env`).
+3. [Run the benchmark](#3-run-the-benchmark) and read the standings.
+4. [Bring your own prompts](#4-bring-your-own-prompts): a local JSONL file or an
+   orq.ai Dataset.
+5. [Know where the results land](#5-where-results-land): the battle log, the manifest, and
+   the HTML report.
 
-Every command below runs through the **`orq-arena`** CLI (installed by the steps in
-[1. Install](#1-install)). Run `uv run orq-arena --help` to list every subcommand. The full
-subcommand and flag reference is in **[cli.md](cli.md)**.
-
-!!! tip "No API key yet?"
-
-    Skip straight to [2. Try it now](#2-try-it-now-no-api-key-needed),
-    `orq-arena demo` replays a full recorded tournament with no network calls. Come back to
-    step 3 when you're ready to point at real models.
+Every command below runs through the **`orq-arena`** CLI. Run `uv run orq-arena --help` to
+list every subcommand; the full flag reference is in **[cli.md](cli.md)**.
 
 ---
 
@@ -33,13 +28,10 @@ subcommand and flag reference is in **[cli.md](cli.md)**.
 | Git | any | `git --version` |
 | orq.ai workspace | active, with at least one chat model enabled | [my.orq.ai](https://my.orq.ai) |
 
-You only need the workspace for **live** runs, the demo needs none of it. When you do go
-live, you need:
-
-- A workspace **API key** (`ORQ_API_KEY`) from [my.orq.ai](https://my.orq.ai) > workspace
-  settings > API keys (per `.env.example`). It's the only secret orq-arena needs, every
-  candidate, judge, and preflight-probe call goes through the orq.ai router gateway
-  with this one key.
+The one secret you need is a workspace **API key** (`ORQ_API_KEY`), created per the
+[API keys guide](https://docs.orq.ai/docs/ai-studio/organization/api-keys). Every candidate, judge, and
+preflight-probe call goes through the orq.ai router gateway with this one key, so one key
+covers every provider in the pool.
 
 ---
 
@@ -51,48 +43,23 @@ cd orq-arena
 uv sync
 ```
 
-`uv sync` creates a `.venv` and installs orq-arena plus its core dependencies (`click`,
-`pydantic`, `pyyaml`, `openai`, `httpx`, `evaluatorq`) resolved against `uv.lock`. This
-registers the **`orq-arena`** console script (entry point `orq_arena.cli:cli` in
-`pyproject.toml`'s `[project.scripts]`), every command below is run through `uv run` so this
-is the only setup step.
+`uv sync` creates a `.venv` and installs orq-arena plus its core dependencies resolved
+against `uv.lock`, registering the **`orq-arena`** console script. That's the only setup
+step: the benchmark, the HTML report, and `rejudge` all run on the core install.
 
-The core install runs the benchmark, the HTML report, and `rejudge`. The Textual live show,
-though, is an **optional extra**: the `--tui` live run and `orq-arena demo` need `textual`,
-which is not in the core dependencies. Add it with:
+Check it worked:
 
-```bash
-uv sync --extra tui
+```text
+$ uv run orq-arena --help
+Usage: orq-arena [OPTIONS] COMMAND [ARGS]...
+
+  orq-arena, LLM arena benchmark: orq.ai router + evaluatorq jury.
+...
 ```
-
-Without the extra, those two commands print a friendly install hint instead of running. If
-you only intend to run headless benchmarks, the plain `uv sync` is enough.
 
 ---
 
-## 2. Try it now, no API key needed
-
-```bash
-uv run orq-arena demo
-```
-
-This replays a fully recorded tournament, 3 matches, 6 judged rounds, all 3 default judges
-voting, from `fixtures/demo_tournament.json` through the exact same TUI screens a live run
-uses: streaming responses, judge verdicts, HP drama, and the final leaderboard. No network
-calls, no API key. Press `q` to quit, `s` to save a screenshot.
-
-![The live fight screen: both candidates streaming side by side, judge cards, HP bars](assets/fight.svg)
-
-`demo` renders through the Textual TUI, so it needs the optional `[tui]` extra
-(`uv sync --extra tui`, see [1. Install](#1-install)); without it the command prints a friendly
-install hint. `demo` still loads `orq_arena.yaml` (only for cosmetic labels like the judge names
-in the fight-screen header), it ships in the repo, so this works immediately after
-`uv sync --extra tui` with no edits needed. `demo` also takes `--fixture` and `--config` if you
-want to point it elsewhere; see [cli.md](cli.md).
-
----
-
-## 3. Add your orq.ai credentials
+## 2. Add your orq.ai credentials
 
 ```bash
 cp .env.example .env
@@ -104,100 +71,194 @@ Then fill in the one variable it asks for:
 ORQ_API_KEY=your-orq-api-key
 ```
 
-`.env` is read by a small stdlib-only loader in `src/orq_arena/cli.py` (`_load_dotenv`),
-called once at the top of every CLI invocation. It uses `os.environ.setdefault`, so **a
-variable already set in your shell always wins**, `.env` only fills in what the shell hasn't
-already set. `.env` is git-ignored; only `.env.example` is committed.
-
-`ORQ_API_KEY` is **not** required for `orq-arena demo` or `orq-arena list-models`, only for
-`run` and `rejudge`, which construct a gateway client. `refresh-models` wants it too, but
-degrades instead of failing: without a key the catalog fetch quietly falls back to any
-existing cache, else an empty list. Full variable reference:
-[configuration.md](configuration.md#environment-variables).
+`.env` is loaded automatically at the top of every CLI invocation; a variable already set in
+your shell always wins over `.env`. `.env` is git-ignored; only `.env.example` is committed.
+Full variable reference: [configuration.md](configuration.md#environment-variables).
 
 ---
 
-## 4. Run your first live tournament
+## 3. Run the benchmark
 
 ```bash
 uv run orq-arena run
 ```
 
-The model pool comes straight from the YAML's `candidates` list (`--config` defaults to the shipped `orq_arena.yaml`;
-edit its `candidates` list, or point at `configs/reasoning_arena.yaml`, the uniform
-thinking-**ON** counterpart of the default thinking-**OFF** pool, or your own file). The run
-is headless by default and walks through three stages:
+The model pool comes straight from the `candidates` list in `orq_arena.yaml` (the shipped
+file has an 8-model pool; edit it or pass `--config your.yaml`). The essentials of that
+file:
 
-1. **Preflight.** The CLI prints the exact call counts and a spend ceiling up front, runs a
-   thinking probe, one tiny call per candidate ("Reply with the single word: ok") to catch
-   vendor-default reasoning that contradicts your config (`🧠 thinks despite config: ...,
-   ranking will be footnoted`), then asks `Proceed?` before any battle or judge call
-   (the probe itself has already made one paid call per candidate), pass
-   `--yes`/`-y` to skip the prompt for CI or scripts (in a non-interactive shell the
-   run refuses up front, before any paid call, and tells you to pass it). For the shipped `orq_arena.yaml` (8
-   candidates) against the default `prompts/starter.jsonl` (30 prompts, capped at
-   `match.max_rounds` = 5 per match), that preflight line reads exactly:
+```yaml
+# orq_arena.yaml (trimmed to the essentials)
+candidates:                # the model pool: router model ids, any size >= 2
+  - model_id: anthropic/claude-sonnet-4-6
+  - model_id: openai/gpt-5.4
+  - model_id: deepseek/deepseek-chat
+  - model_id: google/gemini-3.5-flash
+    reasoning: { thinking: { type: disabled } }   # per-model overrides inline
 
-    ```
-    preflight: 28 matches × 5 rounds → 280 model streams + 840 judge calls + 8 probe calls
-    ```
+judges:                    # the jury; every pair judged in both seat orders
+  - anthropic/claude-haiku-4-5-20251001
+  - google/gemini-2.5-flash-lite
+  - openai/gpt-5.4-nano
 
-2. **The fight.** Every pair of candidates meets once (a full round-robin over the pool),
-   matches in parallel under `headless_concurrency` (default 4). For each prompt, both
-   candidates stream through the router, the jury votes in both seat orders, and the round is
-   logged. Pass `--tui` to watch it live instead (needs the `[tui]` extra): side-by-side
-   streaming, judge verdicts, HP drama, one match at a time.
-3. **The leaderboard.** The final Bradley-Terry ELO standings with bootstrap 95% CIs: printed
-   in the terminal (headless) and rendered into the HTML report, which opens in your browser
-   (`--no-open` to skip; it never opens in CI). In the TUI, press `B` to browse every judged
-   round (prompt, both responses, per-judge votes with flip badges), `S` to save a screenshot,
-   `ENTER`/`SPACE`/`Q` to exit.
+match:
+  max_rounds: 5            # prompts judged per match
+```
 
-![The final leaderboard: ELO with 95% CIs and the len-ctrl column, per-judge behaviour, win grid](assets/leaderboard.svg)
+Every key, default, and per-model override is documented in
+[configuration.md](configuration.md). The run walks through three stages:
 
-The prompt set is swappable: `--prompts your_prompts.jsonl` for a local file (format:
-[Configuration](configuration.md#prompts-file-format)), or `--prompts orq:<dataset_id>` to
-fight over an [orq.ai Dataset](https://docs.orq.ai/docs/ai-studio/optimize/datasets) straight
-from your workspace, same API key.
+1. **Preflight.** The exact call counts print up front, then a **RUN PLAN table**: one row
+   per candidate and judge with its call count, catalog price, and worst-case cost, closing
+   with the maximum the run can spend. A tiny thinking probe runs per candidate, then the
+   run pauses at `Proceed (spends up to $X)? [y/N]` before any battle or judge call. Pass
+   `--yes`/`-y` to skip the pause in CI or scripts.
+2. **The matches.** Every pair of candidates meets once (a full round-robin), matches in
+   parallel. For each prompt, both candidates stream through the router, the jury votes in
+   both seat orders, and the round is logged.
+3. **The standings.** Bradley-Terry ELO with bootstrap 95% CIs, printed in the terminal, and
+   the HTML report is written next to the battle log (`--open` to view it in your browser).
 
-To see which model ids your workspace can fight, `uv run orq-arena refresh-models --show`
-lists the workspace-enabled catalog, grouped by provider, ready to paste into the YAML.
-Full flag reference for `run` and every other subcommand (`demo`, `rejudge` with `--compare`,
-`report`, `annotate`, `anchor`, `list-models`, `refresh-models`): **[cli.md](cli.md)**.
+**Expected output** (reconstructed from the committed
+[`examples/quickstart`](https://github.com/orq-ai/orq-arena/tree/master/examples/quickstart)
+run, a 4-model pool against the default judge trio):
+
+```text
+$ uv run orq-arena run --config examples/quickstart/config.yaml \
+    --output examples/quickstart/battles.jsonl
+preflight: 6 matches × 5 rounds → 60 model streams + 180 judge calls + 4 probe calls
+                                   RUN PLAN
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┓
+┃ Model                                 ┃ Calls ┃ $/M in ┃ $/M out ┃ Ceiling ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━┩
+│ Candidates                            │       │        │         │         │
+│   openai/gpt-5.4-mini                 │    15 │   0.75 │    4.50 │   $0.14 │
+│   anthropic/claude-sonnet-4-6         │    15 │   3.00 │   15.00 │   $0.46 │
+│   google/gemini-3.5-flash             │    15 │   1.50 │    9.00 │   $0.28 │
+│   mistral/mistral-medium-2604         │    15 │   1.50 │    7.50 │   $0.23 │
+│ Judges (×2 seat orders)               │       │        │         │         │
+│   anthropic/claude-haiku-4-5-20251001 │    60 │   1.00 │    5.00 │   $0.88 │
+│   google/gemini-2.5-flash-lite        │    60 │   0.10 │    0.40 │   $0.08 │
+│   openai/gpt-5.4-nano                 │    60 │   0.20 │    1.25 │   $0.21 │
+│ Thinking probe                        │     4 │        │         │   $0.04 │
+├───────────────────────────────────────┼───────┼────────┼─────────┼─────────┤
+│ MAXIMUM SPEND                         │       │        │         │ ≤ $2.31 │
+└───────────────────────────────────────┴───────┴────────┴─────────┴─────────┘
+     worst case: every response maxed out at its token cap; typical runs
+         cost noticeably less. Exact spend is reported after the run.
+thinking probe…
+  pool is thinking-clean ✓
+Proceed (spends up to $2.31)? [y/N]:
+```
+
+**This pause is the cost gate.** Everything above was (almost) free: only the tiny probe
+calls have been made, no battle has run. The RUN PLAN table shows the worst case per model,
+and the `Proceed` question repeats the maximum the run can spend. Answer `n` and nothing
+happens; answer `y` and the matches start:
+
+```text
+Proceed (spends up to $2.31)? [y/N]: y
+M1 🤝 draw
+match 1/6 done
+M2 gemini-3.5-flash beats gpt-5.4-mini
+match 2/6 done
+M4 claude-sonnet-4-6 beats mistral-medium-2604
+match 3/6 done
+M3 gpt-5.4-mini beats mistral-medium-2604
+match 4/6 done
+M5 claude-sonnet-4-6 beats gpt-5.4-mini
+match 5/6 done
+M6 gemini-3.5-flash beats mistral-medium-2604
+match 6/6 done
+
+🏆 gemini-3.5-flash leads, but claude-sonnet-4-6 is statistically tied (CIs
+overlap at 30 rated rounds; the report page has the tie-breakers)
+
+                   FINAL STANDINGS
+┏━━━┳━━━━━━━━━━━━━━━━━━━━━┳━━━━━━┳━━━━━━━━━━━━┳━━━━━━┓
+┃ # ┃ Model               ┃ ELO  ┃ 95% CI     ┃ win% ┃
+┡━━━╇━━━━━━━━━━━━━━━━━━━━━╇━━━━━━╇━━━━━━━━━━━━╇━━━━━━┩
+│ 1 │ gemini-3.5-flash    │ 1572 │ 1259–5000  │ 70%  │
+│ 2 │ claude-sonnet-4-6   │ 1572 │ 1238–4803  │ 70%  │
+│ 3 │ gpt-5.4-mini        │ 489  │ -3000–1810 │ 33%  │
+│ 4 │ mistral-medium-2604 │ 367  │ -3000–1686 │ 27%  │
+└───┴─────────────────────┴──────┴────────────┴──────┘
+
+jury: 95% mean agreement · leaned longer (+2.33); the report prices it out
+rounds: 30 rated · 0 voided
+tokens, models 1,728 in / 51,324 out · jury 349,228 in / 23,643 out
+
+battle log → examples/quickstart/battles.jsonl
+report page → examples/quickstart/battles.report.html
+```
+
+!!! tip "No API key yet?"
+
+    A real recorded run is committed at
+    [`examples/quickstart/`](https://github.com/orq-ai/orq-arena/tree/master/examples/quickstart).
+    Regenerate its report with no key and no network:
+    `uv run orq-arena report examples/quickstart/battles.jsonl`.
 
 ---
 
-## Where results land
+## 4. Bring your own prompts
 
-Every live run, TUI or headless, writes to the same three files, all in the current working
-directory by default. Everything downstream, re-judging, reporting, human annotation, works
-from the battle log alone, with no further model regeneration:
+The whole point of orq-arena is ranking models on **your** prompts. The default
+`prompts/starter.jsonl` is just a demo set; swap it with `--prompts`, from a local file or
+straight from your orq.ai workspace.
 
-```mermaid
-flowchart LR
-    run["orq-arena run"] --> log["battles.jsonl<br/>(one row per judged round)"]
-    run --> manifest["battles.run.json<br/>(seeded manifest)"]
-    run --> html["battles.report.html"]
-    log --> report["orq-arena report"] --> html
-    log --> rejudge["orq-arena rejudge --judge …<br/>(new jury, judge tokens only)"]
-    rejudge --> compare["rejudge --compare<br/>(jury selection table)"]
-    log --> annotate["orq-arena annotate<br/>(blind rating page)"] --> votes["votes.json"]
-    votes --> anchor["orq-arena anchor<br/>(κ vs humans)"]
-    log --> anchor
+**A local JSONL file** — one JSON object per line, `prompt` is the only required field.
+`category` is optional (feeds per-category ratings); any other keys ride along into
+`battles.jsonl` so you can join results back to your source data:
+
+```json
+{"prompt": "Write a Python function that finds the longest palindromic substring.", "category": "code"}
+{"prompt": "Summarize the key trade-offs between SQL and NoSQL for a startup.", "category": "reasoning"}
 ```
+
+```bash
+uv run orq-arena run --prompts your_prompts.jsonl
+```
+
+Full field reference: [Prompts file format](configuration.md#prompts-file-format).
+
+**An orq.ai Dataset** — pass `orq:<dataset_id>` to fight over an
+[orq.ai Dataset](https://docs.orq.ai/docs/ai-studio/optimize/datasets) from your workspace,
+same API key, nothing to export:
+
+```bash
+uv run orq-arena run --prompts orq:my_dataset_id
+```
+
+Each datapoint's last `user` message becomes a prompt (`{{var}}` placeholders filled from
+its `inputs`). The run manifest records the dataset's identity, and the HTML report links
+it by name.
+
+!!! tip "Which model ids can fight?"
+
+    `uv run orq-arena refresh-catalog --show` lists your workspace-enabled catalog, grouped
+    by provider, ready to paste into the YAML's `candidates` list.
+
+---
+
+## 5. Where results land
+
+Every run writes three files, all in the current working directory by default. Everything
+downstream (re-judging, reporting, human annotation) works from the battle log alone, with no
+further model calls:
 
 | File | Contents |
 |---|---|
-| `battles.jsonl` | One JSON line per judged (or voided) round, `BattleRecord`, schema v3: both responses, reconciled per-judge votes, token/TTFT accounting. (v3 drops the old HP/damage columns, HP is now a TUI-only presentation.) |
-| `battles.run.json` | The run manifest, written next to the log, config/prompt hashes, candidate pool, judge panel, seed, and (once finished) agreement stats. |
-| `battles.report.html` | A single-file HTML report, no server, no external assets. The verdict banner leads with the top 3 models (win rate, ELO score, total cost); a value map plots ELO against cost per model on a log scale; a Speed section (tokens per second, time to first token) appears whenever the log carries per-side durations. Runs sourced from an orq.ai Dataset (`--prompts orq:<dataset_id>`) link the dataset by name in the report. |
+| `battles.jsonl` | One JSON line per judged round: both responses, reconciled per-judge votes, token/TTFT accounting. |
+| `battles.run.json` | The run manifest: config/prompt hashes, candidate pool, judge panel, seed, and (once finished) agreement stats. |
+| `battles.report.html` | A single-file HTML report, no server, no external assets. Verdict banner with the top 3 models up top, then the ELO ladder with error bars, a quality-vs-cost value map, speed, and the exact dollar spend. Forward it to anyone. |
 
-Pass `--output path/to/file.jsonl` to move all three, the manifest and report page always sit
-next to whatever `--output` you choose (`Path(battle_log_path).with_suffix(".run.json")` and
-`.with_suffix(".report.html")`). All three files are git-ignored; `orq-arena rejudge` (see
-[cli.md](cli.md)) reads `battles.jsonl` straight back off disk to re-score a run with a
-different jury, at no regeneration cost, and `orq-arena report <log>` regenerates the report
-page on demand.
+![HTML report page: verdict banner with the top three models, badges, ELO leaderboard with CI bars, and the ELO-vs-cost value map](assets/report-page.png)
+
+Pass `--output path/to/file.jsonl` to move all three; the manifest and report page always sit
+next to the log. `orq-arena report <log>` regenerates the report page on demand, and
+`orq-arena rejudge` re-scores a recorded run with a different jury at judge-token cost only
+(see [cli.md](cli.md)).
 
 ---
 
@@ -206,26 +267,24 @@ page on demand.
 ??? failure "`RuntimeError: ORQ_API_KEY is not set. Export it before running orq-arena.`"
 
     `.env` is missing, empty, or still the blank template. Run `cp .env.example .env`, fill in a
-    real key from [my.orq.ai](https://my.orq.ai) > workspace settings > API keys, and re-run. This
-    only fires on `run` or `rejudge`, `demo`, `list-models`, and `refresh-models` never
-    construct a gateway client, so they run with no key at all (`refresh-models` just falls back
-    to cached results, or an empty list).
+    real key (created per the [API keys guide](https://docs.orq.ai/docs/ai-studio/organization/api-keys)), and re-run. This
+    only fires on `run` or `rejudge`; `report`, `annotate`, and `anchor` work from the recorded
+    log with no key at all.
 
-??? warning "A response panel shows `✂ truncated`"
+??? warning "A response shows `✂ truncated` in the report"
 
     The candidate hit its output cap (`gateway.candidate_max_tokens`, default `2048`) before
-    finishing, judges tend to penalize a cut-off answer. Raise `gateway.candidate_max_tokens` in
-    your YAML, or set a higher per-candidate `max_tokens` on that one entry. See
+    finishing, and judges tend to penalize a cut-off answer. Raise `gateway.candidate_max_tokens`
+    in your YAML, or set a higher per-candidate `max_tokens` on that one entry. See
     [configuration.md](configuration.md#gateway-gatewayconfig).
 
 ??? question "A model you expected in the default pool isn't there"
 
-    `orq_arena.yaml` deliberately excludes models the router can't disable thinking for, the
-    shipped file's own comment names `moonshotai/kimi-k2.6`, `deepseek/deepseek-v4-pro`, and
-    `alibaba/qwen3.5-flash` as excluded for this reason. Mixing an always-thinking model into the
-    uniform thinking-**OFF** pool would compare reasoning tokens no config could turn off. Add
-    them to `configs/reasoning_arena.yaml` (the thinking-**ON** preset) instead, or add them
-    to your own YAML explicitly if a mixed pool is what you want.
+    `orq_arena.yaml` deliberately excludes models the router can't disable thinking for.
+    Mixing an always-thinking model into the uniform thinking-**OFF** pool would compare
+    reasoning tokens no config could turn off. Add them to `configs/reasoning_arena.yaml`
+    (the thinking-**ON** preset) instead, or add them to your own YAML explicitly if a mixed
+    pool is what you want.
 
 ---
 
@@ -237,4 +296,3 @@ page on demand.
 | Understand every `orq_arena.yaml` key | [configuration.md](configuration.md) |
 | Understand the scoring methodology | [methodology.md](methodology.md) |
 | Contribute to the project | [CONTRIBUTING.md](https://github.com/orq-ai/orq-arena/blob/master/CONTRIBUTING.md) |
-| Back to the project overview | [README.md](https://github.com/orq-ai/orq-arena/blob/master/README.md) |

@@ -2,7 +2,9 @@
 
 JSONL format: one JSON object per line with at least a ``prompt`` key;
 optional ``category`` feeds the per-category ELO slices (untagged rows land
-in ``"general"``).
+in ``"general"``). Any other keys ride along as ``metadata`` and are carried
+onto every battle record for that prompt, so rounds in ``battles.jsonl`` can
+be joined back to the source data.
 
 ``orq:<dataset_id>`` instead of a file path pulls the datapoints of an
 orq.ai Dataset via the orq-python SDK (same API key as the gateway): the
@@ -14,7 +16,7 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -23,12 +25,14 @@ from typing import Any
 class PromptItem:
     text: str
     category: str = "general"
+    # Opaque pass-through: never sliced or judged on, only carried to the log.
+    metadata: dict = field(default_factory=dict)
 
 
 def load_prompts(path: str | Path, api_key_env: str = "ORQ_API_KEY") -> list[PromptItem]:
     """Return the prompts in file (or dataset) order."""
     if str(path).startswith("orq:"):
-        return _load_orq_dataset(str(path)[len("orq:"):], api_key_env)
+        return _load_orq_dataset(str(path)[len("orq:") :], api_key_env)
     p = Path(path)
     out: list[PromptItem] = []
     with p.open(encoding="utf-8") as fh:
@@ -40,7 +44,10 @@ def load_prompts(path: str | Path, api_key_env: str = "ORQ_API_KEY") -> list[Pro
             text = row.get("prompt") or row.get("text")
             if not text:
                 continue
-            out.append(PromptItem(text=text, category=row.get("category") or "general"))
+            meta = {k: v for k, v in row.items() if k not in ("prompt", "text", "category")}
+            out.append(
+                PromptItem(text=text, category=row.get("category") or "general", metadata=meta)
+            )
     return out
 
 
@@ -75,8 +82,9 @@ def datapoint_to_prompt(inputs: dict | None, messages: list | None) -> PromptIte
     for key, value in (inputs or {}).items():
         # lambda replacement: dataset values are literals, not regex templates
         # (a backslash in code/LaTeX inputs must not become a group reference)
-        text = re.sub(r"\{\{\s*" + re.escape(str(key)) + r"\s*\}\}",
-                      lambda _m, v=str(value): v, text)
+        text = re.sub(
+            r"\{\{\s*" + re.escape(str(key)) + r"\s*\}\}", lambda _m, v=str(value): v, text
+        )
     return PromptItem(text=text)
 
 
@@ -127,7 +135,8 @@ def _load_orq_dataset(dataset_id: str, api_key_env: str) -> list[PromptItem]:
                     getattr(dp, "inputs", None), getattr(dp, "messages", None)
                 )
                 if item:
-                    out.append(item)
+                    dp_id = getattr(dp, "id", None)
+                    out.append(replace(item, metadata={"datapoint_id": dp_id} if dp_id else {}))
                 else:
                     skipped += 1
             if not rows or not getattr(page, "has_more", False):

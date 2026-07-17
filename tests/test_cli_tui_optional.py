@@ -35,14 +35,6 @@ def test_run_tui_without_textual_gives_hint(monkeypatch, tmp_path):
     assert "--tui" in result.output
 
 
-def test_demo_without_textual_gives_hint(monkeypatch, tmp_path):
-    _hide_textual(monkeypatch)
-    monkeypatch.chdir(tmp_path)  # hint must fire even where orq_arena.yaml doesn't exist
-    result = CliRunner().invoke(cli, ["demo"])
-    assert result.exit_code != 0
-    assert "orq-arena[tui]" in result.output
-
-
 def test_help_works_without_textual(monkeypatch):
     _hide_textual(monkeypatch)
     result = CliRunner().invoke(cli, ["--help"])

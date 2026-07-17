@@ -45,7 +45,11 @@ orders**, concurrently:
 
 This dual-ordering design is the standard defense the Chatbot-Arena family of methodologies uses
 against position bias, a well-documented tendency for LLM judges to prefer whichever answer they
-see first.
+see first ([Zheng et al., 2023](https://arxiv.org/abs/2306.05685);
+[Wang et al., 2023](https://arxiv.org/abs/2305.17926)). One deliberate difference from MT-Bench:
+Zheng et al. score an order-inconsistent judgment as a tie, orq-arena instead removes that
+judge's vote from the round entirely (see the consistency gate below), a stricter reading of the
+same signal.
 
 One bias survives both blinding and seat-swapping: **self-preference**. LLM judges recognize
 their own family's prose stylistically and favor it (Panickssery et al., NeurIPS 2024), so

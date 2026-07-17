@@ -5,7 +5,7 @@ Drives the real TUI headlessly (Textual Pilot) over the committed example run
 
     uv run python scripts/capture_docs_media.py
 
-Writes leaderboard.svg and battle-browser.svg. The report PNG is captured
+Writes run-plan.svg, leaderboard.svg, and battle-browser.svg. The report PNG is captured
 separately with headless Chrome from examples/quickstart/battles.report.html.
 """
 
@@ -37,7 +37,35 @@ async def capture() -> dict[str, str]:
 
     shots: dict[str, str] = {}
 
-    app = ArenaApp(cfg=cfg, prompts=[], battle_log_path="", live=False)
+    # RUN PLAN screen, from the same preflight math a live run would show.
+    from orq_arena.data.prompts import load_prompts
+    from orq_arena.preflight import call_counts, cost_ceiling, judge_family_overlaps
+    from orq_arena.tui.screens.title import RunPlanScreen
+
+    from orq_arena.providers.models_list import fetch_price_map
+
+    prompts = load_prompts(str(ROOT / "prompts" / "starter.jsonl"), api_key_env="ORQ_API_KEY")
+    counts = call_counts(cfg, prompts)
+    ceiling = cost_ceiling(cfg, prompts, counts, await fetch_price_map(cfg.gateway))
+    plan = {
+        "counts": counts,
+        "ceiling": ceiling,
+        "overlap": judge_family_overlaps(list(cfg.judges), cfg.candidates),
+        "probe_lines": [],
+        "n_candidates": len(cfg.candidates),
+        "n_judges": len(cfg.judges),
+        "n_prompts": len(prompts),
+        "prompts_label": "prompts/starter.jsonl",
+        "prompt_categories": {},
+        "log_path": "battles.jsonl",
+    }
+    app = ArenaApp(cfg=cfg, prompts=[], battle_log_path="")
+    async with app.run_test(size=(140, 44)) as pilot:
+        app.push_screen(RunPlanScreen(plan))
+        await pilot.pause()
+        shots["run-plan.svg"] = app.export_screenshot()
+
+    app = ArenaApp(cfg=cfg, prompts=[], battle_log_path="")
     async with app.run_test(size=(140, 38)) as pilot:
         app.push_screen(
             LeaderboardScreen(
@@ -51,7 +79,7 @@ async def capture() -> dict[str, str]:
         await pilot.pause()
         shots["leaderboard.svg"] = app.export_screenshot()
 
-    app = ArenaApp(cfg=cfg, prompts=[], battle_log_path="", live=False)
+    app = ArenaApp(cfg=cfg, prompts=[], battle_log_path="")
     async with app.run_test(size=(140, 36)) as pilot:
         app.push_screen(BattleBrowserScreen(records))
         for _ in range(BROWSER_ROUND):

@@ -35,7 +35,7 @@ Models are called through the [orq.ai router gateway](https://docs.orq.ai/docs/a
 - **Headless by default.** Plain log lines on pipes, a progress bar on terminals, matches in parallel. Drop it in CI or cron with `-y`.
 - **Cheap jury swaps.** The responses are already recorded, so re-judging with a different panel costs judge tokens only, and tells you how much the ranking depends on who judged it.
 - **Human spot-checks.** `annotate` renders a run into a blind page (no model names, no jury votes) you can send to human raters; `anchor` compares their votes with the panel's. (The mechanism ships; no published study against it yet, see [Methodology](docs/methodology.md#current-limitations).)
-- **A live show when you want one.** `--tui` (optional extra) streams the run as a CRT-neon arena with health bars and judge cards. `orq-arena demo` replays one with no API key.
+- **A live show when you want one.** `--tui` (optional extra) opens on a RUN PLAN consent screen (the full per-model cost table), then streams the run as a CRT-neon arena with health bars and judge cards.
 
 Don't take the bullets' word for it: a real recorded run is committed at [`examples/quickstart/`](examples/quickstart/) (a small 4-model pool). Inspect the raw `battles.jsonl` and its manifest, or regenerate the report yourself: `uv run orq-arena report examples/quickstart/battles.jsonl`.
 
@@ -50,25 +50,25 @@ uv sync
 ```
 
 `uv sync` (or `pip install orq-arena`) installs the core: the benchmark, the HTML report, and
-`rejudge` all run on this. The live `--tui` show and `orq-arena demo` need the optional `tui`
-extra: `uv sync --extra tui` (or `pip install "orq-arena[tui]"`). Without it those commands
-print a friendly install hint.
+`rejudge` all run on this. The live `--tui` show needs the optional `tui` extra:
+`uv sync --extra tui` (or `pip install "orq-arena[tui]"`). Without it, `--tui` prints a
+friendly install hint.
 
 ## Quick start
 
-1. Get an API key from your [orq.ai](https://my.orq.ai) workspace: `cp .env.example .env`, then fill in `ORQ_API_KEY` (loaded automatically).
+1. Get an API key from your orq.ai workspace ([API keys guide](https://docs.orq.ai/docs/ai-studio/organization/api-keys)): `cp .env.example .env`, then fill in `ORQ_API_KEY` (loaded automatically).
 2. Point the `candidates` list at your model pool (or keep the shipped 8-model `orq_arena.yaml`) and run:
 
 ```bash
 uv run orq-arena run --config orq_arena.yaml --prompts your_prompts.jsonl
 ```
 
-Before spending anything, the preflight prints the exact number of API calls and a worst-case dollar ceiling, then asks once. Matches run in parallel with plain log lines. When the last round lands, the **HTML report opens in your browser**.
+Before spending anything, the preflight prints the exact number of API calls and a worst-case dollar ceiling, then asks once. Matches run in parallel with plain log lines. When the last round lands, the **HTML report is written next to the battle log** (`--open` to view it in your browser).
 
 ```bash
 # CI/cron-ready: -y skips the confirmation (required in a non-interactive
-# shell, where the prompt would abort), --no-open skips the browser
-uv run orq-arena run --config orq_arena.yaml --prompts your_prompts.jsonl -y --no-open
+# shell, where the prompt would abort)
+uv run orq-arena run --config orq_arena.yaml --prompts your_prompts.jsonl -y
 ```
 
 Bring your prompts either way:
@@ -90,7 +90,7 @@ Dataset-backed runs record the [Dataset](https://docs.orq.ai/docs/ai-studio/opti
 
 Set expectations for the out-of-the-box run: the shipped 30-prompt bank and cheap default judge trio are a **smoke test** that exercises every mechanism, not a benchmark. Expect wide, overlapping error bars and a judge/candidate family-overlap caveat on the report; both are the honest output at that scale. A ranking you intend to defend takes your own prompt set (hundreds of rounds) and judges from families outside the pool ([Methodology](docs/methodology.md#current-limitations)).
 
-No key yet? Watch a recorded tournament first: `uv run orq-arena demo` (zero API calls).
+No key yet? Open the committed example run's report at [`examples/quickstart/`](examples/quickstart/), or regenerate it keyless: `uv run orq-arena report examples/quickstart/battles.jsonl`. Keys: [API keys guide](https://docs.orq.ai/docs/ai-studio/organization/api-keys).
 
 ## Usage
 
@@ -102,9 +102,9 @@ No key yet? Watch a recorded tournament first: `uv run orq-arena demo` (zero API
 
 ## The live show (bonus)
 
-The same run, projected: `uv run orq-arena run --config orq_arena.yaml --tui` streams both models side by side with judge cards that call out position-biased votes in public. `s` saves an SVG screenshot, `q` quits. Try it with no API key: `uv run orq-arena demo`.
+The same run, projected: `uv run orq-arena run --tui` opens on the RUN PLAN consent screen (every model priced, one ENTER to fight), then streams both models side by side with judge cards that call out position-biased votes in public. `s` saves an SVG screenshot, `q` quits.
 
-![orq-arena demo: a replayed match streaming side by side, judge cards calling out flipped votes, and the final leaderboard](media/demo.gif)
+![The live --tui show: a match streaming side by side, judge cards calling out flipped votes, and the final leaderboard](media/demo.gif)
 
 From the final leaderboard, `B` pages through every judged round (prompt, both responses, per-judge votes with flip badges). Screenshots and keys: [docs/cli.md](docs/cli.md).
 
@@ -112,7 +112,7 @@ From the final leaderboard, `B` pages through every judged round (prompt, both r
 
 Everything lives in `orq_arena.yaml`, no flags to remember. The default pool runs every model with extended reasoning ("thinking") turned **off**, and verifies that against the live router, so the ELO compares models on equal footing rather than whatever each vendor enables by default. `configs/reasoning_arena.yaml` is the thinking-ON counterpart, and [`configs/`](configs/) has ready-made frontier, budget, and 16-model pools. Per-provider reasoning settings, replacement judges, and every other key: **[docs/configuration.md](docs/configuration.md)**.
 
-**Not locked to orq.ai.** The engine speaks plain OpenAI-compatible chat: point `gateway.base_url` at any endpoint that speaks that format and set `api_key_env` to match. A ready-made example against OpenRouter ships in the repo, `orq-arena run --config configs/byok_openrouter.yaml` — off the router you lose catalog pricing (spend ceiling, report cost section), nothing else. The orq.ai router is the default because one key covers every provider; it is the recommended path, not the only one. Details: [docs/configuration.md](docs/configuration.md#bring-your-own-endpoint).
+**Not locked to orq.ai.** The engine speaks plain OpenAI-compatible chat: point `gateway.base_url` at any endpoint that speaks that format and set `api_key_env` to match — off the router you lose catalog pricing (spend ceiling, report cost section), nothing else. The orq.ai router is the default because one key covers every provider; it is the recommended path, not the only one. Details: [docs/configuration.md](docs/configuration.md#bring-your-own-endpoint).
 
 ```yaml
 candidates:
@@ -141,7 +141,7 @@ Full guides live at **[orq-ai.github.io/orq-arena](https://orq-ai.github.io/orq-
 | Guide | Description |
 |-------|-------------|
 | [Getting Started](docs/getting-started.md) | Prerequisites, install, first live run, common setup issues |
-| [CLI Reference](docs/cli.md) | Every command and flag, `run`, `demo`, `rejudge` (with `--compare`), `report`, `annotate`, `anchor`, `list-models`, `refresh-models` |
+| [CLI Reference](docs/cli.md) | Every command and flag, `run`, `rejudge` (with `--compare`), `report`, `annotate`, `anchor`, `pool`, `refresh-catalog` |
 | [Configuration](docs/configuration.md) | Every `orq_arena.yaml` key, reasoning recipes, defaults |
 | [Methodology](docs/methodology.md) | How the ranking is made, bias controls, confidence intervals, reproducibility |
 

@@ -36,8 +36,15 @@ def test_datapoint_without_user_message_is_skipped() -> None:
 def test_datapoint_content_parts_are_joined() -> None:
     item = datapoint_to_prompt(
         inputs=None,
-        messages=[{"role": "user", "content": [{"type": "text", "text": "part one"},
-                                               {"type": "text", "text": "part two"}]}],
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "part one"},
+                    {"type": "text", "text": "part two"},
+                ],
+            }
+        ],
     )
     assert item is not None and item.text == "part one\npart two"
 
@@ -46,3 +53,14 @@ def test_orq_scheme_requires_api_key(monkeypatch) -> None:
     monkeypatch.delenv("ORQ_API_KEY", raising=False)
     with pytest.raises(RuntimeError, match="ORQ_API_KEY"):
         load_prompts("orq:some_dataset_id")
+
+
+def test_jsonl_extra_keys_become_metadata(tmp_path) -> None:
+    f = tmp_path / "p.jsonl"
+    f.write_text(
+        '{"prompt": "hi", "category": "code", "length_bucket": "short", "source_id": 7}\n'
+        '{"prompt": "plain"}\n'
+    )
+    items = load_prompts(f)
+    assert items[0].metadata == {"length_bucket": "short", "source_id": 7}
+    assert items[1].metadata == {}

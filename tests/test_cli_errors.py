@@ -10,7 +10,7 @@ from orq_arena.cli import cli
     "argv",
     [
         ["run", "-y"],
-        ["list-models"],
+        ["pool"],
         ["report", "whatever.jsonl"],
     ],
 )
@@ -28,7 +28,7 @@ def test_list_models_json_is_parseable(tmp_path, monkeypatch):
 
     yaml = Path("orq_arena.yaml").resolve()
     monkeypatch.chdir(tmp_path)
-    result = CliRunner().invoke(cli, ["list-models", "--config", str(yaml), "--json"])
+    result = CliRunner().invoke(cli, ["pool", "--config", str(yaml), "--json"])
     assert result.exit_code == 0, result.output
     pool = json.loads(result.stdout)
     assert pool and {"seed", "name", "model_id"} <= set(pool[0])

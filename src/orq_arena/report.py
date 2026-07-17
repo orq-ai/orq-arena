@@ -29,13 +29,14 @@ _MARK = (
     "</g></svg>"
 )
 
-_CSS = """
+# Shared orq v2 design tokens (shadcn "Neutral" base, mirrors orquesta-web
+# _spartan.css + _orq.css): neutral white/gray surfaces, Inter, indigo brand
+# with Pulse Orange as a reserved accent, subtle elevation, full light+dark.
+# A/B side colors stay functional. Every self-contained HTML page in this
+# project (report, annotate) shares this block so they read as one system.
+_ROOT_CSS = """
 :root {
   color-scheme: light dark;
-  /* orq v2 design language (shadcn "Neutral" base, mirrors orquesta-web
-     _spartan.css + _orq.css): neutral white/gray surfaces, Inter, indigo
-     brand with Pulse Orange as a reserved accent, subtle elevation, full
-     light+dark. A/B side colors stay functional. */
   --radius: 10px; --r-sm: 6px; --r-md: 8px; --r-lg: 10px; --r-xl: 12px;
   --paper: oklch(0.985 0 0); --surface: oklch(0.97 0 0); --card: oklch(1 0 0);
   --line: oklch(0.922 0 0); --ink: #141319; --muted: oklch(0.50 0 0);
@@ -56,6 +57,11 @@ _CSS = """
   --a: #c084fc; --b: #4dd0e1; --dot-mute: oklch(0.5 0 0); --heat: 255 143 52;
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / .5); --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / .4);
 }}
+"""
+
+_CSS = (
+    _ROOT_CSS
+    + """
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--sans);
        line-height: 1.55; -webkit-font-smoothing: antialiased; }
@@ -150,6 +156,7 @@ details.method p { font-size: 13px; color: var(--muted); margin: 4px 2px; max-wi
 .sig.warn { color: var(--warn); } .sig.good { color: var(--good); }
 @media (max-width: 640px) { h1 { font-size: 24px; } .verdict .kpis { flex-direction: column; } }
 """
+)
 
 
 def _e(s: Any) -> str:

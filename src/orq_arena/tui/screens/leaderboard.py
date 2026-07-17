@@ -1,7 +1,6 @@
 """Leaderboard screen, final ELO rankings with the statistics that make
 them defensible: bootstrap CIs, per-judge jury behaviour, verbosity, and a
-win grid. Renders plain (rank/ELO only) when no report is available, e.g.
-replaying an old fixture."""
+win grid. Renders plain (rank/ELO only) when no report is supplied."""
 
 from __future__ import annotations
 

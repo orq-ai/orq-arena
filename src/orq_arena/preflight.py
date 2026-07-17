@@ -55,6 +55,18 @@ def _est_tokens(text: str) -> int:
 
 
 @dataclass(frozen=True)
+class CostRow:
+    """One line of the run-plan cost table; usd=None means unpriced, not $0."""
+
+    role: str  # "candidate" | "judge" | "probe"
+    model_id: str
+    calls: int  # streams for candidates, judge calls for judges, probes for probe
+    price_in: float | None  # $/M input tokens; None when absent from the catalog
+    price_out: float | None
+    usd: float | None
+
+
+@dataclass(frozen=True)
 class CostCeiling:
     """Spend bound with every output cap fully hit; math, not prediction."""
 
@@ -63,6 +75,7 @@ class CostCeiling:
     judges_usd: float
     probe_usd: float
     unpriced: list[str]  # router ids absent from the catalog, excluded
+    rows: tuple[CostRow, ...] = ()
 
 
 def cost_ceiling(
@@ -82,18 +95,22 @@ def cost_ceiling(
     rounds = counts.rounds_per_match
     n = len(cfg.candidates)
     unpriced: list[str] = []
+    rows: list[CostRow] = []
 
     models_usd = 0.0
     max_cap = 0
     for w in cfg.candidates:
         cap = w.max_tokens or cfg.gateway.candidate_max_tokens
         max_cap = max(max_cap, cap)
+        streams = (n - 1) * rounds  # each candidate meets every other once
         if w.model_id not in prices:
             unpriced.append(w.model_id)
+            rows.append(CostRow("candidate", w.model_id, streams, None, None, None))
             continue
         cin, cout = prices[w.model_id]
-        streams = (n - 1) * rounds  # each candidate meets every other once
-        models_usd += streams * (cin * prompt_tok + cout * cap) / 1e6
+        usd = streams * (cin * prompt_tok + cout * cap) / 1e6
+        models_usd += usd
+        rows.append(CostRow("candidate", w.model_id, streams, cin, cout, usd))
 
     judge_in_tok = prompt_tok + 2 * max_cap + _JUDGE_WRAPPER_TOKENS
     judges_usd = 0.0
@@ -101,11 +118,12 @@ def cost_ceiling(
     for j in cfg.judges:
         if j not in prices:
             unpriced.append(j)
+            rows.append(CostRow("judge", j, calls_per_judge, None, None, None))
             continue
         cin, cout = prices[j]
-        judges_usd += (
-            calls_per_judge * (cin * judge_in_tok + cout * cfg.gateway.judge_max_tokens) / 1e6
-        )
+        usd = calls_per_judge * (cin * judge_in_tok + cout * cfg.gateway.judge_max_tokens) / 1e6
+        judges_usd += usd
+        rows.append(CostRow("judge", j, calls_per_judge, cin, cout, usd))
 
     probe_usd = 0.0
     if counts.probe_calls:
@@ -115,6 +133,7 @@ def cost_ceiling(
                 continue  # already recorded above
             cin, cout = prices[w.model_id]
             probe_usd += (cin * probe_prompt_tok + cout * _PROBE_MAX_TOKENS) / 1e6
+        rows.append(CostRow("probe", "thinking probe", counts.probe_calls, None, None, probe_usd))
 
     return CostCeiling(
         total_usd=models_usd + judges_usd + probe_usd,
@@ -122,6 +141,7 @@ def cost_ceiling(
         judges_usd=judges_usd,
         probe_usd=probe_usd,
         unpriced=sorted(set(unpriced)),
+        rows=tuple(rows),
     )
 
 
