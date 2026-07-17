@@ -1,8 +1,8 @@
 # Example model pool for the committed quickstart run (examples/quickstart/).
-# An 8-model pool spanning six providers, judged by the cheap default trio.
+# An 8-model pool spanning five providers, judged by the cheap default trio.
 # Regenerate with:
 #   orq-arena run --config examples/quickstart/config.yaml \
-#     --prompts prompts/starter.jsonl -y --no-open \
+#     --prompts prompts/starter.jsonl -y \
 #     --output examples/quickstart/battles.jsonl
 
 match:

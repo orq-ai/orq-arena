@@ -113,9 +113,6 @@ between the human ranking and the panel's. Usage: [cli.md](cli.md#annotate).
 - **The shipped 30-prompt bank is a smoke test**, sized to exercise every mechanism, not to
   defend a ranking. A ranking you intend to defend takes your own prompt set (hundreds of
   rounds) and judges from families outside the pool.
-- **Style control covers length only**, not markdown formatting.
-- **The human-anchor mechanism ships without a published validation study**; run your own
-  raters before treating the panel as a proxy for your users.
 
 ## References
 

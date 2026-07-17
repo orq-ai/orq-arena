@@ -144,6 +144,7 @@ run, an 8-model pool against the default judge trio):
 $ orq-arena run --config examples/quickstart/config.yaml \
     --output examples/quickstart/battles.jsonl
 preflight: 28 matches × 5 rounds → 280 model streams + 840 judge calls + 8 probe calls
+  ⚖ judge/contestant family overlap: anthropic/claude-haiku-4-5-20251001, google/gemini-2.5-flash-lite, openai/gpt-5.4-nano. Self-preference bias is not corrected by seat swapping; prefer judges from families outside the pool.
                                    RUN PLAN
 ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━┓
 ┃ Model                                 ┃ Calls ┃ $/M in ┃ $/M out ┃ Ceiling  ┃
@@ -278,7 +279,7 @@ further model calls:
 |---|---|
 | `battles.jsonl` | One JSON line per judged round: both responses, reconciled per-judge votes, token/TTFT accounting. |
 | `battles.run.json` | The run manifest: config/prompt hashes, candidate pool, judge panel, seed, and (once finished) agreement stats. |
-| `battles.report.html` | A single-file HTML report, no server, no external assets. Verdict banner with the top 3 models up top, then the ELO ladder with error bars, a quality-vs-cost value map, speed, and the exact dollar spend. Forward it to anyone. |
+| `battles.report.html` | A single-file HTML report, no server, no external assets. Verdict banner with the top 3 models up top, then the ELO ladder with error bars, a quality-vs-cost value map, speed, and the exact dollar spend. Share it with anyone. |
 
 ![HTML report page: verdict banner with the top three models, badges, ELO leaderboard with CI bars, and the ELO-vs-cost value map](assets/report-page.png)
 

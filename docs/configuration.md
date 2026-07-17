@@ -26,14 +26,10 @@ cp .env.example .env
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `ORQ_API_KEY` | Required for live runs |, | The only secret orq-arena needs. Every candidate, judge, and preflight-probe call goes through the orq.ai router gateway with this one key. Resolved through evaluatorq's `resolve_llm_client` at the default `base_url`, else read directly from the environment (`src/orq_arena/providers/orq_gateway.py`, see [Credential/host resolution](#gateway-orqaigatewayconfig)); the gateway raises `RuntimeError("ORQ_API_KEY is not set. Export it before running orq-arena.")` at construction time if it is empty. Create one per the [API keys guide](https://docs.orq.ai/docs/ai-studio/organization/api-keys) (per `.env.example`). |
+| `ORQ_API_KEY` | Required for live runs | (none) | The only secret orq-arena needs. Every candidate, judge, and preflight-probe call goes through the orq.ai router gateway with this one key; the run fails up front with `ORQ_API_KEY is not set. Export it before running orq-arena.` if it is missing. Create one per the [API keys guide](https://docs.orq.ai/docs/ai-studio/organization/api-keys) (per `.env.example`). |
 
 Notes:
 
-- The variable **name** itself is configurable, not hardcoded, it comes from the YAML key
-  the fixed `ORQ_API_KEY` environment variable (see the [`gateway` table](#gateway-orqaigatewayconfig)
-  below). It does not
-  set a key.
 - `ORQ_API_KEY` is **not** required for `orq-arena pool` (prints the candidate pool, never
   constructs a gateway) or the log-reading commands (`report`, `annotate`, `anchor`).
 
@@ -156,16 +152,6 @@ hardcoded in `OrqGateway.__init__` alongside `stream_read_timeout_s`, only the r
 is exposed as a config key. The preflight probe call (see below) also uses a hardcoded
 `max_tokens=1000`, independent of `candidate_max_tokens`/`judge_max_tokens`.
 
-!!! info "Credential/host resolution at defaults"
-
-    When `base_url` is left at its default, `OrqGateway` delegates
-    credential and host resolution to evaluatorq's `resolve_llm_client` (the company-wide
-    single source of truth). That path **honors the `ORQ_BASE_URL` environment variable**
-    (host plus `/v3/router`, the way to point at a staging host) and **requires an ORQ
-    key**, it will not silently fall back to `OPENAI_API_KEY`. Setting `base_url` in the
-    YAML uses the config verbatim with no environment-variable precedence (`ORQ_BASE_URL`
-    is ignored); the key still comes from `ORQ_API_KEY`.
-
 ### `preflight` (`PreflightConfig`)
 
 | Key | Type | Default | Effect |
@@ -185,7 +171,7 @@ least 2 entries (`ArenaConfig._validate`: `"Need at least 2 candidates, got {n}"
 
 | Key | Type | Default | Effect |
 |---|---|---|---|
-| `model_id` | `str` |, (required) | orq.ai router gateway model slug, e.g. `anthropic/claude-opus-4-8`. The only required field per candidate entry. |
+| `model_id` | `str` | (required) | orq.ai router gateway model slug, e.g. `anthropic/claude-opus-4-8`. The only required field per candidate entry. |
 | `name` | `str` | `""` → falls back to `short_model` | Display name used on the leaderboard, TUI cards, and arena events (`MatchStarted`/`MatchResolved`). Defaults to `model_id` with the provider prefix stripped (`"anthropic/claude-opus-4-8"` → `"claude-opus-4-8"`) and is **never auto-generated beyond that**: a custom name is allowed but not invented (`src/orq_arena/candidates.py` docstring: "Display name defaults to the model's short name... A custom `name` is still allowed but never generated."). Note: `battles.jsonl` records (`BattleRecord.model_a`/`model_b`) always store `short_model`, not `name`; `name` is presentation-only. |
 | `emblem` | `str` | `""` | Optional glyph/emoji shown before the orc name on the TUI candidate card (`src/orq_arena/tui/widgets/model_card.py`). Purely cosmetic. |
 | `reasoning` | `dict \| null` | `None` | Raw router reasoning-control object, forwarded verbatim as `extra_body` on the completion request (`stream_completion`, `src/orq_arena/providers/orq_gateway.py`). Not interpreted beyond the `budget_tokens` cross-check below, the router normalizes it per provider. |
@@ -221,7 +207,7 @@ in that file), those belong in `configs/reasoning_arena.yaml` instead.
 
 | Key | Type | Default | Effect |
 |---|---|---|---|
-| `judges` | `list[str]` |, (required, non-empty) | Router model ids forming the base judge panel handed to evaluatorq's `llm_jury_pairwise(judges=...)`. Must be non-empty, `ArenaConfig._validate` raises `ValueError("Judge panel is empty")` otherwise. Each judge votes on both seat orderings of every round. |
+| `judges` | `list[str]` | (required, non-empty) | Router model ids forming the base judge panel handed to evaluatorq's `llm_jury_pairwise(judges=...)`. Must be non-empty, `ArenaConfig._validate` raises `ValueError("Judge panel is empty")` otherwise. Each judge votes on both seat orderings of every round. |
 | `replacement_judges` | `list[str]` | `[]` | Neutral stand-ins promoted when a primary judge errors mid-run (`llm_jury_pairwise(replacement_judges=...)`). |
 | `criteria` | `str` | `"Accuracy and correctness, helpfulness and completeness, clarity, and relevance to the prompt."` | Free-text criteria string every judge is given, what the jury is asked to judge on. Can be overridden for a single re-judge without editing the YAML via `orq-arena rejudge ... --criteria "..."`. |
 | `min_successful_judges` | `int` | `2` | Minimum number of decisive reconciled votes required for a round to produce a real verdict. Fewer than this, and the round is `inconclusive` (dropped from the rating, doesn't count toward `max_rounds`), a guard against a "jury of one" deciding a round. |
@@ -264,7 +250,7 @@ only for dataset-sourced runs, and `battles.report.html` links the dataset by th
 | `prompt` | `str` | Required (or `text`, see below) | The prompt text, becomes `PromptItem.text`. |
 | `text` | `str` | Fallback for `prompt` | Read only if `prompt` is absent (`row.get("prompt") or row.get("text")`). A row with neither key is silently skipped. |
 | `category` | `str` | Optional, default `"general"` | Feeds the per-category ELO slices on the leaderboard. Untagged rows land in `"general"`. |
-| any other key | any | Optional | Carried verbatim as `prompt_metadata` on every battle record for that prompt in `battles.jsonl` — opaque pass-through for joining rounds back to your source data (never sliced or judged on). |
+| any other key | any | Optional | Carried verbatim as `prompt_metadata` on every battle record for that prompt in `battles.jsonl`, an opaque pass-through for joining rounds back to your source data (never sliced or judged on). |
 
 `PromptItem` itself (`src/orq_arena/data/prompts.py`) is a frozen dataclass with three
 fields: `text: str`, `category: str = "general"`, and `metadata: dict = {}`.

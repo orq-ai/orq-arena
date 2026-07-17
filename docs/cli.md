@@ -51,7 +51,7 @@ full `orq_arena.yaml` key reference, see [configuration.md](configuration.md).
 
 | Command | Purpose |
 |---|---|
-| [`run`](#run) | Round-robin benchmark via the orq.ai router: headless by default, HTML report opens at the end, `--tui` for the live show. |
+| [`run`](#run) | Round-robin benchmark via the orq.ai router: headless by default, HTML report written next to the log (`--open` to view), `--tui` for the live show. |
 | [`pool`](#pool) | Print the configured candidate pool (seed, name, model id). |
 | [`rejudge`](#rejudge) | Re-score a recorded `battles.jsonl` with a different judge panel, zero regeneration; or, with [`--compare`](#rejudge-compare), tabulate saved rejudge reports side by side. |
 | [`report`](#report) | Render the single-file HTML report page from a recorded run; no model calls, one optional catalog read for prices. |
@@ -108,7 +108,7 @@ headless: matches in parallel, plain log lines on pipes, a progress bar on
 terminals, and the HTML report is written next to the battle log at the end
 (`--open` to view it in your browser). `--tui` runs
 the same tournament as the live show instead; it needs the optional `[tui]`
-extra (`uv tool install '.[tui]'`) and prints a friendly install hint without it.
+extra and prints a friendly install hint without it.
 The headless run needs no extra.
 
 ```text
@@ -173,7 +173,7 @@ enabled, has already made its one probe stream per model). When stdin is not an 
 terminal the run errors out with a "pass `--yes`" hint instead of prompting.
 
 **Streams.** Preflight narration, warnings, per-match lines, and the progress bar print to
-stderr; the final standings, token totals, battle-log path, and report-page path print to
+stderr; the Final Results, token totals, battle-log path, and report-page path print to
 stdout. `1>results.txt` captures only the results; `2>/dev/null` silences the chatter.
 
 **Output.** Every judged round is appended to `--output` (`battles.jsonl`, schema v3) as the
@@ -299,7 +299,7 @@ The run ends on the **Final Results screen**: ELO with its 95% CI and len-ctrl r
 model, the per-category slices, per-judge behaviour (A/B lean, flip rate, tie rate, Fleiss'
 κ), and the win grid.
 
-![Final standings: ELO ladder with CIs and len-ctrl, per-judge behaviour, win grid](assets/leaderboard.svg)
+![Final Results: ELO ladder with CIs and len-ctrl, per-judge behaviour, win grid](assets/leaderboard.svg)
 
 **From the final leaderboard**: `B` opens the battle browser, paging through every judged
 round with the prompt, both responses, and per-judge votes with flip badges; `s` saves an

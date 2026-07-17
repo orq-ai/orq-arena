@@ -1,21 +1,21 @@
 # Quickstart example run
 
 A real, committed orq-arena run so you can inspect the output before spending a
-cent of your own: 8 models across six providers, the 30-prompt starter bank,
+cent of your own: 8 models across five providers, the 30-prompt starter bank,
 the cheap default judge trio.
 
 Open **[`battles.report.html`](battles.report.html)** in a browser for the full
 page. Regenerate it from the recorded log at any time (no model calls):
 
 ```bash
-uv run orq-arena report examples/quickstart/battles.jsonl
+orq-arena report examples/quickstart/battles.jsonl
 ```
 
 Reproduce the whole run (needs `ORQ_API_KEY`, ~$12 ceiling, several minutes):
 
 ```bash
-uv run orq-arena run --config examples/quickstart/config.yaml \
-  --prompts prompts/starter.jsonl -y --no-open \
+orq-arena run --config examples/quickstart/config.yaml \
+  --prompts prompts/starter.jsonl -y \
   --output examples/quickstart/battles.jsonl
 ```
 

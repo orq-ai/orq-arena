@@ -1,13 +1,20 @@
 # orq-arena documentation
 
-An arena benchmark for LLMs on **your own prompts**. It answers the question every model pool
-raises: **"which of these models actually wins on *my* prompts, and can I trust the ranking?"**
+An arena benchmark for LLMs on **your own data**.
+
+A new model ships every few weeks, and each one tops a leaderboard somewhere. Whether it wins
+on your workload is a different question: public leaderboards rank models on someone else's
+data.
+
+So run your own leaderboard. orq-arena ranks your model pool head-to-head on your own prompts
+and answers the question directly: **"which of these models actually wins on my data, and can
+I trust the ranking?"**
 
 One command runs a round-robin tournament over your models. A panel of LLM judges compares every
 pair of answers blind, in both orders so no judge can favor "whichever answer came first". Out the
 other end: a chess-style **ELO leaderboard** with confidence intervals.
 
-Every run opens on the **RUN PLAN**: the full pool, every judge, and the estimated cost to run
+Every run opens on the **Run Plan**: the full pool, every judge, and the estimated cost to run
 the benchmark:
 
 ![RUN PLAN screen: the pool, the jury, and the worst-case cost per model, before anything is spent](assets/run-plan.svg)
@@ -15,19 +22,16 @@ the benchmark:
 And ends on the **Final Results**: ELO with 95% CIs and the length-controlled rating,
 per-judge behaviour, and the win grid:
 
-![Final standings: ELO ladder with CIs and len-ctrl, per-judge behaviour, win grid](assets/leaderboard.svg)
+![Final Results: ELO ladder with CIs and len-ctrl, per-judge behaviour, win grid](assets/leaderboard.svg)
 
 ## Why orq-arena?
 
-Public leaderboards rank models on someone else's data. Your eval suite scores models one at a
-time, and once several models all pass, the scores stop telling them apart: everything gets a
-9/10.
-
-Comparison still works where scores saturate. Show a judge two answers to the same prompt and ask
-which is better; that's how [LMArena](https://lmarena.ai) ranks models with human voters.
-orq-arena runs the same protocol on **your prompts** with an LLM jury instead of a crowd, and
-guards the verdicts: every pair is judged twice with the answers swapped, a judge that changes its
-vote when only the order changed is discarded for that round, and if too few trustworthy votes
+Eval suites score models one at a time and stop discriminating once several models pass:
+everything reads 9/10 and the ranking goes flat. Head-to-head comparison keeps discriminating:
+show a judge two answers to the same prompt and ask which is better, the same technique the big
+human-preference leaderboards use, with an LLM jury instead of a crowd. The verdicts are
+guarded: every pair is judged twice with the answers swapped, a judge that changes its vote
+when only the order changed is discarded for that round, and if too few trustworthy votes
 remain the round counts as `inconclusive` rather than a coin flip.
 
 Models are called through the [orq.ai router gateway](https://docs.orq.ai/docs/ai-gateway), so one
@@ -37,9 +41,10 @@ library for exactly this kind of jury.
 **Use it when you want to:**
 
 - Pick a default model for a product on **your own prompts**, not a public leaderboard's
-- Re-rank the pool when a new model drops: one command, ~10 minutes, exact token accounting
+- Re-rank the pool when a new model drops: one command, exact token accounting
 - Generate **pairwise preference data** (`battles.jsonl`) with per-judge votes for later analysis
 - Check whether "thinking" actually helps on your workload (uniform ON vs OFF pools)
+- Pick the strong/economical pair for your [Orq.ai Auto Router](https://docs.orq.ai/docs/ai-gateway/auto-router): the leaderboard shows which cheaper models are statistically tied with your strongest
 
 ## What you get
 
@@ -48,32 +53,22 @@ library for exactly this kind of jury.
   model behind chess-style ratings, fit over every judged round with bootstrapped 95% confidence
   intervals. When two models are statistically tied, the report says so instead of hiding it.
   Judge-agreement stats ship with the standings.
-- **A report you can forward.** One self-contained HTML file per run. Plain-words verdict up top,
-  then the ELO ladder with error bars, a quality-vs-cost chart, latency, and the exact dollar
-  spend.
+- **A report you can share.** One HTML per run. Verdict first, then the ELO ladder with
+  error bars, a quality-vs-cost chart, latency, and the exact dollar spend.
 - **Raw data out the back.** Every judged round lands in `battles.jsonl`: both responses, each
   judge's vote, exact token counts, per-response timing. Real pairwise preference data for
   whatever you want to do next.
-- **Headless by default.** Plain log lines on pipes, a progress bar on terminals, matches in
-  parallel. Drop it in CI or cron with `-y`.
-- **Cheap jury swaps.** The responses are already recorded, so re-judging with a different panel
+- **Jury swaps.** The responses are already recorded, so re-judging with a different panel
   costs judge tokens only, and tells you how much the ranking depends on who judged it.
 - **Human spot-checks.** `annotate` renders a run into a blind page (no model names, no jury
-  votes) you can send to human raters; `anchor` compares their votes with the panel's. (The
-  mechanism ships; no published study against it yet, see
-  [Methodology](methodology.md#current-limitations).)
-- **A live show when you want one.** `--tui` (optional extra) opens on a RUN PLAN consent
-  screen (full per-model cost table), then streams the run as a live arena with health
-  bars and judge cards.
+  votes) you can send to human raters; `anchor` compares their votes with the panel's.
+- **Watch live.** `--tui` (optional extra) opens on a Run Plan consent screen (full
+  per-model cost table), then streams the run as a live arena with health bars and
+  judge cards.
 
-The report is the artifact you forward, one self-contained HTML file:
+The report is the artifact you can share, one self-contained HTML file:
 
 ![HTML report page: verdict banner with the top three models, badges, ELO leaderboard with CI bars, and the ELO-vs-cost value map](assets/report-page.png)
-
-Don't take the bullets' word for it: a real recorded run is committed at
-[`examples/quickstart/`](https://github.com/orq-ai/orq-arena/tree/master/examples/quickstart) (an
-8-model pool). Inspect the raw `battles.jsonl` and its manifest, or regenerate the report
-yourself: `orq-arena report examples/quickstart/battles.jsonl`.
 
 <div class="grid cards" markdown>
 
@@ -89,9 +84,8 @@ yourself: `orq-arena report examples/quickstart/battles.jsonl`.
 
     ---
 
-    Every command and flag with its expected output: `run`, `rejudge`
-    (with `--compare`), `report`, `annotate`, `anchor`, `pool`,
-    `refresh-catalog`.
+    Every command and flag with its expected output: `run`, `pool`,
+    `report`, and the rest.
 
     [:octicons-arrow-right-24: CLI Reference](cli.md)
 
@@ -118,5 +112,4 @@ yourself: `orq-arena report examples/quickstart/battles.jsonl`.
 ## Suggested reading order
 
 - **Running benchmarks?** [Getting Started](getting-started.md) → [Configuration](configuration.md) → [CLI Reference](cli.md)
-- **Contributing code?** [CONTRIBUTING.md](https://github.com/orq-ai/orq-arena/blob/master/CONTRIBUTING.md) has the dev setup, project shape, and PR conventions
 - **New to Orq.ai?** [orq.ai](https://orq.ai) is the platform behind the router and the jury; [docs.orq.ai](https://docs.orq.ai) covers the gateway, datasets, and API keys
