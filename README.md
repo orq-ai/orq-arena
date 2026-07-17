@@ -14,7 +14,7 @@ One command runs a round-robin tournament over your models. A panel of LLM judge
 
 ## Why orq-arena?
 
-Public leaderboards rank models on someone else's prompts. Your eval suite scores models one at a time, and once several models all pass, the scores stop telling them apart: everything gets a 9/10.
+Public leaderboards rank models on someone else's data. Your eval suite scores models one at a time, and once several models all pass, the scores stop telling them apart: everything gets a 9/10.
 
 Comparison still works where scores saturate. Show a judge two answers to the same prompt and ask which is better; that's how [LMArena](https://lmarena.ai) ranks models with human voters. orq-arena runs the same protocol on **your prompts** with an LLM jury instead of a crowd, and guards the verdicts: every pair is judged twice with the answers swapped, a judge that changes its vote when only the order changed is discarded for that round, and if too few trustworthy votes remain the round counts as `inconclusive` rather than a coin flip.
 

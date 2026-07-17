@@ -19,7 +19,7 @@ per-judge behaviour, and the win grid:
 
 ## Why orq-arena?
 
-Public leaderboards rank models on someone else's prompts. Your eval suite scores models one at a
+Public leaderboards rank models on someone else's data. Your eval suite scores models one at a
 time, and once several models all pass, the scores stop telling them apart: everything gets a
 9/10.
 
