@@ -111,38 +111,6 @@ No key yet? Open the committed example run's report at [`examples/quickstart/`](
 
 **Re-judge with a different jury**: the responses are already in `battles.jsonl`, so swapping the panel costs judge tokens only: `orq-arena rejudge battles.jsonl --judge mistral/mistral-small-2603`. It reports how the new jury behaved and how much the ranking moved. Multi-judge example: **[docs/cli.md](docs/cli.md)**.
 
-## The live show (bonus)
-
-The same run, projected: `orq-arena run --config orq_arena.yaml --tui` opens on the Run Plan consent screen (every model priced, one ENTER to fight), then streams both models side by side with judge cards that call out position-biased votes in public. `s` saves an SVG screenshot, `q` quits.
-
-![The live --tui show: a match streaming side by side, judge cards calling out flipped votes, and the final leaderboard](media/demo.gif)
-
-From the final leaderboard, `B` pages through every judged round (prompt, both responses, per-judge votes with flip badges). Screenshots and keys: [docs/cli.md](docs/cli.md).
-
-## Configuration
-
-Everything lives in `orq_arena.yaml`, no flags to remember. The default pool runs every model with extended reasoning ("thinking") turned **off**, and verifies that against the live router, so the ELO compares models on equal footing rather than whatever each vendor enables by default. `configs/reasoning_arena.yaml` is the thinking-ON counterpart, and [`configs/`](configs/) has ready-made frontier, budget, and 16-model pools. Per-provider reasoning settings, replacement judges, and every other key: **[docs/configuration.md](docs/configuration.md)**.
-
-```yaml
-candidates:
-  - model_id: anthropic/claude-opus-4-8
-  - model_id: google/gemini-3.1-pro-preview
-    reasoning: { thinking: { type: disabled } }   # raw router fields, verbatim
-
-judges:
-  - anthropic/claude-haiku-4-5-20251001
-  - google/gemini-2.5-flash-lite
-min_successful_judges: 2   # jury-of-one -> inconclusive, never a verdict
-```
-
-## How the number is made
-
-- **Same prompt, both orders.** Every pair of answers is judged twice with positions swapped, the standard defense the big human-preference leaderboards use. A judge that picks A in one order and B in the other was voting on position, not content; its vote is thrown out for that round and the flip is counted against it.
-- **Ratings from every round, not from knockouts.** The ELO is a Bradley-Terry fit over all judged rounds (a default 8-model run rates on up to 140 comparisons, not 7 match wins), with bootstrapped 95% confidence intervals. On small runs the intervals overlap; the report says so rather than pretending precision.
-- **Length preference is priced out, in public.** LLM judges tend to favor longer answers. The rating is also refit with that preference removed, and both numbers are shown side by side. A model can still win by being longer; it can't do it invisibly.
-- **A model loses on its words, never on its network.** A dead stream retries once, then the round is voided, never judged, never scored. Timeouts fire on silence between tokens, not total duration, so slow-thinking models aren't penalized for being slow.
-- **Self-aware and reproducible.** Judge-agreement statistics and per-judge flip rates ship with the standings. Every run writes a manifest with the random seed, config and prompt hashes, and the exact panel, enough to rerun or audit it. Full details: **[docs/methodology.md](docs/methodology.md)**.
-
 ## Documentation
 
 Full guides live at **[orq-ai.github.io/orq-arena](https://orq-ai.github.io/orq-arena/)** (source in [`docs/`](docs/)); start with the [docs index](docs/index.md) for a reading order tailored to your goal.
