@@ -1,7 +1,8 @@
 """Replay the committed example run through the real TUI, for the demo GIF.
 
-Feeds ArenaApp events reconstructed from examples/quickstart/battles.jsonl,
-so the live show renders real matches without an API key or a cent of spend.
+Opens on the Run Plan screen (rebuilt from the committed manifest's preflight,
+so no API key and no spend), then feeds ArenaApp events reconstructed from
+examples/quickstart/battles.jsonl so the live show renders real matches.
 Recorded by vhs (scripts/demo.tape) into media/demo.gif:
 
     vhs scripts/demo.tape
@@ -10,6 +11,7 @@ Recorded by vhs (scripts/demo.tape) into media/demo.gif:
 from __future__ import annotations
 
 import asyncio
+import json
 from pathlib import Path
 
 from orq_arena.config import load_config
@@ -25,6 +27,7 @@ from orq_arena.events import (
     TurnPrompt,
     TurnResolved,
 )
+from orq_arena.preflight import CallCounts, CostCeiling, CostRow
 from orq_arena.tournament.driver import rebuild_from_log
 from orq_arena.tui.app import ArenaApp, _judge_display
 
@@ -34,7 +37,35 @@ REPLAY_MATCHES = ["M1"]  # short on purpose; the GIF should loop, not lecture
 CHUNK_CHARS = 90
 CHUNK_DELAY_S = 0.006
 JUDGE_DELAY_S = 0.8
-LEADERBOARD_HOLD_S = 7.0
+PLAN_HOLD_S = 5.0  # long enough to read the cost table, short enough to loop
+# Outlives the tape's Sleep on purpose: vhs stops recording while the final
+# leaderboard is still on screen, so the gif never ends on a shell prompt.
+LEADERBOARD_HOLD_S = 30.0
+
+
+def plan_from_manifest(cfg, manifest: dict) -> dict:
+    """The Run Plan dict the CLI would build, rebuilt from the recorded preflight."""
+    pf = manifest["preflight"]
+    ceiling_d = pf["cost_ceiling"]
+    return {
+        "counts": CallCounts(**pf["counts"]),
+        "ceiling": CostCeiling(
+            total_usd=ceiling_d["total_usd"],
+            models_usd=ceiling_d["models_usd"],
+            judges_usd=ceiling_d["judges_usd"],
+            probe_usd=ceiling_d["probe_usd"],
+            unpriced=ceiling_d["unpriced"],
+            rows=tuple(CostRow(**r) for r in ceiling_d["rows"]),
+        ),
+        "overlap": pf.get("family_overlaps") or [],
+        "probe_lines": [],
+        "n_candidates": len(cfg.candidates),
+        "n_judges": len(cfg.judges),
+        "n_prompts": manifest["prompt_count"],
+        "prompts_label": "prompts/starter.jsonl",
+        "prompt_categories": manifest.get("category_counts") or {},
+        "log_path": "battles.jsonl",
+    }
 
 
 class ReplayApp(ArenaApp):
@@ -45,6 +76,10 @@ class ReplayApp(ArenaApp):
         self._records = records
         self._final_elo = final_elo
         self._final_report = final_report
+
+    def on_mount(self) -> None:
+        super().on_mount()  # pushes RunPlanScreen (plan mode, no auto_start)
+        self.set_timer(PLAN_HOLD_S, self.begin)  # the "press ENTER" beat
 
     async def _run_live(self) -> None:  # overrides the network engine
         put = self._events.put
@@ -141,6 +176,7 @@ class ReplayApp(ArenaApp):
 def main() -> None:
     cfg = load_config(str(EXAMPLE / "config.yaml"))
     records = load_records(EXAMPLE / "battles.jsonl")
+    manifest = json.loads((EXAMPLE / "battles.run.json").read_text())
     elo, report = rebuild_from_log(cfg, records)
     replay = [r for r in records if r.match_id in REPLAY_MATCHES and not r.error]
     app = ReplayApp(
@@ -150,7 +186,7 @@ def main() -> None:
         cfg=cfg,
         prompts=[],
         battle_log_path="examples/quickstart/battles.jsonl",
-        auto_start=True,
+        plan=plan_from_manifest(cfg, manifest),
     )
     app.run()
 

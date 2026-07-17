@@ -13,4 +13,6 @@ Type "uv run python scripts/record_demo_gif.py"
 Enter
 Show
 
-Sleep 60s
+# 5s Run Plan + ~23s replay + a leaderboard tail; the app holds the leaderboard
+# longer than this on purpose, so the gif always ends there, never on a prompt
+Sleep 40s
