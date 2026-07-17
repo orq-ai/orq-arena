@@ -129,7 +129,6 @@ Bug reports, feature ideas, documentation fixes, and pull requests are all welco
 ## Related projects
 
 - **[evaluatorq](https://github.com/orq-ai/evaluatorq)**: the evaluation framework doing the judging here (pairwise juries, red teaming, agent simulation).
-- **[orq-auto-router-evaluation](https://github.com/orq-ai/orq-auto-router-evaluation)**: benchmark the Orq.ai Auto Router on quality, cost, and latency over your own workload.
 - **[orq-python](https://github.com/orq-ai/orq-python)**: the official typed SDK for the same router surface, reasoning controls included.
 - **[Orq.ai docs](https://docs.orq.ai)**: the router gateway, evaluators, and platform.
 
