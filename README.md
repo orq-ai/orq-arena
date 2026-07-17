@@ -107,6 +107,8 @@ No key yet? Open the committed example run's report at [`examples/quickstart/`](
 
 **Run the benchmark**: `orq-arena run --config orq_arena.yaml` (headless, parallel, report at the end; the config is explicit, point it at the shipped `orq_arena.yaml` or your own, and edit its `candidates` list to change the pool). Pass `--tui` to watch the fight live. Full flag reference: **[docs/cli.md](docs/cli.md)**.
 
+![The live --tui show: a real match streaming side by side, judge cards with flip badges, and the final leaderboard](media/demo.gif)
+
 **Share the result**: the report (`<log>.report.html`) is one self-contained file. It opens with a verdict banner naming the top three models (win rate, ELO, total cost), then the full ladder with error bars, a quality-vs-cost chart, speed, the win grid, and how the jury behaved. Regenerate it any time with `orq-arena report battles.jsonl`, no model calls needed.
 
 **Re-judge with a different jury**: the responses are already in `battles.jsonl`, so swapping the panel costs judge tokens only: `orq-arena rejudge battles.jsonl --judge mistral/mistral-small-2603`. It reports how the new jury behaved and how much the ranking moved. Multi-judge example: **[docs/cli.md](docs/cli.md)**.
