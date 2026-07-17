@@ -83,8 +83,7 @@ def cli() -> None:
 @click.option(
     "--config",
     "config_path",
-    default=DEFAULT_CONFIG,
-    show_default=True,
+    required=True,
     help="YAML config: candidates (the model pool), judges, match, gateway.",
 )
 @click.option(
@@ -157,13 +156,13 @@ def run(
     """Run the arena benchmark (hits orq.ai): headless logs by default,
     then the HTML report is written next to the battle log (--open to view it).
 
-    The YAML candidates are used as-is (default orq_arena.yaml); matches run in
-    parallel. Pass --tui to watch the live show instead.
+    The YAML candidates are used as-is; matches run in parallel. Pass --tui to
+    watch the live show instead.
 
     \b
     Examples:
-      orq-arena run -y --rounds 8
-      orq-arena run --prompts orq:my_dataset --output runs/today.jsonl
+      orq-arena run --config orq_arena.yaml -y --rounds 8
+      orq-arena run --config orq_arena.yaml --prompts orq:my_dataset --output runs/today.jsonl
     """
     import asyncio
     import sys
@@ -207,7 +206,7 @@ def run(
             "answered; pass --yes to proceed."
         )
     cfg = _load_config(config_path)
-    prompts = load_prompts(prompts_path, api_key_env=cfg.gateway.api_key_env)
+    prompts = load_prompts(prompts_path)
     if rounds is not None:
         if rounds < 1:
             raise click.ClickException("--rounds must be >= 1")
@@ -222,7 +221,7 @@ def run(
     if prompts_path.startswith("orq:"):
         from .data.prompts import orq_dataset_meta
 
-        dataset = orq_dataset_meta(prompts_path[len("orq:") :], api_key_env=cfg.gateway.api_key_env)
+        dataset = orq_dataset_meta(prompts_path[len("orq:") :])
 
     counts = call_counts(cfg, prompts)
     status(
@@ -325,7 +324,9 @@ def run(
                 quiet=quiet,
             )
         )
-    _open_report(output_path, open_browser)
+    # The headless summary already printed the report-page pointer; the TUI
+    # exits to a bare terminal, so it still needs one.
+    _open_report(output_path, open_browser, announce=tui)
 
 
 def _print_run_plan(ceiling) -> None:
@@ -390,8 +391,9 @@ def _print_run_plan(ceiling) -> None:
     Console(file=sys.stderr).print(table)
 
 
-def _open_report(battle_log_path: str, open_browser: bool) -> None:
-    """Point the user at the finished report; open it only on request (--open)."""
+def _open_report(battle_log_path: str, open_browser: bool, announce: bool = False) -> None:
+    """Open the finished report on request (--open); announce only when the
+    run summary didn't already print the pointer (TUI runs)."""
     import os
     import sys
     import webbrowser
@@ -402,7 +404,8 @@ def _open_report(battle_log_path: str, open_browser: bool) -> None:
     page = report_path_for(Path(battle_log_path))
     if not page.exists():
         return
-    click.echo(f"report page -> {page}")
+    if announce:
+        click.echo(f"report page → {page}")
     if open_browser and sys.stdout.isatty() and not os.environ.get("CI"):
         webbrowser.open(page.resolve().as_uri())
 
@@ -411,8 +414,7 @@ def _open_report(battle_log_path: str, open_browser: bool) -> None:
 @click.option(
     "--config",
     "config_path",
-    default=DEFAULT_CONFIG,
-    show_default=True,
+    required=True,
     help="YAML config: candidates (the model pool), judges, match, gateway.",
 )
 @click.option(

@@ -85,10 +85,15 @@ class ArenaApp(App):
     # ----- lifecycle -----
 
     def on_mount(self) -> None:
-        from .theme import CRT_THEME
+        from .theme import THEMES
 
-        self.register_theme(CRT_THEME)
-        self.theme = "crt-neon"
+        for theme in THEMES.values():
+            self.register_theme(theme)
+        # crt-neon stays registered (command palette / ORQ_ARENA_THEME) but
+        # the brand look is the default.
+        import os
+
+        self.theme = os.environ.get("ORQ_ARENA_THEME") or "orq-arena"
         if self._auto_start:
             self.begin()  # -y: consent already given, straight to the fight
         elif self._plan is not None:

@@ -9,8 +9,8 @@ from orq_arena.cli import cli
 @pytest.mark.parametrize(
     "argv",
     [
-        ["run", "-y"],
-        ["pool"],
+        ["run", "-y", "--config", "missing.yaml"],
+        ["pool", "--config", "missing.yaml"],
         ["report", "whatever.jsonl"],
     ],
 )
@@ -19,7 +19,15 @@ def test_missing_config_is_a_clean_error(monkeypatch, tmp_path, argv):
     result = CliRunner().invoke(cli, argv)
     assert result.exit_code != 0
     assert result.exception is None or isinstance(result.exception, SystemExit)
-    assert "orq_arena.yaml not found" in result.output
+    assert "not found" in result.output
+
+
+@pytest.mark.parametrize("argv", [["run", "-y"], ["pool"]])
+def test_config_is_required(monkeypatch, tmp_path, argv):
+    monkeypatch.chdir(tmp_path)
+    result = CliRunner().invoke(cli, argv)
+    assert result.exit_code != 0
+    assert "--config" in result.output
 
 
 def test_list_models_json_is_parseable(tmp_path, monkeypatch):
@@ -36,6 +44,8 @@ def test_list_models_json_is_parseable(tmp_path, monkeypatch):
 
 def test_run_without_yes_fails_fast_on_non_tty(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    result = CliRunner().invoke(cli, ["run"])
+    # The --yes gate fires before the config is ever read, so the file
+    # named here doesn't need to exist.
+    result = CliRunner().invoke(cli, ["run", "--config", "any.yaml"])
     assert result.exit_code != 0
     assert "pass --yes" in result.output

@@ -25,7 +25,7 @@ from orq_arena.tui.screens.leaderboard import LeaderboardScreen
 ROOT = Path(__file__).resolve().parent.parent
 EXAMPLE = ROOT / "examples" / "quickstart"
 # A decisive round with a flip badge, the two things the browser exists to show.
-BROWSER_ROUND = 2
+BROWSER_ROUND = 3
 
 
 async def capture() -> dict[str, str]:
@@ -44,7 +44,7 @@ async def capture() -> dict[str, str]:
 
     from orq_arena.providers.models_list import fetch_price_map
 
-    prompts = load_prompts(str(ROOT / "prompts" / "starter.jsonl"), api_key_env="ORQ_API_KEY")
+    prompts = load_prompts(str(ROOT / "prompts" / "starter.jsonl"))
     counts = call_counts(cfg, prompts)
     ceiling = cost_ceiling(cfg, prompts, counts, await fetch_price_map(cfg.gateway))
     plan = {

@@ -11,8 +11,8 @@ It has seven subcommands: [`run`](#run), [`pool`](#pool),
 specific subcommand.
 
 ```bash
-uv run orq-arena --help              # list every subcommand
-uv run orq-arena <command> --help    # per-command flag help
+orq-arena --help              # list every subcommand
+orq-arena <command> --help    # per-command flag help
 ```
 
 ```text
@@ -69,8 +69,8 @@ A few things apply across every subcommand and are only documented once, here:
   doing anything else. **A variable already set in your shell always wins over `.env`.**
   `ORQ_API_KEY` is the only variable the tool reads. Details (quoting, comments,
   missing-file handling): [configuration.md](configuration.md#environment-variables).
-- **Config validation is all-or-nothing**: the *entire* `--config` file (default
-  `orq_arena.yaml`) is validated (≥2 `candidates`, non-empty `judges`, thinking-budget
+- **Config validation is all-or-nothing**: the *entire* `--config` file
+  is validated (≥2 `candidates`, non-empty `judges`, thinking-budget
   cross-checks, etc.) regardless of which fields a given subcommand actually uses. An
   invalid config file fails the same way for `pool` or `refresh-catalog` as it does for
   `run`, see [Required vs Optional Settings](configuration.md#required-vs-optional-settings).
@@ -79,7 +79,7 @@ A few things apply across every subcommand and are only documented once, here:
 
   | Value | Used by |
   |---|---|
-  | `orq_arena.yaml` | `--config` on `run`, `pool`, `rejudge`, `report`, and `refresh-catalog` (`annotate` and `anchor` take no config) |
+  | `orq_arena.yaml` | `--config` default on `rejudge`, `report`, and `refresh-catalog`; `run` and `pool` require an explicit `--config` (`annotate` and `anchor` take no config) |
   | `prompts/starter.jsonl` | `run --prompts` |
   | `battles.jsonl` | `run --output`, and the `LOG_PATH` positional on `rejudge` and `report` |
 
@@ -103,22 +103,22 @@ A few things apply across every subcommand and are only documented once, here:
 ## `run`
 
 Run the benchmark (a full round-robin over the pool), hits orq.ai. The model pool
-comes from the YAML as-is (`--config` defaults to `orq_arena.yaml`). The run is
+comes from the YAML you point `--config` at, as-is. The run is
 headless: matches in parallel, plain log lines on pipes, a progress bar on
 terminals, and the HTML report is written next to the battle log at the end
 (`--open` to view it in your browser). `--tui` runs
 the same tournament as the live show instead; it needs the optional `[tui]`
-extra (`uv sync --extra tui`) and prints a friendly install hint without it.
+extra (`uv tool install '.[tui]'`) and prints a friendly install hint without it.
 The headless run needs no extra.
 
 ```text
-orq-arena run [--config PATH] [--prompts PATH] [--output PATH] [--rounds N]
+orq-arena run --config PATH [--prompts PATH] [--output PATH] [--rounds N]
               [--overwrite] [--tui] [--open] [--yes|-y] [--quiet|-q]
 ```
 
 | Flag | Default | Effect |
 |---|---|---|
-| `--config PATH` | `orq_arena.yaml` | YAML config: candidates (the model pool), judges, match, gateway; used exactly as written. |
+| `--config PATH` | (required) | YAML config: candidates (the model pool), judges, match, gateway; used exactly as written. |
 | `--prompts PATH` | `prompts/starter.jsonl` | JSONL prompt file, see [Prompts file format](configuration.md#prompts-file-format), or `orq:<dataset_id>` to pull an [orq.ai Dataset](https://docs.orq.ai/docs/ai-studio/optimize/datasets): each datapoint's last user message becomes a prompt, `{{var}}` placeholders filled from its `inputs`; datapoints without a user message are skipped. Uses the same API key as the gateway. When the prompts come from a Dataset, the run manifest records its id, display name, and studio URL, and the HTML report links the dataset by name. |
 | `--output PATH` | `battles.jsonl` | Where the battle log (schema v3) is written as rounds complete. |
 | `--rounds N` | `match.max_rounds` from the YAML | Rounds per match. The preflight warns when this samples a subset of your prompts. |
@@ -128,136 +128,146 @@ orq-arena run [--config PATH] [--prompts PATH] [--output PATH] [--rounds N]
 | `--yes`, `-y` | off | Skip the preflight confirmation pause. Required when stdin is not a terminal (pipes, CI): without it the run fails fast instead of hanging on a prompt nobody can answer. |
 | `--quiet`, `-q` | off | Suppress preflight narration and progress; warnings and the final results stay. |
 
-**Behavior notes:**
+### How a run behaves
 
-- **The model pool is the YAML's `candidates` list, verbatim.** Preflight and the confirmation
-  prompt happen up front in the terminal, before the TUI (or headless run) even starts. To
-  discover which model ids your workspace can fight, see
-  [`refresh-catalog`](#refresh-catalog) (`--show` lists them grouped by provider).
-- **Preflight output.** First, exact call counts:
+**The model pool is the YAML's `candidates` list, verbatim.** Preflight and the confirmation
+prompt happen up front in the terminal, before the TUI (or headless run) even starts. To
+discover which model ids your workspace can fight, see
+[`refresh-catalog`](#refresh-catalog) (`--show` lists them grouped by provider).
 
-  ```text
-  preflight: {matches} matches × {rounds_per_match} rounds → {model_streams} model streams + {judge_calls} judge calls[ + {probe_calls} probe calls]
-  ```
+**Preflight: call counts.** The first line is exact arithmetic, not an estimate:
 
-  where every pair of candidates plays one match, each match runs
-  `min(--rounds, number of prompts)` rounds, every round streams both contestants once,
-  and every round is scored by each judge twice (once per seat order). Next, the **RUN
-  PLAN table** (see the expected output below): one row per candidate and judge with its
-  call count, catalog price ($/M in / $/M out), and worst-case cost, closing with a bold
-  `MAXIMUM SPEND ≤ $X` row, computed from those exact counts, the config's output token
-  caps, and per-model prices from the router's Model Garden catalog. The total is an
-  upper bound, the number the run cannot exceed, not a prediction; the judge-input term
-  assumes both responses hit the model output cap. Models missing from the catalog (a
-  normal state for self-hosted models) keep their row with `n/a` prices and a `?` cost,
-  the total renders `≤ $X + ?`, and a
-  `no catalog price (self-hosted or unpriced): …; excluded from total`
-  note follows; if pricing is entirely unreachable the table is skipped (pricing never
-  blocks the run). With `--quiet` the table is suppressed but a one-line
-  `maximum spend ≤ $X (worst case)` still prints, cost survives quiet mode. The ceiling
-  and its per-row breakdown are recorded in the run manifest under
-  `preflight.cost_ceiling`. If the thinking probe (`preflight.thinking_probe` in the YAML)
-  is enabled (default `true`), a `thinking probe…` line follows, then one line per candidate that
-  either failed the probe (`⚠ {name} ({model}): probe failed, {error}`) or thinks despite
-  being configured off (`🧠 {name} ({model}): thinks despite config ({reasoning_tokens}
-  reasoning tok), ranking will be footnoted`). If no candidate thinks despite being configured
-  off, a `pool is thinking-clean ✓` line prints (probe-failure warnings, if any, still appear
-  above it).
-- **Confirmation.** Unless `--yes`/`-y` is given, the CLI prompts
-  `Proceed (spends up to $X)?`, so the dollar bound sits in the approval question itself
-  (plain `Proceed?` when nothing could be priced). Declining aborts before any battle or
-  judge calls (the thinking probe, when enabled, has already made its one probe stream
-  per model). When stdin is not an interactive terminal the run errors out with a
-  "pass `--yes`" hint instead of prompting.
-- **Streams.** Preflight narration, warnings, per-match lines, and the progress bar print to
-  stderr; the final standings, token totals, battle-log path, and report-page path print to
-  stdout. `1>results.txt` captures only the results; `2>/dev/null` silences the chatter.
-- **Output.** Every judged round is appended to `--output` (`battles.jsonl`, schema v3) as the
-  run proceeds, live-run or headless alike.
+```text
+preflight: {matches} matches × {rounds_per_match} rounds → {model_streams} model streams + {judge_calls} judge calls[ + {probe_calls} probe calls]
+```
+
+Every pair of candidates plays one match, each match runs `min(--rounds, number of prompts)`
+rounds, every round streams both contestants once and is scored by each judge twice (once
+per seat order).
+
+**Preflight: the RUN PLAN table** (see the expected output below). One row per candidate and
+judge (call count, catalog price in $/M in / $/M out, worst-case cost), closing with a bold
+`MAXIMUM SPEND ≤ $X` row.
+
+- The total is an **upper bound**, not a prediction: it assumes every response hits its
+  output token cap. Prices come from the router's Model Garden catalog.
+- **Unpriced models** (normal for self-hosted) keep their row with `n/a` prices and a `?`
+  cost; the total renders `≤ $X + ?` with a `no catalog price (self-hosted or unpriced): …`
+  note below. If pricing is entirely unreachable the table is skipped. Pricing never blocks
+  the run.
+- **`--quiet`** suppresses the table but a one-line `maximum spend ≤ $X (worst case)` still
+  prints, cost survives quiet mode.
+- The ceiling and its per-row breakdown land in the run manifest under
+  `preflight.cost_ceiling`.
+
+**Preflight: the thinking probe** (`preflight.thinking_probe`, default `true`). A
+`thinking probe…` line, then one line per candidate that failed
+(`⚠ {name} ({model}): probe failed, {error}`) or thinks despite being configured off
+(`🧠 {name} ({model}): thinks despite config …, ranking will be footnoted`). No surprises →
+`pool is thinking-clean ✓`.
+
+**Confirmation.** Unless `--yes`/`-y` is given, the CLI prompts `Proceed (spends up to $X)?`,
+so the dollar bound sits in the approval question itself (plain `Proceed?` when nothing could
+be priced). Declining aborts before any battle or judge calls (the thinking probe, when
+enabled, has already made its one probe stream per model). When stdin is not an interactive
+terminal the run errors out with a "pass `--yes`" hint instead of prompting.
+
+**Streams.** Preflight narration, warnings, per-match lines, and the progress bar print to
+stderr; the final standings, token totals, battle-log path, and report-page path print to
+stdout. `1>results.txt` captures only the results; `2>/dev/null` silences the chatter.
+
+**Output.** Every judged round is appended to `--output` (`battles.jsonl`, schema v3) as the
+run proceeds, live-run or headless alike.
 
 **Examples:**
 
 ```bash
-# Fight the shipped pool (orq_arena.yaml), confirm the preflight interactively
-uv run orq-arena run
+# Fight the shipped pool, confirm the preflight interactively
+orq-arena run --config orq_arena.yaml
 
 # Same, skipping the confirmation prompt
-uv run orq-arena run --yes
+orq-arena run --config orq_arena.yaml --yes
 
 # CI/cron -- headless is the default; matches run in parallel (headless_concurrency)
-uv run orq-arena run --yes
+orq-arena run --config orq_arena.yaml --yes
 
 # Custom prompt set and output path, with an alternate pool
-uv run orq-arena run --config configs/reasoning_arena.yaml --prompts prompts/starter.jsonl --output reasoning_battles.jsonl
+orq-arena run --config configs/reasoning_arena.yaml --prompts prompts/starter.jsonl --output reasoning_battles.jsonl
 ```
 
 **Expected output** (headless, piped, both streams shown interleaved; everything above
 `FINAL STANDINGS` is stderr; reconstructed from the committed
 [`examples/quickstart`](https://github.com/orq-ai/orq-arena/tree/master/examples/quickstart) run's
-recorded manifest and log, its 4-model pool against the default judge trio):
+recorded manifest and log, its 8-model pool against the default judge trio):
 
 ```text
-$ uv run orq-arena run --config examples/quickstart/config.yaml -y \
+$ orq-arena run --config examples/quickstart/config.yaml -y \
     --output examples/quickstart/battles.jsonl
-preflight: 6 matches × 5 rounds → 60 model streams + 180 judge calls + 4 probe calls
+preflight: 28 matches × 5 rounds → 280 model streams + 840 judge calls + 8 probe calls
   ⚖ judge/contestant family overlap: anthropic/claude-haiku-4-5-20251001, google/gemini-2.5-flash-lite, openai/gpt-5.4-nano. Self-preference bias is not corrected by seat swapping; prefer judges from families outside the pool.
                                    RUN PLAN
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┓
-┃ Model                                 ┃ Calls ┃ $/M in ┃ $/M out ┃ Ceiling ┃
-┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━┩
-│ Candidates                            │       │        │         │         │
-│   openai/gpt-5.4-mini                 │    15 │   0.75 │    4.50 │   $0.14 │
-│   anthropic/claude-sonnet-4-6         │    15 │   3.00 │   15.00 │   $0.46 │
-│   google/gemini-3.5-flash             │    15 │   1.50 │    9.00 │   $0.28 │
-│   mistral/mistral-medium-2604         │    15 │   1.50 │    7.50 │   $0.23 │
-│ Judges (×2 seat orders)               │       │        │         │         │
-│   anthropic/claude-haiku-4-5-20251001 │    60 │   1.00 │    5.00 │   $0.88 │
-│   google/gemini-2.5-flash-lite        │    60 │   0.10 │    0.40 │   $0.08 │
-│   openai/gpt-5.4-nano                 │    60 │   0.20 │    1.25 │   $0.21 │
-│ Thinking probe                        │     4 │        │         │   $0.04 │
-├───────────────────────────────────────┼───────┼────────┼─────────┼─────────┤
-│ MAXIMUM SPEND                         │       │        │         │ ≤ $2.31 │
-└───────────────────────────────────────┴───────┴────────┴─────────┴─────────┘
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━┓
+┃ Model                                 ┃ Calls ┃ $/M in ┃ $/M out ┃ Ceiling  ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━┩
+│ Candidates                            │       │        │         │          │
+│   anthropic/claude-opus-4-8           │    35 │   5.00 │   25.00 │   $1.80  │
+│   anthropic/claude-sonnet-4-6         │    35 │   3.00 │   15.00 │   $1.08  │
+│   openai/gpt-5.4                      │    35 │   2.50 │   15.00 │   $1.08  │
+│   openai/gpt-5.4-mini                 │    35 │   0.75 │    4.50 │   $0.32  │
+│   google/gemini-3.1-pro-preview       │    35 │   2.00 │   12.00 │   $0.86  │
+│   google/gemini-3.5-flash             │    35 │   1.50 │    9.00 │   $0.65  │
+│   deepseek/deepseek-chat              │    35 │   0.14 │    0.28 │   $0.02  │
+│   mistral/mistral-medium-2604         │    35 │   1.50 │    7.50 │   $0.54  │
+│ Judges (×2 seat orders)               │       │        │         │          │
+│   anthropic/claude-haiku-4-5-20251001 │   280 │   1.00 │    5.00 │   $4.11  │
+│   google/gemini-2.5-flash-lite        │   280 │   0.10 │    0.40 │   $0.35  │
+│   openai/gpt-5.4-nano                 │   280 │   0.20 │    1.25 │   $0.97  │
+│ Thinking probe                        │     8 │        │         │   $0.09  │
+├───────────────────────────────────────┼───────┼────────┼─────────┼──────────┤
+│ MAXIMUM SPEND                         │       │        │         │ ≤ $11.87 │
+└───────────────────────────────────────┴───────┴────────┴─────────┴──────────┘
      worst case: every response maxed out at its token cap; typical runs
          cost noticeably less. Exact spend is reported after the run.
 thinking probe…
   pool is thinking-clean ✓
+M1 round 1: inconclusive
 M1 round 1: A
-M1 round 2: tie
-M1 round 3: B
-M1 round 4: A
-M1 round 5: B
-M1 🤝 draw
-match 1/6 done
+M1 round 2: inconclusive
+M1 round 2: B
+M1 round 3: A
+M1 gpt-5.4-mini beats gemini-3.1-pro-preview
+match 1/28 done
 M2 round 1: A
-… (one line per judged round; A/B are the round's seat labels)
-M2 gemini-3.5-flash beats gpt-5.4-mini
-match 2/6 done
-M4 claude-sonnet-4-6 beats mistral-medium-2604
-match 3/6 done
-M3 gpt-5.4-mini beats mistral-medium-2604
-match 4/6 done
-M5 claude-sonnet-4-6 beats gpt-5.4-mini
-match 5/6 done
-M6 gemini-3.5-flash beats mistral-medium-2604
-match 6/6 done
+… (one line per judged round; A/B are the round's seat labels; an
+inconclusive round redraws a prompt, so round numbers can repeat)
+M2 gpt-5.4 beats deepseek-chat
+match 2/28 done
+M3 🤝 draw
+match 3/28 done
+…
+M28 🤝 draw
+match 28/28 done
 
 🏆 gemini-3.5-flash leads, but claude-sonnet-4-6 is statistically tied (CIs
-overlap at 30 rated rounds; the report page has the tie-breakers)
+overlap at 76 rated rounds; the report page has the tie-breakers)
 
-                   FINAL STANDINGS
-┏━━━┳━━━━━━━━━━━━━━━━━━━━━┳━━━━━━┳━━━━━━━━━━━━┳━━━━━━┓
-┃ # ┃ Model               ┃ ELO  ┃ 95% CI     ┃ win% ┃
-┡━━━╇━━━━━━━━━━━━━━━━━━━━━╇━━━━━━╇━━━━━━━━━━━━╇━━━━━━┩
-│ 1 │ gemini-3.5-flash    │ 1572 │ 1259–5000  │ 70%  │
-│ 2 │ claude-sonnet-4-6   │ 1572 │ 1238–4803  │ 70%  │
-│ 3 │ gpt-5.4-mini        │ 489  │ -3000–1810 │ 33%  │
-│ 4 │ mistral-medium-2604 │ 367  │ -3000–1686 │ 27%  │
-└───┴─────────────────────┴──────┴────────────┴──────┘
+                    FINAL STANDINGS
+┏━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━┳━━━━━━━━━━━┳━━━━━━┓
+┃ # ┃ Model                  ┃ ELO  ┃ 95% CI    ┃ win% ┃
+┡━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━╇━━━━━━━━━━━╇━━━━━━┩
+│ 1 │ gemini-3.5-flash       │ 1374 │ 1218–2162 │ 86%  │
+│ 2 │ claude-sonnet-4-6      │ 1196 │ 1016–1897 │ 79%  │
+│ 3 │ gpt-5.4                │ 1174 │ 997–1893  │ 76%  │
+│ 4 │ claude-opus-4-8        │ 1072 │ 905–1737  │ 61%  │
+│ 5 │ deepseek-chat          │ 1016 │ 870–1627  │ 52%  │
+│ 6 │ mistral-medium-2604    │ 901  │ 665–1531  │ 40%  │
+│ 7 │ gpt-5.4-mini           │ 805  │ 421–1410  │ 27%  │
+│ 8 │ gemini-3.1-pro-preview │ 463  │ -3000–603 │ 5%   │
+└───┴────────────────────────┴──────┴───────────┴──────┘
 
-jury: 95% mean agreement · leaned longer (+2.33); the report prices it out
-rounds: 30 rated · 0 voided
-tokens, models 1,728 in / 51,324 out · jury 349,228 in / 23,643 out
+jury: 90% mean agreement · leaned longer (+3.44); the report prices it out
+rounds: 76 rated · 0 voided
+tokens, models 8,350 in / 220,700 out · jury 1,481,428 in / 107,697 out
 
 battle log → examples/quickstart/battles.jsonl
 report page → examples/quickstart/battles.report.html
@@ -266,7 +276,7 @@ report page → examples/quickstart/battles.report.html
 On a terminal (not piped) the per-round heartbeat lines are replaced by a pinned
 progress bar (spinner, rounds M-of-N, elapsed, current leader) that advances once per
 round, with the per-match lines printing above it; without `-y` the run pauses at
-`Proceed (spends up to $2.31)? [y/N]` after the preflight, before any battle or
+`Proceed (spends up to $11.87)? [y/N]` after the preflight, before any battle or
 judge call.
 
 See [Match rules, gateway, candidates, and judges](configuration.md) for every YAML key this
@@ -285,6 +295,12 @@ its call counts and the ceiling reads `unavailable`.
 
 ![RUN PLAN screen: prompts block, per-model cost table, consent bar](assets/run-plan.svg)
 
+The run ends on the **FINAL STANDINGS screen**: ELO with its 95% CI and len-ctrl rating per
+model, the per-category slices, per-judge behaviour (A/B lean, flip rate, tie rate, Fleiss'
+κ), and the win grid.
+
+![Final standings: ELO ladder with CIs and len-ctrl, per-judge behaviour, win grid](assets/leaderboard.svg)
+
 **From the final leaderboard**: `B` opens the battle browser, paging through every judged
 round with the prompt, both responses, and per-judge votes with flip badges; `s` saves an
 SVG screenshot; `q` quits.
@@ -298,12 +314,12 @@ SVG screenshot; `q` quits.
 Print the configured candidate pool, no API calls, no key required.
 
 ```text
-orq-arena pool [--config PATH] [--json]
+orq-arena pool --config PATH [--json]
 ```
 
 | Flag | Default | Effect |
 |---|---|---|
-| `--config PATH` | `orq_arena.yaml` | YAML config whose `candidates` are printed. |
+| `--config PATH` | (required) | YAML config whose `candidates` are printed. |
 | `--json` | off | Print the pool as a JSON array of `{seed, name, model_id}` objects instead of the table. |
 
 **Behavior notes:**
@@ -315,7 +331,7 @@ orq-arena pool [--config PATH] [--json]
 **Expected output**, against the shipped `orq_arena.yaml` (8 candidates, none with a custom `name`):
 
 ```bash
-uv run orq-arena pool
+orq-arena pool --config orq_arena.yaml
 ```
 
 ```text
@@ -332,7 +348,7 @@ Seed  Name                       Model ID
 ```
 
 ```bash
-uv run orq-arena pool --config configs/reasoning_arena.yaml
+orq-arena pool --config configs/reasoning_arena.yaml
 ```
 
 ---
@@ -404,27 +420,27 @@ orq-arena rejudge --compare REPORT_JSON [--compare REPORT_JSON ...]
 
 ```bash
 # Single-judge rejudge of the default log against the default config
-uv run orq-arena rejudge battles.jsonl --judge mistral/mistral-small-2603
+orq-arena rejudge battles.jsonl --judge mistral/mistral-small-2603
 
 # Multi-judge panel
-uv run orq-arena rejudge battles.jsonl --judge mistral/mistral-small-2603 --judge anthropic/claude-haiku-4-5-20251001
+orq-arena rejudge battles.jsonl --judge mistral/mistral-small-2603 --judge anthropic/claude-haiku-4-5-20251001
 
 # Override criteria, write both the rejudged log and a JSON summary
-uv run orq-arena rejudge battles.jsonl \
+orq-arena rejudge battles.jsonl \
   --judge mistral/mistral-small-2603 \
   --criteria "Correctness only; ignore style." \
   --output battles.rejudged.jsonl \
   --report-json rejudge_report.json
 
 # Higher concurrency against a non-default log
-uv run orq-arena rejudge my_battles.jsonl --judge openai/gpt-5.4-nano --concurrency 8
+orq-arena rejudge my_battles.jsonl --judge openai/gpt-5.4-nano --concurrency 8
 ```
 
 **Expected output** (illustrative; the table shape and labels are exact, the numbers are
 from a single-judge rejudge of the committed example run):
 
 ```text
-$ uv run orq-arena rejudge examples/quickstart/battles.jsonl --judge openai/gpt-5.1
+$ orq-arena rejudge examples/quickstart/battles.jsonl --judge openai/gpt-5.1
 
 re-judged 30 rounds, 6 verdicts changed
 rank correlation (Spearman) old→new: 0.80 , judge-robust ranking
@@ -468,10 +484,10 @@ jury?), inconclusive rate (decisiveness), mean agreement, worst per-judge flip r
 which jury is *right* needs gold pairs or a human anchor (see [`annotate`](#annotate) and [`anchor`](#anchor)).
 
 ```bash
-uv run orq-arena rejudge battles.jsonl --judge openai/gpt-5.1 --report-json solo.json
-uv run orq-arena rejudge battles.jsonl --judge anthropic/claude-haiku-4-5-20251001 \
+orq-arena rejudge battles.jsonl --judge openai/gpt-5.1 --report-json solo.json
+orq-arena rejudge battles.jsonl --judge anthropic/claude-haiku-4-5-20251001 \
   --judge openai/gpt-5.1 --report-json panel.json
-uv run orq-arena rejudge --compare solo.json --compare panel.json
+orq-arena rejudge --compare solo.json --compare panel.json
 ```
 
 **Expected output** (the report JSONs carry the numbers; the compare step itself makes no API calls):
@@ -517,15 +533,15 @@ one catalog read, never completion spend), and the
 manifest hashes for reproducibility.
 
 ```bash
-uv run orq-arena report outputs/g1/battles.jsonl
-uv run orq-arena report battles.jsonl --output /tmp/run.html
+orq-arena report outputs/g1/battles.jsonl
+orq-arena report battles.jsonl --output /tmp/run.html
 ```
 
 **Expected output** (one line; without a key the page's cost section is simply omitted,
 nothing warns or fails):
 
 ```text
-$ uv run orq-arena report examples/quickstart/battles.jsonl
+$ orq-arena report examples/quickstart/battles.jsonl
 report page -> examples/quickstart/battles.report.html
 ```
 
@@ -572,18 +588,18 @@ un-flipped to the canonical A/B frame, so the vote file is independent of presen
 order.
 
 ```bash
-uv run orq-arena annotate outputs/g1/battles.jsonl --sample 60
-uv run orq-arena annotate battles.jsonl --output rater2.html --seed 42
+orq-arena annotate outputs/g1/battles.jsonl --sample 60
+orq-arena annotate battles.jsonl --output rater2.html --seed 42
 # resume: only the rounds dana hasn't voted yet
-uv run orq-arena annotate battles.jsonl --exclude votes-dana.json --output dana-round2.html
+orq-arena annotate battles.jsonl --exclude votes-dana.json --output dana-round2.html
 # annotate your own run locally, votes save as you click, Ctrl-C prints the numbers
-uv run orq-arena annotate outputs/g1/battles.jsonl --serve --sample 60
+orq-arena annotate outputs/g1/battles.jsonl --serve --sample 60
 ```
 
 **Expected output** (file mode; `--serve` prints the local URL instead and holds until Ctrl-C):
 
 ```text
-$ uv run orq-arena annotate examples/quickstart/battles.jsonl --output annotate.html --sample 10
+$ orq-arena annotate examples/quickstart/battles.jsonl --output annotate.html --sample 10
 10 rounds -> annotate.html (blind; votes export as votes.json)
 ```
 
@@ -610,7 +626,7 @@ each rater pair's inter-annotator κ over their shared rounds. Votes whose key m
 round in the log are counted and warned, never crash.
 
 ```bash
-uv run orq-arena anchor outputs/g1/battles.jsonl votes-h1.json votes-h2.json
+orq-arena anchor outputs/g1/battles.jsonl votes-h1.json votes-h2.json
 ```
 
 **Expected output** (two raters over the committed example run):
@@ -672,16 +688,16 @@ orq-arena refresh-catalog [--config PATH] [--show/--no-show]
 **Examples:**
 
 ```bash
-uv run orq-arena refresh-catalog
-uv run orq-arena refresh-catalog --show
-uv run orq-arena refresh-catalog --config configs/reasoning_arena.yaml --show
+orq-arena refresh-catalog
+orq-arena refresh-catalog --show
+orq-arena refresh-catalog --config configs/reasoning_arena.yaml --show
 ```
 
 **Expected output** (here keyless, so the live fetch is skipped and the cache re-reported;
 with a key, `source=live` and `age=0s`):
 
 ```text
-$ uv run orq-arena refresh-catalog
+$ orq-arena refresh-catalog
 137 models (source=cache, age=4528s, cache=/Users/you/.cache/orq-arena/models.json)
 ```
 
@@ -696,7 +712,7 @@ No key yet? Open the committed example run's report,
 or regenerate it keyless from the committed log:
 
 ```bash
-uv run orq-arena report examples/quickstart/battles.jsonl
+orq-arena report examples/quickstart/battles.jsonl
 ```
 
 Then get a key: https://docs.orq.ai/docs/ai-studio/organization/api-keys.
@@ -705,7 +721,7 @@ Then get a key: https://docs.orq.ai/docs/ai-studio/organization/api-keys.
 
 ```bash
 cp .env.example .env   # fill in ORQ_API_KEY
-uv run orq-arena run
+orq-arena run --config orq_arena.yaml
 ```
 
 Fights the shipped `orq_arena.yaml` pool headless; edit its `candidates` list to change the
@@ -714,7 +730,7 @@ pool. Confirm the preflight to spend tokens.
 ### Run for CI/cron
 
 ```bash
-uv run orq-arena run --yes
+orq-arena run --config orq_arena.yaml --yes
 ```
 
 `--yes` skips the confirmation prompt, safe for a non-interactive shell; plain line-per-match
@@ -723,7 +739,7 @@ output on pipes.
 ### Compare two juries on the same recorded run
 
 ```bash
-uv run orq-arena rejudge battles.jsonl --judge mistral/mistral-small-2603 --judge anthropic/claude-haiku-4-5-20251001
+orq-arena rejudge battles.jsonl --judge mistral/mistral-small-2603 --judge anthropic/claude-haiku-4-5-20251001
 ```
 
 Costs judge tokens only, the responses already in `battles.jsonl` are reused as-is. Prints
@@ -732,7 +748,7 @@ the changed-verdict count and the Spearman rank correlation against the original
 ### Discover model ids for your model pool
 
 ```bash
-uv run orq-arena refresh-catalog --show
+orq-arena refresh-catalog --show
 ```
 
 Forces a live re-fetch (bypassing the 24h cache) and lists every workspace-enabled chat model
@@ -747,7 +763,7 @@ Everything you need to run `orq-arena` unattended or pipe its output:
 - **Confirmation**: `run` requires `--yes`/`-y` when stdin is not a terminal; without it the
   command fails immediately with that hint instead of hanging on a prompt.
 - **Streams**: results on stdout, messaging (preflight narration, warnings, progress) on
-  stderr. `orq-arena run -y 1>results.txt 2>run.log` separates them cleanly.
+  stderr. `orq-arena run --config orq_arena.yaml -y 1>results.txt 2>run.log` separates them cleanly.
 - **Quiet**: `run --quiet`/`-q` drops narration and progress; warnings and the final
   standings still print.
 - **No animations off-TTY**: when stderr is not a terminal the progress bar is replaced by

@@ -6,7 +6,7 @@ Bradley-Terry ELO with confidence intervals attached.
 
 The path is five steps:
 
-1. [Install](#1-install) the CLI (`uv sync`).
+1. [Install](#1-install) the CLI (`uv tool install`).
 2. [Add your orq.ai API key](#2-add-your-orqai-credentials) (`.env`).
 3. [Run the benchmark](#3-run-the-benchmark) and read the standings.
 4. [Bring your own prompts](#4-bring-your-own-prompts): a local JSONL file or an
@@ -14,7 +14,7 @@ The path is five steps:
 5. [Know where the results land](#5-where-results-land): the battle log, the manifest, and
    the HTML report.
 
-Every command below runs through the **`orq-arena`** CLI. Run `uv run orq-arena --help` to
+Every command below runs through the **`orq-arena`** CLI. Run `orq-arena --help` to
 list every subcommand; the full flag reference is in **[cli.md](cli.md)**.
 
 ---
@@ -26,7 +26,7 @@ list every subcommand; the full flag reference is in **[cli.md](cli.md)**.
 | Python | `>= 3.10` | `python3 --version` |
 | [uv](https://docs.astral.sh/uv/getting-started/installation/) | any recent | `uv --version` |
 | Git | any | `git --version` |
-| orq.ai workspace | active, with at least one chat model enabled | [my.orq.ai](https://my.orq.ai) |
+| [orq.ai](https://orq.ai) workspace | active, with at least one chat model enabled | [my.orq.ai](https://my.orq.ai) (sign up at [orq.ai](https://orq.ai) if you don't have one) |
 
 The one secret you need is a workspace **API key** (`ORQ_API_KEY`), created per the
 [API keys guide](https://docs.orq.ai/docs/ai-studio/organization/api-keys). Every candidate, judge, and
@@ -40,21 +40,37 @@ covers every provider in the pool.
 ```bash
 git clone https://github.com/orq-ai/orq-arena.git
 cd orq-arena
-uv sync
+uv tool install .
 ```
 
-`uv sync` creates a `.venv` and installs orq-arena plus its core dependencies resolved
-against `uv.lock`, registering the **`orq-arena`** console script. That's the only setup
-step: the benchmark, the HTML report, and `rejudge` all run on the core install.
+`uv tool install .` puts the **`orq-arena`** command on your PATH in its own isolated
+environment. That's the only setup step: the benchmark, the HTML report, and `rejudge`
+all run on it. (Hacking on the code instead? `uv sync` and prefix commands with
+`uv run`.)
 
 Check it worked:
 
 ```text
-$ uv run orq-arena --help
+$ orq-arena --help
 Usage: orq-arena [OPTIONS] COMMAND [ARGS]...
 
   orq-arena, LLM arena benchmark: orq.ai router + evaluatorq jury.
-...
+
+Options:
+  --version  Show the version and exit.
+  --help     Show this message and exit.
+
+Commands:
+  anchor           Merge human vote files against a recorded run: κ +...
+  annotate         Render a blinded human-annotation page from a recorded...
+  pool             Print the configured candidate pool.
+  refresh-catalog  Re-fetch the workspace-enabled chat model catalog from...
+  rejudge          Re-judge a recorded run with a different panel, zero...
+  report           Render the single-file HTML report page from a...
+  run              Run the arena benchmark (hits orq.ai): headless logs...
+
+  Docs: https://github.com/orq-ai/orq-arena/tree/master/docs · Issues:
+  https://github.com/orq-ai/orq-arena/issues
 ```
 
 ---
@@ -65,7 +81,8 @@ Usage: orq-arena [OPTIONS] COMMAND [ARGS]...
 cp .env.example .env
 ```
 
-Then fill in the one variable it asks for:
+Then fill in the one variable it asks for, an API key from your workspace
+(create one per the [API keys guide](https://docs.orq.ai/docs/ai-studio/organization/api-keys)):
 
 ```bash
 ORQ_API_KEY=your-orq-api-key
@@ -80,11 +97,11 @@ Full variable reference: [configuration.md](configuration.md#environment-variabl
 ## 3. Run the benchmark
 
 ```bash
-uv run orq-arena run
+orq-arena run --config orq_arena.yaml
 ```
 
-The model pool comes straight from the `candidates` list in `orq_arena.yaml` (the shipped
-file has an 8-model pool; edit it or pass `--config your.yaml`). The essentials of that
+The model pool comes straight from the `candidates` list in the YAML you point `--config`
+at; the shipped `orq_arena.yaml` has an 8-model pool to start from. The essentials of that
 file:
 
 ```yaml
@@ -121,34 +138,38 @@ Every key, default, and per-model override is documented in
 
 **Expected output** (reconstructed from the committed
 [`examples/quickstart`](https://github.com/orq-ai/orq-arena/tree/master/examples/quickstart)
-run, a 4-model pool against the default judge trio):
+run, an 8-model pool against the default judge trio):
 
 ```text
-$ uv run orq-arena run --config examples/quickstart/config.yaml \
+$ orq-arena run --config examples/quickstart/config.yaml \
     --output examples/quickstart/battles.jsonl
-preflight: 6 matches × 5 rounds → 60 model streams + 180 judge calls + 4 probe calls
+preflight: 28 matches × 5 rounds → 280 model streams + 840 judge calls + 8 probe calls
                                    RUN PLAN
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┓
-┃ Model                                 ┃ Calls ┃ $/M in ┃ $/M out ┃ Ceiling ┃
-┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━┩
-│ Candidates                            │       │        │         │         │
-│   openai/gpt-5.4-mini                 │    15 │   0.75 │    4.50 │   $0.14 │
-│   anthropic/claude-sonnet-4-6         │    15 │   3.00 │   15.00 │   $0.46 │
-│   google/gemini-3.5-flash             │    15 │   1.50 │    9.00 │   $0.28 │
-│   mistral/mistral-medium-2604         │    15 │   1.50 │    7.50 │   $0.23 │
-│ Judges (×2 seat orders)               │       │        │         │         │
-│   anthropic/claude-haiku-4-5-20251001 │    60 │   1.00 │    5.00 │   $0.88 │
-│   google/gemini-2.5-flash-lite        │    60 │   0.10 │    0.40 │   $0.08 │
-│   openai/gpt-5.4-nano                 │    60 │   0.20 │    1.25 │   $0.21 │
-│ Thinking probe                        │     4 │        │         │   $0.04 │
-├───────────────────────────────────────┼───────┼────────┼─────────┼─────────┤
-│ MAXIMUM SPEND                         │       │        │         │ ≤ $2.31 │
-└───────────────────────────────────────┴───────┴────────┴─────────┴─────────┘
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━┓
+┃ Model                                 ┃ Calls ┃ $/M in ┃ $/M out ┃ Ceiling  ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━┩
+│ Candidates                            │       │        │         │          │
+│   anthropic/claude-opus-4-8           │    35 │   5.00 │   25.00 │   $1.80  │
+│   anthropic/claude-sonnet-4-6         │    35 │   3.00 │   15.00 │   $1.08  │
+│   openai/gpt-5.4                      │    35 │   2.50 │   15.00 │   $1.08  │
+│   openai/gpt-5.4-mini                 │    35 │   0.75 │    4.50 │   $0.32  │
+│   google/gemini-3.1-pro-preview       │    35 │   2.00 │   12.00 │   $0.86  │
+│   google/gemini-3.5-flash             │    35 │   1.50 │    9.00 │   $0.65  │
+│   deepseek/deepseek-chat              │    35 │   0.14 │    0.28 │   $0.02  │
+│   mistral/mistral-medium-2604         │    35 │   1.50 │    7.50 │   $0.54  │
+│ Judges (×2 seat orders)               │       │        │         │          │
+│   anthropic/claude-haiku-4-5-20251001 │   280 │   1.00 │    5.00 │   $4.11  │
+│   google/gemini-2.5-flash-lite        │   280 │   0.10 │    0.40 │   $0.35  │
+│   openai/gpt-5.4-nano                 │   280 │   0.20 │    1.25 │   $0.97  │
+│ Thinking probe                        │     8 │        │         │   $0.09  │
+├───────────────────────────────────────┼───────┼────────┼─────────┼──────────┤
+│ MAXIMUM SPEND                         │       │        │         │ ≤ $11.87 │
+└───────────────────────────────────────┴───────┴────────┴─────────┴──────────┘
      worst case: every response maxed out at its token cap; typical runs
          cost noticeably less. Exact spend is reported after the run.
 thinking probe…
   pool is thinking-clean ✓
-Proceed (spends up to $2.31)? [y/N]:
+Proceed (spends up to $11.87)? [y/N]:
 ```
 
 **This pause is the cost gate.** Everything above was (almost) free: only the tiny probe
@@ -157,36 +178,42 @@ and the `Proceed` question repeats the maximum the run can spend. Answer `n` and
 happens; answer `y` and the matches start:
 
 ```text
-Proceed (spends up to $2.31)? [y/N]: y
-M1 🤝 draw
-match 1/6 done
-M2 gemini-3.5-flash beats gpt-5.4-mini
-match 2/6 done
-M4 claude-sonnet-4-6 beats mistral-medium-2604
-match 3/6 done
-M3 gpt-5.4-mini beats mistral-medium-2604
-match 4/6 done
-M5 claude-sonnet-4-6 beats gpt-5.4-mini
-match 5/6 done
-M6 gemini-3.5-flash beats mistral-medium-2604
-match 6/6 done
+Proceed (spends up to $11.87)? [y/N]: y
+M1 round 1: inconclusive
+M1 round 1: A
+M1 round 2: inconclusive
+M1 round 2: B
+M1 round 3: A
+M1 gpt-5.4-mini beats gemini-3.1-pro-preview
+match 1/28 done
+M2 gpt-5.4 beats deepseek-chat
+match 2/28 done
+M3 🤝 draw
+match 3/28 done
+…
+M28 🤝 draw
+match 28/28 done
 
 🏆 gemini-3.5-flash leads, but claude-sonnet-4-6 is statistically tied (CIs
-overlap at 30 rated rounds; the report page has the tie-breakers)
+overlap at 76 rated rounds; the report page has the tie-breakers)
 
-                   FINAL STANDINGS
-┏━━━┳━━━━━━━━━━━━━━━━━━━━━┳━━━━━━┳━━━━━━━━━━━━┳━━━━━━┓
-┃ # ┃ Model               ┃ ELO  ┃ 95% CI     ┃ win% ┃
-┡━━━╇━━━━━━━━━━━━━━━━━━━━━╇━━━━━━╇━━━━━━━━━━━━╇━━━━━━┩
-│ 1 │ gemini-3.5-flash    │ 1572 │ 1259–5000  │ 70%  │
-│ 2 │ claude-sonnet-4-6   │ 1572 │ 1238–4803  │ 70%  │
-│ 3 │ gpt-5.4-mini        │ 489  │ -3000–1810 │ 33%  │
-│ 4 │ mistral-medium-2604 │ 367  │ -3000–1686 │ 27%  │
-└───┴─────────────────────┴──────┴────────────┴──────┘
+                    FINAL STANDINGS
+┏━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━┳━━━━━━━━━━━┳━━━━━━┓
+┃ # ┃ Model                  ┃ ELO  ┃ 95% CI    ┃ win% ┃
+┡━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━╇━━━━━━━━━━━╇━━━━━━┩
+│ 1 │ gemini-3.5-flash       │ 1374 │ 1218–2162 │ 86%  │
+│ 2 │ claude-sonnet-4-6      │ 1196 │ 1016–1897 │ 79%  │
+│ 3 │ gpt-5.4                │ 1174 │ 997–1893  │ 76%  │
+│ 4 │ claude-opus-4-8        │ 1072 │ 905–1737  │ 61%  │
+│ 5 │ deepseek-chat          │ 1016 │ 870–1627  │ 52%  │
+│ 6 │ mistral-medium-2604    │ 901  │ 665–1531  │ 40%  │
+│ 7 │ gpt-5.4-mini           │ 805  │ 421–1410  │ 27%  │
+│ 8 │ gemini-3.1-pro-preview │ 463  │ -3000–603 │ 5%   │
+└───┴────────────────────────┴──────┴───────────┴──────┘
 
-jury: 95% mean agreement · leaned longer (+2.33); the report prices it out
-rounds: 30 rated · 0 voided
-tokens, models 1,728 in / 51,324 out · jury 349,228 in / 23,643 out
+jury: 90% mean agreement · leaned longer (+3.44); the report prices it out
+rounds: 76 rated · 0 voided
+tokens, models 8,350 in / 220,700 out · jury 1,481,428 in / 107,697 out
 
 battle log → examples/quickstart/battles.jsonl
 report page → examples/quickstart/battles.report.html
@@ -197,7 +224,7 @@ report page → examples/quickstart/battles.report.html
     A real recorded run is committed at
     [`examples/quickstart/`](https://github.com/orq-ai/orq-arena/tree/master/examples/quickstart).
     Regenerate its report with no key and no network:
-    `uv run orq-arena report examples/quickstart/battles.jsonl`.
+    `orq-arena report examples/quickstart/battles.jsonl`.
 
 ---
 
@@ -207,7 +234,7 @@ The whole point of orq-arena is ranking models on **your** prompts. The default
 `prompts/starter.jsonl` is just a demo set; swap it with `--prompts`, from a local file or
 straight from your orq.ai workspace.
 
-**A local JSONL file** — one JSON object per line, `prompt` is the only required field.
+**A local JSONL file**: one JSON object per line, `prompt` is the only required field.
 `category` is optional (feeds per-category ratings); any other keys ride along into
 `battles.jsonl` so you can join results back to your source data:
 
@@ -217,17 +244,17 @@ straight from your orq.ai workspace.
 ```
 
 ```bash
-uv run orq-arena run --prompts your_prompts.jsonl
+orq-arena run --config orq_arena.yaml --prompts your_prompts.jsonl
 ```
 
 Full field reference: [Prompts file format](configuration.md#prompts-file-format).
 
-**An orq.ai Dataset** — pass `orq:<dataset_id>` to fight over an
+**An orq.ai Dataset**: pass `orq:<dataset_id>` to fight over an
 [orq.ai Dataset](https://docs.orq.ai/docs/ai-studio/optimize/datasets) from your workspace,
 same API key, nothing to export:
 
 ```bash
-uv run orq-arena run --prompts orq:my_dataset_id
+orq-arena run --config orq_arena.yaml --prompts orq:my_dataset_id
 ```
 
 Each datapoint's last `user` message becomes a prompt (`{{var}}` placeholders filled from
@@ -236,7 +263,7 @@ it by name.
 
 !!! tip "Which model ids can fight?"
 
-    `uv run orq-arena refresh-catalog --show` lists your workspace-enabled catalog, grouped
+    `orq-arena refresh-catalog --show` lists your workspace-enabled catalog, grouped
     by provider, ready to paste into the YAML's `candidates` list.
 
 ---
@@ -276,7 +303,7 @@ next to the log. `orq-arena report <log>` regenerates the report page on demand,
     The candidate hit its output cap (`gateway.candidate_max_tokens`, default `2048`) before
     finishing, and judges tend to penalize a cut-off answer. Raise `gateway.candidate_max_tokens`
     in your YAML, or set a higher per-candidate `max_tokens` on that one entry. See
-    [configuration.md](configuration.md#gateway-gatewayconfig).
+    [configuration.md](configuration.md#gateway-orqaigatewayconfig).
 
 ??? question "A model you expected in the default pool isn't there"
 

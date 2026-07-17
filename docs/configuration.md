@@ -11,7 +11,7 @@ file format. The tool is configured by two layers:
    model.
 
 The source of truth for every key below is `src/orq_arena/config.py` (models `MatchRules`,
-`GatewayConfig`, `PreflightConfig`, `ArenaConfig`) and `src/orq_arena/candidates.py`
+`OrqAIGatewayConfig`, `PreflightConfig`, `ArenaConfig`) and `src/orq_arena/candidates.py`
 (`CandidateSpec`). All file paths in this document are relative to the project root.
 
 ---
@@ -26,13 +26,13 @@ cp .env.example .env
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `ORQ_API_KEY` | Required for live runs |, | The only secret orq-arena needs. Every candidate, judge, and preflight-probe call goes through the orq.ai router gateway with this one key. Resolved through evaluatorq's `resolve_llm_client` at the default `base_url`/`api_key_env`, else read directly via `os.environ.get(cfg.api_key_env, "")` (`src/orq_arena/providers/orq_gateway.py`, see [Credential/host resolution](#gateway-gatewayconfig)); the gateway raises `RuntimeError("ORQ_API_KEY is not set. Export it before running orq-arena.")` at construction time if it is empty. Create one per the [API keys guide](https://docs.orq.ai/docs/ai-studio/organization/api-keys) (per `.env.example`). |
+| `ORQ_API_KEY` | Required for live runs |, | The only secret orq-arena needs. Every candidate, judge, and preflight-probe call goes through the orq.ai router gateway with this one key. Resolved through evaluatorq's `resolve_llm_client` at the default `base_url`, else read directly from the environment (`src/orq_arena/providers/orq_gateway.py`, see [Credential/host resolution](#gateway-orqaigatewayconfig)); the gateway raises `RuntimeError("ORQ_API_KEY is not set. Export it before running orq-arena.")` at construction time if it is empty. Create one per the [API keys guide](https://docs.orq.ai/docs/ai-studio/organization/api-keys) (per `.env.example`). |
 
 Notes:
 
 - The variable **name** itself is configurable, not hardcoded, it comes from the YAML key
-  `gateway.api_key_env` (default `"ORQ_API_KEY"`, see the [`gateway` table](#gateway-gatewayconfig)
-  below). Changing `api_key_env` changes which environment variable orq-arena reads; it does not
+  the fixed `ORQ_API_KEY` environment variable (see the [`gateway` table](#gateway-orqaigatewayconfig)
+  below). It does not
   set a key.
 - `ORQ_API_KEY` is **not** required for `orq-arena pool` (prints the candidate pool, never
   constructs a gateway) or the log-reading commands (`report`, `annotate`, `anchor`).
@@ -65,8 +65,8 @@ the YAML, every value is literal.
 
 | Command | `--config` behavior |
 |---|---|
-| `orq-arena run` | Defaults to `orq_arena.yaml`. The YAML candidates are used as-is; the run is headless by default (`--tui` opts into the live show). |
-| `orq-arena pool` | Defaults to `orq_arena.yaml`. Prints the configured candidate pool. |
+| `orq-arena run` | Required, no default. The YAML candidates are used as-is; the run is headless by default (`--tui` opts into the live show). |
+| `orq-arena pool` | Required, no default. Prints the configured candidate pool. |
 | `orq-arena rejudge` | Defaults to `orq_arena.yaml`. Supplies `gateway` and (unless `--criteria` overrides it) `criteria`. |
 | `orq-arena report` | Defaults to `orq_arena.yaml`. Supplies the judge panel and model-name mapping for the statistics rebuild. |
 | `orq-arena refresh-catalog` | Defaults to `orq_arena.yaml`. Only `gateway` is used, to re-fetch the workspace model catalog. |
@@ -90,7 +90,6 @@ match:
 
 gateway:
   base_url: https://api.orq.ai/v3/router
-  api_key_env: ORQ_API_KEY
   candidate_max_tokens: 2048
   judge_max_tokens: 2048
   stream_read_timeout_s: 1200
@@ -124,30 +123,29 @@ min_successful_judges: 2
 ### `match` (`MatchRules`)
 
 Only `max_rounds` affects what gets rated. `starting_hp`, `damage_unanimous`, and
-`damage_majority` are **TUI-presentation-only** knobs: the engine no longer tracks HP, so they
-feed nothing but the live show's health bars. The TUI recomputes HP, damage tiers, and KO
-client-side from the judged verdicts (`src/orq_arena/tui/hp.py::HPTracker`); the rating never
-sees any of them.
+`damage_majority` are **TUI-presentation-only** knobs. Hit points are the fighting-game
+style health bar each model carries in the live show; the engine no longer tracks them, so
+these keys feed nothing but that display. The TUI recomputes hit points, damage tiers, and
+knockouts client-side from the judged verdicts; the rating never sees any of them.
 
 | Key | Type | Default | Effect |
 |---|---|---|---|
 | `max_rounds` | `int` | `5` | Prompt cap per match. The actual number of rounds run is `min(max_rounds, len(prompts))` (`preflight.call_counts`), a smaller prompts file also shortens matches. **The only match key that affects the rating.** |
-| `starting_hp` | `int` | `100` | **TUI-only.** HP each candidate's health bar starts a match with, in the live show (`HPTracker`). Never read by the rating. |
-| `damage_unanimous` | `int` | `30` | **TUI-only.** HP the show's bar subtracts when a round's decisive votes agree unanimously. Presentation drama only; the rating is decided by judged round wins, not HP. |
-| `damage_majority` | `int` | `15` | **TUI-only.** HP the show's bar subtracts on a decisive but non-unanimous (split) verdict. Presentation drama only. |
+| `starting_hp` | `int` | `100` | **TUI-only.** Hit points each candidate's health bar starts a match with, in the live show. Never read by the rating. |
+| `damage_unanimous` | `int` | `30` | **TUI-only.** Hit points the show's bar subtracts when a round's decisive votes agree unanimously. Presentation drama only; the rating is decided by judged round wins, not hit points. |
+| `damage_majority` | `int` | `15` | **TUI-only.** Hit points the show's bar subtracts on a decisive but non-unanimous (split) verdict. Presentation drama only. |
 
 Verdict pacing is no longer a config key: the seconds the TUI holds on each verdict before the
 next round is a code constant, `VERDICT_HOLD_S` in `src/orq_arena/tui/hp.py` (headless runs never
 pause). The match winner is the side with more judged round wins (equal round wins is a draw, an
 empty winner), and every prompt in the drawn slice is always judged regardless of where the
-on-screen HP bar happens to sit.
+on-screen health bar happens to sit.
 
-### `gateway` (`GatewayConfig`)
+### `gateway` (`OrqAIGatewayConfig`)
 
 | Key | Type | Default | Effect |
 |---|---|---|---|
 | `base_url` | `str` | `"https://api.orq.ai/v3/router"` | Base URL for the `AsyncOpenAI` client (`OrqGateway.__init__`, `src/orq_arena/providers/orq_gateway.py`). One OpenAI-compatible endpoint fronts every provider, models, judges, and the preflight probe all share it. |
-| `api_key_env` | `str` | `"ORQ_API_KEY"` | Name of the environment variable read for the API key. Changing this changes which env var orq-arena looks for; see [Environment Variables](#environment-variables) above. |
 | `candidate_max_tokens` | `int` | `2048` | Default per-response output cap for candidate completions (`stream_completion`'s `max_tokens=max_tokens or self._cfg.candidate_max_tokens`). Too low truncates long or creative answers, a cut response is flagged `✂ truncated` in the TUI response panel (`src/orq_arena/tui/widgets/response_panel.py`) and judges tend to penalize it. Overridden per-candidate by `candidates[].max_tokens`. |
 | `judge_max_tokens` | `int` | `2048` | Output cap for judge calls, passed to evaluatorq's `llm_jury_pairwise(max_tokens=...)`. A **cap, not a target**: it costs nothing extra on frugal judges. Thinking-by-default judges (e.g. `gemini-2.5-flash`) burn reasoning tokens before writing a verdict; a low cap starves the verdict entirely and fails the vote (the codebase's own regression case: `512` produced a `LengthFinishReasonError` on every one of that judge's votes). `2048` leaves headroom without materially raising cost on the cheap default panel. |
 | `stream_read_timeout_s` | `int` | `1200` | Max **silence** between stream chunks, in seconds, before the client treats the connection as dead (`httpx.Timeout(read=float(stream_read_timeout_s), ...)` in `OrqGateway.__init__`). This is a read-gap timeout, not a total-duration cap, a thinking model that pauses for minutes before its first token is fine as long as chunks keep arriving within this gap. A stream that goes silent longer than this is retried once, then the round is voided (logged, shown, excluded from scoring). `1200s` = 20 minutes, deliberately generous. |
@@ -160,31 +158,13 @@ is exposed as a config key. The preflight probe call (see below) also uses a har
 
 !!! info "Credential/host resolution at defaults"
 
-    When `base_url` and `api_key_env` are left at their defaults, `OrqGateway` delegates
+    When `base_url` is left at its default, `OrqGateway` delegates
     credential and host resolution to evaluatorq's `resolve_llm_client` (the company-wide
     single source of truth). That path **honors the `ORQ_BASE_URL` environment variable**
     (host plus `/v3/router`, the way to point at a staging host) and **requires an ORQ
-    key**, it will not silently fall back to `OPENAI_API_KEY`. Setting either `base_url` or
-    `api_key_env` in the YAML is a **bring-your-own-endpoint opt-out**: the run then uses
-    the config verbatim with no environment-variable precedence, so `ORQ_BASE_URL` is
-    ignored and only the named `api_key_env` variable is read.
-
-#### Bring your own endpoint
-
-The gateway client is a plain `AsyncOpenAI` client: nothing in the tournament engine is
-orq.ai-specific. Point `base_url` at any OpenAI-compatible chat endpoint and set `api_key_env`
-to whatever variable holds that endpoint's key.
-Two features do depend on the orq.ai router and degrade cleanly without it:
-
-- **`refresh-catalog` and catalog pricing** read the workspace model catalog from the router.
-  On another endpoint, `refresh-catalog` degrades to any existing cache and the preflight
-  spend ceiling / report cost section are skipped when no prices resolve.
-- **Reasoning controls** (`candidates[].reasoning`) are forwarded verbatim as `extra_body`; the
-  router normalizes them per provider. Other endpoints receive them as-is and may ignore or
-  reject unknown fields, so on a non-router endpoint only include fields your server accepts.
-
-The default stays on the router because one key covering every provider is what makes a mixed
-pool a one-command run. It is the recommended path, not the only one.
+    key**, it will not silently fall back to `OPENAI_API_KEY`. Setting `base_url` in the
+    YAML uses the config verbatim with no environment-variable precedence (`ORQ_BASE_URL`
+    is ignored); the key still comes from `ORQ_API_KEY`.
 
 ### `preflight` (`PreflightConfig`)
 
@@ -264,7 +244,7 @@ JSON object per line (JSONL), parsed by `load_prompts()` into a list of `PromptI
 
 Instead of a file path, `--prompts orq:<dataset_id>` pulls the datapoints of an
 [orq.ai Dataset](https://docs.orq.ai/docs/ai-studio/optimize/datasets) through the orq-python
-SDK, authenticated with the same environment variable as the gateway (`gateway.api_key_env`).
+SDK, authenticated with the same `ORQ_API_KEY` as the gateway.
 Mapping per datapoint: the last `user` message becomes the prompt text, `{{var}}` placeholders
 are filled from the datapoint's `inputs`, multi-part content is joined, and datapoints without
 a user message are skipped (the count is reported if the dataset yields nothing usable).
@@ -310,7 +290,7 @@ Settings that cause a hard failure (config load or first live call) if absent or
 - `judges`: required top-level key, must be a non-empty list.
 - Any `candidates[].reasoning.thinking.budget_tokens` must be strictly less than that candidate's
   effective `max_tokens` (own override or `gateway.candidate_max_tokens`), or config loading fails.
-- `ORQ_API_KEY` (or whatever `gateway.api_key_env` names) must be set in the real environment,
+- `ORQ_API_KEY` must be set in the real environment,
   not required to *load* the YAML, but the gateway raises `RuntimeError` the moment any live
   call is attempted (`orq-arena run`, `rejudge`, `refresh-catalog`). Not needed for
   `orq-arena pool`, `report`, `annotate`, or `anchor`.
@@ -326,7 +306,6 @@ Everything else is a Pydantic default and safe to omit from the YAML entirely:
 | `match.damage_unanimous` (TUI-only) | `30` |
 | `match.damage_majority` (TUI-only) | `15` |
 | `gateway.base_url` | `https://api.orq.ai/v3/router` |
-| `gateway.api_key_env` | `ORQ_API_KEY` |
 | `gateway.candidate_max_tokens` | `2048` |
 | `gateway.judge_max_tokens` | `2048` |
 | `gateway.stream_read_timeout_s` | `1200` |

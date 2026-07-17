@@ -4,7 +4,19 @@ site_url: https://orq-ai.github.io/orq-arena/
 repo_url: https://github.com/orq-ai/orq-arena
 repo_name: orq-ai/orq-arena
 docs_dir: docs
-copyright: "© 2026 Orq AI · MIT License"
+copyright: '© 2026 <a href="https://orq.ai" target="_blank" rel="noopener">Orq.ai</a> · MIT License'
+
+extra:
+  social:
+    - icon: material/web
+      link: https://orq.ai
+      name: orq.ai
+    - icon: material/book-open-variant
+      link: https://docs.orq.ai
+      name: Orq.ai documentation
+    - icon: fontawesome/brands/github
+      link: https://github.com/orq-ai/orq-arena
+      name: orq-arena on GitHub
 
 theme:
   name: material

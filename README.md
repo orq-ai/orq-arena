@@ -35,9 +35,9 @@ Models are called through the [orq.ai router gateway](https://docs.orq.ai/docs/a
 - **Headless by default.** Plain log lines on pipes, a progress bar on terminals, matches in parallel. Drop it in CI or cron with `-y`.
 - **Cheap jury swaps.** The responses are already recorded, so re-judging with a different panel costs judge tokens only, and tells you how much the ranking depends on who judged it.
 - **Human spot-checks.** `annotate` renders a run into a blind page (no model names, no jury votes) you can send to human raters; `anchor` compares their votes with the panel's. (The mechanism ships; no published study against it yet, see [Methodology](docs/methodology.md#current-limitations).)
-- **A live show when you want one.** `--tui` (optional extra) opens on a RUN PLAN consent screen (the full per-model cost table), then streams the run as a CRT-neon arena with health bars and judge cards.
+- **A live show when you want one.** `--tui` (optional extra) opens on a RUN PLAN consent screen (the full per-model cost table), then streams the run as a live arena with health bars and judge cards.
 
-Don't take the bullets' word for it: a real recorded run is committed at [`examples/quickstart/`](examples/quickstart/) (a small 4-model pool). Inspect the raw `battles.jsonl` and its manifest, or regenerate the report yourself: `uv run orq-arena report examples/quickstart/battles.jsonl`.
+Don't take the bullets' word for it: a real recorded run is committed at [`examples/quickstart/`](examples/quickstart/) (an 8-model pool). Inspect the raw `battles.jsonl` and its manifest, or regenerate the report yourself: `uv run orq-arena report examples/quickstart/battles.jsonl`.
 
 ## Installation
 
@@ -94,7 +94,7 @@ No key yet? Open the committed example run's report at [`examples/quickstart/`](
 
 ## Usage
 
-**Run the benchmark**: `uv run orq-arena run` (headless, parallel, report at the end; `--config` defaults to the shipped `orq_arena.yaml`, edit its `candidates` list to change the pool). Pass `--tui` to watch the fight live. Full flag reference: **[docs/cli.md](docs/cli.md)**.
+**Run the benchmark**: `uv run orq-arena run --config orq_arena.yaml` (headless, parallel, report at the end; the config is explicit, point it at the shipped `orq_arena.yaml` or your own, and edit its `candidates` list to change the pool). Pass `--tui` to watch the fight live. Full flag reference: **[docs/cli.md](docs/cli.md)**.
 
 **Share the result**: the report (`<log>.report.html`) is one self-contained file. It opens with a verdict banner naming the top three models (win rate, ELO, total cost), then the full ladder with error bars, a quality-vs-cost chart, speed, the win grid, and how the jury behaved. Regenerate it any time with `uv run orq-arena report battles.jsonl`, no model calls needed.
 
@@ -102,7 +102,7 @@ No key yet? Open the committed example run's report at [`examples/quickstart/`](
 
 ## The live show (bonus)
 
-The same run, projected: `uv run orq-arena run --tui` opens on the RUN PLAN consent screen (every model priced, one ENTER to fight), then streams both models side by side with judge cards that call out position-biased votes in public. `s` saves an SVG screenshot, `q` quits.
+The same run, projected: `uv run orq-arena run --config orq_arena.yaml --tui` opens on the RUN PLAN consent screen (every model priced, one ENTER to fight), then streams both models side by side with judge cards that call out position-biased votes in public. `s` saves an SVG screenshot, `q` quits.
 
 ![The live --tui show: a match streaming side by side, judge cards calling out flipped votes, and the final leaderboard](media/demo.gif)
 
@@ -111,8 +111,6 @@ From the final leaderboard, `B` pages through every judged round (prompt, both r
 ## Configuration
 
 Everything lives in `orq_arena.yaml`, no flags to remember. The default pool runs every model with extended reasoning ("thinking") turned **off**, and verifies that against the live router, so the ELO compares models on equal footing rather than whatever each vendor enables by default. `configs/reasoning_arena.yaml` is the thinking-ON counterpart, and [`configs/`](configs/) has ready-made frontier, budget, and 16-model pools. Per-provider reasoning settings, replacement judges, and every other key: **[docs/configuration.md](docs/configuration.md)**.
-
-**Not locked to orq.ai.** The engine speaks plain OpenAI-compatible chat: point `gateway.base_url` at any endpoint that speaks that format and set `api_key_env` to match — off the router you lose catalog pricing (spend ceiling, report cost section), nothing else. The orq.ai router is the default because one key covers every provider; it is the recommended path, not the only one. Details: [docs/configuration.md](docs/configuration.md#bring-your-own-endpoint).
 
 ```yaml
 candidates:

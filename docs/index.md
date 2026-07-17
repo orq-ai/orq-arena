@@ -56,13 +56,13 @@ library for exactly this kind of jury.
   mechanism ships; no published study against it yet, see
   [Methodology](methodology.md#current-limitations).)
 - **A live show when you want one.** `--tui` (optional extra) opens on a RUN PLAN consent
-  screen (full per-model cost table), then streams the run as a CRT-neon arena with health
+  screen (full per-model cost table), then streams the run as a live arena with health
   bars and judge cards.
 
 Don't take the bullets' word for it: a real recorded run is committed at
-[`examples/quickstart/`](https://github.com/orq-ai/orq-arena/tree/master/examples/quickstart) (a
-small 4-model pool). Inspect the raw `battles.jsonl` and its manifest, or regenerate the report
-yourself: `uv run orq-arena report examples/quickstart/battles.jsonl`.
+[`examples/quickstart/`](https://github.com/orq-ai/orq-arena/tree/master/examples/quickstart) (an
+8-model pool). Inspect the raw `battles.jsonl` and its manifest, or regenerate the report
+yourself: `orq-arena report examples/quickstart/battles.jsonl`.
 
 <div class="grid cards" markdown>
 
@@ -108,3 +108,4 @@ yourself: `uv run orq-arena report examples/quickstart/battles.jsonl`.
 
 - **Running benchmarks?** [Getting Started](getting-started.md) → [Configuration](configuration.md) → [CLI Reference](cli.md)
 - **Contributing code?** [CONTRIBUTING.md](https://github.com/orq-ai/orq-arena/blob/master/CONTRIBUTING.md) has the dev setup, project shape, and PR conventions
+- **New to Orq.ai?** [orq.ai](https://orq.ai) is the platform behind the router and the jury; [docs.orq.ai](https://docs.orq.ai) covers the gateway, datasets, and API keys

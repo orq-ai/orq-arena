@@ -52,7 +52,8 @@ judge's vote from the round entirely (see the consistency gate below), a stricte
 same signal.
 
 One bias survives both blinding and seat-swapping: **self-preference**. LLM judges recognize
-their own family's prose stylistically and favor it (Panickssery et al., NeurIPS 2024), so
+their own family's prose stylistically and favor it
+([Panickssery et al., 2024](https://arxiv.org/abs/2404.13076)), so
 excluding the exact self-judge per match is necessary but not sufficient. When any configured
 judge shares a provider family with any candidate, preflight prints a family-overlap warning; the run proceeds, but the ranking ships with that
 caveat on record. The clean setup is a jury drawn entirely from families outside the pool.
@@ -105,12 +106,13 @@ relevance to the prompt."` It can be swapped for a single re-judge without touch
 ## Scoring: what the rating sees, and what the TUI shows
 
 This is the distinction most worth getting right: **the rating is built from per-round judged
-verdicts, and the HP bar in the TUI is a separate, presentation-only recomputation of those same
-verdicts.** The engine itself no longer tracks HP at all.
+verdicts, and the hit-points bar in the TUI, the fighting-game style health bar each model
+carries in the live show, is a separate, presentation-only recomputation of those same
+verdicts.** The engine itself no longer tracks hit points at all.
 
-### HP lives entirely in the TUI
+### Hit points live entirely in the TUI
 
-There is no HP or damage in the scored pipeline. The live show recomputes health bars, damage
+There is no hit-point tracking or damage in the scored pipeline. The live show recomputes health bars, damage
 tiers, and KO client-side from the judged verdicts, purely
 for the drama on screen: a unanimous round drops the bar further than a split one, and a bar
 reaching zero draws a KO. The `match.starting_hp` / `damage_unanimous` / `damage_majority` config
@@ -120,7 +122,7 @@ keys feed only this display (see
 The match winner is decided by **judged round wins**: whichever side won more rounds takes the
 match, and equal round wins is a draw (an empty winner, `MatchResolved`/`MatchResult` no longer
 carry a `by` field). That per-match outcome drives the on-screen story only. Every prompt in the
-drawn slice is always judged regardless of where the HP bar happens to sit, and the turn loop
+drawn slice is always judged regardless of where the health bar happens to sit, and the turn loop
 keeps drawing prompts until `match.max_rounds` decisive rounds have counted.
 
 ### The rating is per-round, not per-match
@@ -144,12 +146,19 @@ match scoreboard (each candidate meets every other candidate exactly once).
 
 ### Per-round Bradley-Terry MLE
 
-orq-arena fits a standard Bradley-Terry model (Bradley & Terry, 1952) by iterative
-maximum likelihood over the per-round outcome list above:
+orq-arena fits a standard Bradley-Terry model
+([Bradley & Terry, 1952](https://doi.org/10.2307/2334029)) by iterative
+maximum likelihood over the per-round outcome list above. This is the same move LMArena made in
+[December 2023](https://www.lmsys.org/blog/2023-12-07-leaderboard/), replacing the online Elo
+update ([Elo, 1978](https://openlibrary.org/works/OL10321371W)) with a full Bradley-Terry MLE
+refit, because an incremental Elo weighs recent games more heavily while a benchmark's models
+don't drift mid-run ([Chiang et al., 2024](https://arxiv.org/abs/2403.04132)):
 
 - Every win/loss increments a wins matrix by 1.0.
 - **Ties split 0.5/0.5**: `build_wins_matrix` adds 0.5 to both directions on a tie, the
-  standard Bradley-Terry tie convention.
+  standard Bradley-Terry tie convention, also used by LMArena.
+  ([Rao & Kupper, 1967](https://doi.org/10.1080/01621459.1967.10482901) model ties with an
+  explicit threshold parameter instead; the half-win split is the simpler convention.)
 - Ratings refit for up to 100 iterations (tolerance `1e-6`), renormalized each iteration, then
   converted to a familiar scale via `400 × log10(rating) + 1000`, anchored so the field's
   geometric mean sits at **1000**.
@@ -161,7 +170,9 @@ fit over every round judged so far, not a value frozen at tournament design time
 
 The confidence intervals resample the full outcome list with replacement **200 times** (seeded,
 `seed=42`), refits Bradley-Terry on each resample, and reports each candidate's 2.5th/97.5th
-percentile rating across the 200 refits as its 95% CI. On a small pool this produces **wide,
+percentile rating across the 200 refits as its 95% CI, the same percentile-bootstrap technique
+Chatbot Arena uses for its leaderboard intervals
+([Chiang et al., 2024](https://arxiv.org/abs/2403.04132)). On a small pool this produces **wide,
 overlapping intervals**, that is not hidden, it is the honest statistical output of a benchmark
 built on a limited number of comparisons; the module's own comment says as much: "Small pools +
 few comparisons => wide intervals, which is the honest output." Read overlapping CIs on the
@@ -170,9 +181,11 @@ leaderboard as "not statistically distinguishable at this sample size," not as a
 ### Style control: the length confound, priced out
 
 Seat-swapping fixes position bias and nothing else; a jury that prefers the *longer* answer
-prefers it in both orders. The field's standard correction (LMArena style control,
-length-controlled AlpacaEval) is to estimate that preference jointly with model strength instead
-of pretending it isn't there. orq-arena refits Bradley-Terry as a logistic regression with
+prefers it in both orders. The field's standard correction
+([LMArena style control](https://www.lmsys.org/blog/2024-08-28-style-control/),
+[length-controlled AlpacaEval](https://arxiv.org/abs/2404.04475),
+[Arena-Hard-Auto](https://arxiv.org/abs/2406.11939)) is to estimate that preference jointly with
+model strength instead of pretending it isn't there. orq-arena refits Bradley-Terry as a logistic regression with
 one extra term per round:
 
 ```
@@ -219,14 +232,14 @@ agreement, since a single vote can't agree or disagree with anything.
 The run computes chance-corrected inter-judge agreement, because raw agreement
 inflates whenever most rounds have an obvious winner:
 
-- **Fleiss' κ (1971)** is computed over rounds where **every** primary panelist
+- **[Fleiss' κ (1971)](https://doi.org/10.1037/h0031619)** is computed over rounds where **every** primary panelist
   voted decisively, abstentions and replacement judges make a round's vote count non-uniform,
   which Fleiss' formula assumes fixed, so partial rounds are excluded and that exclusion is
   reported alongside as `rounds_used` / `rounds_total` coverage.
-- **Cohen's κ (1960)** is computed per judge pair, over just that pair's
+- **[Cohen's κ (1960)](https://doi.org/10.1177/001316446002000104)** is computed per judge pair, over just that pair's
   co-decisive rounds, a looser bar that tolerates one judge abstaining while another decides.
-- Both map onto **Landis & Koch (1977)** labels: <0 poor, ≤0.20 slight, ≤0.40 fair, ≤0.60
-  moderate, ≤0.80 substantial, >0.80 almost perfect.
+- Both map onto **[Landis & Koch (1977)](https://doi.org/10.2307/2529310)** labels: <0 poor,
+  ≤0.20 slight, ≤0.40 fair, ≤0.60 moderate, ≤0.80 substantial, >0.80 almost perfect.
 
 ### Per-judge flip rates, position bias, made public
 
@@ -265,7 +278,7 @@ its token cap, the round is judged normally on the truncated text. `finish_reaso
 `"length"`) is recorded per side on the `BattleRecord` and surfaced as a `✂ truncated` flag in the
 TUI's response panel, the jury sees exactly what the reader sees, and a truncation-driven loss is
 legible rather than mysterious. See `gateway.candidate_max_tokens` / `gateway.judge_max_tokens` in
-[Configuration](configuration.md#gateway-gatewayconfig), an under-sized `judge_max_tokens` cap
+[Configuration](configuration.md#gateway-orqaigatewayconfig), an under-sized `judge_max_tokens` cap
 starving a thinking-by-default judge's own verdict is exactly the kind of failure this policy is
 designed to make visible rather than silently absorb.
 
@@ -345,9 +358,9 @@ numbers.
 This repository ships a real recorded run at
 [`examples/quickstart/`](https://github.com/orq-ai/orq-arena/tree/master/examples/quickstart),
 so the mechanisms above are not just described, they are demonstrated on committed artifacts you
-can inspect and reproduce yourself. It is a small **4-model, thinking-OFF pool** (a full
-round-robin, `C(4,2) = 6` matches) judged by the shipped 3-judge default panel, chosen to be fast
-and cheap to regenerate rather than to be a rigorous benchmark.
+can inspect and reproduce yourself. It is an **8-model pool spanning six providers** (a full
+round-robin, `C(8,2) = 28` matches) judged by the shipped 3-judge default panel, sized to
+demonstrate every mechanism on real data rather than to be a rigorous benchmark.
 
 !!! example "Read the numbers yourself"
 
@@ -383,6 +396,34 @@ What the committed run lets you see end to end, on real data:
     `rated_rounds` against the total round count in your own run's manifest (the committed example's
     included) before leaning on a close pairwise gap.
 
+## How this compares to other benchmarks
+
+orq-arena's scoring pipeline is deliberately the Chatbot-Arena family's, applied to an LLM jury
+instead of crowd votes. Where it sits relative to the published systems:
+
+- **[LMArena / Chatbot Arena](https://arxiv.org/abs/2403.04132)** collects human pairwise votes
+  at scale, samples matchups actively to shrink the widest confidence intervals, and fits the
+  same Bradley-Terry MLE with bootstrap CIs used here. orq-arena swaps the humans for a
+  seat-swapped LLM jury, uses a seeded round-robin instead of active sampling (the right trade
+  for a small fixed pool where every pair can simply be played), and regresses out length only
+  where LMArena's [style control](https://www.lmsys.org/blog/2024-08-28-style-control/) also
+  covers markdown headers, lists, and bold text.
+- **[Arena-Hard-Auto](https://arxiv.org/abs/2406.11939)** is the closest published analog: an
+  automated benchmark scoring pairwise LLM-judge verdicts with a style-controlled Bradley-Terry
+  fit. It relies on a single judge model against a fixed baseline; orq-arena adds a multi-judge
+  panel, the both-orders consistency gate, a quorum, and self-judge exclusion on top of the same
+  statistical core.
+- **[MT-Bench](https://arxiv.org/abs/2306.05685)** established that strong LLM judges reach
+  roughly human-human agreement levels on pairwise verdicts, and judges both orders like
+  orq-arena does, but scores an order-flip as a tie where orq-arena makes the judge abstain.
+- **[AlpacaEval-LC](https://arxiv.org/abs/2404.04475)** measures win rate against one fixed
+  baseline model with a length-debiasing regression; orq-arena fits the same length term inside
+  a full round-robin field rather than against a single reference.
+- Because the schedule is a seeded round-robin over a declared pool, with no private variants,
+  no selective score retraction, and no sampling asymmetry, the incentive problems documented in
+  [The Leaderboard Illusion](https://arxiv.org/abs/2504.20879) for public crowdsourced arenas do
+  not apply to a self-hosted run.
+
 ## Current limitations
 
 Stated plainly, so you can weigh them against your own use case:
@@ -392,18 +433,40 @@ Stated plainly, so you can weigh them against your own use case:
   this page, but well below the 20-comparison-per-category floor within a single round-robin run
   (`match.max_rounds=5` draws only 5 prompts per match). Treat the shipped bank as a smoke test,
   not a rigorous benchmark, until you supply your own larger prompt set.
-- **No human-anchor *results* yet.** The workflow now exists
-  ([Human anchor](#human-anchor-does-the-panel-agree-with-people): `annotate` + `anchor`), but
-  no study has been run and published against it. Until then the Fleiss'/Cohen's κ numbers
-  above still only measure *judges agreeing with each other*, not *judges agreeing with
-  people*, a self-consistent panel is not the same claim as an accurate one. Target: 50-100
-  rounds, 2-3 blind raters.
-- **Style control covers length only.** The len-ctrl rating (see
-  [Style control](#style-control-the-length-confound-priced-out)) corrects for response length;
-  markdown/formatting covariates (headers, lists, bold), which LMArena's full style control also
-  regresses out, are not modeled yet. The prompt bank's `length_bucket` field (`short`/`medium`)
-  is likewise not used yet.
-- **One free-text criteria string per run.** Every judge scores every prompt category against the
-  same `criteria` field, there is no per-category or per-prompt-type rubric today, so a run
-  spanning very different prompt types (code correctness vs. creative writing) is judged against
-  one general-purpose bar.
+
+## References
+
+- Bradley, R. A., & Terry, M. E. (1952). Rank Analysis of Incomplete Block Designs: I. The
+  Method of Paired Comparisons. *Biometrika*, 39(3/4), 324-345.
+  [doi:10.2307/2334029](https://doi.org/10.2307/2334029)
+- Chiang, W.-L., Zheng, L., Sheng, Y., et al. (2024). Chatbot Arena: An Open Platform for
+  Evaluating LLMs by Human Preference. *ICML 2024*.
+  [arXiv:2403.04132](https://arxiv.org/abs/2403.04132)
+- Cohen, J. (1960). A Coefficient of Agreement for Nominal Scales. *Educational and
+  Psychological Measurement*, 20(1), 37-46.
+  [doi:10.1177/001316446002000104](https://doi.org/10.1177/001316446002000104)
+- Dubois, Y., Galambosi, B., Liang, P., & Hashimoto, T. B. (2024). Length-Controlled
+  AlpacaEval: A Simple Way to Debias Automatic Evaluators.
+  [arXiv:2404.04475](https://arxiv.org/abs/2404.04475)
+- Elo, A. E. (1978). *The Rating of Chessplayers, Past and Present*. Arco Publishing.
+- Fleiss, J. L. (1971). Measuring Nominal Scale Agreement Among Many Raters. *Psychological
+  Bulletin*, 76(5), 378-382. [doi:10.1037/h0031619](https://doi.org/10.1037/h0031619)
+- Landis, J. R., & Koch, G. G. (1977). The Measurement of Observer Agreement for Categorical
+  Data. *Biometrics*, 33(1), 159-174. [doi:10.2307/2529310](https://doi.org/10.2307/2529310)
+- Li, T., Chiang, W.-L., Frick, E., et al. (2024). From Crowdsourced Data to High-Quality
+  Benchmarks: Arena-Hard and BenchBuilder Pipeline.
+  [arXiv:2406.11939](https://arxiv.org/abs/2406.11939)
+- LMSYS Org (2024). Does style matter? Disentangling style and substance in Chatbot Arena.
+  [lmsys.org blog](https://www.lmsys.org/blog/2024-08-28-style-control/)
+- Panickssery, A., Bowman, S. R., & Feng, S. (2024). LLM Evaluators Recognize and Favor Their
+  Own Generations. *NeurIPS 2024*. [arXiv:2404.13076](https://arxiv.org/abs/2404.13076)
+- Rao, P. V., & Kupper, L. L. (1967). Ties in Paired-Comparison Experiments: A Generalization
+  of the Bradley-Terry Model. *Journal of the American Statistical Association*, 62(317),
+  194-204. [doi:10.1080/01621459.1967.10482901](https://doi.org/10.1080/01621459.1967.10482901)
+- Singh, S., Nan, Y., Wang, A., et al. (2025). The Leaderboard Illusion.
+  [arXiv:2504.20879](https://arxiv.org/abs/2504.20879)
+- Wang, P., Li, L., Chen, L., et al. (2023). Large Language Models are not Fair Evaluators.
+  *ACL 2024*. [arXiv:2305.17926](https://arxiv.org/abs/2305.17926)
+- Zheng, L., Chiang, W.-L., Sheng, Y., et al. (2023). Judging LLM-as-a-Judge with MT-Bench and
+  Chatbot Arena. *NeurIPS 2023 Datasets and Benchmarks*.
+  [arXiv:2306.05685](https://arxiv.org/abs/2306.05685)

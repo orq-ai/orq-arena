@@ -17,6 +17,8 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field, replace
+
+from ..config import ORQ_API_KEY_ENV
 from pathlib import Path
 from typing import Any
 
@@ -29,10 +31,10 @@ class PromptItem:
     metadata: dict = field(default_factory=dict)
 
 
-def load_prompts(path: str | Path, api_key_env: str = "ORQ_API_KEY") -> list[PromptItem]:
+def load_prompts(path: str | Path) -> list[PromptItem]:
     """Return the prompts in file (or dataset) order."""
     if str(path).startswith("orq:"):
-        return _load_orq_dataset(str(path)[len("orq:") :], api_key_env)
+        return _load_orq_dataset(str(path)[len("orq:") :])
     p = Path(path)
     out: list[PromptItem] = []
     with p.open(encoding="utf-8") as fh:
@@ -88,7 +90,7 @@ def datapoint_to_prompt(inputs: dict | None, messages: list | None) -> PromptIte
     return PromptItem(text=text)
 
 
-def orq_dataset_meta(dataset_id: str, api_key_env: str = "ORQ_API_KEY") -> dict:
+def orq_dataset_meta(dataset_id: str) -> dict:
     """Report metadata for an orq.ai Dataset: id, display name, studio URL.
 
     The name fetch is best-effort; on any failure the id doubles as the name
@@ -100,7 +102,7 @@ def orq_dataset_meta(dataset_id: str, api_key_env: str = "ORQ_API_KEY") -> dict:
     try:
         from orq_ai_sdk import Orq
 
-        with Orq(api_key=os.environ.get(api_key_env, "")) as client:
+        with Orq(api_key=os.environ.get(ORQ_API_KEY_ENV, "")) as client:
             name = client.datasets.retrieve(dataset_id=dataset_id).display_name
     except Exception:
         pass
@@ -111,15 +113,15 @@ def orq_dataset_meta(dataset_id: str, api_key_env: str = "ORQ_API_KEY") -> dict:
     }
 
 
-def _load_orq_dataset(dataset_id: str, api_key_env: str) -> list[PromptItem]:
+def _load_orq_dataset(dataset_id: str) -> list[PromptItem]:
     import os
 
     from orq_ai_sdk import Orq
 
-    api_key = os.environ.get(api_key_env, "")
+    api_key = os.environ.get(ORQ_API_KEY_ENV, "")
     if not api_key:
         raise RuntimeError(
-            f"{api_key_env} is not set; it is needed to fetch dataset {dataset_id!r}."
+            f"{ORQ_API_KEY_ENV} is not set; it is needed to fetch dataset {dataset_id!r}."
         )
     out: list[PromptItem] = []
     skipped = 0

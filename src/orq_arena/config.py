@@ -21,9 +21,12 @@ class MatchRules(BaseModel):
     damage_majority: int = 15
 
 
-class GatewayConfig(BaseModel):
+# The one secret orq-arena reads; every gateway/catalog/dataset call uses it.
+ORQ_API_KEY_ENV = "ORQ_API_KEY"
+
+
+class OrqAIGatewayConfig(BaseModel):
     base_url: str = "https://api.orq.ai/v3/router"
-    api_key_env: str = "ORQ_API_KEY"
     candidate_max_tokens: int = 2048
     # A cap, not a target, free headroom for judges that think by default
     # (G1 finding: 512 starved gemini-2.5-flash's reasoning and killed every
@@ -49,7 +52,7 @@ class ArenaConfig(BaseModel):
     preflight: PreflightConfig = Field(default_factory=PreflightConfig)
     # Parallel matches for headless runs only; the TUI is always sequential.
     headless_concurrency: int = 4
-    gateway: GatewayConfig = Field(default_factory=GatewayConfig)
+    gateway: OrqAIGatewayConfig = Field(default_factory=OrqAIGatewayConfig)
     candidates: list[CandidateSpec]
     judges: list[str] = Field(description="Judge panel, router model ids")
     replacement_judges: list[str] = Field(default_factory=list)
