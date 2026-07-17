@@ -196,7 +196,7 @@ orq-arena run --config configs/reasoning_arena.yaml --prompts prompts/starter.js
 ```
 
 **Expected output** (headless, piped, both streams shown interleaved; everything above
-`FINAL STANDINGS` is stderr; reconstructed from the committed
+`Final Results` is stderr; reconstructed from the committed
 [`examples/quickstart`](https://github.com/orq-ai/orq-arena/tree/master/examples/quickstart) run's
 recorded manifest and log, its 8-model pool against the default judge trio):
 
@@ -251,7 +251,7 @@ match 28/28 done
 🏆 gemini-3.5-flash leads, but claude-sonnet-4-6 is statistically tied (CIs
 overlap at 76 rated rounds; the report page has the tie-breakers)
 
-                    FINAL STANDINGS
+                    Final Results
 ┏━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━┳━━━━━━━━━━━┳━━━━━━┓
 ┃ # ┃ Model                  ┃ ELO  ┃ 95% CI    ┃ win% ┃
 ┡━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━╇━━━━━━━━━━━╇━━━━━━┩
@@ -295,7 +295,7 @@ its call counts and the ceiling reads `unavailable`.
 
 ![RUN PLAN screen: prompts block, per-model cost table, consent bar](assets/run-plan.svg)
 
-The run ends on the **FINAL STANDINGS screen**: ELO with its 95% CI and len-ctrl rating per
+The run ends on the **Final Results screen**: ELO with its 95% CI and len-ctrl rating per
 model, the per-category slices, per-judge behaviour (A/B lean, flip rate, tie rate, Fleiss'
 κ), and the win grid.
 

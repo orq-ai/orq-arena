@@ -51,7 +51,7 @@ class LeaderboardScreen(Screen):
     def compose(self) -> ComposeResult:
         r = self._report
         with VerticalScroll():
-            yield Static("FINAL STANDINGS", id="title")
+            yield Static("Final Results", id="title")
             yield Static(f"🏆 Leaderboard king: {self._champion}", id="champion")
 
             agreement = r.get("mean_agreement")

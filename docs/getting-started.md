@@ -197,7 +197,7 @@ match 28/28 done
 🏆 gemini-3.5-flash leads, but claude-sonnet-4-6 is statistically tied (CIs
 overlap at 76 rated rounds; the report page has the tie-breakers)
 
-                    FINAL STANDINGS
+                    Final Results
 ┏━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━┳━━━━━━━━━━━┳━━━━━━┓
 ┃ # ┃ Model                  ┃ ELO  ┃ 95% CI    ┃ win% ┃
 ┡━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━╇━━━━━━━━━━━╇━━━━━━┩

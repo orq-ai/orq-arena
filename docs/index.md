@@ -12,7 +12,7 @@ the benchmark:
 
 ![RUN PLAN screen: the pool, the jury, and the worst-case cost per model, before anything is spent](assets/run-plan.svg)
 
-And ends on the **FINAL STANDINGS**: ELO with 95% CIs and the length-controlled rating,
+And ends on the **Final Results**: ELO with 95% CIs and the length-controlled rating,
 per-judge behaviour, and the win grid:
 
 ![Final standings: ELO ladder with CIs and len-ctrl, per-judge behaviour, win grid](assets/leaderboard.svg)

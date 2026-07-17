@@ -72,7 +72,7 @@ def _final_table(ended: TournamentEnded) -> Table:
     ci = r.get("elo_ci") or {}
     grid = r.get("win_grid") or {}
     thinking = r.get("thinking") or {}
-    table = Table(title="FINAL STANDINGS")
+    table = Table(title="Final Results")
     cols = ["#", "Model", "ELO"] + (["95% CI"] if ci else []) + (["win%"] if grid else [])
     for c in cols:
         table.add_column(c)
