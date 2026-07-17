@@ -34,16 +34,6 @@ Commands:
   run              Run the arena benchmark (hits orq.ai): headless logs...
 ```
 
-!!! info "About the output blocks on this page"
-
-    The *Expected output* blocks below are captured from real invocations
-    against the committed example run at
-    [`examples/quickstart/`](https://github.com/orq-ai/orq-arena/tree/master/examples/quickstart),
-    keyless wherever the command makes no API calls. The two blocks that need
-    live judge calls (`run`, `rejudge --judge`) are reconstructed from that
-    same run's recorded numbers and marked as such. Your model names and
-    numbers will differ; the shape won't.
-
 For installation and your first run, see [getting-started.md](getting-started.md). For the
 full `orq_arena.yaml` key reference, see [configuration.md](configuration.md).
 
