@@ -1,64 +1,28 @@
 # Methodology
 
-How orq-arena turns judged pairwise rounds into a Bradley-Terry ELO rating, the judging
-protocol, the scoring math, the confidence intervals, the agreement and bias metrics that let you
-audit the panel, the reliability and reproducibility policies, and what the committed example run
-demonstrates.
+How orq-arena turns judged pairwise rounds into a ranking you can audit. This page is the
+overview of the principles; the implementation itself is open source and is the full detail.
 
 ## How it works
 
-For every round, one prompt, two candidates, in a tournament:
+For every round, one prompt, two candidates, in a round-robin tournament:
 
-1. Both candidates stream a response to the same prompt through the same orq.ai router gateway
-   call.
-2. evaluatorq's pairwise jury compares the two responses. **Every judge sees the pair twice, once
-   in each seat order**, and its two verdicts are reconciled into one vote. A judge that
-   contradicts itself between orders **abstains** rather than being averaged or trusted on a coin
-   flip.
-3. If fewer than `min_successful_judges` (default 2) judges cast a decisive vote, the round is
-   `inconclusive`: it never reaches the rating.
-4. Every other judged round, a win for A, a win for B, or a tie, feeds a **Bradley-Terry
-   maximum-likelihood** fit across every round judged so far in the tournament; ties count as
-   half a win each.
-5. Bradley-Terry produces one rating per candidate, anchored so the field's geometric mean sits at
-   1000, plus a 200-resample percentile **bootstrap 95% confidence interval** on every rating,
-   and a **length-controlled rating** that refits the same rounds with the jury's length
-   preference priced out.
-6. Alongside the rating, the run reports how often judges agreed with each other (Fleiss'/Cohen's
-   κ), how often each individual judge flipped between seat orders, and the jury's fitted
-   **length coefficient**, public, per-judge evidence of how much to trust that vote.
+1. Both candidates answer the same prompt through the same orq.ai router gateway.
+2. An evaluatorq jury compares the two responses. Every judge sees the pair twice, once in
+   each seat order; a judge that contradicts itself between orders abstains rather than being
+   trusted on a coin flip.
+3. If fewer than two judges cast a decisive vote, the round is inconclusive and never reaches
+   the rating.
+4. Every judged round (win, loss, or tie) feeds a Bradley-Terry fit over all rounds so far.
+5. The fit produces one rating per candidate with a bootstrap 95% confidence interval, plus a
+   length-controlled rating that prices out the jury's verbosity preference.
+6. The run also reports how much the judges agreed with each other and how often each one
+   flipped between seat orders, public evidence of how much to trust the verdicts.
 
-The rest of this page is the detail behind those six steps, plus what the committed example run
-demonstrates.
+## Judging
 
-## Judging protocol
-
-Every round's two responses are scored by an evaluatorq pairwise jury, built once per match from the config's `judges` list minus
-whichever judge is also a contestant in that specific match, self-judge exclusion. (If that
-would empty the panel, the match raises instead of judging with a compromised jury.) Each
-`.compare(question, response_a, response_b)` call then runs the whole panel in **both seat
-orders**, concurrently:
-
-- **Order 1**: A = candidate A's response, B = candidate B's response.
-- **Order 2**: A = candidate B's response, B = candidate A's response (un-swapped back to the
-  canonical A/B frame before reconciliation).
-
-This dual-ordering design is the standard defense the Chatbot-Arena family of methodologies uses
-against position bias, a well-documented tendency for LLM judges to prefer whichever answer they
-see first ([Zheng et al., 2023](https://arxiv.org/abs/2306.05685);
-[Wang et al., 2023](https://arxiv.org/abs/2305.17926)). One deliberate difference from MT-Bench:
-Zheng et al. score an order-inconsistent judgment as a tie, orq-arena instead removes that
-judge's vote from the round entirely (see the consistency gate below), a stricter reading of the
-same signal.
-
-One bias survives both blinding and seat-swapping: **self-preference**. LLM judges recognize
-their own family's prose stylistically and favor it
-([Panickssery et al., 2024](https://arxiv.org/abs/2404.13076)), so
-excluding the exact self-judge per match is necessary but not sufficient. When any configured
-judge shares a provider family with any candidate, preflight prints a family-overlap warning; the run proceeds, but the ranking ships with that
-caveat on record. The clean setup is a jury drawn entirely from families outside the pool.
-
-### Consistency gating, a flip is an abstention, not a coin flip
+**Both seat orders, always.** LLM judges measurably favor whichever answer they see first
+(Zheng et al., 2023), so every judge scores each pair twice with the sides swapped:
 
 ```mermaid
 flowchart TD
@@ -67,406 +31,101 @@ flowchart TD
     rec -- yes --> vote["reconciled vote"]
     rec -- no --> flip["abstain, flipped=True"]
     rec -- "a call failed" --> fail["abstain, not a flip"]
-    vote --> quorum{"≥ min_successful_judges<br/>decisive votes?"}
+    vote --> quorum{"≥ 2 decisive votes?"}
     quorum -- yes --> verdict["round verdict: A / B / tie"]
     quorum -- no --> inc["inconclusive,<br/>never reaches the rating"]
 ```
 
-For each judge, the two verdicts (one per ordering) are reconciled:
+A judge that gives a different verdict in each order abstains for that round, and the flip is
+recorded. A round needs at least two decisive votes (configurable) to produce a verdict;
+otherwise it is dropped from the rating rather than decided by a jury that could not agree
+with itself.
 
-- **Same verdict both times** → that becomes the judge's reconciled vote for the round.
-- **Different verdict each time** → the judge disagreed with itself; it **abstains**
-  (`vote=None`) and is recorded with `flipped=True`.
-- **A missing or failed verdict on either ordering** → also abstains, but is *not* counted as a
-  flip, it never got the chance to contradict itself.
+**Self-preference.** LLM judges recognize and favor their own family's prose (Panickssery et
+al., 2024). A judge that is also a contestant is excluded from its own matches, and the
+preflight warns whenever a judge shares a provider family with any candidate. The clean setup
+is a jury drawn entirely from families outside the pool.
 
-This is orq-arena's core bias control. Rather than trust a single, possibly position-biased vote,
-or silently average two contradictory answers, an inconsistent judge is removed from that round's
-tally, and the inconsistency itself becomes reported data (see per-judge flip rates below).
+All judges score the same free-text criteria for the whole run (configurable, and swappable
+after the fact with `rejudge`).
 
-### Quorum, no jury of one
+## Ratings
 
-A round only produces a real verdict once at least `min_successful_judges` (default **2**,
-`orq_arena.yaml`'s `min_successful_judges` key) judges cast a decisive reconciled vote. Below
-that floor, evaluatorq's `run_pairwise` returns `winner='inconclusive'` regardless of what the
-surviving vote(s) say, one consistent judge is never enough to decide a round on its own. If a
-primary judge's call fails outright (an API error, not a flip), a configured `replacement_judges`
-stand-in is promoted for that pair and runs in both orderings so it can cast a full reconciled
-vote in its place.
+**Bradley-Terry, not incremental Elo.** Ratings come from a maximum-likelihood Bradley-Terry
+fit (Bradley & Terry, 1952) over every judged round, refit as the tournament progresses; ties
+count as half a win for each side. This is the same statistical core as Chatbot Arena's
+leaderboard (Chiang et al., 2024). Ratings are anchored so the field's average sits at 1000.
 
-### Criteria
+**Confidence intervals.** A 200-resample bootstrap gives each candidate a 95% CI. On a small
+run the intervals are wide and overlapping; that is the honest output, and overlapping CIs
+should be read as "not statistically distinguishable at this sample size", not as a tie.
 
-All judges score against the same free-text criteria for the whole run, `orq_arena.yaml`'s
-`criteria` key, default `"Accuracy and correctness, helpfulness and completeness, clarity, and
-relevance to the prompt."` It can be swapped for a single re-judge without touching the YAML
-(`orq-arena rejudge ... --criteria "..."`; see
-[Jury swapping](#jury-swapping-re-judge-without-regenerating) below). Full field reference:
-[Configuration → judges, replacement_judges, criteria, min_successful_judges](configuration.md#judges-replacement_judges-criteria-min_successful_judges).
+**Length control.** Seat-swapping fixes position bias, not verbosity bias: a jury that likes
+longer answers likes them in both orders. Following length-controlled AlpacaEval (Dubois et
+al., 2024) and LMArena's style control, the fit is repeated with a length term, producing the
+jury's length coefficient (printed with the standings) and a len-ctrl rating column with that
+preference priced out. A big raw-vs-len-ctrl gap means verbosity, not quality, is doing the
+separating. Length is the only style axis controlled today; markdown formatting is not.
 
-## Scoring: what the rating sees, and what the TUI shows
+**Per-category slices.** Ratings are also refit per prompt category, but only for categories
+with enough comparisons to mean anything; thin slices are dropped instead of shown with
+misleading precision.
 
-This is the distinction most worth getting right: **the rating is built from per-round judged
-verdicts, and the hit-points bar in the TUI, the fighting-game style health bar each model
-carries in the live show, is a separate, presentation-only recomputation of those same
-verdicts.** The engine itself no longer tracks hit points at all.
+## Auditing the jury
 
-### Hit points live entirely in the TUI
+Every run reports the numbers needed to challenge its own ranking:
 
-There is no hit-point tracking or damage in the scored pipeline. The live show recomputes health bars, damage
-tiers, and KO client-side from the judged verdicts, purely
-for the drama on screen: a unanimous round drops the bar further than a split one, and a bar
-reaching zero draws a KO. The `match.starting_hp` / `damage_unanimous` / `damage_majority` config
-keys feed only this display (see
-[Configuration → match](configuration.md#match-matchrules)); none of them reach the rating.
+- **Agreement**: mean modal-vote share per round, plus chance-corrected Fleiss' and Cohen's
+  kappa with the standard Landis-Koch labels (slight to almost-perfect).
+- **Per-judge flip rates**: how often each judge contradicted itself between seat orders,
+  published per judge rather than hidden in an average.
+- **Jury swap**: `rejudge` re-scores the recorded responses under a different panel (judge
+  tokens only, zero regeneration) and reports the Spearman rank correlation against the
+  original ranking, the direct test that the ranking is not an artifact of which judges were
+  picked.
 
-The match winner is decided by **judged round wins**: whichever side won more rounds takes the
-match, and equal round wins is a draw (an empty winner, `MatchResolved`/`MatchResult` no longer
-carry a `by` field). That per-match outcome drives the on-screen story only. Every prompt in the
-drawn slice is always judged regardless of where the health bar happens to sit, and the turn loop
-keeps drawing prompts until `match.max_rounds` decisive rounds have counted.
+## Reliability
 
-### The rating is per-round, not per-match
-
-Live standings and the final leaderboard are **not** derived from the per-match winner at all.
-After every match, the driver walks that match's records and extracts one outcome per
-**judged round**:
-
-- `majority_verdict == "A"` → a win for A
-- `majority_verdict == "B"` → a win for B
-- `majority_verdict == "tie"` → a tie
-- `majority_verdict == "inconclusive"`, or a voided round (`error` set) → **dropped**: not fed
-  to the rating, and specifically never counted as a tie.
-
-That per-round outcome list, never the per-match winner, is what the rating fits. A default 8-candidate round-robin
-(`match.max_rounds=5`) therefore rates on up to `C(8,2) × 5 = 140` round-level comparisons pooled
-across the whole field, not the 7 match-level wins any single candidate would show on the
-match scoreboard (each candidate meets every other candidate exactly once).
-
-## Ratings: Bradley-Terry with ties, bootstrapped CIs, per-category slices
-
-### Per-round Bradley-Terry MLE
-
-orq-arena fits a standard Bradley-Terry model
-([Bradley & Terry, 1952](https://doi.org/10.2307/2334029)) by iterative
-maximum likelihood over the per-round outcome list above. This is the same move LMArena made in
-[December 2023](https://www.lmsys.org/blog/2023-12-07-leaderboard/), replacing the online Elo
-update ([Elo, 1978](https://openlibrary.org/works/OL10321371W)) with a full Bradley-Terry MLE
-refit, because an incremental Elo weighs recent games more heavily while a benchmark's models
-don't drift mid-run ([Chiang et al., 2024](https://arxiv.org/abs/2403.04132)):
-
-- Every win/loss increments a wins matrix by 1.0.
-- **Ties split 0.5/0.5**: `build_wins_matrix` adds 0.5 to both directions on a tie, the
-  standard Bradley-Terry tie convention, also used by LMArena.
-  ([Rao & Kupper, 1967](https://doi.org/10.1080/01621459.1967.10482901) model ties with an
-  explicit threshold parameter instead; the half-win split is the simpler convention.)
-- Ratings refit for up to 100 iterations (tolerance `1e-6`), renormalized each iteration, then
-  converted to a familiar scale via `400 × log10(rating) + 1000`, anchored so the field's
-  geometric mean sits at **1000**.
-
-Standings recompute after every match, so the TUI's live leaderboard always reflects the current
-fit over every round judged so far, not a value frozen at tournament design time.
-
-### 95% confidence intervals
-
-The confidence intervals resample the full outcome list with replacement **200 times** (seeded,
-`seed=42`), refits Bradley-Terry on each resample, and reports each candidate's 2.5th/97.5th
-percentile rating across the 200 refits as its 95% CI, the same percentile-bootstrap technique
-Chatbot Arena uses for its leaderboard intervals
-([Chiang et al., 2024](https://arxiv.org/abs/2403.04132)). On a small pool this produces **wide,
-overlapping intervals**, that is not hidden, it is the honest statistical output of a benchmark
-built on a limited number of comparisons; the module's own comment says as much: "Small pools +
-few comparisons => wide intervals, which is the honest output." Read overlapping CIs on the
-leaderboard as "not statistically distinguishable at this sample size," not as a tie.
-
-### Style control: the length confound, priced out
-
-Seat-swapping fixes position bias and nothing else; a jury that prefers the *longer* answer
-prefers it in both orders. The field's standard correction
-([LMArena style control](https://www.lmsys.org/blog/2024-08-28-style-control/),
-[length-controlled AlpacaEval](https://arxiv.org/abs/2404.04475),
-[Arena-Hard-Auto](https://arxiv.org/abs/2406.11939)) is to estimate that preference jointly with
-model strength instead of pretending it isn't there. orq-arena refits Bradley-Terry as a logistic regression with
-one extra term per round:
-
-```
-P(A wins) = sigmoid(theta_A - theta_B + gamma * d),   d = (len_A - len_B) / (len_A + len_B)
-```
-
-fit over the same judged rounds (ties enter as y = 0.5), anchored like the raw fit so the
-field's geometric mean sits at 1000. Two numbers come out:
-
-- **`gamma`, the jury's length coefficient**, printed with the standings. Positive means the
-  panel favored longer answers; the magnitude says how much.
-- **The len-ctrl ELO**, the rating with the length term zeroed: what the ranking looks like once
-  the jury's length preference is priced out. It appears as its own leaderboard column next to
-  the raw ELO, never instead of it.
-
-A large raw-vs-len-ctrl gap on your run means verbosity, not quality, is doing the separating;
-read the len-ctrl column before crowning anyone. This controls response *length* only; markdown
-and formatting features (headers, lists, bold) are a known further refinement, not yet built.
-
-### Per-category slices
-
-`elo_by_category` refits Bradley-Terry separately within each prompt category (`code`, `general`,
-`math`, `creative` in the shipped prompt set), but **only for categories with at least 20
-comparisons** (`MIN_CATEGORY_COMPARISONS = 20`). Thinner slices are dropped from the report
-rather than shown with misleadingly precise ratings. On the shipped 30-prompt starter bank (see
-[Current limitations](#current-limitations)), most categories will not clear that floor in a
-single round-robin run, per-category breakdowns become meaningful once you scale the prompt set
-or accumulate multiple runs.
-
-## Agreement and bias metrics
-
-Every finished run reports three families of numbers whose purpose is to let you audit the panel
-that produced your rating, not just take it on faith.
-
-### Mean agreement
-
-`mean_agreement` is the mean modal-vote share across rounds with at
-least two decisive votes, for each such round, what fraction of the decisive votes agreed with
-the plurality. A round with exactly one decisive vote is excluded rather than scored as 100%
-agreement, since a single vote can't agree or disagree with anything.
-
-### Fleiss' and Cohen's κ
-
-The run computes chance-corrected inter-judge agreement, because raw agreement
-inflates whenever most rounds have an obvious winner:
-
-- **[Fleiss' κ (1971)](https://doi.org/10.1037/h0031619)** is computed over rounds where **every** primary panelist
-  voted decisively, abstentions and replacement judges make a round's vote count non-uniform,
-  which Fleiss' formula assumes fixed, so partial rounds are excluded and that exclusion is
-  reported alongside as `rounds_used` / `rounds_total` coverage.
-- **[Cohen's κ (1960)](https://doi.org/10.1177/001316446002000104)** is computed per judge pair, over just that pair's
-  co-decisive rounds, a looser bar that tolerates one judge abstaining while another decides.
-- Both map onto **[Landis & Koch (1977)](https://doi.org/10.2307/2529310)** labels: <0 poor,
-  ≤0.20 slight, ≤0.40 fair, ≤0.60 moderate, ≤0.80 substantial, >0.80 almost perfect.
-
-### Per-judge flip rates, position bias, made public
-
-Each judge's reported `position_bias` is its flip rate: flips over pairs
-where flipping was even possible (both seat orders returned a decisive verdict, a failed call
-never had the chance to contradict itself and doesn't dilute the rate). This number, and the
-individual flip badges shown in the TUI's battle browser, are the project's most direct public
-evidence of judge bias: the leaderboard does not hide that some judges are less positionally
-consistent than others, it reports the rate per judge and lets the quorum described above act on
-it.
-
-## Reliability policies
-
-The rating should reflect a candidate's words, never the network's mood. Three policies enforce
-that.
-
-### Void on stream failure, after exactly one retry
-
-Each side of a round gets one retry if its stream dies. A
-second failure **voids the round**: `BattleRecord.error` is set, a `RoundVoided` event fires, and
-the round is excluded from `outcomes_from_records` entirely, never judged, never rated, but
-logged and shown in the TUI so a voided round is visible, not silently dropped from the count.
-
-### Timeouts are read-gap, not total-duration
-
-`gateway.stream_read_timeout_s` (default `1200` seconds / 20 minutes) is a **read-gap** timeout,
-the connection is only treated as dead after that many seconds pass with *no new chunk arriving*,
-not after the stream has simply been open that long. A model that reasons silently for minutes
-before its first token is never penalized for being a slow thinker; only a connection that has
-genuinely gone silent times out.
-
-### Truncation is judged, not hidden, but it stays visible
-
-There is no retry or exclusion path for a truncated response: if a candidate's output is cut off by
-its token cap, the round is judged normally on the truncated text. `finish_reason` (e.g.
-`"length"`) is recorded per side on the `BattleRecord` and surfaced as a `✂ truncated` flag in the
-TUI's response panel, the jury sees exactly what the reader sees, and a truncation-driven loss is
-legible rather than mysterious. See `gateway.candidate_max_tokens` / `gateway.judge_max_tokens` in
-[Configuration](configuration.md#gateway-orqaigatewayconfig), an under-sized `judge_max_tokens` cap
-starving a thinking-by-default judge's own verdict is exactly the kind of failure this policy is
-designed to make visible rather than silently absorb.
+- **Failed streams void the round.** One retry per side; a second failure voids the round,
+  which is logged and shown but never judged or rated. The rating reflects the candidates'
+  words, never the network's mood.
+- **Timeouts measure silence, not duration.** A stream only dies after a long gap with no new
+  chunk, so a model that thinks for minutes before its first token is not penalized.
+- **Truncation is judged, not hidden.** A response cut off by its token cap is judged as-is
+  and flagged visibly; the jury sees exactly what a reader would see.
 
 ## Reproducibility
 
-Every run is seeded and manifested so its rating can be audited or re-derived after the fact:
-
-- **Seeded schedule and prompt slices**: the pairing order and every match's prompt slice are drawn
-  from one seeded random generator (default `seed=42`). Every slice is pre-drawn before any match starts, so the schedule stays stable regardless
-  of completion order under concurrency.
-- **A run manifest, written twice**: the run writes `<output>.run.json` immediately at tournament start (config hash, prompt hash, candidate pool, judge
-  panel, replacement judges, quorum, the installed `evaluatorq` version, `started_at`) and
-  rewrites it at the end with `finished_at` plus the closing report's `mean_agreement`,
-  `error_rounds`, `rated_rounds`, `category_counts`, `fleiss`, `length_coef` (the jury's fitted
-  length coefficient, see [Style control](#style-control-the-length-confound-priced-out)), and
-  token totals.
-- **Content-addressed hashes, not filenames**: `config_sha256` and `prompts_sha256` are SHA-256
-  digests (first 16 hex characters) of the serialized config and the newline-joined prompt texts,
-  so two runs against the same config and prompt content are provably comparable even if either
-  file got renamed in between.
-- **The evaluatorq version is pinned into the manifest itself**, so a rating produced under one evaluatorq release stays
-  distinguishable from one produced under another, even if the installed version drifted between
-  runs.
-
-## Jury swapping: re-judge without regenerating
-
-`orq-arena rejudge <battles.jsonl> --judge <id> [...]` re-scores every
-recorded round's **already-generated responses** against a new judge panel, no candidate calls,
-judge tokens only. It then reports whether the new panel's ranking agrees with the original:
-
-- `spearman(old_rank, new_rank)`: rank correlation between the Bradley-Terry ranking implied by
-  the original judged verdicts and the ranking implied by the re-judged verdicts, both computed
-  the same way (`bradley_terry_mle` over the respective outcome list).
-- `changed_verdicts`: the raw count of individual rounds whose `majority_verdict` flipped
-  between the two panels, independent of whether that changed the overall ranking.
-- The CLI's own read of the result: Spearman ≥ 0.8 is reported as "judge-robust ranking"; below
-  that, "ranking is panel-sensitive; treat with care."
-
-The re-judge panel's own quorum is clamped to its own size
-(`min(cfg.min_successful_judges, len(panel))`), so a legitimate single-judge re-judge, useful
-specifically as a contrast baseline against the full panel, see Measured evidence below, is not
-rejected by a quorum sized for the original run's larger panel.
-
-This is the project's answer to "how do I know the ranking isn't just an artifact of which judges
-I happened to pick?", swap the jury, keep the responses, and measure rank stability directly
-instead of asserting it.
+Every run is seeded (schedule and prompt draws) and writes a manifest next to the battle log
+with content hashes of the config and prompt set, the judge panel, and the closing agreement
+stats, so two runs are provably comparable and any rating can be re-derived from its log.
 
 ## Human anchor: does the panel agree with people?
 
-Everything above measures the panel against itself. The human-anchor workflow measures it
-against people, the accuracy claim reliability metrics cannot make:
-
-1. `orq-arena annotate <log>` renders the recorded rounds into one self-contained, **blind**
-   annotation page: no model names, no jury votes, no verdicts in the
-   payload; rounds shuffled and sides swapped per round under a seed; round keys are one-way
-   hashes. The same seat-order discipline applied to the jury applies to the human, a rater
-   can't favor a side or a model they can't identify. Send the file to 2-3 raters (guidelines,
-   round count, and a time estimate are shown up front; the rubric shown is `--criteria`,
-   default identical to the jury's default).
-2. Each rater's votes come back as `votes.json`, exported in the canonical A/B frame (the page
-   un-flips before export, so vote files are independent of presentation order).
-3. `orq-arena anchor <log> votes.json […]` treats each human as one more judge and reports,
-   per rater: **Cohen's κ vs the panel majority** (over rounds where the panel was decisive;
-   inconclusive rounds are excluded from κ but still feed the human Bradley-Terry fit),
-   the **Spearman correlation between the human-vote Bradley-Terry ranking and the panel's**,
-   and, with several raters, **inter-annotator κ** per pair.
-
-Read the numbers the same way as the jury metrics: κ says whether the panel's round-level
-verdicts track human preference; the rank correlation says whether disagreements, where they
-exist, actually move the leaderboard. One residual bias survives the blinding: a rater who
-works with these models daily may recognize a family's prose style, the same self-preference
-caveat the jury carries, so prefer raters who don't, and report who rated alongside the
-numbers.
-
-## Measured evidence: the committed example run
-
-This repository ships a real recorded run at
-[`examples/quickstart/`](https://github.com/orq-ai/orq-arena/tree/master/examples/quickstart),
-so the mechanisms above are not just described, they are demonstrated on committed artifacts you
-can inspect and reproduce yourself. It is an **8-model pool spanning six providers** (a full
-round-robin, `C(8,2) = 28` matches) judged by the shipped 3-judge default panel, sized to
-demonstrate every mechanism on real data rather than to be a rigorous benchmark.
-
-!!! example "Read the numbers yourself"
-
-    The numbers below are from the committed `examples/quickstart` run. Open
-    `examples/quickstart/battles.report.html` to read them, or regenerate the report from the
-    committed log with `orq-arena report examples/quickstart/battles.jsonl`. To re-run the whole
-    tournament from scratch, use the command in `examples/quickstart/config.yaml`'s header.
-
-What the committed run lets you see end to end, on real data:
-
-- **The full pipeline on committed artifacts**: `config.yaml` (the model pool and rules),
-  `battles.jsonl` (one row per judged round, both responses and per-judge reconciled votes),
-  `battles.run.json` (the seeded manifest, config/prompt hashes, panel, agreement stats), and the
-  regenerable HTML report. Nothing here is simulated.
-- **The agreement and bias metrics in context**: open the report's jury-behaviour table and the
-  manifest's `mean_agreement` / `fleiss` fields to read how consistently that panel voted and how
-  often each judge flipped between seat orders, then compare `rated_rounds` against the total
-  round count to see how many rounds actually reached the rating.
-- **Jury cost dominance**: the manifest's token totals show how much of a run's spend the panel
-  accounts for (two seat orders times a multi-judge panel, on every round, adds up fast), against
-  the candidates' own token use.
-- **Rank stability under a jury swap**: re-judge the committed log with a different panel
-  (`orq-arena rejudge examples/quickstart/battles.jsonl --judge ...`) and read the Spearman
-  correlation the command prints, the direct test that the ranking is not an artifact of which
-  judges were picked.
-
-!!! warning "The honest reading"
-
-    A cheap multi-judge panel tends to abstain on *close* pairs, and the
-    quorum then correctly refuses to force a verdict out of a panel that can't agree with itself. A
-    high inconclusive rate is the consistency gate doing its job, not evidence the rating is
-    unreliable, but it does mean a cheap panel rates on fewer rounds than it judges. Check
-    `rated_rounds` against the total round count in your own run's manifest (the committed example's
-    included) before leaning on a close pairwise gap.
-
-## How this compares to other benchmarks
-
-orq-arena's scoring pipeline is deliberately the Chatbot-Arena family's, applied to an LLM jury
-instead of crowd votes. Where it sits relative to the published systems:
-
-- **[LMArena / Chatbot Arena](https://arxiv.org/abs/2403.04132)** collects human pairwise votes
-  at scale, samples matchups actively to shrink the widest confidence intervals, and fits the
-  same Bradley-Terry MLE with bootstrap CIs used here. orq-arena swaps the humans for a
-  seat-swapped LLM jury, uses a seeded round-robin instead of active sampling (the right trade
-  for a small fixed pool where every pair can simply be played), and regresses out length only
-  where LMArena's [style control](https://www.lmsys.org/blog/2024-08-28-style-control/) also
-  covers markdown headers, lists, and bold text.
-- **[Arena-Hard-Auto](https://arxiv.org/abs/2406.11939)** is the closest published analog: an
-  automated benchmark scoring pairwise LLM-judge verdicts with a style-controlled Bradley-Terry
-  fit. It relies on a single judge model against a fixed baseline; orq-arena adds a multi-judge
-  panel, the both-orders consistency gate, a quorum, and self-judge exclusion on top of the same
-  statistical core.
-- **[MT-Bench](https://arxiv.org/abs/2306.05685)** established that strong LLM judges reach
-  roughly human-human agreement levels on pairwise verdicts, and judges both orders like
-  orq-arena does, but scores an order-flip as a tie where orq-arena makes the judge abstain.
-- **[AlpacaEval-LC](https://arxiv.org/abs/2404.04475)** measures win rate against one fixed
-  baseline model with a length-debiasing regression; orq-arena fits the same length term inside
-  a full round-robin field rather than against a single reference.
-- Because the schedule is a seeded round-robin over a declared pool, with no private variants,
-  no selective score retraction, and no sampling asymmetry, the incentive problems documented in
-  [The Leaderboard Illusion](https://arxiv.org/abs/2504.20879) for public crowdsourced arenas do
-  not apply to a self-hosted run.
+The jury metrics above measure the panel against itself; the human-anchor workflow measures
+it against people. `annotate` renders a recorded run into a blind annotation page (no model
+names, no jury votes, sides swapped per round) you can send to raters; `anchor` merges their
+votes back and reports each rater's kappa against the panel majority and the rank correlation
+between the human ranking and the panel's. Usage: [cli.md](cli.md#annotate).
 
 ## Current limitations
 
-Stated plainly, so you can weigh them against your own use case:
-
-- **30-prompt starter bank.** The shipped `prompts/starter.jsonl` has 30 prompts across four
-  categories (code 8, general 11, math 6, creative 5), enough to exercise every mechanism on
-  this page, but well below the 20-comparison-per-category floor within a single round-robin run
-  (`match.max_rounds=5` draws only 5 prompts per match). Treat the shipped bank as a smoke test,
-  not a rigorous benchmark, until you supply your own larger prompt set.
+- **The shipped 30-prompt bank is a smoke test**, sized to exercise every mechanism, not to
+  defend a ranking. A ranking you intend to defend takes your own prompt set (hundreds of
+  rounds) and judges from families outside the pool.
+- **Style control covers length only**, not markdown formatting.
+- **The human-anchor mechanism ships without a published validation study**; run your own
+  raters before treating the panel as a proxy for your users.
 
 ## References
 
-- Bradley, R. A., & Terry, M. E. (1952). Rank Analysis of Incomplete Block Designs: I. The
-  Method of Paired Comparisons. *Biometrika*, 39(3/4), 324-345.
-  [doi:10.2307/2334029](https://doi.org/10.2307/2334029)
-- Chiang, W.-L., Zheng, L., Sheng, Y., et al. (2024). Chatbot Arena: An Open Platform for
-  Evaluating LLMs by Human Preference. *ICML 2024*.
-  [arXiv:2403.04132](https://arxiv.org/abs/2403.04132)
-- Cohen, J. (1960). A Coefficient of Agreement for Nominal Scales. *Educational and
-  Psychological Measurement*, 20(1), 37-46.
-  [doi:10.1177/001316446002000104](https://doi.org/10.1177/001316446002000104)
-- Dubois, Y., Galambosi, B., Liang, P., & Hashimoto, T. B. (2024). Length-Controlled
-  AlpacaEval: A Simple Way to Debias Automatic Evaluators.
-  [arXiv:2404.04475](https://arxiv.org/abs/2404.04475)
-- Elo, A. E. (1978). *The Rating of Chessplayers, Past and Present*. Arco Publishing.
-- Fleiss, J. L. (1971). Measuring Nominal Scale Agreement Among Many Raters. *Psychological
-  Bulletin*, 76(5), 378-382. [doi:10.1037/h0031619](https://doi.org/10.1037/h0031619)
-- Landis, J. R., & Koch, G. G. (1977). The Measurement of Observer Agreement for Categorical
-  Data. *Biometrics*, 33(1), 159-174. [doi:10.2307/2529310](https://doi.org/10.2307/2529310)
-- Li, T., Chiang, W.-L., Frick, E., et al. (2024). From Crowdsourced Data to High-Quality
-  Benchmarks: Arena-Hard and BenchBuilder Pipeline.
-  [arXiv:2406.11939](https://arxiv.org/abs/2406.11939)
-- LMSYS Org (2024). Does style matter? Disentangling style and substance in Chatbot Arena.
-  [lmsys.org blog](https://www.lmsys.org/blog/2024-08-28-style-control/)
-- Panickssery, A., Bowman, S. R., & Feng, S. (2024). LLM Evaluators Recognize and Favor Their
-  Own Generations. *NeurIPS 2024*. [arXiv:2404.13076](https://arxiv.org/abs/2404.13076)
-- Rao, P. V., & Kupper, L. L. (1967). Ties in Paired-Comparison Experiments: A Generalization
-  of the Bradley-Terry Model. *Journal of the American Statistical Association*, 62(317),
-  194-204. [doi:10.1080/01621459.1967.10482901](https://doi.org/10.1080/01621459.1967.10482901)
-- Singh, S., Nan, Y., Wang, A., et al. (2025). The Leaderboard Illusion.
-  [arXiv:2504.20879](https://arxiv.org/abs/2504.20879)
-- Wang, P., Li, L., Chen, L., et al. (2023). Large Language Models are not Fair Evaluators.
-  *ACL 2024*. [arXiv:2305.17926](https://arxiv.org/abs/2305.17926)
-- Zheng, L., Chiang, W.-L., Sheng, Y., et al. (2023). Judging LLM-as-a-Judge with MT-Bench and
-  Chatbot Arena. *NeurIPS 2023 Datasets and Benchmarks*.
+- Bradley & Terry (1952). Rank Analysis of Incomplete Block Designs: The Method of Paired
+  Comparisons. [doi:10.2307/2334029](https://doi.org/10.2307/2334029)
+- Zheng et al. (2023). Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena.
   [arXiv:2306.05685](https://arxiv.org/abs/2306.05685)
+- Chiang et al. (2024). Chatbot Arena: An Open Platform for Evaluating LLMs by Human
+  Preference. [arXiv:2403.04132](https://arxiv.org/abs/2403.04132)
+- Dubois et al. (2024). Length-Controlled AlpacaEval: A Simple Way to Debias Automatic
+  Evaluators. [arXiv:2404.04475](https://arxiv.org/abs/2404.04475)
+- Panickssery et al. (2024). LLM Evaluators Recognize and Favor Their Own Generations.
+  [arXiv:2404.13076](https://arxiv.org/abs/2404.13076)
