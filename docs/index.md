@@ -7,8 +7,8 @@ One command runs a round-robin tournament over your models. A panel of LLM judge
 pair of answers blind, in both orders so no judge can favor "whichever answer came first". Out the
 other end: a chess-style **ELO leaderboard** with confidence intervals.
 
-Every run opens on the **RUN PLAN**: the full pool, every judge, and the worst-case cost per
-model, priced before a single token is spent, with one consent gate:
+Every run opens on the **RUN PLAN**: the full pool, every judge, and the estimated cost to run
+the benchmark:
 
 ![RUN PLAN screen: the pool, the jury, and the worst-case cost per model, before anything is spent](assets/run-plan.svg)
 
