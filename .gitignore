@@ -30,3 +30,6 @@ site/
 !examples/**/battles.jsonl
 !examples/**/battles.run.json
 examples/**/run.log
+# local run scratch at the repo root
+/newbattles*
+/*.report.html
