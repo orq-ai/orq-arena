@@ -8,7 +8,15 @@ pair of answers blind, in both orders so no judge can favor "whichever answer ca
 other end: a chess-style **ELO leaderboard** with confidence intervals, and a self-contained
 **HTML report** you can send to anyone. A live terminal show ships too, as the bonus.
 
-![HTML report page: verdict banner with the top three models, badges, ELO leaderboard with CI bars, and the ELO-vs-cost value map](assets/report-page.png)
+Every run opens on the **RUN PLAN**: the full pool, every judge, and the worst-case cost per
+model, priced before a single token is spent, with one consent gate:
+
+![RUN PLAN screen: the pool, the jury, and the worst-case cost per model, before anything is spent](assets/run-plan.svg)
+
+And ends on the **FINAL STANDINGS**: ELO with 95% CIs and the length-controlled rating,
+per-judge behaviour, and the win grid:
+
+![Final standings: ELO ladder with CIs and len-ctrl, per-judge behaviour, win grid](assets/leaderboard.svg)
 
 ## Why orq-arena?
 
@@ -58,6 +66,10 @@ library for exactly this kind of jury.
 - **A live show when you want one.** `--tui` (optional extra) opens on a RUN PLAN consent
   screen (full per-model cost table), then streams the run as a live arena with health
   bars and judge cards.
+
+The report is the artifact you forward, one self-contained HTML file:
+
+![HTML report page: verdict banner with the top three models, badges, ELO leaderboard with CI bars, and the ELO-vs-cost value map](assets/report-page.png)
 
 Don't take the bullets' word for it: a real recorded run is committed at
 [`examples/quickstart/`](https://github.com/orq-ai/orq-arena/tree/master/examples/quickstart) (an
