@@ -65,7 +65,23 @@ show needs the optional extra (`uv tool install '.[tui]'`); without it, `--tui` 
 friendly install hint. Hacking on the code instead? `uv sync` and prefix commands with
 `uv run`.
 
-## Quick start
+## Explore the example
+
+No API key yet? Start with the committed [quickstart example](examples/quickstart/README.md).
+
+Inspect its exact [config](examples/quickstart/config.yaml) and
+[battle log](examples/quickstart/battles.jsonl), then open the ready-to-view
+[HTML report](examples/quickstart/battles.report.html). The adjacent manifest records the run.
+
+Regenerate the report locally without model calls, writing outside the repository so the
+committed artifact stays untouched:
+
+```bash
+orq-arena report examples/quickstart/battles.jsonl \
+  --output /tmp/orq-arena-quickstart.report.html
+```
+
+## Run your own benchmark
 
 1. Get an API key from your orq.ai workspace ([API keys guide](https://docs.orq.ai/docs/ai-studio/organization/api-keys)): `cp .env.example .env`, then fill in `ORQ_API_KEY` (loaded automatically).
 2. Point the `candidates` list at your model pool (or keep the shipped 8-model `orq_arena.yaml`) and run:
@@ -100,8 +116,6 @@ orq-arena run --config orq_arena.yaml --prompts orq:<dataset_id>
 Dataset-backed runs record the [Dataset](https://docs.orq.ai/docs/ai-studio/optimize/datasets)'s id, name, and studio URL in the manifest, and the report links it by name. If each match should see every prompt, pass `--rounds <n>`; the preflight warns when it samples a subset.
 
 Set expectations for the out-of-the-box run: the shipped 30-prompt bank and cheap default judge trio are a **smoke test** that exercises every mechanism, not a benchmark. Expect wide, overlapping error bars and a judge/candidate family-overlap caveat on the report; both are the honest output at that scale. A ranking you intend to defend takes your own prompt set (hundreds of rounds) and judges from families outside the pool ([Methodology](docs/methodology.md#current-limitations)).
-
-No key yet? Open the committed example run's report at [`examples/quickstart/`](examples/quickstart/), or regenerate it keyless: `orq-arena report examples/quickstart/battles.jsonl`. Keys: [API keys guide](https://docs.orq.ai/docs/ai-studio/organization/api-keys).
 
 ## Usage
 

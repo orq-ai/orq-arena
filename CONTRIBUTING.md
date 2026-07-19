@@ -22,7 +22,8 @@ uv sync --extra tui
 
 # 3. Verify
 uv run pytest            # full suite, no network
-uv run orq-arena demo    # replay a recorded tournament, no API key
+uv run orq-arena report examples/quickstart/battles.jsonl \
+  --output /tmp/orq-arena-quickstart.report.html  # render the committed example, no API key
 ```
 
 Live runs need an orq.ai API key: `cp .env.example .env` and fill in `ORQ_API_KEY`
