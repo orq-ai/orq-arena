@@ -6,7 +6,7 @@
 
 ## How to test
 
-<!-- Commands a reviewer can run to see it work. e.g. `uv run orq-arena demo` -->
+<!-- Commands a reviewer can run to see it work. e.g. `uv run orq-arena report examples/quickstart/battles.jsonl --output /tmp/orq-arena-quickstart.report.html` -->
 
 ## Checklist
 
