@@ -64,7 +64,7 @@ the YAML, every value is literal.
 | `orq-arena run` | Required, no default. The YAML candidates are used as-is; the run is headless by default (`--tui` opts into the live show). |
 | `orq-arena pool` | Required, no default. Prints the configured candidate pool. |
 | `orq-arena rejudge` | Defaults to `orq_arena.yaml`. Supplies `gateway` and (unless `--criteria` overrides it) `criteria`. |
-| `orq-arena report` | Defaults to `orq_arena.yaml`. Supplies the judge panel and model-name mapping for the statistics rebuild. |
+| `orq-arena report` | Reads run identity from the log's `*.run.json` manifest. `orq_arena.yaml` is only a fallback for a log with no manifest; passing `--config` explicitly overrides the manifest and is disclosed on the page. |
 | `orq-arena refresh-catalog` | Defaults to `orq_arena.yaml`. Only `gateway` is used, to re-fetch the workspace model catalog. |
 
 ---

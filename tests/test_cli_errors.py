@@ -11,6 +11,8 @@ from orq_arena.cli import cli
     [
         ["run", "-y", "--config", "missing.yaml"],
         ["pool", "--config", "missing.yaml"],
+        # `report` errors on the missing log first now, which is still the
+        # clean-error contract this test is about.
         ["report", "whatever.jsonl"],
     ],
 )
@@ -28,6 +30,17 @@ def test_config_is_required(monkeypatch, tmp_path, argv):
     result = CliRunner().invoke(cli, argv)
     assert result.exit_code != 0
     assert "--config" in result.output
+
+
+def test_report_without_a_manifest_or_a_config_is_a_clean_error(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "battles.jsonl").write_text(
+        '{"prompt_hash":"h","prompt_text":"p","model_a":"a","model_b":"b"}\n', encoding="utf-8"
+    )
+    result = CliRunner().invoke(cli, ["report", "battles.jsonl"])
+    assert result.exit_code != 0
+    assert result.exception is None or isinstance(result.exception, SystemExit)
+    assert "pass --config" in result.output
 
 
 def test_list_models_json_is_parseable(tmp_path, monkeypatch):

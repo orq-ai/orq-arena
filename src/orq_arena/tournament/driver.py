@@ -16,6 +16,7 @@ from itertools import combinations
 from pathlib import Path
 
 from evaluatorq import PairwiseComparison, build_report
+from pydantic import ValidationError
 
 from ..arena.battle import Battle
 from ..candidates import CandidateSpec
@@ -224,6 +225,73 @@ def rebuild_from_log(
     return elo, report
 
 
+MANIFEST_SUFFIX = ".run.json"
+
+
+def manifest_path_for(log_path: str | Path) -> Path:
+    return Path(log_path).with_suffix(MANIFEST_SUFFIX)
+
+
+def config_sha256(cfg: ArenaConfig) -> str:
+    return hashlib.sha256(cfg.model_dump_json().encode("utf-8")).hexdigest()[:16]
+
+
+def read_manifest(log_path: str | Path) -> dict:
+    """The run's manifest, or ``{}`` when it's missing or unreadable."""
+    try:
+        data = json.loads(manifest_path_for(log_path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def config_from_manifest(
+    manifest: dict, fallback: ArenaConfig | None = None
+) -> tuple[ArenaConfig | None, str]:
+    """The config the run actually used, so a rebuilt report describes that run.
+
+    Rebuilds read model names, the judge panel and the thinking flags from the
+    manifest the run wrote, never from a YAML that may have moved on since.
+    Returns ``(cfg, source)`` with source ``manifest`` (full recorded config),
+    ``manifest-partial`` (pre-config-blob manifests, whose candidate/judge
+    records still pin every field a rebuild reads), or ``config`` (nothing
+    usable on disk, the caller should say so out loud). ``cfg`` is None only
+    when the manifest is unusable and no fallback config was supplied.
+    """
+    recorded = manifest.get("config")
+    if isinstance(recorded, dict):
+        try:
+            return ArenaConfig.model_validate(recorded), "manifest"
+        except ValidationError:
+            pass  # a hand-edited manifest is not worth dying over
+
+    candidates = manifest.get("candidates") or {}
+    judges = manifest.get("judges") or []
+    if candidates and judges:
+        merged = fallback.model_dump() if fallback is not None else {}
+        merged["candidates"] = [
+            {
+                "model_id": spec["model"],
+                "name": name,
+                "reasoning": None
+                if spec.get("reasoning") == "vendor-default"
+                else spec.get("reasoning"),
+            }
+            for name, spec in candidates.items()
+            if isinstance(spec, dict) and spec.get("model")
+        ]
+        merged["judges"] = list(judges)
+        merged["replacement_judges"] = list(manifest.get("replacement_judges") or [])
+        if manifest.get("min_successful_judges") is not None:
+            merged["min_successful_judges"] = manifest["min_successful_judges"]
+        try:
+            return ArenaConfig.model_validate(merged), "manifest-partial"
+        except ValidationError:
+            pass
+
+    return fallback, "config"
+
+
 def _write_manifest(
     path: Path,
     *,
@@ -247,7 +315,10 @@ def _write_manifest(
         "tournament_id": tournament_id,
         "started_at": started_at,
         "seed": seed,
-        "config_sha256": hashlib.sha256(cfg.model_dump_json().encode("utf-8")).hexdigest()[:16],
+        "config_sha256": config_sha256(cfg),
+        # The whole config, so a report rebuilt months later describes this run
+        # rather than whatever the YAML says by then.
+        "config": cfg.model_dump(mode="json"),
         "prompts_sha256": hashlib.sha256(
             "\n".join(p.text for p in prompts).encode("utf-8")
         ).hexdigest()[:16],

@@ -506,8 +506,14 @@ def build_report_html(
     report: dict[str, Any],
     manifest: dict[str, Any],
     prices: dict[str, tuple[float, float]] | None = None,
+    identity_source: str = "manifest",
 ) -> str:
-    """Render the run report page as a self-contained HTML string."""
+    """Render the run report page as a self-contained HTML string.
+
+    ``identity_source`` says where the model names, judge panel and reasoning
+    flags came from: the run's manifest, or a YAML that may have drifted since
+    (``"config"``), which the page then discloses rather than the console only.
+    """
     judged = [r for r in records if r.error is None]
     voids = len(records) - len(judged)
     verdicts = {"A": 0, "B": 0, "tie": 0, "inconclusive": 0}
@@ -639,6 +645,15 @@ def build_report_html(
     # Confidence & methodology: one aligned row per run-confidence signal
     # (reads far better than ragged pills). (label, reading html, td class).
     signal_rows: list[tuple[str, str, str]] = []
+    if identity_source == "config":
+        signal_rows.append(
+            (
+                "Run identity",
+                "model names, judge panel and reasoning flags were rebuilt from a config file, "
+                "not from the run's own manifest, so they may have drifted since the run",
+                " warn",
+            )
+        )
     if family_overlaps:
         signal_rows.append(
             (
@@ -1004,6 +1019,7 @@ def write_report(
     manifest: dict[str, Any],
     log_path: str | Path,
     prices: dict[str, tuple[float, float]] | None = None,
+    identity_source: str = "manifest",
 ) -> Path:
     out = report_path_for(log_path)
     out.write_text(
@@ -1014,6 +1030,7 @@ def write_report(
             report=report,
             manifest=manifest,
             prices=prices,
+            identity_source=identity_source,
         ),
         encoding="utf-8",
     )

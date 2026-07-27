@@ -564,20 +564,29 @@ def report_cmd(log_path: str, config_path: str, output_path: str | None) -> None
     (one catalog read prices the cost section when a key is present).
     The same page is written automatically at the end of every run.
 
+    Model names, the judge panel and the reasoning flags come from the run's
+    own manifest, so a page rebuilt long after the run still describes that
+    run. Passing --config explicitly overrides that, and says so on the page.
+
     \b
     Examples:
       orq-arena report battles.jsonl
       orq-arena report runs/today.jsonl --output share/report.html
     """
     import asyncio
-    import json as _json
     from pathlib import Path
+
+    from click.core import ParameterSource
 
     from .data.schemas import BattleRecord
     from .report import build_report_html, report_path_for
-    from .tournament.driver import rebuild_from_log
+    from .tournament.driver import (
+        config_from_manifest,
+        config_sha256,
+        read_manifest,
+        rebuild_from_log,
+    )
 
-    cfg = _load_config(config_path)
     log = Path(log_path)
     if not log.exists():
         raise click.ClickException(f"{log_path} not found")
@@ -588,10 +597,42 @@ def report_cmd(log_path: str, config_path: str, output_path: str | None) -> None
     ]
     if not records:
         raise click.ClickException(f"no rounds in {log_path}")
-    manifest_path = log.with_suffix(".run.json")
-    manifest = (
-        _json.loads(manifest_path.read_text(encoding="utf-8")) if manifest_path.exists() else {}
+    manifest = read_manifest(log)
+
+    # The run's own record of itself outranks the live YAML; an explicit
+    # --config is the one way to override it, and the page discloses that.
+    explicit_config = (
+        click.get_current_context().get_parameter_source("config_path")
+        == ParameterSource.COMMANDLINE
     )
+    if explicit_config:
+        cfg = _load_config(config_path)
+        identity = "manifest" if manifest.get("config_sha256") == config_sha256(cfg) else "config"
+        if identity == "config":
+            click.echo(
+                f"  ⚠ rebuilding with --config {config_path}, which is not the config this run "
+                "used; model names, judge panel and reasoning flags follow your file, not the run",
+                err=True,
+            )
+    else:
+        # A manifested log carries its own identity, so the default YAML only
+        # has to exist when the log has no manifest to speak for it.
+        try:
+            fallback = load_config(config_path)
+        except FileNotFoundError:
+            fallback = None
+        cfg, identity = config_from_manifest(manifest, fallback)
+        if cfg is None:
+            raise click.ClickException(
+                f"{log_path} has no usable run manifest and {config_path} is not there; "
+                "pass --config <your.yaml> (see docs/configuration.md for the format)."
+            )
+        if identity == "config":
+            click.echo(
+                f"  ⚠ no run manifest next to {log_path}; model names, judge panel and reasoning "
+                f"flags come from {config_path}, which may have drifted since the run",
+                err=True,
+            )
 
     elo, rep = rebuild_from_log(cfg, records, preflight=manifest.get("preflight"))
 
@@ -611,6 +652,7 @@ def report_cmd(log_path: str, config_path: str, output_path: str | None) -> None
             report=rep,
             manifest=manifest,
             prices=prices or None,
+            identity_source=identity,
         ),
         encoding="utf-8",
     )
