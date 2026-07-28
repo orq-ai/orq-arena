@@ -60,6 +60,7 @@ class ArenaApp(App):
         battle_log_path: str,
         preflight: dict | None = None,
         dataset: dict | None = None,
+        prompts_path: str = "",
         plan: dict | None = None,
         auto_start: bool = False,
     ) -> None:
@@ -67,6 +68,7 @@ class ArenaApp(App):
         self.cfg = cfg
         self._preflight = preflight
         self._dataset = dataset
+        self._prompts_path = prompts_path
         self._prompts = prompts
         self._battle_log_path = battle_log_path
         self._plan = plan
@@ -119,6 +121,7 @@ class ArenaApp(App):
                 events=self._events,
                 preflight=self._preflight,
                 dataset=self._dataset,
+                prompts_path=self._prompts_path,
             )
         except Exception as exc:
             await self._events.put(

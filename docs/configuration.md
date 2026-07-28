@@ -335,5 +335,5 @@ git-ignored (`.gitignore`):
 | File | Written by |
 |---|---|
 | `.env` | Hand-authored from `.env.example`; never committed. |
-| `battles.jsonl` | `orq-arena run`, one row per judged round (`BattleRecord`, schema v3; includes per-model `ttft_a_ms`/`ttft_b_ms` and `duration_a_ms`/`duration_b_ms` timing fields). |
-| `battles.run.json` | `orq-arena run`, the run manifest (the config it ran, config + prompt hashes, panel, seed, agreement stats; also a `dataset` key with id, name, and studio URL for dataset-sourced runs). Holds no credential: `ORQ_API_KEY` is read from the environment and never enters the config. |
+| `battles.jsonl` | `orq-arena run`, one row per judged round (`BattleRecord`, schema v4, written as each round resolves; includes per-model `ttft_a_ms`/`ttft_b_ms` and `duration_a_ms`/`duration_b_ms` timing fields). |
+| `battles.run.json` | `orq-arena run`, the run manifest (the config it ran, config + prompt hashes, the prompts path, the host the run actually used, panel, seed, agreement stats; also a `dataset` key with id, name, and studio URL for dataset-sourced runs). Holds no credential: `ORQ_API_KEY` is read from the environment and never enters the config. |

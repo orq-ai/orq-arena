@@ -317,6 +317,7 @@ def run(
             battle_log_path=output_path,
             preflight=preflight_data,
             dataset=dataset,
+            prompts_path=prompts_path,
             plan=plan,
             auto_start=assume_yes,
         )
@@ -331,6 +332,7 @@ def run(
                 battle_log_path=output_path,
                 preflight=preflight_data,
                 dataset=dataset,
+                prompts_path=prompts_path,
                 quiet=quiet,
             )
         )

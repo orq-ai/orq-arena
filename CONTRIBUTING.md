@@ -39,7 +39,7 @@ template. If you add a new credential, wire it through an environment variable a
 
 - `src/orq_arena/`: the benchmark core. `tournament/` (scheduling, Bradley-Terry + CIs),
   `arena/` (one battle: stream → judge → record), `providers/` (orq router client,
-  model catalog), `analysis/` (κ, post-mortems), `data/` (schema-v3 records), `rejudge.py`,
+  model catalog), `analysis/` (κ, post-mortems), `data/` (schema-v4 records), `rejudge.py`,
   `anchor.py` (human annotation), `report.py` (the HTML report).
 - `src/orq_arena/tui/`: the Textual show, behind the optional `[tui]` extra. Strictly a
   consumer of the event stream; nothing in here may affect a verdict (HP/damage is computed

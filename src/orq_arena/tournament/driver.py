@@ -26,6 +26,7 @@ from ..data.log import BattleLog
 from ..data.prompts import PromptItem
 from ..data.schemas import BattleRecord
 from ..events import ArenaEvent, StandingsUpdated, TournamentEnded
+from ..providers.models_list import catalog_host
 from ..providers.orq_gateway import OrqGateway
 from .elo import (
     bootstrap_ci,
@@ -100,6 +101,33 @@ def _rebuild_comparisons(records: list[BattleRecord]) -> list[PairwiseComparison
             )
         )
     return comps
+
+
+def record_names(records: list[BattleRecord], candidates: list[CandidateSpec]) -> dict[str, str]:
+    """Map each record's stored model key to its display name.
+
+    Keyed on the full router id where the record carries one, because short
+    names collide across providers (openai/gpt-oss-120b vs groq/gpt-oss-120b)
+    and a short-name map would rate two different models as one. v3 logs have
+    no ids, so those fall back to the short name they do have.
+    """
+    by_id = {c.model_id: c.name for c in candidates}
+    by_short: dict[str, str] = {}
+    for c in candidates:
+        # A colliding short name resolves to nothing rather than to whichever
+        # candidate happened to be last.
+        by_short[c.short_model] = "" if c.short_model in by_short else c.name
+    alias: dict[str, str] = {}
+    for rec in records:
+        for short, full in ((rec.model_a, rec.model_a_id), (rec.model_b, rec.model_b_id)):
+            name = by_id.get(full) if full else by_short.get(short) or None
+            alias[full or short] = name or short
+    return alias
+
+
+def record_key(rec: BattleRecord, side: str) -> str:
+    """The key a record is rated under: its full id when it has one."""
+    return (rec.model_a_id or rec.model_a) if side == "a" else (rec.model_b_id or rec.model_b)
 
 
 def _top_difference(draws: list[dict[str, float]], ranked: list[tuple[str, float]]) -> dict | None:
@@ -251,17 +279,19 @@ def rebuild_from_log(
     live run (display names), so a regenerated report page matches the one
     the run wrote. The single rebuild path for ``orq-arena report``.
     """
-    alias = {w.short_model: w.name for w in cfg.candidates}
+    alias = record_names(records, cfg.candidates)
     outcomes: list[Outcome] = []
     for rec in records:
         if rec.error is not None:
             continue
         outcomes.extend(
             outcomes_from_records(
-                [rec], alias.get(rec.model_a, rec.model_a), alias.get(rec.model_b, rec.model_b)
+                [rec],
+                alias[record_key(rec, "a")],
+                alias[record_key(rec, "b")],
             )
         )
-    names = sorted({alias.get(m, m) for r in records for m in (r.model_a, r.model_b)})
+    names = sorted({alias[record_key(r, s)] for r in records for s in ("a", "b")})
     elo = bradley_terry_mle(build_wins_matrix(_triples(outcomes)), names)
     report = _final_report(cfg, records, outcomes, names, preflight=preflight)
     return elo, report
@@ -388,6 +418,7 @@ def _write_manifest(
     report: dict | None = None,
     preflight: dict | None = None,
     dataset: dict | None = None,
+    prompts_path: str = "",
 ) -> None:
     try:
         from importlib.metadata import version
@@ -403,10 +434,17 @@ def _write_manifest(
         # The whole config, so a report rebuilt months later describes this run
         # rather than whatever the YAML says by then.
         "config": cfg.model_dump(mode="json"),
+        # Category rides in the hash: two banks with identical prompts but
+        # different category labels are different prompt sets, and rate
+        # differently per category.
         "prompts_sha256": hashlib.sha256(
-            "\n".join(p.text for p in prompts).encode("utf-8")
+            "\n".join(f"{p.category}\t{p.text}" for p in prompts).encode("utf-8")
         ).hexdigest()[:16],
         "prompt_count": len(prompts),
+        "prompts_path": prompts_path,
+        # Where this run's traffic actually went, which ORQ_BASE_URL can move.
+        # Provenance only: a rebuild never adopts a manifest's host (RES-1147).
+        "effective_host": catalog_host(cfg.gateway),
         "candidates": {
             c.name: {"model": c.model_id, "reasoning": c.reasoning or "vendor-default"}
             for c in cfg.candidates
@@ -443,6 +481,7 @@ async def run_tournament(
     concurrency: int = 1,
     preflight: dict | None = None,
     dataset: dict | None = None,
+    prompts_path: str = "",
 ) -> dict[str, float]:
     """Run the full round-robin; return final ELO ratings by orc name.
 
@@ -472,6 +511,7 @@ async def run_tournament(
         started_at=started_at,
         preflight=preflight,
         dataset=dataset,
+        prompts_path=prompts_path,
     )
 
     rng = random.Random(seed)
@@ -501,10 +541,11 @@ async def run_tournament(
                 round_name=f"match {i}/{matches_total}",
                 tournament_id=tournament_id,
                 events=events,
+                # Per round, not per match: a killed run keeps what it paid for.
+                on_record=log.append,
             )
             result = await battle.run()
             async with state_lock:
-                log.append_many(result.battles)
                 all_records.extend(result.battles)
                 outcomes.extend(outcomes_from_records(result.battles, w_a.name, w_b.name))
                 if outcomes:
@@ -540,6 +581,7 @@ async def run_tournament(
         report=report,
         preflight=preflight,
         dataset=dataset,
+        prompts_path=prompts_path,
     )
 
     try:

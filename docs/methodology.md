@@ -105,9 +105,17 @@ Every run reports the numbers needed to challenge its own ranking:
 ## Reproducibility
 
 Every run is seeded (schedule and prompt draws) and writes a manifest next to the battle log
-with the config it ran, content hashes of that config and the prompt set, the judge panel, and the
-closing agreement stats, so two runs are provably comparable and any rating can be re-derived from
-its log.
+with the config it ran, content hashes of that config and the prompt set, the prompts path, the
+host the run actually reached, the judge panel, and the closing agreement stats, so two runs are
+provably comparable and any rating can be re-derived from its log. The prompt hash covers each
+prompt's category as well as its text, so two banks that differ only in how they label prompts are
+not mistaken for the same set.
+
+Rounds are written to the battle log as they resolve, not batched to the end of a match, so a run
+interrupted partway keeps every round it already paid for. Each record carries the full router id
+of both models alongside the short display name, because short names collide across providers
+(`openai/gpt-oss-120b` and `groq/gpt-oss-120b`); the rating is keyed on the full id so two
+providers of one model are never rated as one.
 
 `orq-arena report <log>` rebuilds from that manifest, not from the live YAML: model names, the
 judge panel and the reasoning flags come from the run itself, so regenerating a page after the

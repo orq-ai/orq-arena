@@ -23,6 +23,10 @@ class MatchRules(BaseModel):
 
 # The one secret orq-arena reads; every gateway/catalog/dataset call uses it.
 ORQ_API_KEY_ENV = "ORQ_API_KEY"
+# The user-facing router host. Completions resolve through evaluatorq, which
+# honours ORQ_BASE_URL; the catalog resolves the same way so one run never
+# straddles two environments (see providers/models_list.catalog_host).
+DEFAULT_ORQ_HOST = "https://api.orq.ai"
 
 
 class OrqAIGatewayConfig(BaseModel):
@@ -63,6 +67,37 @@ class ArenaConfig(BaseModel):
     # Fewer decisive reconciled votes than this -> round is \'inconclusive\',
     # never a verdict. Guards against jury-of-one "unanimous" hits.
     min_successful_judges: int = 2
+
+    @model_validator(mode="after")
+    def _unique_candidate_names(self) -> ArenaConfig:
+        """No two candidates may answer to the same name.
+
+        Display names default to the model id minus its provider prefix, so a
+        pool holding the same model from two providers (openai/gpt-oss-120b and
+        groq/gpt-oss-120b) would otherwise collapse into one rating with nothing
+        printed to say so. Generated names fall back to the full id, which is
+        unique by construction; a duplicate the user wrote themselves raises,
+        because guessing which one they meant is worse than asking.
+        """
+        custom = {c.name for c in self.candidates if c.name_is_custom}
+        by_short: dict[str, list[CandidateSpec]] = {}
+        for c in self.candidates:
+            if not c.name_is_custom:
+                by_short.setdefault(c.short_model, []).append(c)
+        for short, group in by_short.items():
+            if len(group) > 1 or short in custom:
+                for c in group:
+                    c.name = c.model_id
+
+        seen: dict[str, str] = {}
+        for c in self.candidates:
+            if c.name in seen:
+                raise ValueError(
+                    f"Duplicate candidate name {c.name!r} "
+                    f"({seen[c.name]} and {c.model_id}); names must be unique"
+                )
+            seen[c.name] = c.model_id
+        return self
 
     @model_validator(mode="after")
     def _validate(self) -> ArenaConfig:

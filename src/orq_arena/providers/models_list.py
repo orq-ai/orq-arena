@@ -24,7 +24,7 @@ from urllib.parse import urlparse
 
 import httpx
 
-from ..config import ORQ_API_KEY_ENV, OrqAIGatewayConfig
+from ..config import DEFAULT_ORQ_HOST, ORQ_API_KEY_ENV, OrqAIGatewayConfig
 
 CACHE_DIR = Path.home() / ".cache" / "orq-arena"
 CACHE_FILE = CACHE_DIR / "models.json"
@@ -125,9 +125,25 @@ def _read_cache() -> tuple[list[ModelEntry], float] | None:
     return _parse_payload(raw), float(raw.get("fetched_at") or 0.0)
 
 
-def _host(cfg: OrqAIGatewayConfig) -> str:
-    parsed = urlparse(cfg.base_url)
+def catalog_host(cfg: OrqAIGatewayConfig) -> str:
+    """The host the catalog and prices come from, resolved like live traffic.
+
+    At default config the completion client is built by evaluatorq's resolver,
+    which honours ``ORQ_BASE_URL``. Deriving this host from ``cfg.base_url``
+    instead meant a staging run was priced against production, and the manifest
+    recorded a host the run never called. A YAML ``base_url`` is still a
+    bring-your-own opt-out and wins here exactly as it does for completions.
+    """
+    if cfg.base_url == OrqAIGatewayConfig().base_url:
+        base = os.environ.get("ORQ_BASE_URL", DEFAULT_ORQ_HOST).rstrip("/")
+    else:
+        base = cfg.base_url
+    parsed = urlparse(base)
     return f"{parsed.scheme}://{parsed.netloc}"
+
+
+def _host(cfg: OrqAIGatewayConfig) -> str:
+    return catalog_host(cfg)
 
 
 def _catalog_urls(cfg: OrqAIGatewayConfig) -> list[str]:

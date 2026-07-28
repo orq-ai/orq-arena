@@ -1,9 +1,11 @@
-"""Battle record, schema v3, one JSONL row per judged (or voided) round.
+"""Battle record, schema v4, one JSONL row per judged (or voided) round.
 
 v2 replaced the hand-rolled judge schema with evaluatorq's reconciled
 ``PairwiseVote`` dumps. v3 drops the arena HP bookkeeping (damage/hp fields):
 HP was never scored, it's a TUI-only presentation the show now derives from
-the judged verdicts. Old v2 logs still load (the dropped fields are ignored).
+the judged verdicts. v4 adds `model_a_id`/`model_b_id`: short names collide across providers, so a
+log carrying only the short name cannot always say which model answered. Old v2
+and v3 logs still load (dropped fields are ignored, absent ids read as empty).
 """
 
 from __future__ import annotations
@@ -18,7 +20,7 @@ from pydantic import BaseModel, Field
 class BattleRecord(BaseModel):
     """A single prompt-turn battle record."""
 
-    schema_version: int = 3
+    schema_version: int = 4
 
     prompt_hash: str
     prompt_text: str
@@ -29,6 +31,12 @@ class BattleRecord(BaseModel):
 
     model_a: str = Field(description="Normalized name of model A (short_model).")
     model_b: str = Field(description="Normalized name of model B.")
+    # Full router ids. Short names can collide across providers
+    # (openai/gpt-oss-120b vs groq/gpt-oss-120b), so a log that carries only
+    # the short name cannot always say which model actually answered.
+    # Empty on v3 logs written before this existed.
+    model_a_id: str = ""
+    model_b_id: str = ""
     response_a: str = ""
     response_b: str = ""
 

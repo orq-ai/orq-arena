@@ -17,6 +17,16 @@ class BattleLog:
         # Truncate on open, one tournament per run.
         self.path.write_text("", encoding="utf-8")
 
+    def append(self, battle: BattleRecord) -> None:
+        """Write one record and flush it.
+
+        Per round, not per match: a run killed mid-match keeps every round it
+        already paid for. Opening and closing per record is the point, the file
+        is complete after every line rather than after some later flush.
+        """
+        with self.path.open("a", encoding="utf-8") as fh:
+            fh.write(battle.model_dump_json() + "\n")
+
     def append_many(self, battles: Iterable[BattleRecord]) -> None:
         with self.path.open("a", encoding="utf-8") as fh:
             for b in battles:
