@@ -1,6 +1,6 @@
 # Configuration Reference
 
-Complete reference for every configuration surface in orq-arena: the one environment variable
+Complete reference for every configuration surface in orq-arena: the environment variables
 it reads, the YAML config files under the project root and `configs/`, and the prompts
 file format. The tool is configured by two layers:
 
@@ -26,12 +26,15 @@ cp .env.example .env
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `ORQ_API_KEY` | Required for live runs | (none) | The only secret orq-arena needs. Every candidate, judge, and preflight-probe call goes through the orq.ai router gateway with this one key; the run fails up front with `ORQ_API_KEY is not set. Export it before running orq-arena.` if it is missing. Create one per the [API keys guide](https://docs.orq.ai/docs/ai-studio/organization/api-keys) (per `.env.example`). |
+| `ORQ_API_KEY` | Required for live runs | (none) | The only secret orq-arena needs. Every candidate, judge, and preflight-probe call goes through the orq.ai router gateway with this one key; the run fails up front with `ORQ_API_KEY is not set. Export it before running orq-arena.` if it is missing. Create one in your workspace settings, as [`.env.example`](https://github.com/orq-ai/orq-arena/blob/master/.env.example) points to, or per the [API keys guide](https://docs.orq.ai/docs/ai-studio/organization/api-keys). |
+| `ORQ_BASE_URL` | No | `https://api.orq.ai` | Points completions **and** the model/price catalog at a different orq.ai host (staging, a proxy). Honoured only while `gateway.base_url` is left at its default: setting that key in the YAML is a bring-your-own-endpoint opt-out that wins outright, so the run can never be split between two hosts. Not read from `.env.example`; export it yourself when you need it. |
 
 Notes:
 
 - `ORQ_API_KEY` is **not** required for `orq-arena pool` (prints the candidate pool, never
-  constructs a gateway) or the log-reading commands (`report`, `annotate`, `anchor`).
+  constructs a gateway) or the log-reading commands (`report`, `annotate`, `anchor`). Note
+  that `report` does use it when present, for the one catalog read that prices the cost
+  section; without a key the page renders with that section omitted.
 
 ### `.env` loading
 
@@ -141,7 +144,7 @@ on-screen health bar happens to sit.
 
 | Key | Type | Default | Effect |
 |---|---|---|---|
-| `base_url` | `str` | `"https://api.orq.ai/v3/router"` | Base URL for the `AsyncOpenAI` client (`OrqGateway.__init__`, `src/orq_arena/providers/orq_gateway.py`). One OpenAI-compatible endpoint fronts every provider, models, judges, and the preflight probe all share it. |
+| `base_url` | `str` | `"https://api.orq.ai/v3/router"` | Base URL for the `AsyncOpenAI` client (`OrqGateway.__init__`, `src/orq_arena/providers/orq_gateway.py`). One OpenAI-compatible endpoint fronts every provider, models, judges, and the preflight probe all share it. Left at the default, host resolution is delegated to evaluatorq and honours `ORQ_BASE_URL`; changing it here opts out of that entirely (see [Alternate configs and overrides](#alternate-configs-and-overrides)). |
 | `candidate_max_tokens` | `int` | `2048` | Default per-response output cap for candidate completions (`stream_completion`'s `max_tokens=max_tokens or self._cfg.candidate_max_tokens`). Too low truncates long or creative answers, a cut response is flagged `✂ truncated` in the TUI response panel (`src/orq_arena/tui/widgets/response_panel.py`) and judges tend to penalize it. Overridden per-candidate by `candidates[].max_tokens`. |
 | `judge_max_tokens` | `int` | `2048` | Output cap for judge calls, passed to evaluatorq's `llm_jury_pairwise(max_tokens=...)`. A **cap, not a target**: it costs nothing extra on frugal judges. Thinking-by-default judges (e.g. `gemini-2.5-flash`) burn reasoning tokens before writing a verdict; a low cap starves the verdict entirely and fails the vote (the codebase's own regression case: `512` produced a `LengthFinishReasonError` on every one of that judge's votes). `2048` leaves headroom without materially raising cost on the cheap default panel. |
 | `stream_read_timeout_s` | `int` | `1200` | Max **silence** between stream chunks, in seconds, before the client treats the connection as dead (`httpx.Timeout(read=float(stream_read_timeout_s), ...)` in `OrqGateway.__init__`). This is a read-gap timeout, not a total-duration cap, a thinking model that pauses for minutes before its first token is fine as long as chunks keep arriving within this gap. A stream that goes silent longer than this is retried once, then the round is voided (logged, shown, excluded from scoring). `1200s` = 20 minutes, deliberately generous. |
@@ -234,7 +237,8 @@ SDK, authenticated with the same `ORQ_API_KEY` as the gateway.
 Mapping per datapoint: the last `user` message becomes the prompt text, `{{var}}` placeholders
 are filled from the datapoint's `inputs`, multi-part content is joined, and datapoints without
 a user message are skipped (the count is reported if the dataset yields nothing usable).
-Dataset prompts all land in the `general` category; `expected_output` is not read today.
+A datapoint's `inputs.category` becomes the prompt's category, falling back to `general` when
+the datapoint doesn't set one; `expected_output` is not read today.
 Each prompt carries its source `datapoint_id` in `prompt_metadata`, so every round in
 `battles.jsonl` joins back to the exact datapoint that produced it.
 
@@ -310,9 +314,8 @@ Everything else is a Pydantic default and safe to omit from the YAML entirely:
 
 ## Alternate configs and overrides
 
-orq-arena is a CLI tool with a single baked-in inference gateway host
-(`gateway.base_url`), not a deployed service, there is no dev/staging/production split to
-document. The equivalent axes for changing behavior between runs are:
+orq-arena is a CLI tool, not a deployed service, so it has no dev/staging/production split of
+its own. The axes for changing behavior between runs are:
 
 - **Different model pool / benchmark question:** pass a different YAML to `--config`. The two
   shipped presets are `orq_arena.yaml` (uniform thinking-OFF, the default) and
@@ -323,9 +326,14 @@ document. The equivalent axes for changing behavior between runs are:
 - **Different jury on an already-recorded run, no regeneration:** `orq-arena rejudge
   <log_path> --judge <id> [--judge <id> ...] [--criteria "..."]` re-scores the responses
   already in `battles.jsonl` with a new panel and/or criteria, without touching the YAML file.
-- **Different gateway host:** edit `gateway.base_url` in the YAML, it is a plain string field
-  with no environment-variable indirection. No alternate/staging orq.ai host is referenced
-  anywhere in this repository; the shipped value is the only one in use.
+- **Different gateway host:** two ways, and they do not mix.
+    - `ORQ_BASE_URL` in the environment retargets an otherwise-default run: completions go
+      through evaluatorq's shared resolver, and the catalog/price read follows the same host
+      (`catalog_host`, `src/orq_arena/providers/models_list.py`). This is the staging path.
+    - `gateway.base_url` in the YAML is the bring-your-own-endpoint opt-out. Setting it to
+      anything other than the default makes the YAML win and `ORQ_BASE_URL` is ignored, for
+      both completions and the catalog, so a run is never priced against one host while
+      calling another.
 
 ### Regenerated / git-ignored files
 

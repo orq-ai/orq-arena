@@ -34,12 +34,12 @@ Models are called through the [orq.ai router gateway](https://docs.orq.ai/docs/a
 - Re-rank the pool when a new model drops: one command, exact token accounting
 - Generate **pairwise preference data** (`battles.jsonl`) with per-judge votes for later analysis
 - Check whether "thinking" actually helps on your workload (uniform ON vs OFF pools)
-- Pick the strong/economical pair for your [Orq.ai Auto Router](https://docs.orq.ai/docs/ai-gateway/auto-router): the leaderboard shows which cheaper models your strongest cannot be told apart from
+- Pick the strong/economical pair for your [Orq.ai Auto Router](https://docs.orq.ai/docs/ai-gateway/auto-router): the report's quality-vs-cost map puts every model's rating against what it costs, so the cheap end of the field is easy to read off
 
 ## What you get
 
 - **A ranking you can defend.** The rating is [Bradley-Terry](https://en.wikipedia.org/wiki/Bradley%E2%80%93Terry_model), the statistical model behind chess-style ratings, fit over every judged round with bootstrapped 95% confidence intervals. When a run is too small to separate the top two, the report says exactly that, with the measured gap, instead of calling it a tie or hiding it. Judge-agreement stats ship with the standings.
-- **A report you can share.** One HTML per run. Verdict first, then the ELO ladder with error bars, a quality-vs-cost chart, latency, and the exact dollar spend.
+- **A report you can share.** One HTML per run. Verdict first, then the ELO ladder with error bars, a quality-vs-cost chart, latency, and the dollar spend: exact per model at catalog rates, and marked `≈` for the jury, whose spend is estimated at the panel's mean rate because the log stores one token total for the panel.
 - **Raw data out the back.** Every judged round lands in `battles.jsonl`: both responses, each judge's vote, exact token counts, per-response timing. Real pairwise preference data for whatever you want to do next.
 - **Jury swaps.** The responses are already recorded, so re-judging with a different panel costs judge tokens only, and tells you how much the ranking depends on who judged it.
 - **Human spot-checks.** `annotate` renders a run into a blind page (no model names, no jury votes) you can send to human raters; `anchor` compares their votes with the panel's.
@@ -123,7 +123,7 @@ Set expectations for the out-of-the-box run: the shipped 30-prompt bank and chea
 
 ![The live --tui show: the Run Plan cost table, a real match streaming side by side, judge cards with flip badges, and the final leaderboard](media/demo.gif)
 
-**Share the result**: the report (`<log>.report.html`) is one self-contained file. It opens with a verdict banner naming the top three models (win rate, ELO, total cost), then the full ladder with error bars, a quality-vs-cost chart, speed, the win grid, and how the jury behaved. Regenerate it any time with `orq-arena report battles.jsonl`, no model calls needed.
+**Share the result**: the report (`<log>.report.html`) is one self-contained file. It opens with a verdict banner naming the top three models (win share, ELO, total cost), then the full ladder with error bars, a quality-vs-cost chart, speed, the win grid, and how the jury behaved. Regenerate it any time with `orq-arena report battles.jsonl`, no model calls needed.
 
 **Re-judge with a different jury**: the responses are already in `battles.jsonl`, so swapping the panel costs judge tokens only: `orq-arena rejudge battles.jsonl --judge mistral/mistral-small-2603`. It reports how the new jury behaved and how much the ranking moved. Multi-judge example: **[docs/cli.md](docs/cli.md)**.
 

@@ -5,19 +5,27 @@ cent of your own: 8 models across five providers, the 30-prompt starter bank,
 the cheap default judge trio.
 
 Open **[`battles.report.html`](battles.report.html)** in a browser for the full
-page. Regenerate it from the recorded log at any time (no model calls):
+page. Regenerate it from the recorded log at any time (no model calls), writing
+outside the repository so the committed artifact stays untouched:
 
 ```bash
-orq-arena report examples/quickstart/battles.jsonl
+orq-arena report examples/quickstart/battles.jsonl \
+  --output /tmp/orq-arena-quickstart.report.html
 ```
 
-Reproduce the whole run (needs `ORQ_API_KEY`, ~$12 projected, several minutes):
+Reproduce the whole run (needs `ORQ_API_KEY`, several minutes). The preflight projects
+≈ $11.87 and puts the worst case at ≈ $36.70, the gap being a stand-in judge covering every
+judge call, which this config's `replacement_judges` allows:
 
 ```bash
 orq-arena run --config examples/quickstart/config.yaml \
   --prompts prompts/starter.jsonl -y \
-  --output examples/quickstart/battles.jsonl
+  --output examples/quickstart/battles.jsonl --overwrite
 ```
+
+`--overwrite` is required here: `battles.jsonl` is committed and non-empty, so without it the
+run refuses rather than erase a recorded run. Drop the flag and write somewhere else if you
+would rather keep the committed log untouched.
 
 ## What this run shows
 
@@ -40,13 +48,13 @@ orq-arena run --config examples/quickstart/config.yaml \
   the manifest records it under `preflight.family_overlaps`. For numbers you
   intend to defend, judge with families outside your pool.
 - **Length control.** The jury leaned longer (length coefficient +3.44); the
-  len-ctrl column prices that preference out.
+  report's `length-adj.` column prices that preference out.
 
 ## Files
 
 | File | What it is |
 |------|-----------|
 | `config.yaml` | The 8-model pool + judge panel this run used |
-| `battles.jsonl` | One JSONL row per judged round (schema v3): both responses, per-judge votes, token usage, timing |
+| `battles.jsonl` | One JSONL row per judged round (schema v3; runs recorded now are v4 and also carry each model's full router id): both responses, per-judge votes, token usage, timing |
 | `battles.run.json` | Seeded manifest: config/prompt hashes, panel, evaluatorq version, preflight (incl. `family_overlaps`) |
 | `battles.report.html` | The self-contained HTML report |
