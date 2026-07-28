@@ -65,15 +65,9 @@ def test_a_match_abandoned_midway_keeps_the_rounds_it_finished(tmp_path):
     assert [r.round_number for r in kept] == [1, 2]
 
 
-def test_append_many_still_works_for_callers_that_batch(tmp_path):
-    log = BattleLog(tmp_path / "battles.jsonl")
-    log.append_many([_record(1), _record(2)])
-    assert len(load_records(log.path)) == 2
-
-
 async def test_the_driver_writes_rounds_not_matches(tmp_path, monkeypatch):
     """End to end through `run_tournament`: the log has to grow while a match
-    is still running, which is the property `append_many`-per-match never had."""
+    is still running, which writing once per match never had."""
     from orq_arena.arena.battle import MatchResult
     from orq_arena.tournament import driver as driver_mod
 

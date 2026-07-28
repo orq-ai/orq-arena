@@ -112,21 +112,28 @@ def record_names(records: list[BattleRecord], candidates: list[CandidateSpec]) -
     no ids, so those fall back to the short name they do have.
     """
     by_id = {c.model_id: c.name for c in candidates}
-    by_short: dict[str, str] = {}
+    # Short names are only usable when they identify one candidate. A collision
+    # resolves to nothing rather than to whichever candidate happened to be last.
+    short_counts: dict[str, int] = {}
     for c in candidates:
-        # A colliding short name resolves to nothing rather than to whichever
-        # candidate happened to be last.
-        by_short[c.short_model] = "" if c.short_model in by_short else c.name
+        short_counts[c.short_model] = short_counts.get(c.short_model, 0) + 1
+    by_short = {c.short_model: c.name for c in candidates if short_counts[c.short_model] == 1}
+
     alias: dict[str, str] = {}
     for rec in records:
         for short, full in ((rec.model_a, rec.model_a_id), (rec.model_b, rec.model_b_id)):
-            name = by_id.get(full) if full else by_short.get(short) or None
-            alias[full or short] = name or short
+            key = full or short
+            alias[key] = (by_id.get(full, "") if full else by_short.get(short, "")) or short
     return alias
 
 
-def record_key(rec: BattleRecord, side: str) -> str:
-    """The key a record is rated under: its full id when it has one."""
+def rating_key(rec: BattleRecord, side: Literal["a", "b"]) -> str:
+    """The key a record is rated under: its full id when it has one.
+
+    Everything downstream of the rating (verbosity, style rows, cost, speed)
+    keys on this too, so a colliding short name cannot merge two models in one
+    view while the leaderboard shows them apart.
+    """
     return (rec.model_a_id or rec.model_a) if side == "a" else (rec.model_b_id or rec.model_b)
 
 
@@ -177,10 +184,10 @@ def _final_report(
     for rec in records:
         if rec.error is not None:
             continue
-        tokens.setdefault(rec.model_a, []).append(rec.tokens_a_out)
-        tokens.setdefault(rec.model_b, []).append(rec.tokens_b_out)
-        reasoning.setdefault(rec.model_a, []).append(rec.tokens_a_reasoning)
-        reasoning.setdefault(rec.model_b, []).append(rec.tokens_b_reasoning)
+        tokens.setdefault(rating_key(rec, "a"), []).append(rec.tokens_a_out)
+        tokens.setdefault(rating_key(rec, "b"), []).append(rec.tokens_b_out)
+        reasoning.setdefault(rating_key(rec, "a"), []).append(rec.tokens_a_reasoning)
+        reasoning.setdefault(rating_key(rec, "b"), []).append(rec.tokens_b_reasoning)
 
     grid: dict[str, dict[str, float]] = {n: {m: 0.0 for m in names} for n in names}
     for a, b, kind, _cat in outcomes:
@@ -199,13 +206,15 @@ def _final_report(
     for o in outcomes:
         cat_counts[o[3]] = cat_counts.get(o[3], 0) + 1
 
-    by_model = {w.short_model: w for w in cfg.candidates}
-    orc_by_model = {w.short_model: w.name for w in cfg.candidates}
+    # Same key the rating uses. Building these from short_model merged two
+    # providers of one model in every view except the leaderboard: one
+    # verbosity figure averaging both, and style rows that were self-matches.
+    alias = record_names(records, cfg.candidates)
     y_by_verdict = {"A": 1.0, "B": 0.0, "tie": 0.5}
     style_rows = [
         (
-            orc_by_model[rec.model_a],
-            orc_by_model[rec.model_b],
+            alias[rating_key(rec, "a")],
+            alias[rating_key(rec, "b")],
             y_by_verdict[rec.majority_verdict],
             len(rec.response_a or ""),
             len(rec.response_b or ""),
@@ -213,8 +222,8 @@ def _final_report(
         for rec in records
         if rec.error is None
         and rec.majority_verdict in y_by_verdict
-        and rec.model_a in orc_by_model
-        and rec.model_b in orc_by_model
+        and rating_key(rec, "a") in alias
+        and rating_key(rec, "b") in alias
     ]
     elo_sc, length_coef = style_controlled_elo(style_rows, names)
     # One bootstrap, summarized two ways: the marginal intervals below and the
@@ -246,10 +255,8 @@ def _final_report(
         "mean_agreement": jury.mean_agreement if jury else None,
         "fleiss": fleiss,
         "cohen": cohen,
-        "verbosity": {orc_by_model.get(m, m): sum(v) / len(v) for m, v in tokens.items() if v},
-        "reasoning_tokens": {
-            orc_by_model.get(m, m): sum(v) / len(v) for m, v in reasoning.items() if v
-        },
+        "verbosity": {alias.get(m, m): sum(v) / len(v) for m, v in tokens.items() if v},
+        "reasoning_tokens": {alias.get(m, m): sum(v) / len(v) for m, v in reasoning.items() if v},
         "win_grid": grid,
         "thinking": {
             w.name: (w.thinking_enabled or probed.get(w.name, False)) for w in cfg.candidates
@@ -266,7 +273,7 @@ def _final_report(
         > 1,
         "error_rounds": sum(1 for r in records if r.error is not None),
         "rated_rounds": len(outcomes),
-        "by_model_names": {w.short_model: w.name for w in by_model.values()},
+        "by_model_names": dict(alias),
     }
 
 
@@ -287,11 +294,11 @@ def rebuild_from_log(
         outcomes.extend(
             outcomes_from_records(
                 [rec],
-                alias[record_key(rec, "a")],
-                alias[record_key(rec, "b")],
+                alias[rating_key(rec, "a")],
+                alias[rating_key(rec, "b")],
             )
         )
-    names = sorted({alias[record_key(r, s)] for r in records for s in ("a", "b")})
+    names = sorted({alias[rating_key(r, s)] for r in records for s in ("a", "b")})
     elo = bradley_terry_mle(build_wins_matrix(_triples(outcomes)), names)
     report = _final_report(cfg, records, outcomes, names, preflight=preflight)
     return elo, report

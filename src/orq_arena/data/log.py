@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
 from pathlib import Path
 
 from .schemas import BattleRecord
@@ -26,8 +25,3 @@ class BattleLog:
         """
         with self.path.open("a", encoding="utf-8") as fh:
             fh.write(battle.model_dump_json() + "\n")
-
-    def append_many(self, battles: Iterable[BattleRecord]) -> None:
-        with self.path.open("a", encoding="utf-8") as fh:
-            for b in battles:
-                fh.write(b.model_dump_json() + "\n")

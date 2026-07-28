@@ -11,8 +11,10 @@ class CandidateSpec(BaseModel):
     """A single candidate, a model routed via the orq.ai gateway.
 
     Display name defaults to the model's short name (owner decision 22:
-    model names only on the leaderboard). A custom ``name`` is still
-    allowed but never generated.
+    model names only on the leaderboard). A custom ``name`` is honoured as
+    written. The one case where a name is generated is a collision: two
+    providers of the same model share a short name, so ``ArenaConfig`` falls
+    both back to their full ids rather than rate them as one model.
     """
 
     model_id: str = Field(description="orq.ai gateway model slug, e.g. 'anthropic/claude-opus-4-8'")
@@ -23,17 +25,10 @@ class CandidateSpec(BaseModel):
     # Per-candidate output cap; None = gateway.candidate_max_tokens.
     max_tokens: int | None = None
 
-    # True when the YAML named this candidate. A collision between two
-    # generated names can be resolved silently; a duplicate the user wrote
-    # themselves is raised instead (see ArenaConfig._unique_candidate_names).
-    name_is_custom: bool = Field(default=False, exclude=True)
-
     @model_validator(mode="after")
     def _default_name(self) -> CandidateSpec:
         if not self.name:
             self.name = self.short_model
-        else:
-            self.name_is_custom = True
         return self
 
     @property

@@ -114,8 +114,10 @@ not mistaken for the same set.
 Rounds are written to the battle log as they resolve, not batched to the end of a match, so a run
 interrupted partway keeps every round it already paid for. Each record carries the full router id
 of both models alongside the short display name, because short names collide across providers
-(`openai/gpt-oss-120b` and `groq/gpt-oss-120b`); the rating is keyed on the full id so two
-providers of one model are never rated as one.
+(`openai/gpt-oss-120b` and `groq/gpt-oss-120b`). Every per-model view is keyed on that full id, not
+just the leaderboard: the rating, the length-controlled rating, verbosity, cost and speed, so two
+providers of one model can never be apart in one panel and merged in another. When two candidates
+would share a display name, both fall back to their full ids and the preflight says so.
 
 `orq-arena report <log>` rebuilds from that manifest, not from the live YAML: model names, the
 judge panel and the reasoning flags come from the run itself, so regenerating a page after the

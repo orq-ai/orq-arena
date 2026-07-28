@@ -58,6 +58,10 @@ class ArenaConfig(BaseModel):
     headless_concurrency: int = 4
     gateway: OrqAIGatewayConfig = Field(default_factory=OrqAIGatewayConfig)
     candidates: list[CandidateSpec]
+    # (was, model_id) for every candidate the validator had to rename off a
+    # collision. Output, never input: excluded so it cannot ride into the
+    # manifest's recorded config and come back as a setting.
+    renamed: list[tuple[str, str]] = Field(default_factory=list, exclude=True)
     judges: list[str] = Field(description="Judge panel, router model ids")
     replacement_judges: list[str] = Field(default_factory=list)
     criteria: str = (
@@ -75,19 +79,25 @@ class ArenaConfig(BaseModel):
         Display names default to the model id minus its provider prefix, so a
         pool holding the same model from two providers (openai/gpt-oss-120b and
         groq/gpt-oss-120b) would otherwise collapse into one rating with nothing
-        printed to say so. Generated names fall back to the full id, which is
-        unique by construction; a duplicate the user wrote themselves raises,
-        because guessing which one they meant is worse than asking.
+        printed to say so. A duplicated name falls back to the full model id,
+        which is unique by construction, and the swap is recorded in
+        ``renamed`` so the CLI can say it out loud rather than quietly
+        answering to something the user did not write.
+
+        Two candidates with the same model id *and* the same name are the same
+        model listed twice, which no rename can disambiguate, so that raises.
         """
-        custom = {c.name for c in self.candidates if c.name_is_custom}
-        by_short: dict[str, list[CandidateSpec]] = {}
+        by_name: dict[str, list[CandidateSpec]] = {}
         for c in self.candidates:
-            if not c.name_is_custom:
-                by_short.setdefault(c.short_model, []).append(c)
-        for short, group in by_short.items():
-            if len(group) > 1 or short in custom:
-                for c in group:
-                    c.name = c.model_id
+            by_name.setdefault(c.name, []).append(c)
+        for name, group in by_name.items():
+            if len(group) == 1:
+                continue
+            if len({c.model_id for c in group}) < len(group):
+                raise ValueError(f"Duplicate candidate {name!r}: the same model_id is listed twice")
+            for c in group:
+                self.renamed.append((name, c.model_id))
+                c.name = c.model_id
 
         seen: dict[str, str] = {}
         for c in self.candidates:
