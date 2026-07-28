@@ -41,16 +41,44 @@ def test_ties_shift_ratings_symmetrically():
     assert ratings["a"] > ratings["c"]
 
 
-def test_style_control_absorbs_pure_length_wins():
+# The longer answer usually wins, at TWO distinct length ratios, with wins
+# nearly balanced between the models. All three properties are load-bearing:
+# counterexamples keep the MLE finite (a clean sweep is separable), the second
+# ratio keeps gamma identified (a single ratio makes d collinear with the pair
+# indicator, a flat ridge on which any gamma fits equally well and the answer
+# is path-dependent), and balance keeps the model term from soaking up the
+# likelihood before the length term is measured.
+STYLE_ROWS = (
+    [("a", "b", 1.0, 400, 100)] * 18
+    + [("a", "b", 0.0, 100, 400)] * 14
+    + [("a", "b", 0.0, 400, 100)] * 4
+    + [("a", "b", 1.0, 100, 400)] * 4
+    + [("a", "b", 1.0, 300, 200)] * 10
+    + [("a", "b", 0.0, 200, 300)] * 10
+)
+
+
+def test_style_control_absorbs_length_wins():
     from orq_arena.tournament.elo import style_controlled_elo
 
-    # A always answers 4x longer and always wins; equally often as seat A or B.
-    rows = [("a", "b", 1.0, 400, 100)] * 10 + [("b", "a", 0.0, 100, 400)] * 10
-    elo, gamma = style_controlled_elo(rows, ["a", "b"])
-    assert gamma > 0  # the jury's length preference is exposed
-    raw = bradley_terry_mle(build_wins_matrix([("a", "b", "winner")] * 20), ["a", "b"])
+    fit = style_controlled_elo(STYLE_ROWS, ["a", "b"])
+    assert fit.converged
+    assert fit.gamma > 0  # the jury's length preference is exposed
+    raw = bradley_terry_mle(
+        build_wins_matrix([("a", "b", "winner")] * 32 + [("b", "a", "winner")] * 28), ["a", "b"]
+    )
     # pricing length out shrinks the gap vs the raw fit
-    assert abs(elo["a"] - elo["b"]) < abs(raw["a"] - raw["b"])
+    assert abs(fit.elo["a"] - fit.elo["b"]) < abs(raw["a"] - raw["b"])
+
+
+def test_style_control_refuses_separated_data():
+    from orq_arena.tournament.elo import style_controlled_elo
+
+    # The longer answer always wins: gamma has no finite maximum, and the old
+    # code silently returned wherever its iteration budget ran out.
+    rows = [("a", "b", 1.0, 400, 100)] * 10 + [("b", "a", 0.0, 100, 400)] * 10
+    fit = style_controlled_elo(rows, ["a", "b"])
+    assert not fit.converged
 
 
 def test_style_control_neutral_without_length_signal():
@@ -58,17 +86,37 @@ def test_style_control_neutral_without_length_signal():
 
     # Same lengths both sides: gamma has nothing to fit, ranking matches raw BT.
     rows = [("a", "b", 1.0, 200, 200)] * 6 + [("a", "b", 0.0, 200, 200)] * 2
-    elo, gamma = style_controlled_elo(rows, ["a", "b"])
-    assert abs(gamma) < 1e-6
-    assert elo["a"] > elo["b"]
+    fit = style_controlled_elo(rows, ["a", "b"])
+    assert fit.converged
+    assert abs(fit.gamma) < 1e-3
+    assert fit.elo["a"] > fit.elo["b"]
 
 
 def test_style_control_empty_rows_is_flat():
     from orq_arena.tournament.elo import style_controlled_elo
 
-    elo, gamma = style_controlled_elo([], ["a", "b"])
-    assert elo == {"a": 1000.0, "b": 1000.0}
-    assert gamma == 0.0
+    fit = style_controlled_elo([], ["a", "b"])
+    assert fit.elo == {"a": 1000.0, "b": 1000.0}
+    assert fit.gamma == 0.0
+    assert fit.converged
+
+
+def test_style_control_gamma_is_stable_under_a_bigger_budget():
+    """The regression that shipped: gamma tracked the iteration count.
+
+    2000 fixed gradient steps reported 3.44 on the example run while the MLE
+    was 18.3; raising the budget moved the answer. A converged fit must give
+    the same gamma no matter how much extra budget it is offered. The fixture
+    has to carry two length ratios: on single-ratio (ridge) data the old
+    estimator was *also* budget-stable, parked at an arbitrary point, and this
+    test would discriminate nothing.
+    """
+    from orq_arena.tournament.elo import style_controlled_elo
+
+    small = style_controlled_elo(STYLE_ROWS, ["a", "b"], max_iter=500)
+    big = style_controlled_elo(STYLE_ROWS, ["a", "b"], max_iter=15000)
+    assert small.converged and big.converged
+    assert abs(small.gamma - big.gamma) < 1e-4
 
 
 def test_judge_family_overlap_flags_shared_provider():
@@ -134,5 +182,5 @@ def test_elo_is_anchored_at_1000_mean():
     # Both fits anchor mean log-strength to 0, i.e. mean ELO == 1000.
     assert abs(sum(bt.values()) / len(bt) - 1000.0) < 1e-6
     rows = [("a", "b", 1.0, 100, 100), ("b", "c", 1.0, 100, 100), ("c", "a", 1.0, 100, 100)]
-    sc, _gamma = style_controlled_elo(rows, ["a", "b", "c"])
-    assert abs(sum(sc.values()) / len(sc) - 1000.0) < 1e-6
+    fit = style_controlled_elo(rows, ["a", "b", "c"])
+    assert abs(sum(fit.elo.values()) / len(fit.elo) - 1000.0) < 1e-6

@@ -220,7 +220,8 @@ tie-breakers)
 │ 8 │ gemini-3.1-pro-preview │ 463  │ -3000–632 │ 5%   │
 └───┴────────────────────────┴──────┴───────────┴──────┘
 
-jury: 90% mean agreement · leaned longer (+3.44); the report prices it out
+jury: 90% mean agreement · longer answer won 80% of decisive rounds (59/74) ·
+the report prices that preference out
 rounds: 76 rated · 0 voided
 tokens, models 8,350 in / 220,700 out · jury 1,481,428 in / 107,697 out
 

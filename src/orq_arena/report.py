@@ -720,16 +720,40 @@ def build_report_html(
                 "",
             )
         )
-    if length_coef is not None:
-        lean = "longer" if length_coef > 0 else "shorter"
-        signal_rows.append(
-            (
-                "Did length sway the jury",
-                f"the jury leaned toward <b>{lean} answers</b>; the length-adjusted column "
-                f"prices that out",
-                "",
-            )
+    # Descriptive claim first: a count, immune to how any estimator behaves.
+    # The modelled coefficient joins it only when identified (fit converged,
+    # bootstrap interval excluding 0), which is also when the length-adj.
+    # column exists. Length means characters throughout.
+    length_pref = report.get("length_pref")
+    if length_pref and length_pref["rounds"]:
+        rounds_n = length_pref["rounds"]
+        longer = length_pref["longer_wins"]
+        lean_word, lean_wins = (
+            ("longer", longer) if longer * 2 >= rounds_n else ("shorter", rounds_n - longer)
         )
+        detail = (
+            f"the <b>{lean_word}</b> answer (in characters) won "
+            f"<b>{lean_wins / rounds_n:.0%}</b> of decisive rounds "
+            f"({lean_wins}/{rounds_n})"
+        )
+        if length_coef is not None:
+            ci_d = report.get("length_coef_ci") or {}
+            lo_t = "unbounded" if ci_d.get("lo") is None else f"{ci_d['lo']:+.1f}"
+            hi_t = "unbounded" if ci_d.get("hi") is None else f"{ci_d['hi']:+.1f}"
+            sep = ci_d.get("separated", 0)
+            sep_note = f"; {sep}/{ci_d.get('draws', '?')} resamples separated" if sep else ""
+            detail += (
+                f"; modelled length coefficient <b>{length_coef:+.1f}</b> "
+                f"(95% CI {lo_t} to {hi_t}{sep_note}), priced out in the "
+                f"length-adj. column"
+            )
+        else:
+            detail += (
+                "; the modelled length coefficient is not statistically "
+                "identified on this run (its interval reaches 0, or the fit "
+                "has no finite estimate), so no length-adjusted column is shown"
+            )
+        signal_rows.append(("Did length sway the jury", detail, ""))
     signal_rows.append(("Judges agreeing on decisive rounds", f"<b>{_pct(agreement)}</b>", ""))
     signal_rows.append(("Jury share of tokens used", f"<b>{jury_share}</b>", ""))
     meth_rows = "".join(
@@ -981,7 +1005,7 @@ def build_report_html(
 <p class="note">ELO is a skill rating anchored at 1000: a model climbs by winning rounds, and more
 for beating a strong opponent, so a higher score means better on your prompts. The 95% CI is the
 range its true rating most likely sits in; the bar plots each on one shared scale, so models
-whose bars overlap are not thereby tied: read each bar on its own, and see Confidence stats for whether the top two actually separate.{" The length-adj. column prices out the jury&#39;s length preference; a large gap between a model&#39;s ELO and its length-adjusted score means verbosity, not quality, was separating them." if elo_sc else ""} Full method (Bradley-Terry, bootstrap intervals, the &minus;&infin; bound) is in Methodology in detail below.{off_note}</p>
+whose bars overlap are not thereby tied: read each bar on its own, and see Confidence stats for whether the top two actually separate.{" The length-adj. column refits the rating with the jury&#39;s length preference (measured in characters) priced out; a large gap between a model&#39;s ELO and its length-adjusted score means verbosity, not quality, was separating them. It appears only when that preference is identified: the joint fit converged and its bootstrap interval excludes 0." if elo_sc else ""} Full method (Bradley-Terry, bootstrap intervals, the &minus;&infin; bound) is in Methodology in detail below.{off_note}</p>
 
 {value_map}
 {speed}
@@ -1032,9 +1056,13 @@ intervals, which is the honest output at this size. Those intervals are marginal
 time: two of them overlapping does not mean the two models are tied, because both are drawn from the
 same resamples and share the anchoring. Whether the top two separate is decided on the bootstrap of
 their difference, taken within each resample, and reported in Confidence stats. A &minus;&infin; lower bound means a model
-won so few rounds its rating is unidentifiable below. The length-adjusted column refits the
-rating with the jury&#39;s length preference priced out; a large gap between ELO and the
-length-adjusted score means verbosity, not quality, is doing the separating.</p>
+won so few rounds its rating is unidentifiable below. The length claim leads with a plain
+count (how often the longer answer, in characters, won a decisive round). The modelled
+coefficient behind the length-adjusted column is a joint logistic fit (Newton with a line
+search, stopped on the gradient norm) bootstrapped over the same rows; the column and the
+coefficient are shown only when that fit converges and the interval excludes 0. Resamples
+where one side always wins have no finite coefficient; they are counted as separated and
+widen the interval rather than being dropped.</p>
 <h3>The jury</h3>
 <p>Every judge scores each pair in both seat orders; a judge that contradicts itself between
 orders abstains (the flip rate), and abstentions never become verdicts. Fleiss&#39; &kappa;

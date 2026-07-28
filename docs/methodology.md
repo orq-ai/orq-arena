@@ -14,8 +14,9 @@ For every round, one prompt, two candidates, in a round-robin tournament:
 3. If fewer than two judges cast a decisive vote, the round is inconclusive and never reaches
    the rating.
 4. Every judged round (win, loss, or tie) feeds a Bradley-Terry fit over all rounds so far.
-5. The fit produces one rating per candidate with a bootstrap 95% confidence interval, plus a
-   length-controlled rating that prices out the jury's verbosity preference.
+5. The fit produces one rating per candidate with a bootstrap 95% confidence interval, plus,
+   when the jury's length preference is statistically identified, a length-controlled rating
+   that prices that preference out.
 6. The run also reports how much the judges agreed with each other and how often each one
    flipped between seat orders, public evidence of how much to trust the verdicts.
 
@@ -72,12 +73,19 @@ out ahead ("ahead in 71% of resamples") rather than declaring a tie, which the d
 support either way.
 
 **Length control.** Seat-swapping fixes position bias, not verbosity bias: a jury that likes
-longer answers likes them in both orders. Following length-controlled AlpacaEval (Dubois et
-al., 2024) and LMArena's style control, the fit is repeated with a length term, producing the
-jury's length coefficient (printed with the standings) and a second rating column with that
-preference priced out (`length-adj.` on the report page, `len-ctrl` in the live TUI). A big
-gap between a model's two ratings means verbosity, not quality, is doing the separating.
-Length is the only style axis controlled today; markdown formatting is not.
+longer answers likes them in both orders. The headline claim is deliberately a plain count,
+how often the longer answer (in characters) won a decisive round, because a count has no
+estimator behind it and nothing to converge. Behind it, following length-controlled
+AlpacaEval (Dubois et al., 2024) and LMArena's style control, the fit is repeated with a
+length term: a joint logistic fit (Newton with a line search, stopped on the gradient norm,
+never on an iteration budget) yields the jury's length coefficient, and a second rating
+column reports each model with that preference priced out (`length-adj.` on the report page,
+`len-ctrl` in the live TUI). The coefficient and the column appear only when the preference
+is identified: the fit converged and a bootstrap interval over the same rows excludes 0.
+Resamples where one side always wins have no finite coefficient; they are counted as
+separated and widen the interval rather than being dropped. A big gap between a model's two
+ratings means verbosity, not quality, is doing the separating. Length is the only style axis
+controlled today; markdown formatting is not.
 
 **Per-category slices.** Ratings are also refit per prompt category, but only for categories
 with enough comparisons to mean anything; thin slices are dropped instead of shown with

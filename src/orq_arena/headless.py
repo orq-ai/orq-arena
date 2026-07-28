@@ -107,9 +107,18 @@ def _print_summary(console: Console, ev: TournamentEnded) -> None:
     jury_bits = []
     if r.get("mean_agreement") is not None:
         jury_bits.append(f"{r['mean_agreement']:.0%} mean agreement")
+    # Descriptive first: a count needs no estimator and no iteration budget.
+    # The modelled coefficient rides behind it only when the fit is identified
+    # (converged, interval excluding 0), which is also when the length-adj.
+    # column exists for "priced out" to point at.
+    lp = r.get("length_pref")
+    if lp and lp["rounds"]:
+        share = lp["longer_wins"] / lp["rounds"]
+        jury_bits.append(
+            f"longer answer won {share:.0%} of decisive rounds ({lp['longer_wins']}/{lp['rounds']})"
+        )
     if r.get("length_coef") is not None:
-        lean = "longer" if r["length_coef"] > 0 else "shorter"
-        jury_bits.append(f"leaned {lean} ({r['length_coef']:+.2f}); the report prices it out")
+        jury_bits.append("the report prices that preference out")
     if jury_bits:
         console.print("jury: " + " · ".join(jury_bits))
     rated = r.get("rated_rounds")

@@ -274,7 +274,8 @@ tie-breakers)
 │ 8 │ gemini-3.1-pro-preview │ 463  │ -3000–632 │ 5%   │
 └───┴────────────────────────┴──────┴───────────┴──────┘
 
-jury: 90% mean agreement · leaned longer (+3.44); the report prices it out
+jury: 90% mean agreement · longer answer won 80% of decisive rounds (59/74) ·
+the report prices that preference out
 rounds: 76 rated · 0 voided
 tokens, models 8,350 in / 220,700 out · jury 1,481,428 in / 107,697 out
 
@@ -309,7 +310,8 @@ its call counts and the spend line reads `spend projection unavailable`.
 
 ![RUN PLAN screen: prompts block, per-model cost table, consent bar](assets/run-plan.svg)
 
-The run ends on the **Final Results screen**: ELO with its 95% CI and len-ctrl rating per
+The run ends on the **Final Results screen**: ELO with its 95% CI and, when the jury's
+length preference is statistically identified, a len-ctrl rating per
 model, the per-category slices, per-judge behaviour (A/B lean, flip rate, tie rate, Fleiss'
 κ), and the win grid.
 

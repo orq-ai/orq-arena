@@ -264,11 +264,13 @@ def test_v3_annotation_keys_are_unchanged_so_existing_votes_still_match():
     assert record_key(v3) == expected
 
 
-def test_every_per_model_view_separates_a_colliding_pool_not_just_the_ladder():
+def test_every_per_model_view_separates_a_colliding_pool_not_just_the_ladder(monkeypatch):
     """The leaderboard separated them while verbosity, the length-controlled
     rating and the name map still merged both models into one entry."""
     from orq_arena.data.schemas import BattleRecord
+    from orq_arena.tournament import driver as driver_mod
     from orq_arena.tournament.driver import rebuild_from_log
+    from orq_arena.tournament.elo import style_controlled_elo
 
     cfg = _cfg([{"model_id": "openai/gpt-oss-120b"}, {"model_id": "groq/gpt-oss-120b"}])
     records = [
@@ -289,6 +291,19 @@ def test_every_per_model_view_separates_a_colliding_pool_not_just_the_ladder():
         )
         for i in range(6)
     ]
+
+    # The style fit's *published* output is now gated on statistical
+    # identification, which a 6-round fixture can never clear, so the identity
+    # regression (style rows built from short names became self-matches and
+    # the fit learned nothing) is asserted on the rows the fit receives.
+    seen_rows: list = []
+    real_fit = style_controlled_elo
+
+    def spy(rows, models, **kw):
+        seen_rows.append(rows)
+        return real_fit(rows, models, **kw)
+
+    monkeypatch.setattr(driver_mod, "style_controlled_elo", spy)
     _, report = rebuild_from_log(cfg, records)
     both = {"openai/gpt-oss-120b", "groq/gpt-oss-120b"}
 
@@ -297,10 +312,9 @@ def test_every_per_model_view_separates_a_colliding_pool_not_just_the_ladder():
     assert report["verbosity"]["groq/gpt-oss-120b"] == 200.0
     assert set(report["reasoning_tokens"]) == both
     assert set(report["by_model_names"].values()) == both
-    # Style rows were self-matches, so the length-controlled fit learned
-    # nothing and reported both models at the 1000 anchor.
-    assert set(report["elo_style_controlled"]) == both
-    assert report["elo_style_controlled"] != dict.fromkeys(both, 1000.0)
+    style_rows = seen_rows[0]
+    assert {r[0] for r in style_rows} | {r[1] for r in style_rows} == both
+    assert all(r[0] != r[1] for r in style_rows), "style rows are self-matches again"
 
 
 # --- every panel, not just the ladder -------------------------------------

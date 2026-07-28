@@ -137,7 +137,15 @@ def test_documented_jury_stats_match_the_rebuild(doc, rebuilt):
     _elo, report = rebuilt
     text = doc.read_text(encoding="utf-8")
     assert f"{report['mean_agreement']:.0%} mean agreement" in text
-    assert f"leaned longer ({report['length_coef']:+.2f})" in text
+    pref = report["length_pref"]
+    share = pref["longer_wins"] / pref["rounds"]
+    assert (
+        f"longer answer won {share:.0%} of decisive rounds "
+        f"({pref['longer_wins']}/{pref['rounds']})" in text
+    )
+    # The pricing-out claim is licensed by the coefficient being identified;
+    # if the gate ever closes on this run, the transcript must drop the claim.
+    assert ("the report prices that preference out" in text) == (report["length_coef"] is not None)
     assert f"rounds: {report['rated_rounds']} rated" in text
 
 
@@ -150,11 +158,22 @@ def test_the_quickstart_readme_prose_quotes_the_real_run(rebuilt):
     elo, report = rebuilt
     champion, rating = max(elo.items(), key=lambda kv: kv[1])
     words = " ".join((QUICKSTART / "README.md").read_text(encoding="utf-8").split())
+    pref = report["length_pref"]
+    sc = report["elo_style_controlled"]
+    ci = report["length_coef_ci"]
+    assert sc and ci, "the committed run stopped being length-identified; rewrite the README"
+    sc_rank = sorted(sc, key=lambda k: -sc[k]).index(champion) + 1
+    ordinal = {1: "1st", 2: "2nd", 3: "3rd"}.get(sc_rank, f"{sc_rank}th")
     for claim in (
         f"`{champion}` leads at {rating:.0f}",
         f"{report['rated_rounds']} rated rounds",
         f"{len(load_records(LOG))} rounds came back inconclusive",
-        f"length coefficient {report['length_coef']:+.2f}",
+        f"longer answer won {pref['longer_wins']} of {pref['rounds']} decisive rounds",
+        f"coefficient is {report['length_coef']:+.1f}",
+        f"lower bound {ci['lo']:.1f}",
+        # The finding, not just the number: where the raw champion lands once
+        # length is priced out.
+        f"champion drops to {ordinal}",
     ):
         assert claim in words, f"quickstart README no longer says {claim!r}"
 

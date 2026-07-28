@@ -52,6 +52,41 @@ async def test_leaderboard_mounts_plain_without_report():
         assert not screen.query("#jury")
 
 
+async def test_style_control_line_is_descriptive_and_len_ctrl_column_is_gated():
+    """Rendered through the widget, per the house rule for Textual changes.
+
+    Identified report: the count line renders and the len-ctrl column exists.
+    Unidentified report (coefficient withheld): the count still renders, the
+    coefficient text and the column are absent.
+    """
+    from textual.widgets import Static
+
+    base = {
+        "length_pref": {"longer_wins": 52, "rounds": 60},
+        "win_grid": {"a": {"b": 2.0}, "b": {"a": 1.0}},
+    }
+    identified = base | {
+        "length_coef": 18.3,
+        "elo_style_controlled": {"a": 1010.0, "b": 990.0},
+    }
+
+    for report, coef_shown in ((identified, True), (base, False)):
+        screen = LeaderboardScreen(
+            elo={"a": 1000.0, "b": 990.0}, champion="a", log_path="x", report=report
+        )
+        app = _Host()
+        async with app.run_test() as pilot:
+            await app.push_screen(screen)
+            await pilot.pause()
+            texts = [str(w.render()) for w in screen.query(Static)]
+            style_lines = [t for t in texts if "longer answer won" in t]
+            assert style_lines, "the descriptive count line never rendered"
+            assert "87% of decisive rounds (52/60)" in style_lines[0]
+            headers = [str(c.label) for c in screen.query_one("#table", DataTable).columns.values()]
+            assert ("len-ctrl" in headers) is coef_shown
+            assert ("prices that preference out" in style_lines[0]) is coef_shown
+
+
 async def test_the_token_columns_show_real_numbers_not_zero():
     """Rendered through the widget, not read off the report dict.
 
