@@ -467,8 +467,10 @@ re-judging 140 rounds with panel: openai/gpt-5.1
 
 re-judged 140 rounds, 23 verdicts changed
 rank correlation (Spearman) old→new: 0.80 over 8 models, 140 rounds, judge-robust ranking
-old ranking: gemini-3.5-flash > claude-sonnet-4-6 > gpt-5.4-mini > mistral-medium-2604
-new ranking: claude-sonnet-4-6 > gemini-3.5-flash > gpt-5.4-mini > mistral-medium-2604
+old ranking: gemini-3.5-flash > claude-sonnet-4-6 > gpt-5.4 > claude-opus-4-8 >
+deepseek-chat > mistral-medium-2604 > gpt-5.4-mini > gemini-3.1-pro-preview
+new ranking: claude-sonnet-4-6 > gemini-3.5-flash > gpt-5.4 > claude-opus-4-8 >
+deepseek-chat > mistral-medium-2604 > gpt-5.4-mini > gemini-3.1-pro-preview
        new jury behaviour
 ┏━━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━┓
 ┃ judge   ┃ A-lean ┃ B-lean ┃ flip rate ┃ tie rate ┃
@@ -524,8 +526,8 @@ JSONs it reads does, so the numbers below are illustrative in the same way the
 ┃ panel           ┃ spearman vs run ┃ inconclusive ┃ agreement ┃ worst flip      ┃ tie rate ┃ changed        ┃
 ┃                 ┃                 ┃              ┃           ┃ (judge)         ┃          ┃ verdicts       ┃
 ┡━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━┩
-│ gpt-5.1         │ 0.80            │ 10%          │ n/a       │ 10% (gpt-5.1)   │ 13%      │ 23/140         │
-│ claude-haiku-4… │ 1.00            │ 17%          │ 86%       │ 13% (gpt-5.1)   │ 7%       │ 11/140         │
+│ gpt-5.1         │ 0.80 over 8     │ 10%          │ n/a       │ 10% (gpt-5.1)   │ 13%      │ 23/140         │
+│ claude-haiku-4… │ 1.00 over 8     │ 17%          │ 86%       │ 13% (gpt-5.1)   │ 7%       │ 11/140         │
 │ gpt-5.1         │                 │              │           │                 │          │                │
 └─────────────────┴─────────────────┴──────────────┴───────────┴─────────────────┴──────────┴────────────────┘
 read: high spearman = the ranking does not depend on this jury; low inconclusive = decisive; low flip =

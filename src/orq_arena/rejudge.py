@@ -293,6 +293,9 @@ def compare_reports(paths: list[str | Path]) -> list[dict]:
                 "inconclusive": jury.get("inconclusive_rate"),
                 "agreement": jury.get("mean_agreement"),
                 "spearman": data.get("spearman"),
+                # n behind the correlation; every saved report carries the
+                # ranking, so old JSONs yield it too
+                "models": len(data.get("old_ranking") or []) or None,
                 "changed": data.get("changed_verdicts"),
                 "total": data.get("total"),
                 "tie_rate": jury.get("tie_rate"),
@@ -324,7 +327,14 @@ def render_comparison(rows: list[dict]) -> None:
     ):
         t.add_column(col)
     for r in rows:
-        sp = "n/a" if r["spearman"] is None else f"{r['spearman']:.2f}"
+        # The same rule as the rejudge line itself: a correlation never
+        # prints without the n it was computed over.
+        if r["spearman"] is None:
+            sp = "n/a"
+        elif r.get("models"):
+            sp = f"{r['spearman']:.2f} over {r['models']}"
+        else:
+            sp = f"{r['spearman']:.2f} (n unknown)"
         t.add_row(
             r["panel"],
             sp,

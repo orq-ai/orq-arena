@@ -145,3 +145,33 @@ def test_fewer_than_two_rankable_models_is_no_ranking_claim():
     row = anchor_result(records, [_vs("h1", voted)])["per_annotator"][0]
     assert row["n_rank_models"] == 0  # both sides sit below the floor
     assert row["spearman"] != row["spearman"]  # NaN, not an alphabetical tie
+
+
+def test_panel_inconclusive_rounds_carry_no_ranking_claim():
+    """Review-demonstrated artifact: with every co-voted round inconclusive,
+    the panel-side fit had no outcomes, `_ranking` fell back to
+    `sorted(models)`, and rho read +-1.0 depending on which side of the
+    alphabet the rater's votes landed. Rounds the panel never decided cannot
+    carry the comparison at all."""
+    records = [_multi_rec(i, "a", "b", "inconclusive") for i in range(4)]
+    for vote in ("A", "B"):
+        voted = {record_key(r): vote for r in records}
+        row = anchor_result(records, [_vs("h1", voted)])["per_annotator"][0]
+        assert row["n_rank_models"] == 0
+        assert row["spearman"] != row["spearman"], f"alphabetical rho for vote={vote}"
+
+
+def test_rounds_against_dropped_models_do_not_clear_the_floor():
+    """Review-demonstrated filler: d had 3 co-voted rounds, every one against
+    below-floor e/f. Those games vanish from the Bradley-Terry fit (it only
+    reads pairs of listed models), so d sat at the 1000 default with a passing
+    grade. The floor now counts rounds against other rankable models only, to
+    a fixed point."""
+    records = [_multi_rec(i, "a", "b", "A") for i in range(4)] + [
+        _multi_rec(10, "d", "e", "A"),
+        _multi_rec(11, "d", "f", "A"),
+        _multi_rec(12, "d", "e", "B"),
+    ]
+    voted = {record_key(r): "A" for r in records}
+    row = anchor_result(records, [_vs("h1", voted)])["per_annotator"][0]
+    assert row["n_rank_models"] == 2  # a and b; d's rounds were all vs filler

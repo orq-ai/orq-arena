@@ -417,19 +417,33 @@ def _ranking(records, majorities, models) -> list[str]:
     return sorted(models, key=lambda m: elo[m], reverse=True)
 
 
-# A model enters a rater's ranking only with this many co-voted rounds behind
-# it. Below the floor its rating is noise ordered among ties, and the reported
-# rho starts measuring the filler, not the rater (RES-1153).
+# A model enters a rater's ranking only with this many qualifying rounds
+# behind it. Below the floor its rating is noise ordered among ties, and the
+# reported rho starts measuring the filler, not the rater (RES-1153).
 MIN_RANK_COMPARISONS = 3
 
 
 def _rankable_models(recs) -> list[str]:
-    """Models with enough co-voted rounds to earn a place in the ranking."""
-    counts: dict[str, int] = {}
-    for r in recs:
-        counts[r.model_a] = counts.get(r.model_a, 0) + 1
-        counts[r.model_b] = counts.get(r.model_b, 0) + 1
-    return sorted(m for m, n in counts.items() if n >= MIN_RANK_COMPARISONS)
+    """Models with enough rounds against *other rankable models* to be ranked.
+
+    A fixed point, not one pass: review found a model clearing the floor
+    purely on rounds against below-floor opponents. Those rounds vanish from
+    the Bradley-Terry fit (it only reads games between listed models), so the
+    "qualified" model sat at the 1000 default anyway, filler with a passing
+    grade. Dropping a model can strand its opponents the same way, hence the
+    loop; it shrinks monotonically and terminates.
+    """
+    kept = {m for r in recs for m in (r.model_a, r.model_b)}
+    while True:
+        counts: dict[str, int] = {}
+        for r in recs:
+            if r.model_a in kept and r.model_b in kept:
+                counts[r.model_a] = counts.get(r.model_a, 0) + 1
+                counts[r.model_b] = counts.get(r.model_b, 0) + 1
+        still = {m for m in kept if counts.get(m, 0) >= MIN_RANK_COMPARISONS}
+        if still == kept:
+            return sorted(kept)
+        kept = still
 
 
 def _pair_kappa(rounds: list, a: str, b: str) -> dict:
@@ -467,11 +481,18 @@ def anchor_result(records, votesets: list[VoteSet]) -> dict:
             if keyed[k].majority_verdict in _DECISIVE
         ]
         pair = _pair_kappa(rounds, _PANEL, label)
-        recs = [keyed[k] for k in co]
+        # Only rounds the panel actually decided can carry the comparison: an
+        # inconclusive round gives the panel fit nothing, so counting it
+        # toward the floor let a rater's rho be computed against a ranking
+        # that was really `sorted(models)`. Review demonstrated the artifact:
+        # all-inconclusive co-voted rounds scored rho = +-1.0 depending on
+        # which side of the alphabet the rater's votes happened to land.
+        scored = [(k, v) for k, v in co.items() if keyed[k].majority_verdict in _DECISIVE]
+        recs = [keyed[k] for k, _v in scored]
         ranked = _rankable_models(recs)
         if len(ranked) >= 2:
-            panel_sub = _ranking(recs, [keyed[k].majority_verdict for k in co], ranked)
-            human_rank = _ranking(recs, list(co.values()), ranked)
+            panel_sub = _ranking(recs, [keyed[k].majority_verdict for k, _v in scored], ranked)
+            human_rank = _ranking(recs, [v for _k, v in scored], ranked)
             rho = spearman(panel_sub, human_rank)
         else:
             # one rankable model orders nothing; no ranking claim at all
