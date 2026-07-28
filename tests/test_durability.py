@@ -10,6 +10,7 @@ while `docs/cli.md` already promised the log is written "as rounds complete".
 from __future__ import annotations
 
 import asyncio
+from types import SimpleNamespace
 
 import pytest
 
@@ -131,3 +132,57 @@ async def test_a_voided_round_keeps_whatever_text_arrived(monkeypatch):
     )
     assert res.error is not None
     assert res.text == "the first half"
+
+
+async def test_a_voided_round_is_still_identifiable(monkeypatch):
+    """A void carries the same identity a judged round does, so a colliding
+    pool's error rounds can be attributed to the model that actually failed."""
+    from orq_arena.arena.battle import Battle
+
+    battle = Battle(
+        cfg=CFG,
+        gateway=SimpleNamespace(client=object()),
+        candidate_a=CFG.candidates[0],
+        candidate_b=CFG.candidates[1],
+        prompts=[],
+        match_id="M1",
+        round_name="r",
+        tournament_id="t",
+        events=asyncio.Queue(),
+    )
+    from orq_arena.arena.battle import SideResult
+    from orq_arena.data.prompts import PromptItem
+
+    rec = await battle._void_round(
+        round_number=1,
+        item=PromptItem(text="p"),
+        reason="boom",
+        res_a=SideResult(text="", error="boom", usage={}, ttft_ms=0),
+        res_b=SideResult(text="", error=None, usage={}, ttft_ms=0),
+    )
+    assert rec.model_a_id == CFG.candidates[0].model_id
+    assert rec.model_b_id == CFG.candidates[1].model_id
+
+
+async def test_the_battle_actually_hands_each_record_to_the_log(tmp_path):
+    """Both driver tests fake `Battle`, so the real on_record wiring, which is
+    the whole of defect 1, was never exercised."""
+    from orq_arena.arena.battle import Battle
+
+    written: list = []
+    battle = Battle(
+        cfg=CFG,
+        gateway=SimpleNamespace(client=object()),
+        candidate_a=CFG.candidates[0],
+        candidate_b=CFG.candidates[1],
+        prompts=[],
+        match_id="M1",
+        round_name="r",
+        tournament_id="t",
+        events=asyncio.Queue(),
+        on_record=written.append,
+    )
+    battles: list = []
+    battle._record(battles, _record(1))
+    assert [r.round_number for r in written] == [1], "the log never saw the round"
+    assert len(battles) == 1

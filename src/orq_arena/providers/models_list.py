@@ -142,12 +142,8 @@ def catalog_host(cfg: OrqAIGatewayConfig) -> str:
     return f"{parsed.scheme}://{parsed.netloc}"
 
 
-def _host(cfg: OrqAIGatewayConfig) -> str:
-    return catalog_host(cfg)
-
-
 def _catalog_urls(cfg: OrqAIGatewayConfig) -> list[str]:
-    host = _host(cfg)
+    host = catalog_host(cfg)
     urls = [f"{host}/v2/router/models", f"{host}/v3/router/models"]
     configured = cfg.base_url.rstrip("/") + "/models"
     if configured not in urls:
@@ -161,7 +157,7 @@ async def _fetch_type_map(
     """``{model_id: type}`` from the Model Garden; empty dict on failure."""
     try:
         resp = await client.get(
-            f"{_host(cfg)}/v2/models", headers={"Authorization": f"Bearer {api_key}"}
+            f"{catalog_host(cfg)}/v2/models", headers={"Authorization": f"Bearer {api_key}"}
         )
         resp.raise_for_status()
         payload = resp.json()
@@ -198,7 +194,7 @@ async def fetch_price_map(cfg: OrqAIGatewayConfig) -> dict[str, tuple[float, flo
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(
-                f"{_host(cfg)}/v2/models", headers={"Authorization": f"Bearer {api_key}"}
+                f"{catalog_host(cfg)}/v2/models", headers={"Authorization": f"Bearer {api_key}"}
             )
             resp.raise_for_status()
             payload = resp.json()

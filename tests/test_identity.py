@@ -11,7 +11,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from orq_arena.config import ArenaConfig
+from orq_arena.config import ORQ_API_KEY_ENV, ArenaConfig
 
 
 def _cfg(candidates: list[dict]) -> ArenaConfig:
@@ -113,7 +113,7 @@ def test_v3_logs_without_model_ids_still_load():
     assert rec.model_a_id == "" and rec.model_b_id == ""
 
 
-def test_two_providers_of_one_model_are_rated_separately(tmp_path):
+def test_two_providers_of_one_model_are_rated_separately():
     """The end of the chain: distinct names are useless if the rebuild still
     keys on the colliding short name."""
     from orq_arena.data.schemas import BattleRecord
@@ -301,3 +301,150 @@ def test_every_per_model_view_separates_a_colliding_pool_not_just_the_ladder():
     # nothing and reported both models at the 1000 anchor.
     assert set(report["elo_style_controlled"]) == both
     assert report["elo_style_controlled"] != dict.fromkeys(both, 1000.0)
+
+
+# --- every panel, not just the ladder -------------------------------------
+
+PANEL_PRICES = {
+    "openai/gpt-5.4": (1.0, 2.0),
+    "anthropic/claude-opus-4-8": (1.0, 2.0),
+    "openai/gpt-oss-120b": (1.0, 2.0),
+    "groq/gpt-oss-120b": (1.0, 2.0),
+}
+
+
+def _panel_records(a_id, b_id, a_short, b_short):
+    from orq_arena.data.schemas import BattleRecord
+
+    return [
+        BattleRecord(
+            prompt_hash=f"h{i}",
+            prompt_text="p",
+            model_a=a_short,
+            model_b=b_short,
+            model_a_id=a_id,
+            model_b_id=b_id,
+            response_a="x",
+            response_b="y",
+            majority_verdict="A",
+            winner=a_short,
+            tokens_a_in=10,
+            tokens_a_out=50,
+            tokens_b_in=10,
+            tokens_b_out=90,
+            duration_a_ms=1000,
+            duration_b_ms=2000,
+            judge_votes=[{"model": "prov/j1", "vote": "A"}],
+        )
+        for i in range(4)
+    ]
+
+
+def _panels(cands, a_id, b_id, a_short, b_short):
+    """(tui tokens, speed row names, per-model cost) as a reader would see them."""
+    from orq_arena.report import _per_model_cost, _speed_stats
+    from orq_arena.tournament.driver import rebuild_from_log
+
+    cfg = _cfg(cands)
+    recs = _panel_records(a_id, b_id, a_short, b_short)
+    _, report = rebuild_from_log(cfg, recs)
+    alias = report["by_model_names"]
+    manifest = {"candidates": {c.name: {"model": c.model_id} for c in cfg.candidates}}
+    names = [c.name for c in cfg.candidates]
+    return (
+        {n: report["verbosity"].get(n, 0) for n in names},  # leaderboard.py's lookup
+        [row[0] for row in _speed_stats(recs, alias)],
+        _per_model_cost(recs, manifest, PANEL_PRICES, alias),
+    )
+
+
+@pytest.mark.parametrize(
+    "label,cands,a_id,b_id,a_short,b_short",
+    [
+        (
+            "ordinary",
+            [{"model_id": "openai/gpt-5.4"}, {"model_id": "anthropic/claude-opus-4-8"}],
+            "openai/gpt-5.4",
+            "anthropic/claude-opus-4-8",
+            "gpt-5.4",
+            "claude-opus-4-8",
+        ),
+        (
+            "custom names",
+            [
+                {"model_id": "openai/gpt-5.4", "name": "Red"},
+                {"model_id": "anthropic/claude-opus-4-8", "name": "Blue"},
+            ],
+            "openai/gpt-5.4",
+            "anthropic/claude-opus-4-8",
+            "gpt-5.4",
+            "claude-opus-4-8",
+        ),
+        (
+            "colliding",
+            [{"model_id": "openai/gpt-oss-120b"}, {"model_id": "groq/gpt-oss-120b"}],
+            "openai/gpt-oss-120b",
+            "groq/gpt-oss-120b",
+            "gpt-oss-120b",
+            "gpt-oss-120b",
+        ),
+        (
+            "v3 log, no ids",
+            [{"model_id": "openai/gpt-5.4"}, {"model_id": "anthropic/claude-opus-4-8"}],
+            "",
+            "",
+            "gpt-5.4",
+            "claude-opus-4-8",
+        ),
+    ],
+)
+def test_no_panel_merges_or_blanks_a_model(label, cands, a_id, b_id, a_short, b_short):
+    """Tokens, speed and cost all key on the record's own key. Keying any one of
+    them differently showed two models apart on the ladder and merged, blank or
+    missing in another panel, which is worse than either alone."""
+    tokens, speed_rows, cost = _panels(cands, a_id, b_id, a_short, b_short)
+    assert len(speed_rows) == 2, f"{label}: speed merged into {speed_rows}"
+    assert len(cost) == 2, f"{label}: cost lost a model ({cost})"
+    assert sorted(tokens.values()) == [50.0, 90.0], f"{label}: tokens read {tokens}"
+    assert set(tokens) == set(speed_rows) == set(cost), f"{label}: panels disagree on names"
+
+
+def test_the_preflight_says_which_models_it_renamed(tmp_path, monkeypatch):
+    """methodology.md promises "the preflight says so". A silent merge becoming
+    a silent rename would be no better."""
+    import json
+
+    from click.testing import CliRunner
+
+    from orq_arena.cli import cli
+
+    cfg = {
+        "candidates": [{"model_id": "openai/gpt-oss-120b"}, {"model_id": "groq/gpt-oss-120b"}],
+        "judges": ["anthropic/claude-haiku-4-5-20251001"],
+        "preflight": {"thinking_probe": False},
+    }
+    (tmp_path / "c.yaml").write_text(json.dumps(cfg), encoding="utf-8")
+    (tmp_path / "p.jsonl").write_text('{"prompt": "hi"}\n', encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv(ORQ_API_KEY_ENV, raising=False)  # keeps the catalog read offline
+
+    async def _no_tournament(**_kw):
+        return {}
+
+    monkeypatch.setattr("orq_arena.headless.run_headless", _no_tournament)
+    monkeypatch.setattr("orq_arena.cli._open_report", lambda *a, **k: None)
+
+    res = CliRunner().invoke(
+        cli,
+        ["run", "-y", "--config", "c.yaml", "--prompts", "p.jsonl", "--output", "out.jsonl"],
+    )
+    assert res.exit_code == 0, res.output
+    assert "renamed to keep two models apart" in res.output
+    assert "openai/gpt-oss-120b" in res.output
+
+
+def test_listing_one_model_twice_is_an_error_no_rename_can_resolve():
+    """Distinct models get pulled apart by falling back to their ids. The same
+    id twice has no second identity to fall back to, so it has to raise."""
+    with pytest.raises(ValidationError, match="listed twice"):
+        _cfg([{"model_id": "openai/gpt-5.4"}, {"model_id": "openai/gpt-5.4"}])

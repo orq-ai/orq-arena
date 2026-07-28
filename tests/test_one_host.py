@@ -9,18 +9,16 @@ recorded a host the run never used.
 
 from __future__ import annotations
 
-from orq_arena.config import ORQ_API_KEY_ENV, OrqAIGatewayConfig
+from orq_arena.config import OrqAIGatewayConfig
 from orq_arena.providers.models_list import catalog_host
 
 
 def test_staging_traffic_is_priced_against_staging(monkeypatch):
-    monkeypatch.setenv(ORQ_API_KEY_ENV, "k")
     monkeypatch.setenv("ORQ_BASE_URL", "https://staging.orq.ai")
     assert catalog_host(OrqAIGatewayConfig()) == "https://staging.orq.ai"
 
 
 def test_the_default_host_is_used_when_nothing_overrides_it(monkeypatch):
-    monkeypatch.setenv(ORQ_API_KEY_ENV, "k")
     monkeypatch.delenv("ORQ_BASE_URL", raising=False)
     assert catalog_host(OrqAIGatewayConfig()) == "https://api.orq.ai"
 
@@ -28,7 +26,6 @@ def test_the_default_host_is_used_when_nothing_overrides_it(monkeypatch):
 def test_an_explicit_yaml_base_url_still_wins_over_the_environment(monkeypatch):
     """Naming the endpoint in the YAML is a bring-your-own opt-out, and the
     gateway already treats it that way for completions."""
-    monkeypatch.setenv(ORQ_API_KEY_ENV, "k")
     monkeypatch.setenv("ORQ_BASE_URL", "https://staging.orq.ai")
     byo = OrqAIGatewayConfig(base_url="https://vllm.internal/v1")
     assert catalog_host(byo) == "https://vllm.internal"

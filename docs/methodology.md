@@ -101,6 +101,9 @@ Every run reports the numbers needed to challenge its own ranking:
   chunk, so a model that thinks for minutes before its first token is not penalized.
 - **Truncation is judged, not hidden.** A response cut off by its token cap is judged as-is
   and flagged visibly; the jury sees exactly what a reader would see.
+- **A voided round keeps what it received.** The partial response is recorded alongside the
+  error rather than discarded. The round is still never judged and never rated; the text is
+  there so a failure can be diagnosed from the log instead of guessed at.
 
 ## Reproducibility
 

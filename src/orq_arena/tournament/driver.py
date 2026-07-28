@@ -119,22 +119,14 @@ def record_names(records: list[BattleRecord], candidates: list[CandidateSpec]) -
         short_counts[c.short_model] = short_counts.get(c.short_model, 0) + 1
     by_short = {c.short_model: c.name for c in candidates if short_counts[c.short_model] == 1}
 
-    alias: dict[str, str] = {}
+    # Start from the pool so a candidate with no rounds still has a name; then
+    # records add anything the pool no longer lists.
+    alias: dict[str, str] = {c.model_id: c.name for c in candidates}
     for rec in records:
         for short, full in ((rec.model_a, rec.model_a_id), (rec.model_b, rec.model_b_id)):
             key = full or short
             alias[key] = (by_id.get(full, "") if full else by_short.get(short, "")) or short
     return alias
-
-
-def rating_key(rec: BattleRecord, side: Literal["a", "b"]) -> str:
-    """The key a record is rated under: its full id when it has one.
-
-    Everything downstream of the rating (verbosity, style rows, cost, speed)
-    keys on this too, so a colliding short name cannot merge two models in one
-    view while the leaderboard shows them apart.
-    """
-    return (rec.model_a_id or rec.model_a) if side == "a" else (rec.model_b_id or rec.model_b)
 
 
 def _top_difference(draws: list[dict[str, float]], ranked: list[tuple[str, float]]) -> dict | None:
@@ -184,10 +176,10 @@ def _final_report(
     for rec in records:
         if rec.error is not None:
             continue
-        tokens.setdefault(rating_key(rec, "a"), []).append(rec.tokens_a_out)
-        tokens.setdefault(rating_key(rec, "b"), []).append(rec.tokens_b_out)
-        reasoning.setdefault(rating_key(rec, "a"), []).append(rec.tokens_a_reasoning)
-        reasoning.setdefault(rating_key(rec, "b"), []).append(rec.tokens_b_reasoning)
+        tokens.setdefault(rec.rating_key("a"), []).append(rec.tokens_a_out)
+        tokens.setdefault(rec.rating_key("b"), []).append(rec.tokens_b_out)
+        reasoning.setdefault(rec.rating_key("a"), []).append(rec.tokens_a_reasoning)
+        reasoning.setdefault(rec.rating_key("b"), []).append(rec.tokens_b_reasoning)
 
     grid: dict[str, dict[str, float]] = {n: {m: 0.0 for m in names} for n in names}
     for a, b, kind, _cat in outcomes:
@@ -213,8 +205,8 @@ def _final_report(
     y_by_verdict = {"A": 1.0, "B": 0.0, "tie": 0.5}
     style_rows = [
         (
-            alias[rating_key(rec, "a")],
-            alias[rating_key(rec, "b")],
+            alias[rec.rating_key("a")],
+            alias[rec.rating_key("b")],
             y_by_verdict[rec.majority_verdict],
             len(rec.response_a or ""),
             len(rec.response_b or ""),
@@ -222,8 +214,8 @@ def _final_report(
         for rec in records
         if rec.error is None
         and rec.majority_verdict in y_by_verdict
-        and rating_key(rec, "a") in alias
-        and rating_key(rec, "b") in alias
+        and rec.rating_key("a") in alias
+        and rec.rating_key("b") in alias
     ]
     elo_sc, length_coef = style_controlled_elo(style_rows, names)
     # One bootstrap, summarized two ways: the marginal intervals below and the
@@ -294,11 +286,11 @@ def rebuild_from_log(
         outcomes.extend(
             outcomes_from_records(
                 [rec],
-                alias[rating_key(rec, "a")],
-                alias[rating_key(rec, "b")],
+                alias[rec.rating_key("a")],
+                alias[rec.rating_key("b")],
             )
         )
-    names = sorted({alias[rating_key(r, s)] for r in records for s in ("a", "b")})
+    names = sorted({alias[r.rating_key(s)] for r in records for s in ("a", "b")})
     elo = bradley_terry_mle(build_wins_matrix(_triples(outcomes)), names)
     report = _final_report(cfg, records, outcomes, names, preflight=preflight)
     return elo, report

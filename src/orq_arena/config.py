@@ -60,8 +60,9 @@ class ArenaConfig(BaseModel):
     candidates: list[CandidateSpec]
     # (was, model_id) for every candidate the validator had to rename off a
     # collision. Output, never input: excluded so it cannot ride into the
-    # manifest's recorded config and come back as a setting.
-    renamed: list[tuple[str, str]] = Field(default_factory=list, exclude=True)
+    # manifest's recorded config, and rebuilt from scratch on every validation
+    # so a copy cannot inherit or share another config's list.
+    renamed: list[tuple[str, str]] = Field(default_factory=list, exclude=True, init=False)
     judges: list[str] = Field(description="Judge panel, router model ids")
     replacement_judges: list[str] = Field(default_factory=list)
     criteria: str = (
@@ -87,6 +88,7 @@ class ArenaConfig(BaseModel):
         Two candidates with the same model id *and* the same name are the same
         model listed twice, which no rename can disambiguate, so that raises.
         """
+        self.renamed = []  # this validation's findings, not a previous one's
         by_name: dict[str, list[CandidateSpec]] = {}
         for c in self.candidates:
             by_name.setdefault(c.name, []).append(c)

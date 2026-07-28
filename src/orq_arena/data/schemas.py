@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -60,6 +60,21 @@ class BattleRecord(BaseModel):
     duration_b_ms: int = 0
     judge_tokens_in: int = 0
     judge_tokens_out: int = 0
+
+    def rating_key(self, side: Literal["a", "b"]) -> str:
+        """The key this record's model is known by on ``side``.
+
+        The full router id when the record carries one, else the short name.
+        Every per-model view keys on this: the rating, the length-controlled
+        rating, verbosity, cost, speed and the annotation key. Short names
+        collide across providers (openai/gpt-oss-120b vs groq/gpt-oss-120b), so
+        a consumer that keys on the short name alone merges two models, and a
+        consumer that disagrees with its neighbours shows them apart in one
+        panel and merged in another.
+        """
+        return (
+            (self.model_a_id or self.model_a) if side == "a" else (self.model_b_id or self.model_b)
+        )
 
     # Set when the round was voided (stream failure after retry), such a
     # round is never judged and never scored.
