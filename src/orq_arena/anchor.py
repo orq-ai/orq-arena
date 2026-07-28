@@ -27,8 +27,15 @@ from .tournament.elo import bradley_terry_mle, build_wins_matrix
 
 
 def record_key(rec: BattleRecord) -> str:
-    """One-way 16-hex key; recomputable from the log, opaque in the page."""
-    raw = f"{rec.prompt_hash}:{rec.model_a}:{rec.model_b}:{rec.match_id}:{rec.round_number}"
+    """One-way 16-hex key; recomputable from the log, opaque in the page.
+
+    Full router ids enter the key when the record carries them (v4+), because
+    short names collide across providers and two rounds of a colliding pool
+    would otherwise hash alike. v3 records have no ids and keep the key they
+    always had, so vote files collected against them still match.
+    """
+    ids = f":{rec.model_a_id}:{rec.model_b_id}" if rec.model_a_id or rec.model_b_id else ""
+    raw = f"{rec.prompt_hash}:{rec.model_a}:{rec.model_b}{ids}:{rec.match_id}:{rec.round_number}"
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 

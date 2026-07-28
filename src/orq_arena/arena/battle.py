@@ -17,7 +17,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import time
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -109,7 +109,11 @@ async def _generate_side(
                     match_id=match_id, side=side, full_text="".join(chunks), error=last_error
                 )
             )
-            return SideResult(text="", error=last_error, usage=usage, ttft_ms=0, duration_ms=0)
+            # Keep what arrived. The round is voided either way, but a
+            # half-written answer is the evidence for why it died.
+            return SideResult(
+                text="".join(chunks), error=last_error, usage=usage, ttft_ms=0, duration_ms=0
+            )
 
         full = "".join(chunks)
         await events.put(
@@ -149,6 +153,7 @@ class Battle:
         round_name: str,
         tournament_id: str,
         events: asyncio.Queue[ArenaEvent],
+        on_record: Callable[[BattleRecord], None] | None = None,
     ) -> None:
         self.cfg = cfg
         self.gateway = gateway
@@ -159,6 +164,10 @@ class Battle:
         self.round_name = round_name
         self.tournament_id = tournament_id
         self.events = events
+        # Called the moment a round resolves, so a run killed mid-match keeps
+        # every round it already paid for. Batching to the end of the match
+        # lost up to `headless_concurrency` matches of work on a Ctrl-C.
+        self._on_record = on_record
 
         contestants = {candidate_a.model_id, candidate_b.model_id}
         panel = [m for m in cfg.judges if m not in contestants]
@@ -197,6 +206,8 @@ class Battle:
             prompt_metadata=item.metadata,
             model_a=self.a.short_model,
             model_b=self.b.short_model,
+            model_a_id=self.a.model_id,
+            model_b_id=self.b.model_id,
             response_a=res_a.text,
             response_b=res_b.text,
             majority_verdict="inconclusive",
@@ -206,6 +217,12 @@ class Battle:
             match_id=self.match_id,
             round_number=round_number,
         )
+
+    def _record(self, battles: list[BattleRecord], rec: BattleRecord) -> None:
+        """Keep the in-memory list and the on-disk log in step, per round."""
+        battles.append(rec)
+        if self._on_record is not None:
+            self._on_record(rec)
 
     async def run(self) -> MatchResult:
         rules = self.cfg.match
@@ -261,14 +278,15 @@ class Battle:
             if res_a.error or res_b.error:
                 failed = self.a.name if res_a.error else self.b.name
                 reason = f"{failed}: stream failed after retry, {res_a.error or res_b.error}"
-                battles.append(
+                self._record(
+                    battles,
                     await self._void_round(
                         round_number=round_number,
                         item=item,
                         reason=reason,
                         res_a=res_a,
                         res_b=res_b,
-                    )
+                    ),
                 )
                 continue
 
@@ -277,14 +295,15 @@ class Battle:
                     question=prompt, response_a=res_a.text, response_b=res_b.text
                 )
             except Exception as exc:
-                battles.append(
+                self._record(
+                    battles,
                     await self._void_round(
                         round_number=round_number,
                         item=item,
                         reason=f"jury failed: {exc}",
                         res_a=res_a,
                         res_b=res_b,
-                    )
+                    ),
                 )
                 continue
 
@@ -309,7 +328,8 @@ class Battle:
             # tie/inconclusive: judged and recorded, but no round-cap credit.
 
             judge_usage = comparison.token_usage
-            battles.append(
+            self._record(
+                battles,
                 BattleRecord(
                     prompt_hash=_prompt_hash(prompt),
                     prompt_text=prompt,
@@ -317,6 +337,8 @@ class Battle:
                     prompt_metadata=item.metadata,
                     model_a=self.a.short_model,
                     model_b=self.b.short_model,
+                    model_a_id=self.a.model_id,
+                    model_b_id=self.b.model_id,
                     response_a=res_a.text,
                     response_b=res_b.text,
                     judge_votes=[v.model_dump() for v in comparison.votes],
@@ -345,7 +367,7 @@ class Battle:
                     tournament_id=self.tournament_id,
                     match_id=self.match_id,
                     round_number=round_number,
-                )
+                ),
             )
 
             await self.events.put(

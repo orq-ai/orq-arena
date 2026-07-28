@@ -191,10 +191,7 @@ def _cost_lines(records, manifest, prices, alias=None):
     if not prices:
         return None
     alias = alias or {}
-    id_by_name = {
-        n: (w.get("model") if isinstance(w, dict) else "")
-        for n, w in (manifest.get("candidates") or {}).items()
-    }
+    id_by_name = _ids_by_name(manifest)
     models_usd, unpriced = 0.0, set()
     j_in = j_out = 0
     for r in records:
@@ -202,12 +199,11 @@ def _cost_lines(records, manifest, prices, alias=None):
             continue
         j_in += r.judge_tokens_in
         j_out += r.judge_tokens_out
-        for name, tin, tout in (
-            (r.model_a, r.tokens_a_in, r.tokens_a_out),
-            (r.model_b, r.tokens_b_in, r.tokens_b_out),
+        for side, tin, tout in (
+            ("a", r.tokens_a_in, r.tokens_a_out),
+            ("b", r.tokens_b_in, r.tokens_b_out),
         ):
-            name = alias.get(name, name)
-            pr = prices.get(id_by_name.get(name, ""))
+            name, pr = _priced_side(r, side, alias, prices, id_by_name)
             if pr is None:
                 unpriced.add(name)
             else:
@@ -232,22 +228,36 @@ def _win_rates(grid: dict, names: list[str]) -> dict[str, float]:
     return rates
 
 
-def _per_model_cost(records, manifest, prices, alias=None) -> dict[str, float]:
-    alias = alias or {}
-    id_by_name = {
-        n: (w.get("model") if isinstance(w, dict) else "")
+def _ids_by_name(manifest) -> dict[str, str]:
+    return {
+        n: str(w.get("model") or "") if isinstance(w, dict) else ""
         for n, w in (manifest.get("candidates") or {}).items()
     }
+
+
+def _priced_side(r, side, alias, prices, id_by_name):
+    """``(display name, price pair or None)`` for one side of one record.
+
+    v4 records carry the router id, which is what the catalog prices by; v3
+    records only have a short name, so those route through the manifest's pool.
+    """
+    key = r.rating_key(side)
+    name = alias.get(key, key)
+    return name, prices.get(key if key in prices else id_by_name.get(name, ""))
+
+
+def _per_model_cost(records, manifest, prices, alias=None) -> dict[str, float]:
+    alias = alias or {}
+    id_by_name = _ids_by_name(manifest)
     out: dict[str, float] = {}
     for r in records:
         if r.error is not None:
             continue
-        for name, tin, tout in (
-            (r.model_a, r.tokens_a_in, r.tokens_a_out),
-            (r.model_b, r.tokens_b_in, r.tokens_b_out),
+        for side, tin, tout in (
+            ("a", r.tokens_a_in, r.tokens_a_out),
+            ("b", r.tokens_b_in, r.tokens_b_out),
         ):
-            name = alias.get(name, name)
-            pr = prices.get(id_by_name.get(name, ""))
+            name, pr = _priced_side(r, side, alias, prices, id_by_name)
             if pr is not None:
                 out[name] = out.get(name, 0.0) + tin * pr[0] / 1e6 + tout * pr[1] / 1e6
     return out
@@ -416,10 +426,12 @@ def _speed_stats(records, alias=None) -> list[tuple[str, float, float, float, fl
     for r in records:
         if r.error is not None:
             continue
-        for name, tout, ttft, dur in (
-            (alias.get(r.model_a, r.model_a), r.tokens_a_out, r.ttft_a_ms, r.duration_a_ms),
-            (alias.get(r.model_b, r.model_b), r.tokens_b_out, r.ttft_b_ms, r.duration_b_ms),
+        for side, tout, ttft, dur in (
+            ("a", r.tokens_a_out, r.ttft_a_ms, r.duration_a_ms),
+            ("b", r.tokens_b_out, r.ttft_b_ms, r.duration_b_ms),
         ):
+            key = r.rating_key(side)  # type: ignore[arg-type]
+            name = alias.get(key, key)
             a = agg.setdefault(name, [0.0, 0, 0.0, 0, 0.0, 0, 0.0])
             if dur > 0 and tout:
                 a[0] += tout / (dur / 1000)

@@ -110,7 +110,7 @@ orq-arena run --config PATH [--prompts PATH] [--output PATH] [--rounds N]
 |---|---|---|
 | `--config PATH` | (required) | YAML config: candidates (the model pool), judges, match, gateway; used exactly as written. |
 | `--prompts PATH` | `prompts/starter.jsonl` | JSONL prompt file, see [Prompts file format](configuration.md#prompts-file-format), or `orq:<dataset_id>` to pull an [orq.ai Dataset](https://docs.orq.ai/docs/ai-studio/optimize/datasets): each datapoint's last user message becomes a prompt, `{{var}}` placeholders filled from its `inputs`; datapoints without a user message are skipped. Uses the same API key as the gateway. When the prompts come from a Dataset, the run manifest records its id, display name, and studio URL, and the HTML report links the dataset by name. |
-| `--output PATH` | `battles.jsonl` | Where the battle log (schema v3) is written as rounds complete. |
+| `--output PATH` | `battles.jsonl` | Where the battle log (schema v4) is written, one line per round as it resolves, so a run killed midway keeps every round it paid for. |
 | `--rounds N` | `match.max_rounds` from the YAML | Rounds per match. The preflight warns when this samples a subset of your prompts. |
 | `--overwrite` | off | Allow replacing an existing non-empty battle log at `--output`; without it the run refuses rather than erase a recorded run. |
 | `--tui` | off | Watch the live TUI show instead of headless logs. Headless runs use `headless_concurrency` (default `4`, see [configuration.md](configuration.md)) to parallelize matches. |
@@ -174,7 +174,7 @@ terminal the run errors out with a "pass `--yes`" hint instead of prompting.
 stderr; the Final Results, token totals, battle-log path, and report-page path print to
 stdout. `1>results.txt` captures only the results; `2>/dev/null` silences the chatter.
 
-**Output.** Every judged round is appended to `--output` (`battles.jsonl`, schema v3) as the
+**Output.** Every judged round is appended to `--output` (`battles.jsonl`, schema v4) as the
 run proceeds, live-run or headless alike.
 
 **Examples:**
@@ -369,7 +369,7 @@ orq-arena rejudge --compare REPORT_JSON [--compare REPORT_JSON ...]
 
 | Argument / Flag | Default | Effect |
 |---|---|---|
-| `log_path` (positional) | `battles.jsonl` | Recorded battle log to re-judge (schema v3 JSONL). Optional, omit it to re-judge the default log in the current directory. Ignored in `--compare` mode. |
+| `log_path` (positional) | `battles.jsonl` | Recorded battle log to re-judge (schema v4 JSONL; v3 still loads). Optional, omit it to re-judge the default log in the current directory. Ignored in `--compare` mode. |
 | `--judge MODEL_ID` | none, **required unless `--compare`, repeatable** | Router model id for the new panel; pass `--judge` multiple times for a multi-judge panel. Mutually exclusive with `--compare`. |
 | `--compare REPORT_JSON` | none, **repeatable** | Switches to compare mode: tabulate the given saved rejudge report JSONs side by side (see [`rejudge --compare`](#rejudge-compare)). Mutually exclusive with `--judge`; makes no API calls. |
 | `--criteria TEXT` | `criteria` from `--config` | Override the judging criteria for this rejudge only, doesn't touch the YAML file. |

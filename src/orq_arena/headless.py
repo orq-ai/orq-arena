@@ -222,6 +222,7 @@ async def run_headless(
     battle_log_path: str,
     preflight: dict | None = None,
     dataset: dict | None = None,
+    prompts_path: str = "",
     quiet: bool = False,
 ) -> dict[str, float]:
     console = Console(file=sys.stdout)
@@ -250,6 +251,7 @@ async def run_headless(
         concurrency=max(1, cfg.headless_concurrency),
         preflight=preflight,
         dataset=dataset,
+        prompts_path=prompts_path,
     )
     await printer_task
     return elo

@@ -172,7 +172,7 @@ least 2 entries (`ArenaConfig._validate`: `"Need at least 2 candidates, got {n}"
 | Key | Type | Default | Effect |
 |---|---|---|---|
 | `model_id` | `str` | (required) | orq.ai router gateway model slug, e.g. `anthropic/claude-opus-4-8`. The only required field per candidate entry. |
-| `name` | `str` | `""` → falls back to `short_model` | Display name used on the leaderboard, TUI cards, and arena events (`MatchStarted`/`MatchResolved`). Defaults to `model_id` with the provider prefix stripped (`"anthropic/claude-opus-4-8"` → `"claude-opus-4-8"`) and is **never auto-generated beyond that**: a custom name is allowed but not invented (`src/orq_arena/candidates.py` docstring: "Display name defaults to the model's short name... A custom `name` is still allowed but never generated."). Note: `battles.jsonl` records (`BattleRecord.model_a`/`model_b`) always store `short_model`, not `name`; `name` is presentation-only. |
+| `name` | `str` | `""` → falls back to `short_model` | Display name used on the leaderboard, TUI cards, and arena events (`MatchStarted`/`MatchResolved`). Defaults to `model_id` with the provider prefix stripped (`"anthropic/claude-opus-4-8"` → `"claude-opus-4-8"`) and is **generated only to break a collision: when two candidates would answer to the same name, both fall back to their full model ids and the preflight says so**. A custom name is honoured as written. Note: `battles.jsonl` records store both `short_model` (`model_a`/`model_b`) and the full router id (`model_a_id`/`model_b_id`); the id is what every per-model view keys on, because short names collide across providers. `name` is presentation-only. |
 | `emblem` | `str` | `""` | Optional glyph/emoji shown before the orc name on the TUI candidate card (`src/orq_arena/tui/widgets/model_card.py`). Purely cosmetic. |
 | `reasoning` | `dict \| null` | `None` | Raw router reasoning-control object, forwarded verbatim as `extra_body` on the completion request (`stream_completion`, `src/orq_arena/providers/orq_gateway.py`). Not interpreted beyond the `budget_tokens` cross-check below, the router normalizes it per provider. |
 | `max_tokens` | `int \| null` | `None` → falls back to `gateway.candidate_max_tokens` | Per-candidate override of the response output cap. |
@@ -301,7 +301,7 @@ Everything else is a Pydantic default and safe to omit from the YAML entirely:
 | `replacement_judges` | `[]` |
 | `criteria` | `"Accuracy and correctness, helpfulness and completeness, clarity, and relevance to the prompt."` |
 | `min_successful_judges` | `2` |
-| `candidates[].name` | short model id |
+| `candidates[].name` | short model id, or the full id when two candidates would share one |
 | `candidates[].emblem` | `""` |
 | `candidates[].reasoning` | `null` |
 | `candidates[].max_tokens` | `null` (→ `gateway.candidate_max_tokens`) |
@@ -335,5 +335,5 @@ git-ignored (`.gitignore`):
 | File | Written by |
 |---|---|
 | `.env` | Hand-authored from `.env.example`; never committed. |
-| `battles.jsonl` | `orq-arena run`, one row per judged round (`BattleRecord`, schema v3; includes per-model `ttft_a_ms`/`ttft_b_ms` and `duration_a_ms`/`duration_b_ms` timing fields). |
-| `battles.run.json` | `orq-arena run`, the run manifest (the config it ran, config + prompt hashes, panel, seed, agreement stats; also a `dataset` key with id, name, and studio URL for dataset-sourced runs). Holds no credential: `ORQ_API_KEY` is read from the environment and never enters the config. |
+| `battles.jsonl` | `orq-arena run`, one row per judged round (`BattleRecord`, schema v4, written as each round resolves; includes per-model `ttft_a_ms`/`ttft_b_ms` and `duration_a_ms`/`duration_b_ms` timing fields). |
+| `battles.run.json` | `orq-arena run`, the run manifest (the config it ran, config + prompt hashes, the prompts path, the host the run actually used, panel, seed, agreement stats; also a `dataset` key with id, name, and studio URL for dataset-sourced runs). Holds no credential: `ORQ_API_KEY` is read from the environment and never enters the config. |

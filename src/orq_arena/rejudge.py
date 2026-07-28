@@ -55,18 +55,29 @@ def spearman(rank_a: list[str], rank_b: list[str]) -> float:
     return 1 - (6 * d2) / (n * (n**2 - 1))
 
 
+def contestant_key(rec: BattleRecord) -> frozenset[str]:
+    """The pair a comparator is built for, one entry per contestant.
+
+    Full ids where the record has them: a colliding short-name pair collapses
+    to a one-element set, which drops a contestant from the self-judge
+    exclusion and lets it judge itself.
+    """
+    return frozenset((rec.model_a_id or rec.model_a, rec.model_b_id or rec.model_b))
+
+
 def panel_excluding_contestants(
-    judges: list[str], contestant_shorts: frozenset[str], short_to_full: dict[str, str]
+    judges: list[str], contestants: frozenset[str], short_to_full: dict[str, str]
 ) -> list[str]:
     """Judges that aren't a contestant, matched the way the live run matches.
 
-    Records carry short names; the live run (battle.py) excludes a judge by
-    full ``model_id``. Resolve each contestant short name to its full id and
-    compare there. A contestant missing from the config can't be resolved to a
-    provider, so fall back to a short-name match to keep exclusion safe.
+    The live run (battle.py) excludes a judge by full ``model_id``. v4 records
+    carry full ids, which compare directly; v3 records carry only short names,
+    which are resolved through the run's own pool. A contestant that resolves
+    to neither falls back to a short-name match, so exclusion stays safe rather
+    than silently letting a contestant judge itself.
     """
-    contestants_full = {short_to_full.get(m, m) for m in contestant_shorts}
-    unresolved_short = {m for m in contestant_shorts if m not in short_to_full}
+    contestants_full = {short_to_full.get(m, m) for m in contestants}
+    unresolved_short = {m for m in contestants if m not in short_to_full}
 
     def is_contestant(j: str) -> bool:
         # Same short-name convention as candidates.short_model: strip the first
@@ -128,7 +139,7 @@ async def rejudge_run(
     comparators: dict[frozenset[str], object] = {}
 
     def comparator_for(rec: BattleRecord):
-        key = frozenset((rec.model_a, rec.model_b))  # short contestant names
+        key = contestant_key(rec)
         if key not in comparators:
             panel = panel_excluding_contestants(judges, key, short_to_full)
             if not panel:

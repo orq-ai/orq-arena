@@ -83,7 +83,10 @@ def datapoint_to_prompt(inputs: dict | None, messages: list | None) -> PromptIte
         return None
     for key, value in (inputs or {}).items():
         text = _fill_placeholder(text, str(key), str(value))
-    return PromptItem(text=text)
+    # Datasets tag datapoints in `inputs`; without this every dataset-sourced
+    # prompt landed in "general" and per-category ELO was dead for them.
+    category = str((inputs or {}).get("category") or "general")
+    return PromptItem(text=text, category=category)
 
 
 def _fill_placeholder(text: str, key: str, value: str) -> str:

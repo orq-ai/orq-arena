@@ -231,6 +231,12 @@ def run(
         f"{counts.model_streams} model streams + {counts.judge_calls} judge calls"
         + (f" + {counts.probe_calls} probe calls" if counts.probe_calls else "")
     )
+    if cfg.renamed:
+        warn(
+            "  ⚠ renamed to keep two models apart: "
+            + ", ".join(f"{was} → {now}" for was, now in cfg.renamed)
+            + " (a short name cannot identify one model across two providers)"
+        )
     overlap = judge_family_overlaps(list(cfg.judges), cfg.candidates)
     if overlap:
         warn(
@@ -317,6 +323,7 @@ def run(
             battle_log_path=output_path,
             preflight=preflight_data,
             dataset=dataset,
+            prompts_path=prompts_path,
             plan=plan,
             auto_start=assume_yes,
         )
@@ -331,6 +338,7 @@ def run(
                 battle_log_path=output_path,
                 preflight=preflight_data,
                 dataset=dataset,
+                prompts_path=prompts_path,
                 quiet=quiet,
             )
         )

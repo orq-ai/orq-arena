@@ -43,8 +43,10 @@ class FakeBattle:
         round_name,
         tournament_id,
         events,
+        on_record=None,
     ):
         self.a, self.b = candidate_a, candidate_b
+        self._on_record = on_record
 
     async def run(self):
         rec = BattleRecord(
@@ -55,6 +57,8 @@ class FakeBattle:
             majority_verdict="A",
             winner=self.a.short_model,
         )
+        if self._on_record is not None:
+            self._on_record(rec)
         return SimpleNamespace(battles=[rec], winner=self.a, loser=self.b, draw=False)
 
 

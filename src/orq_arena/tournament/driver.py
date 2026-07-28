@@ -26,6 +26,7 @@ from ..data.log import BattleLog
 from ..data.prompts import PromptItem
 from ..data.schemas import BattleRecord
 from ..events import ArenaEvent, StandingsUpdated, TournamentEnded
+from ..providers.models_list import catalog_host
 from ..providers.orq_gateway import OrqGateway
 from .elo import (
     bootstrap_ci,
@@ -102,6 +103,32 @@ def _rebuild_comparisons(records: list[BattleRecord]) -> list[PairwiseComparison
     return comps
 
 
+def record_names(records: list[BattleRecord], candidates: list[CandidateSpec]) -> dict[str, str]:
+    """Map each record's stored model key to its display name.
+
+    Keyed on the full router id where the record carries one, because short
+    names collide across providers (openai/gpt-oss-120b vs groq/gpt-oss-120b)
+    and a short-name map would rate two different models as one. v3 logs have
+    no ids, so those fall back to the short name they do have.
+    """
+    by_id = {c.model_id: c.name for c in candidates}
+    # Short names are only usable when they identify one candidate. A collision
+    # resolves to nothing rather than to whichever candidate happened to be last.
+    short_counts: dict[str, int] = {}
+    for c in candidates:
+        short_counts[c.short_model] = short_counts.get(c.short_model, 0) + 1
+    by_short = {c.short_model: c.name for c in candidates if short_counts[c.short_model] == 1}
+
+    # Start from the pool so a candidate with no rounds still has a name; then
+    # records add anything the pool no longer lists.
+    alias: dict[str, str] = {c.model_id: c.name for c in candidates}
+    for rec in records:
+        for short, full in ((rec.model_a, rec.model_a_id), (rec.model_b, rec.model_b_id)):
+            key = full or short
+            alias[key] = (by_id.get(full, "") if full else by_short.get(short, "")) or short
+    return alias
+
+
 def _top_difference(draws: list[dict[str, float]], ranked: list[tuple[str, float]]) -> dict | None:
     """Bootstrap of (champion - runner-up), from the report's own draws.
 
@@ -149,10 +176,10 @@ def _final_report(
     for rec in records:
         if rec.error is not None:
             continue
-        tokens.setdefault(rec.model_a, []).append(rec.tokens_a_out)
-        tokens.setdefault(rec.model_b, []).append(rec.tokens_b_out)
-        reasoning.setdefault(rec.model_a, []).append(rec.tokens_a_reasoning)
-        reasoning.setdefault(rec.model_b, []).append(rec.tokens_b_reasoning)
+        tokens.setdefault(rec.rating_key("a"), []).append(rec.tokens_a_out)
+        tokens.setdefault(rec.rating_key("b"), []).append(rec.tokens_b_out)
+        reasoning.setdefault(rec.rating_key("a"), []).append(rec.tokens_a_reasoning)
+        reasoning.setdefault(rec.rating_key("b"), []).append(rec.tokens_b_reasoning)
 
     grid: dict[str, dict[str, float]] = {n: {m: 0.0 for m in names} for n in names}
     for a, b, kind, _cat in outcomes:
@@ -171,13 +198,15 @@ def _final_report(
     for o in outcomes:
         cat_counts[o[3]] = cat_counts.get(o[3], 0) + 1
 
-    by_model = {w.short_model: w for w in cfg.candidates}
-    orc_by_model = {w.short_model: w.name for w in cfg.candidates}
+    # Same key the rating uses. Building these from short_model merged two
+    # providers of one model in every view except the leaderboard: one
+    # verbosity figure averaging both, and style rows that were self-matches.
+    alias = record_names(records, cfg.candidates)
     y_by_verdict = {"A": 1.0, "B": 0.0, "tie": 0.5}
     style_rows = [
         (
-            orc_by_model[rec.model_a],
-            orc_by_model[rec.model_b],
+            alias[rec.rating_key("a")],
+            alias[rec.rating_key("b")],
             y_by_verdict[rec.majority_verdict],
             len(rec.response_a or ""),
             len(rec.response_b or ""),
@@ -185,8 +214,8 @@ def _final_report(
         for rec in records
         if rec.error is None
         and rec.majority_verdict in y_by_verdict
-        and rec.model_a in orc_by_model
-        and rec.model_b in orc_by_model
+        and rec.rating_key("a") in alias
+        and rec.rating_key("b") in alias
     ]
     elo_sc, length_coef = style_controlled_elo(style_rows, names)
     # One bootstrap, summarized two ways: the marginal intervals below and the
@@ -218,10 +247,8 @@ def _final_report(
         "mean_agreement": jury.mean_agreement if jury else None,
         "fleiss": fleiss,
         "cohen": cohen,
-        "verbosity": {orc_by_model.get(m, m): sum(v) / len(v) for m, v in tokens.items() if v},
-        "reasoning_tokens": {
-            orc_by_model.get(m, m): sum(v) / len(v) for m, v in reasoning.items() if v
-        },
+        "verbosity": {alias.get(m, m): sum(v) / len(v) for m, v in tokens.items() if v},
+        "reasoning_tokens": {alias.get(m, m): sum(v) / len(v) for m, v in reasoning.items() if v},
         "win_grid": grid,
         "thinking": {
             w.name: (w.thinking_enabled or probed.get(w.name, False)) for w in cfg.candidates
@@ -238,7 +265,7 @@ def _final_report(
         > 1,
         "error_rounds": sum(1 for r in records if r.error is not None),
         "rated_rounds": len(outcomes),
-        "by_model_names": {w.short_model: w.name for w in by_model.values()},
+        "by_model_names": dict(alias),
     }
 
 
@@ -251,17 +278,19 @@ def rebuild_from_log(
     live run (display names), so a regenerated report page matches the one
     the run wrote. The single rebuild path for ``orq-arena report``.
     """
-    alias = {w.short_model: w.name for w in cfg.candidates}
+    alias = record_names(records, cfg.candidates)
     outcomes: list[Outcome] = []
     for rec in records:
         if rec.error is not None:
             continue
         outcomes.extend(
             outcomes_from_records(
-                [rec], alias.get(rec.model_a, rec.model_a), alias.get(rec.model_b, rec.model_b)
+                [rec],
+                alias[rec.rating_key("a")],
+                alias[rec.rating_key("b")],
             )
         )
-    names = sorted({alias.get(m, m) for r in records for m in (r.model_a, r.model_b)})
+    names = sorted({alias[r.rating_key(s)] for r in records for s in ("a", "b")})
     elo = bradley_terry_mle(build_wins_matrix(_triples(outcomes)), names)
     report = _final_report(cfg, records, outcomes, names, preflight=preflight)
     return elo, report
@@ -388,6 +417,7 @@ def _write_manifest(
     report: dict | None = None,
     preflight: dict | None = None,
     dataset: dict | None = None,
+    prompts_path: str = "",
 ) -> None:
     try:
         from importlib.metadata import version
@@ -403,10 +433,17 @@ def _write_manifest(
         # The whole config, so a report rebuilt months later describes this run
         # rather than whatever the YAML says by then.
         "config": cfg.model_dump(mode="json"),
+        # Category rides in the hash: two banks with identical prompts but
+        # different category labels are different prompt sets, and rate
+        # differently per category.
         "prompts_sha256": hashlib.sha256(
-            "\n".join(p.text for p in prompts).encode("utf-8")
+            "\n".join(f"{p.category}\t{p.text}" for p in prompts).encode("utf-8")
         ).hexdigest()[:16],
         "prompt_count": len(prompts),
+        "prompts_path": prompts_path,
+        # Where this run's traffic actually went, which ORQ_BASE_URL can move.
+        # Provenance only: a rebuild never adopts a manifest's host (RES-1147).
+        "effective_host": catalog_host(cfg.gateway),
         "candidates": {
             c.name: {"model": c.model_id, "reasoning": c.reasoning or "vendor-default"}
             for c in cfg.candidates
@@ -443,6 +480,7 @@ async def run_tournament(
     concurrency: int = 1,
     preflight: dict | None = None,
     dataset: dict | None = None,
+    prompts_path: str = "",
 ) -> dict[str, float]:
     """Run the full round-robin; return final ELO ratings by orc name.
 
@@ -472,6 +510,7 @@ async def run_tournament(
         started_at=started_at,
         preflight=preflight,
         dataset=dataset,
+        prompts_path=prompts_path,
     )
 
     rng = random.Random(seed)
@@ -501,10 +540,11 @@ async def run_tournament(
                 round_name=f"match {i}/{matches_total}",
                 tournament_id=tournament_id,
                 events=events,
+                # Per round, not per match: a killed run keeps what it paid for.
+                on_record=log.append,
             )
             result = await battle.run()
             async with state_lock:
-                log.append_many(result.battles)
                 all_records.extend(result.battles)
                 outcomes.extend(outcomes_from_records(result.battles, w_a.name, w_b.name))
                 if outcomes:
@@ -540,6 +580,7 @@ async def run_tournament(
         report=report,
         preflight=preflight,
         dataset=dataset,
+        prompts_path=prompts_path,
     )
 
     try:

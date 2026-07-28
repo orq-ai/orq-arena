@@ -132,7 +132,6 @@ class LeaderboardScreen(Screen):
         thinking = r.get("thinking") or {}
         verbosity = r.get("verbosity") or {}
         reasoning = r.get("reasoning_tokens") or {}
-        names_by_model = r.get("by_model_names") or {}
 
         table = self.query_one("#table", DataTable)
         sc = r.get("elo_style_controlled") or {}
@@ -145,8 +144,10 @@ class LeaderboardScreen(Screen):
             cols += ["avg tok", "🧠 tok"]
         table.add_columns(*cols)
 
-        # verbosity is keyed by short_model; map orc name -> short_model
-        model_by_name = {orc: model for model, orc in names_by_model.items()}
+        # verbosity and reasoning are keyed by display name, the same key the
+        # rows are built from, so no indirection is needed. Going through a
+        # reversed name map is what made these columns read 0 whenever the map
+        # and the metrics disagreed about their key.
         ranked = sorted(self._elo.items(), key=lambda kv: kv[1], reverse=True)
         for i, (name, elo) in enumerate(ranked, 1):
             badge = " 🧠" if thinking.get(name) else ""
@@ -157,9 +158,8 @@ class LeaderboardScreen(Screen):
             if sc:
                 row.append(f"{sc.get(name, elo):.0f}")
             if verbosity:
-                m = model_by_name.get(name, "")
-                row.append(f"{verbosity.get(m, 0):.0f}")
-                row.append(f"{reasoning.get(m, 0):.0f}")
+                row.append(f"{verbosity.get(name, 0):.0f}")
+                row.append(f"{reasoning.get(name, 0):.0f}")
             table.add_row(*row)
 
         by_cat = r.get("elo_by_category") or {}

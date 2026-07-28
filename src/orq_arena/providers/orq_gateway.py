@@ -20,7 +20,7 @@ from typing import Any
 import httpx
 from openai import AsyncOpenAI
 
-from ..config import ORQ_API_KEY_ENV, OrqAIGatewayConfig
+from ..config import DEFAULT_ORQ_HOST, ORQ_API_KEY_ENV, OrqAIGatewayConfig
 
 
 class OrqGateway:
@@ -41,9 +41,7 @@ class OrqGateway:
             from evaluatorq.common.llm_client import MissingLLMCredentialsError, resolve_llm_client
 
             try:
-                resolved = resolve_llm_client(
-                    default_orq_host="https://api.orq.ai", require_orq=True
-                )
+                resolved = resolve_llm_client(default_orq_host=DEFAULT_ORQ_HOST, require_orq=True)
             except MissingLLMCredentialsError as exc:
                 raise RuntimeError(
                     f"{ORQ_API_KEY_ENV} is not set. Export it before running orq-arena."
