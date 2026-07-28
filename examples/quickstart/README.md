@@ -47,6 +47,6 @@ orq-arena run --config examples/quickstart/config.yaml \
 | File | What it is |
 |------|-----------|
 | `config.yaml` | The 8-model pool + judge panel this run used |
-| `battles.jsonl` | One JSONL row per judged round (schema v3): both responses, per-judge votes, token usage, timing |
+| `battles.jsonl` | One JSONL row per judged round (schema v3; runs recorded now are v4 and also carry each model's full router id): both responses, per-judge votes, token usage, timing |
 | `battles.run.json` | Seeded manifest: config/prompt hashes, panel, evaluatorq version, preflight (incl. `family_overlaps`) |
 | `battles.report.html` | The self-contained HTML report |
