@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import math
 from collections import defaultdict
+from dataclasses import dataclass
 
 
 def build_wins_matrix(
@@ -122,10 +123,44 @@ def style_controlled_elo(
     return ({m: 400 * t / ln10 + 1000 for m, t in theta.items()}, gamma)
 
 
+# Resamples per bootstrap. 1000 costs milliseconds on a pool this size and
+# steadies the tails; 200 left the 2.5th percentile jumping between runs.
+BOOTSTRAP_ITERATIONS = 1000
+
+
+def _resampled_ratings(
+    matches: list[tuple[str, str, str]],
+    models: list[str],
+    iterations: int,
+    seed: int,
+) -> list[dict[str, float]]:
+    """One refitted rating vector per resample, kept whole.
+
+    Every summary below reads these same vectors, so a difference is always
+    taken within one resample rather than between two summaries of them.
+    """
+    import random
+
+    rng = random.Random(seed)
+    out: list[dict[str, float]] = []
+    for _ in range(iterations):
+        resampled = [matches[rng.randrange(len(matches))] for _ in matches]
+        ratings = bradley_terry_mle(build_wins_matrix(resampled), models, iterations=50)
+        out.append({m: ratings.get(m, 1000.0) for m in models})
+    return out
+
+
+def _percentiles(vals: list[float]) -> tuple[float, float]:
+    """Nearest-rank 2.5/97.5 percentiles on (n-1), symmetric at both tails."""
+    vals = sorted(vals)
+    n = len(vals)
+    return vals[int(0.025 * (n - 1))], vals[int(0.975 * (n - 1))]
+
+
 def bootstrap_ci(
     matches: list[tuple[str, str, str]],
     models: list[str],
-    iterations: int = 200,
+    iterations: int = BOOTSTRAP_ITERATIONS,
     seed: int = 42,
 ) -> dict[str, tuple[float, float]]:
     """Percentile bootstrap 95% CI on the BT-MLE ratings.
@@ -133,24 +168,54 @@ def bootstrap_ci(
     Resamples the outcome list with replacement ``iterations`` times and
     refits. Small pools + few comparisons => wide intervals, which is the
     honest output.
-    """
-    import random
 
+    These are *marginal* intervals: read one at a time. Two of them overlapping
+    says nothing about whether those two models differ, because they are drawn
+    from the same resamples and share the anchoring. For that question use
+    ``paired_difference``.
+    """
     if not matches:
         return {m: (1000.0, 1000.0) for m in models}
-    rng = random.Random(seed)
-    samples: dict[str, list[float]] = {m: [] for m in models}
-    for _ in range(iterations):
-        resampled = [matches[rng.randrange(len(matches))] for _ in matches]
-        ratings = bradley_terry_mle(build_wins_matrix(resampled), models, iterations=50)
-        for m in models:
-            samples[m].append(ratings.get(m, 1000.0))
-    out: dict[str, tuple[float, float]] = {}
-    for m, vals in samples.items():
-        vals.sort()
-        n = len(vals)
-        # Nearest-rank percentiles on (n-1), symmetric at both tails.
-        lo = vals[int(0.025 * (n - 1))]
-        hi = vals[int(0.975 * (n - 1))]
-        out[m] = (lo, hi)
-    return out
+    draws = _resampled_ratings(matches, models, iterations, seed)
+    return {m: _percentiles([d[m] for d in draws]) for m in models}
+
+
+@dataclass(frozen=True)
+class Difference:
+    """The bootstrap distribution of one model's rating minus another's.
+
+    ``lo``/``hi`` are the 95% interval on that difference; it excluding 0 is
+    what "separated" means. ``win_rate`` is the share of resamples where the
+    first model came out ahead, which stays readable when the interval doesn't
+    exclude 0: "ahead in 71% of resamples" is a measurement, where "tied" would
+    be a claim the data cannot support.
+    """
+
+    lo: float
+    hi: float
+    win_rate: float
+
+    @property
+    def separated(self) -> bool:
+        return self.lo > 0.0
+
+
+def paired_difference(
+    matches: list[tuple[str, str, str]],
+    models: list[str],
+    a: str,
+    b: str,
+    iterations: int = BOOTSTRAP_ITERATIONS,
+    seed: int = 42,
+) -> Difference:
+    """Bootstrap ``rating[a] - rating[b]``, differenced within each resample.
+
+    Subtracting two marginal intervals instead would ignore that the two
+    ratings move together across resamples, and give an interval far too wide
+    to ever separate anything.
+    """
+    if not matches:
+        return Difference(lo=0.0, hi=0.0, win_rate=0.5)
+    diffs = [d[a] - d[b] for d in _resampled_ratings(matches, models, iterations, seed)]
+    lo, hi = _percentiles(diffs)
+    return Difference(lo=lo, hi=hi, win_rate=sum(d > 0 for d in diffs) / len(diffs))

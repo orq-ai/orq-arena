@@ -538,14 +538,13 @@ def build_report_html(
     elo_sc = report.get("elo_style_controlled") or {}
     length_coef = report.get("length_coef")
 
-    # Verdict hero: is the top spot statistically separated from the runner-up?
-    # None when there's no runner-up or no CI to compare.
-    top_separated: bool | None = None
-    if len(ranked) > 1 and ci:
-        runner, _ = ranked[1]
-        c_lo = ci.get(champion, (champ_elo, champ_elo))[0]
-        r_hi = ci.get(runner, (0.0, 0.0))[1]
-        top_separated = r_hi < c_lo
+    # Verdict hero: does the top spot actually beat the runner-up? That is a
+    # question about their difference, bootstrapped per resample. Two marginal
+    # intervals overlapping would say nothing: they share the anchoring and move
+    # together, so overlap is routine even for a lead that never reverses.
+    # None when there's no runner-up, or a run recorded before this was measured.
+    top_diff = report.get("top_difference") or None
+    top_separated: bool | None = top_diff["separated"] if top_diff else None
 
     fleiss = report.get("fleiss") or {}
     agreement = report.get("mean_agreement")
@@ -670,17 +669,28 @@ def build_report_html(
                 " warn",
             )
         )
-    if top_separated is not None:
+    if top_diff:
         runner_name = ranked[1][0]
+        rate = f"{top_diff['win_rate']:.0%}"
         if top_separated:
-            signal_rows.append(
-                ("Top-spot separation", "top spot clears the runner-up at 95% CI", " good")
-            )
-        else:
             signal_rows.append(
                 (
                     "Top-spot separation",
-                    f"{_e(runner_name)} is statistically indistinguishable at this sample size",
+                    f"the lead over {_e(runner_name)} is <b>{top_diff['lo']:.0f} to "
+                    f"{top_diff['hi']:.0f}</b> rating points (95% of resamples), and holds in "
+                    f"{rate} of them",
+                    " good",
+                )
+            )
+        else:
+            # Not "tied": a run this size simply cannot resolve the gap either
+            # way, and the resample share says which way it leans meanwhile.
+            signal_rows.append(
+                (
+                    "Top-spot separation",
+                    f"not resolved at this sample size: the gap to {_e(runner_name)} spans "
+                    f"<b>{top_diff['lo']:.0f} to {top_diff['hi']:.0f}</b> rating points, with "
+                    f"{_e(champion)} ahead in {rate} of resamples",
                     " warn",
                 )
             )
@@ -839,7 +849,7 @@ def build_report_html(
             "",
             (
                 f"Adopt {_e(champion)}: wins {champ_rate:.0%} of rated rounds, "
-                f"statistically ahead at 95% confidence."
+                f"and the lead over {_e(runner_name)} holds across resamples."
             ),
         )
         expl = (
@@ -847,19 +857,27 @@ def build_report_html(
             f"over {_e(runner_name)} exceeds the uncertainty of a run this size."
         )
     else:
+        # Unresolved is not tied. The models may well differ; this run is too
+        # small to say. Report which way it leans and how often, and let the
+        # reader decide whether to spend more rounds or pick on cost.
+        lean = f"{top_diff['win_rate']:.0%}" if top_diff else ""
         vclass, headline = (
             " tied",
             (
-                f"{_e(champion)} leads, but {_e(runner_name)} is statistically tied: "
-                f"decide on cost and speed."
+                f"{_e(champion)} leads {_e(runner_name)}, but this run is too small to "
+                f"call it: decide on cost and speed, or run more rounds."
             ),
         )
         expl = (
-            f"{_e(champion)} has the best rating, but at {len(records)} rounds the gap to "
-            f"{_e(runner_name)} is inside the error bars. The value map below is the "
-            f"tie-breaker; more rounds would separate them."
+            f"{_e(champion)} has the best rating"
+            + (f" and stays ahead of {_e(runner_name)} in {lean} of resamples" if lean else "")
+            + f", but at {len(records)} rounds the gap could still be either way. That is not "
+            f"evidence they are equal, only that this run cannot separate them. The value map "
+            f"below breaks the deadlock on cost; more rounds would settle it on quality."
         )
-    status = "&#10003; TOP SPOT SEPARATED" if separated else "&#9888; STATISTICAL TIE AT THE TOP"
+    status = (
+        "&#10003; TOP SPOT SEPARATED" if separated else "&#9888; TOP SPOT NOT RESOLVED AT THIS SIZE"
+    )
     top3 = []
     for i, (nm, e0) in enumerate(ranked[:3]):
         cls = " state" if i == 0 else ""
@@ -932,7 +950,7 @@ def build_report_html(
 <p class="note">ELO is a skill rating anchored at 1000: a model climbs by winning rounds, and more
 for beating a strong opponent, so a higher score means better on your prompts. The 95% CI is the
 range its true rating most likely sits in; the bar plots each on one shared scale, so models
-whose bars overlap are effectively tied at this sample size.{" The length-adj. column prices out the jury&#39;s length preference; a large gap between a model&#39;s ELO and its length-adjusted score means verbosity, not quality, was separating them." if elo_sc else ""} Full method (Bradley-Terry, bootstrap intervals, the &minus;&infin; bound) is in Methodology in detail below.{off_note}</p>
+whose bars overlap are not thereby tied: read each bar on its own, and see Confidence stats for whether the top two actually separate.{" The length-adj. column prices out the jury&#39;s length preference; a large gap between a model&#39;s ELO and its length-adjusted score means verbosity, not quality, was separating them." if elo_sc else ""} Full method (Bradley-Terry, bootstrap intervals, the &minus;&infin; bound) is in Methodology in detail below.{off_note}</p>
 
 {value_map}
 {speed}
@@ -978,8 +996,11 @@ did the separating.</p>
 <details class="method"><summary>Methodology in detail</summary>
 <h3>Ratings</h3>
 <p>Bradley-Terry MLE over every rated round (wins and ties), anchored at a 1000-point mean.
-95% intervals are 200-iteration bootstrap percentiles; small pools give wide, overlapping
-intervals, which is the honest output at this size. A &minus;&infin; lower bound means a model
+95% intervals are 1000-iteration bootstrap percentiles; small pools give wide, overlapping
+intervals, which is the honest output at this size. Those intervals are marginal, so read one at a
+time: two of them overlapping does not mean the two models are tied, because both are drawn from the
+same resamples and share the anchoring. Whether the top two separate is decided on the bootstrap of
+their difference, taken within each resample, and reported in Confidence stats. A &minus;&infin; lower bound means a model
 won so few rounds its rating is unidentifiable below. The length-adjusted column refits the
 rating with the jury&#39;s length preference priced out; a large gap between ELO and the
 length-adjusted score means verbosity, not quality, is doing the separating.</p>

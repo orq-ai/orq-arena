@@ -27,7 +27,13 @@ from ..data.prompts import PromptItem
 from ..data.schemas import BattleRecord
 from ..events import ArenaEvent, StandingsUpdated, TournamentEnded
 from ..providers.orq_gateway import OrqGateway
-from .elo import bootstrap_ci, bradley_terry_mle, build_wins_matrix, style_controlled_elo
+from .elo import (
+    bootstrap_ci,
+    bradley_terry_mle,
+    build_wins_matrix,
+    paired_difference,
+    style_controlled_elo,
+)
 
 Outcome = tuple[str, str, str, str]  # (name, name, 'winner' | 'tie', category)
 
@@ -92,6 +98,28 @@ def _rebuild_comparisons(records: list[BattleRecord]) -> list[PairwiseComparison
             )
         )
     return comps
+
+
+def _top_difference(outcomes: list[Outcome], names: list[str]) -> dict | None:
+    """Bootstrap of (champion - runner-up), or None when there is no pair."""
+    triples = _triples(outcomes)
+    if len(names) < 2 or not triples:
+        return None
+    ranked = sorted(
+        bradley_terry_mle(build_wins_matrix(triples), names).items(),
+        key=lambda kv: kv[1],
+        reverse=True,
+    )
+    (champion, _), (runner, _) = ranked[0], ranked[1]
+    diff = paired_difference(triples, names, champion, runner)
+    return {
+        "champion": champion,
+        "runner_up": runner,
+        "lo": diff.lo,
+        "hi": diff.hi,
+        "win_rate": diff.win_rate,
+        "separated": diff.separated,
+    }
 
 
 def _final_report(
@@ -163,6 +191,9 @@ def _final_report(
     elo_sc, length_coef = style_controlled_elo(style_rows, names)
     return {
         "elo_ci": bootstrap_ci(_triples(outcomes), names),
+        # Whether the top two actually differ is a question about their
+        # difference, not about whether two marginal intervals happen to touch.
+        "top_difference": _top_difference(outcomes, names),
         "elo_style_controlled": elo_sc if style_rows else None,
         "length_coef": length_coef if style_rows else None,
         "elo_by_category": elo_by_category(outcomes),
