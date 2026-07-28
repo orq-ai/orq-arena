@@ -145,6 +145,46 @@ def test_report_path_convention(tmp_path):
     assert report_path_for(tmp_path / "battles.jsonl").name == "battles.report.html"
 
 
+def test_length_row_descriptive_first_and_coefficient_gated():
+    """The page's length claim follows the producer's identification gate.
+
+    Identified: the count, the coefficient with its interval (unbounded side
+    named, separated resamples disclosed), and the length-adj. column.
+    Not identified: the count still renders, with an explicit withholding
+    line, and no column.
+    """
+    records = [_record("A"), _record("B")]
+    identified = REPORT | {
+        "length_pref": {"longer_wins": 59, "rounds": 74},
+        "length_coef": 18.27,
+        "length_coef_ci": {"lo": 13.2, "hi": None, "separated": 61, "draws": 400},
+        "elo_style_controlled": {"model-a": 1010.0, "model-b": 990.0},
+    }
+    html = build_report_html(
+        cfg=CFG,
+        records=records,
+        elo={"model-a": 1050.0, "model-b": 950.0},
+        report=identified,
+        manifest=MANIFEST,
+    )
+    assert "<b>longer</b> answer (in characters) won <b>80%</b> of decisive rounds (59/74)" in html
+    assert "+18.3" in html and "13.2 to unbounded" in html
+    assert "61/400 resamples separated" in html
+    assert "length-adj." in html
+
+    withheld = REPORT | {"length_pref": {"longer_wins": 40, "rounds": 74}}
+    html = build_report_html(
+        cfg=CFG,
+        records=records,
+        elo={"model-a": 1050.0, "model-b": 950.0},
+        report=withheld,
+        manifest=MANIFEST,
+    )
+    assert "won <b>54%</b> of decisive rounds (40/74)" in html
+    assert "too few rounds to identify a length coefficient" in html
+    assert "length-adj." not in html
+
+
 def test_report_cost_column_with_prices():
     records = [_record("A"), _record("B")]
     prices = {

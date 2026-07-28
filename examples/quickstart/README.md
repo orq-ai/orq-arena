@@ -47,8 +47,15 @@ would rather keep the committed log untouched.
   sides), so the report carries a `judge/contestant family overlap` badge and
   the manifest records it under `preflight.family_overlaps`. For numbers you
   intend to defend, judge with families outside your pool.
-- **Length control.** The jury leaned longer (length coefficient +3.44); the
-  report's `length-adj.` column prices that preference out.
+- **Length control, and it changes the answer.** The longer answer won 59 of
+  74 decisive rounds (80%, length in characters). The modelled length
+  coefficient is +18.3 (95% lower bound 13.2), and the report's `length-adj.`
+  column refits the rating with that preference priced out, where the raw
+  champion drops to 6th: its lead is substantially a length effect. The
+  manifest records `length_coef: 3.437`, the value this run computed at the
+  time with an estimator that stopped long before converging; manifests are
+  historical records, so it stays, and the report page recomputes correctly
+  from the log.
 
 ## Files
 

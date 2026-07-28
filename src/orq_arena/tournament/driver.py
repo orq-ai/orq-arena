@@ -31,6 +31,7 @@ from ..providers.orq_gateway import OrqGateway
 from .elo import (
     bootstrap_ci,
     bootstrap_draws,
+    bootstrap_gamma,
     bradley_terry_mle,
     build_wins_matrix,
     ci_from_draws,
@@ -217,7 +218,21 @@ def _final_report(
         and rec.rating_key("a") in alias
         and rec.rating_key("b") in alias
     ]
-    elo_sc, length_coef = style_controlled_elo(style_rows, names)
+    fit = style_controlled_elo(style_rows, names)
+    # The headline length claim is a plain count: no estimator, no iteration
+    # budget, nothing to converge (RES-1150). Length means characters, and
+    # equal-length rounds have no longer answer to credit.
+    len_rounds = [(la > lb, y) for _a, _b, y, la, lb in style_rows if y != 0.5 and la != lb]
+    longer_wins = sum(1 for longer_a, y in len_rounds if longer_a == (y == 1.0))
+    # The modelled coefficient is published only when it is identified: the
+    # fit converged and a bootstrap over the style rows keeps 0 out of the
+    # interval. Nulling both keys here is what hides the column and the lean
+    # line on every display path at once; a per-path flag would be the fifth
+    # sibling-path miss waiting to happen.
+    gamma_ci = (
+        bootstrap_gamma(style_rows, names, warm=fit) if style_rows and fit.converged else None
+    )
+    identified = gamma_ci is not None and gamma_ci.excludes_zero
     # One bootstrap, summarized two ways: the marginal intervals below and the
     # top-two difference. Resampling separately per question would leave them
     # agreeing only for as long as both call sites passed the same seed.
@@ -233,8 +248,21 @@ def _final_report(
         # Whether the top two actually differ is a question about their
         # difference, not about whether two marginal intervals happen to touch.
         "top_difference": _top_difference(draws, ranked_now),
-        "elo_style_controlled": elo_sc if style_rows else None,
-        "length_coef": length_coef if style_rows else None,
+        "length_pref": (
+            {"longer_wins": longer_wins, "rounds": len(len_rounds)} if len_rounds else None
+        ),
+        "elo_style_controlled": fit.elo if identified else None,
+        "length_coef": fit.gamma if identified else None,
+        "length_coef_ci": (
+            {
+                "lo": gamma_ci.lo,
+                "hi": gamma_ci.hi,
+                "separated": gamma_ci.separated,
+                "draws": gamma_ci.draws,
+            }
+            if gamma_ci is not None and identified
+            else None
+        ),
         "elo_by_category": elo_by_category(outcomes),
         "category_counts": cat_counts,
         "tokens": {

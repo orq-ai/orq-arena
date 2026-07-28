@@ -70,57 +70,204 @@ def bradley_terry_mle(
     return {m: 400 * math.log10(max(r, 1e-10)) + 1000 for m, r in ratings.items()}
 
 
+@dataclass(frozen=True)
+class StyleFit:
+    """A length-controlled fit that either converged or says so.
+
+    The previous version returned wherever 2000 fixed gradient steps stopped.
+    On the committed example run that was gamma=3.44 against a true MLE of
+    18.3, and the column fit at the wrong gamma reordered the leaderboard
+    (RES-1150). A fit that cannot certify convergence reports it, and the
+    caller publishes no coefficient rather than a number that measures the
+    iteration budget.
+
+    ``converged`` is the whole-fit verdict (every played rating and gamma at
+    an interior optimum), the bar for publishing the length-adjusted column.
+    ``gamma_converged`` judges the length coefficient alone: a bootstrap
+    resample can crater one model's rating (all its rounds redrawn as losses)
+    while gamma sits at a perfectly good maximum, and calling that draw
+    "gamma separated" would misstate which parameter failed.
+    """
+
+    elo: dict[str, float]
+    gamma: float
+    converged: bool
+    gamma_converged: bool
+
+
+def _style_loglik(
+    theta: list[float], gamma: float, feats: list[tuple[int, int, float, float]]
+) -> float:
+    s = 0.0
+    for a, b, y, d in feats:
+        z = max(-30.0, min(30.0, theta[a] - theta[b] + gamma * d))
+        p = 1.0 / (1.0 + math.exp(-z))
+        s += y * math.log(max(p, 1e-12)) + (1.0 - y) * math.log(max(1.0 - p, 1e-12))
+    return s
+
+
 def style_controlled_elo(
     rows: list[tuple[str, str, float, int, int]],
     models: list[str],
-    iterations: int = 2000,
-    lr: float = 0.05,
-    tol: float = 1e-7,
-) -> tuple[dict[str, float], float]:
+    max_iter: int = 500,
+    gtol: float = 1e-6,
+    warm: StyleFit | None = None,
+) -> StyleFit:
     """Bradley-Terry as logistic regression with a length-difference covariate.
 
     The LMArena style-control / length-controlled AlpacaEval approach:
     P(A wins) = sigmoid(theta_a - theta_b + gamma * d) with
-    d = (len_a - len_b) / (len_a + len_b), fit jointly, then the reported
-    rating zeroes the length term. gamma > 0 means the jury favored longer
-    answers; the style-controlled ELO is what remains once that preference
-    is priced out.
+    d = (len_a - len_b) / (len_a + len_b) in characters, fit jointly, then the
+    reported rating zeroes the length term. gamma > 0 means the jury favored
+    longer answers.
+
+    Diagonal-Newton with a backtracking line search on the log-likelihood,
+    stopping on the **gradient norm**. Each piece is load-bearing: plain
+    gradient descent needed ~500k iterations to reach this MLE (the shipped
+    2000 got a fifth of the way and shipped that), an undamped Newton step
+    diverges outright on this likelihood, and a step-size stopping test never
+    fires on a slow crawl. On separable data (the longer answer always wins)
+    no finite maximum exists; the loop runs out and returns converged=False.
 
     ``rows``: (model_a, model_b, y, len_a, len_b) with y = 1.0 A wins,
-    0.0 B wins, 0.5 tie. Returns ({model: elo}, gamma), anchored like
-    ``bradley_terry_mle`` (geometric mean at 1000).
+    0.0 B wins, 0.5 tie. ``elo`` is anchored like ``bradley_terry_mle``
+    (geometric mean at 1000).
     """
     if not rows or not models:
-        return ({m: 1000.0 for m in models}, 0.0)
-    theta = {m: 0.0 for m in models}
-    gamma = 0.0
-    n = len(rows)
-    feats = [(a, b, y, (la - lb) / (la + lb) if (la + lb) > 0 else 0.0) for a, b, y, la, lb in rows]
-    for _ in range(iterations):
-        g_theta = {m: 0.0 for m in models}
+        return StyleFit({m: 1000.0 for m in models}, 0.0, converged=True, gamma_converged=True)
+    idx = {m: i for i, m in enumerate(models)}
+    feats = [
+        (idx[a], idx[b], y, (la - lb) / (la + lb) if (la + lb) > 0 else 0.0)
+        for a, b, y, la, lb in rows
+    ]
+    ln10 = math.log(10)
+    if warm is None:
+        theta = [0.0] * len(models)
+        gamma = 0.0
+    else:
+        # Bootstrap draws start at the full-data optimum: a resample's maximum
+        # sits nearby, so a converged draw takes a handful of steps instead of
+        # hundreds, and a separated one runs off immediately instead of
+        # spending its whole budget mid-climb and being miscounted.
+        theta = [(warm.elo.get(m, 1000.0) - 1000.0) * ln10 / 400.0 for m in models]
+        gamma = warm.gamma
+    ll = _style_loglik(theta, gamma, feats)
+    played = {a for a, _b, _y, _d in feats} | {b for _a, b, _y, _d in feats}
+    has_length_signal = any(f[3] != 0.0 for f in feats)
+    converged = False
+    gamma_converged = False
+    for _ in range(max_iter):
+        g_theta = [0.0] * len(models)
         g_gamma = 0.0
+        h_theta = [1e-9] * len(models)  # Hessian-diagonal floor: unplayed models
+        h_gamma = 1e-9
         for a, b, y, d in feats:
-            z = theta[a] - theta[b] + gamma * d
-            p = 1.0 / (1.0 + math.exp(-max(-30.0, min(30.0, z))))
+            z = max(-30.0, min(30.0, theta[a] - theta[b] + gamma * d))
+            p = 1.0 / (1.0 + math.exp(-z))
+            w = max(p * (1.0 - p), 1e-9)
             err = y - p
             g_theta[a] += err
             g_theta[b] -= err
             g_gamma += err * d
-        step = 0.0
-        for m in models:
-            delta = lr * g_theta[m] / n
-            theta[m] += delta
-            step = max(step, abs(delta))
-        gd = lr * g_gamma / n
-        gamma += gd
-        step = max(step, abs(gd))
-        mean = sum(theta.values()) / len(theta)
-        for m in theta:
-            theta[m] -= mean
-        if step < tol:
+            h_theta[a] += w
+            h_theta[b] += w
+            h_gamma += w * d * d
+        # A vanishing gradient is necessary, not sufficient: separable data
+        # drives every p toward 1, so errors AND curvature both collapse
+        # toward gtol, and "the optimum" is wherever saturation stalled, with
+        # theta and gamma split arbitrarily. An interior maximum keeps
+        # per-parameter curvature orders of magnitude above that (every
+        # unsaturated row contributes p(1-p) ~ 0.1). Parameters with no data
+        # are exempt: an unplayed model stays anchored at 0, and all-equal
+        # lengths legitimately pin gamma there too.
+        gamma_converged = abs(g_gamma) < gtol and (not has_length_signal or h_gamma > 100 * gtol)
+        if max(max(abs(g) for g in g_theta), abs(g_gamma)) < gtol:
+            converged = gamma_converged and all(h_theta[i] > 100 * gtol for i in played)
             break
-    ln10 = math.log(10)
-    return ({m: 400 * t / ln10 + 1000 for m, t in theta.items()}, gamma)
+        step = 1.0
+        while step > 1e-8:
+            cand_theta = [t + step * g_theta[i] / h_theta[i] for i, t in enumerate(theta)]
+            cand_gamma = gamma + step * g_gamma / h_gamma
+            mean = sum(cand_theta) / len(cand_theta)
+            cand_theta = [t - mean for t in cand_theta]  # loglik-invariant anchor
+            cand_ll = _style_loglik(cand_theta, cand_gamma, feats)
+            if cand_ll > ll:
+                break
+            step /= 2
+        else:
+            # No ascent step exists at float precision. For gamma this is a
+            # verdict, not a failure: the flag above says whether it settled
+            # (a draw that craters one model stalls here with gamma at a
+            # perfectly good maximum). The whole fit stays unconverged.
+            break
+        theta, gamma, ll = cand_theta, cand_gamma, cand_ll
+    elo = {m: 400 * theta[i] / ln10 + 1000 for m, i in idx.items()}
+    return StyleFit(elo, gamma, converged, gamma_converged)
+
+
+@dataclass(frozen=True)
+class GammaInterval:
+    """Percentile interval for the length coefficient, honest about infinity.
+
+    A resample where the longer answer always wins has no finite MLE; its fit
+    never converges. Such draws are placed at signed infinity rather than
+    dropped, so they widen the interval instead of silently tightening it. A
+    bound that lands on infinity reports as None (unbounded on that side).
+    """
+
+    lo: float | None
+    hi: float | None
+    separated: int  # draws whose fit ran off without a finite maximum
+    draws: int
+
+    @property
+    def excludes_zero(self) -> bool:
+        """[lo, +inf) excludes 0 iff lo > 0; (-inf, hi] iff hi < 0."""
+        if self.lo is not None and self.lo > 0.0:
+            return True
+        return self.hi is not None and self.hi < 0.0
+
+
+def bootstrap_gamma(
+    rows: list[tuple[str, str, float, int, int]],
+    models: list[str],
+    draws: int = 400,
+    seed: int = 42,
+    max_iter: int = 1000,
+    warm: StyleFit | None = None,
+) -> GammaInterval:
+    """Bootstrap the length coefficient over the style rows.
+
+    Its own resample: the rating bootstrap's draws carry (a, b, verdict)
+    triples with no lengths, so gamma cannot be read off them. Pass the
+    full-data fit as ``warm`` so each draw starts at that optimum.
+
+    # ponytail: a draw that hasn't converged by max_iter counts as separated,
+    # which can only widen the interval; raise max_iter if that margin matters
+    """
+    import random
+
+    rng = random.Random(seed)
+    vals: list[float] = []
+    separated = 0
+    for _ in range(draws):
+        resampled = [rows[rng.randrange(len(rows))] for _ in rows]
+        fit = style_controlled_elo(resampled, models, max_iter=max_iter, warm=warm)
+        # gamma_converged, not converged: a draw may crater one model's rating
+        # (that parameter separates) while gamma sits at a clean maximum, and
+        # this interval is about gamma alone.
+        if fit.gamma_converged:
+            vals.append(fit.gamma)
+        else:
+            separated += 1
+            vals.append(math.copysign(math.inf, fit.gamma))
+    lo, hi = _percentiles(vals)
+    return GammaInterval(
+        lo=None if math.isinf(lo) else lo,
+        hi=None if math.isinf(hi) else hi,
+        separated=separated,
+        draws=draws,
+    )
 
 
 # Resamples per bootstrap. 1000 costs milliseconds on a pool this size and

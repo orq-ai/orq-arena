@@ -76,12 +76,21 @@ class LeaderboardScreen(Screen):
 
             yield DataTable(id="table")
 
-            lc = r.get("length_coef")
-            if lc is not None:
-                lean = "longer" if lc > 0 else "shorter"
+            # Descriptive first (a count, nothing to converge); the modelled
+            # coefficient only exists when identified, which is also when the
+            # len-ctrl column it explains is present (RES-1150).
+            lp = r.get("length_pref")
+            if lp and lp["rounds"]:
+                share = lp["longer_wins"] / lp["rounds"]
+                lc = r.get("length_coef")
+                coef_bit = (
+                    f"; len-ctrl ELO prices that preference out (coef {lc:+.1f})"
+                    if lc is not None
+                    else ""
+                )
                 yield Static(
-                    f"style control: jury length coefficient {lc:+.2f} "
-                    f"(leaned {lean}); len-ctrl ELO prices that preference out",
+                    f"style control: longer answer won {share:.0%} of decisive "
+                    f"rounds ({lp['longer_wins']}/{lp['rounds']}){coef_bit}",
                     classes="section",
                 )
 

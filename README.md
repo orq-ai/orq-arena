@@ -18,7 +18,7 @@ Every run opens on the **Run Plan**: the full pool, every judge, and the estimat
 
 ![RUN PLAN screen: the pool, the jury, and the worst-case cost per model, before anything is spent](docs/assets/run-plan.svg)
 
-And ends on the **Final Results**: ELO with 95% CIs and the length-controlled rating, per-judge behaviour, and the win grid:
+And ends on the **Final Results**: ELO with 95% CIs, the length-controlled rating (when the jury's length preference is identified), per-judge behaviour, and the win grid:
 
 ![Final Results: ELO ladder with CIs and len-ctrl, per-judge behaviour, win grid](docs/assets/leaderboard.svg)
 
