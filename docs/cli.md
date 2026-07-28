@@ -136,19 +136,27 @@ rounds, every round streams both contestants once and is scored by each judge tw
 per seat order).
 
 **Preflight: the RUN PLAN table** (see the expected output below). One row per candidate and
-judge (call count, catalog price in $/M in / $/M out, worst-case cost), closing with a bold
-`MAXIMUM SPEND ≤ $X` row.
+judge (call count, catalog price in $/M in / $/M out, cost), closing with a bold
+`PROJECTED SPEND ≈ $X` row and a dimmer worst-case row beneath it.
 
-- The total is an **upper bound**, not a prediction: it assumes every response hits its
-  output token cap. Prices come from the router's Model Garden catalog.
+- **Two figures, because one cannot answer both questions honestly.** The projection prices
+  the calls a clean run makes, assuming every response hits its output token cap. The worst
+  case adds the failure paths that spend money without appearing in any call count: the one
+  retry each stream takes, and a replacement panel for every judge call when
+  `replacement_judges` is set.
+- **Neither is a hard guarantee.** Prices are real (the router's Model Garden catalog) and
+  call counts are exact, but prompt tokens are estimated from character count, which
+  under-counts CJK, code and dense punctuation. Treat the projection as a good estimate, not
+  a cap your invoice cannot exceed.
 - **Unpriced models** (normal for self-hosted) keep their row with `n/a` prices and a `?`
-  cost; the total renders `≤ $X + ?` with a `no catalog price (self-hosted or unpriced): …`
+  cost; the total renders `≈ $X + ?` with a `no catalog price (self-hosted or unpriced): …`
   note below. If pricing is entirely unreachable the table is skipped. Pricing never blocks
   the run.
-- **`--quiet`** suppresses the table but a one-line `maximum spend ≤ $X (worst case)` still
+- **`--quiet`** suppresses the table but a one-line
+  `projected spend ≈ $X, up to $Y if streams retry and stand-in judges step in` still
   prints, cost survives quiet mode.
-- The ceiling and its per-row breakdown land in the run manifest under
-  `preflight.cost_ceiling`.
+- Both figures and the per-row breakdown land in the run manifest under
+  `preflight.cost_projection`.
 
 **Preflight: the thinking probe** (`preflight.thinking_probe`, default `true`). A
 `thinking probe…` line, then one line per candidate that failed
@@ -156,9 +164,9 @@ judge (call count, catalog price in $/M in / $/M out, worst-case cost), closing 
 (`🧠 {name} ({model}): thinks despite config …, ranking will be footnoted`). No surprises →
 `pool is thinking-clean ✓`.
 
-**Confirmation.** Unless `--yes`/`-y` is given, the CLI prompts `Proceed (spends up to $X)?`,
-so the dollar bound sits in the approval question itself (plain `Proceed?` when nothing could
-be priced). Declining aborts before any battle or judge calls (the thinking probe, when
+**Confirmation.** Unless `--yes`/`-y` is given, the CLI prompts
+`Proceed (≈ $X, up to $Y with retries)?`, so both dollar figures sit in the approval question
+itself (plain `Proceed?` when nothing could be priced). Declining aborts before any battle or judge calls (the thinking probe, when
 enabled, has already made its one probe stream per model). When stdin is not an interactive
 terminal the run errors out with a "pass `--yes`" hint instead of prompting.
 
@@ -214,7 +222,8 @@ preflight: 28 matches × 5 rounds → 280 model streams + 840 judge calls + 8 pr
 │   openai/gpt-5.4-nano                 │   280 │   0.20 │    1.25 │   $0.97  │
 │ Thinking probe                        │     8 │        │         │   $0.09  │
 ├───────────────────────────────────────┼───────┼────────┼─────────┼──────────┤
-│ MAXIMUM SPEND                         │       │        │         │ ≤ $11.87 │
+│ PROJECTED SPEND                       │       │        │         │ ≈ $11.87 │
+│ worst case, retries + stand-ins       │       │        │         │ ≈ $18.22 │
 └───────────────────────────────────────┴───────┴────────┴─────────┴──────────┘
      worst case: every response maxed out at its token cap; typical runs
          cost noticeably less. Exact spend is reported after the run.
@@ -238,8 +247,9 @@ match 3/28 done
 M28 🤝 draw
 match 28/28 done
 
-🏆 gemini-3.5-flash leads, but claude-sonnet-4-6 is statistically tied (CIs
-overlap at 76 rated rounds; the report page has the tie-breakers)
+🏆 gemini-3.5-flash leads, but 76 rated rounds cannot separate it from
+claude-sonnet-4-6 (ahead in 83% of resamples; the report page has the
+tie-breakers)
 
                     Final Results
 ┏━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━┳━━━━━━━━━━━┳━━━━━━┓
@@ -266,7 +276,7 @@ report page → examples/quickstart/battles.report.html
 On a terminal (not piped) the per-round heartbeat lines are replaced by a pinned
 progress bar (spinner, rounds M-of-N, elapsed, current leader) that advances once per
 round, with the per-match lines printing above it; without `-y` the run pauses at
-`Proceed (spends up to $11.87)? [y/N]` after the preflight, before any battle or
+`Proceed (≈ $11.87, up to $18.22 with retries)? [y/N]` after the preflight, before any battle or
 judge call.
 
 See [Match rules, gateway, candidates, and judges](configuration.md) for every YAML key this
@@ -277,11 +287,12 @@ command reads, and [methodology.md](methodology.md) for how matches are schedule
 ## The `--tui` live show
 
 `orq-arena run --tui` opens on the **RUN PLAN screen**: the branding, the prompt set and its
-size, and the full per-model cost table (every candidate and judge listed, worst-case ceiling
-per row), ending in the run's one confirmation, `ENTER fight (spends up to $X)` / `Q quit`.
+size, and the full per-model cost table (every candidate and judge listed, cost per row),
+ending in the run's one confirmation,
+`ENTER fight (≈ $X, up to $Y with retries)` / `Q quit`.
 Nothing has been spent when it renders except the tiny thinking-probe calls; `-y` skips the
 screen and starts the fight directly. On endpoints without catalog pricing the table keeps
-its call counts and the ceiling reads `unavailable`.
+its call counts and the spend line reads `spend projection unavailable`.
 
 ![RUN PLAN screen: prompts block, per-model cost table, consent bar](assets/run-plan.svg)
 
@@ -524,7 +535,7 @@ orq-arena report [LOG_PATH] [--config PATH] [--output PATH]
 | `--output PATH` | `<log>.report.html` | Destination HTML file. |
 
 The page is self-contained (inline CSS, no external assets, works from `file://`): verdict
-headline with a CI-overlap caveat, the ELO ladder with confidence-interval bars and the
+headline stating whether the top two separate, the ELO ladder with confidence-interval bars and the
 len-ctrl column, the win grid, per-judge behaviour, token and cost accounting (catalog
 rates when a key is present: candidate spend exact, jury spend estimated at the panel mean;
 one catalog read, never completion spend), and the
@@ -659,7 +670,7 @@ orq-arena refresh-catalog [--config PATH] [--show/--no-show]
   workspace-enabled, chat-capable catalog live from orq.ai. Non-chat models (embeddings,
   TTS/STT, image, rerank, moderation, etc.) are filtered out. Use `--show` to discover
   model ids for your YAML's `candidates` list; the same catalog also prices the preflight
-  spend ceiling and the report's cost section.
+  spend projection and the report's cost section.
 - **Without `ORQ_API_KEY`:** the command doesn't error, it skips the live fetch and falls
   back to any existing cache; with no cache either, it prints `0 models (source=fallback, ...)`
   (this command passes no fallback ids of its own).

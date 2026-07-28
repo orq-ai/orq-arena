@@ -1,9 +1,12 @@
-"""Pre-run checks: exact call counts, a spend ceiling, a thinking probe.
+"""Pre-run checks: exact call counts, a spend projection, a thinking probe.
 
-Counts are exact. The dollar line is a *ceiling*, every output cap fully
-hit, priced from the router's own catalog, so it supersedes plan decision
-18 ("prices are guesses"): prices are real, only token volumes are bounded
-rather than predicted. Live runs land under, never over.
+Counts are exact. The dollar figures are not a guarantee, and the code no
+longer pretends otherwise: prices come from the router's own catalog and every
+output cap is assumed fully hit, but prompt tokens are estimated from character
+count, which under-counts CJK, code and dense punctuation. Two figures come
+out, because one number cannot honestly answer both questions a user has:
+``projected_usd`` is what a clean run costs, and ``worst_case_usd`` adds the
+retry every stream may take and the replacement panel every judge may need.
 The probe automates the audit that caught kimi-k2.6 burning its whole token
 budget on vendor-default thinking: one tiny call per candidate, flag anything
 that produces reasoning despite its config.
@@ -58,7 +61,7 @@ def _est_tokens(text: str) -> int:
 class CostRow:
     """One line of the run-plan cost table; usd=None means unpriced, not $0."""
 
-    role: str  # "candidate" | "judge" | "probe"
+    role: str  # "candidate" | "judge" | "replacement" | "probe"
     model_id: str
     calls: int  # streams for candidates, judge calls for judges, probes for probe
     price_in: float | None  # $/M input tokens; None when absent from the catalog
@@ -67,10 +70,19 @@ class CostRow:
 
 
 @dataclass(frozen=True)
-class CostCeiling:
-    """Spend bound with every output cap fully hit; math, not prediction."""
+class CostProjection:
+    """What a run costs, with every output cap assumed fully hit.
 
-    total_usd: float
+    Two figures, because a single one would have to lie about something.
+    ``projected_usd`` prices the calls a clean run makes. ``worst_case_usd``
+    adds the failure paths that spend real money without appearing in any call
+    count: the one retry each stream takes, and a replacement panel for every
+    judge call, when replacements are configured. Neither is a hard bound,
+    since prompt tokens are estimated from characters; see the module docstring.
+    """
+
+    projected_usd: float
+    worst_case_usd: float
     models_usd: float
     judges_usd: float
     probe_usd: float
@@ -78,18 +90,19 @@ class CostCeiling:
     rows: tuple[CostRow, ...] = ()
 
 
-def cost_ceiling(
+def cost_projection(
     cfg: ArenaConfig,
     prompts: list[PromptItem],
     counts: CallCounts,
     prices: dict[str, tuple[float, float]],
-) -> CostCeiling:
-    """Upper-bound the run's spend from exact counts, config caps, catalog prices.
+) -> CostProjection:
+    """Price the run from exact call counts, config caps and catalog prices.
 
-    The only estimated inputs are prompt tokens (chars/4, taken at the
-    longest prompt) and the judge-input term, which assumes both responses
-    hit the model output cap. Replacement judges swap in only for a failed
-    primary call and price similarly; not modeled.
+    Estimated inputs: prompt tokens (chars/4, taken at the longest prompt) and
+    the judge-input term, which assumes both responses hit the model output
+    cap. Retries and replacement judges never appear in a call count, so they
+    are priced into ``worst_case_usd`` rather than left for the user to discover
+    on the invoice.
     """
     prompt_tok = max((_est_tokens(p.text) for p in prompts), default=1)
     rounds = counts.rounds_per_match
@@ -135,8 +148,38 @@ def cost_ceiling(
             probe_usd += (cin * probe_prompt_tok + cout * _PROBE_MAX_TOKENS) / 1e6
         rows.append(CostRow("probe", "thinking probe", counts.probe_calls, None, None, probe_usd))
 
-    return CostCeiling(
-        total_usd=models_usd + judges_usd + probe_usd,
+    # Stand-ins are priced at their own worst rate, not the primary panel's: a
+    # cheap panel backed by an expensive replacement would otherwise slip past
+    # the figure entirely.
+    replacement_usd = 0.0
+    if cfg.replacement_judges:
+        per_call = [
+            (prices[j][0] * judge_in_tok + prices[j][1] * cfg.gateway.judge_max_tokens) / 1e6
+            for j in cfg.replacement_judges
+            if j in prices
+        ]
+        unpriced.extend(j for j in cfg.replacement_judges if j not in prices)
+        # Every primary call failing and being stood in for is the bound.
+        replacement_usd = max(per_call, default=0.0) * calls_per_judge * len(cfg.judges)
+        rows.append(
+            CostRow(
+                "replacement",
+                ", ".join(cfg.replacement_judges),
+                0,  # only on failure; no call is scheduled up front
+                None,
+                None,
+                replacement_usd or None,
+            )
+        )
+
+    projected = models_usd + judges_usd + probe_usd
+    # Failure paths that spend money without adding a call to any count:
+    # `_generate_side` retries a dead stream once, and evaluatorq promotes a
+    # stand-in for a judge call that errors outright.
+    worst_case = projected + models_usd + replacement_usd
+    return CostProjection(
+        projected_usd=projected,
+        worst_case_usd=worst_case,
         models_usd=models_usd,
         judges_usd=judges_usd,
         probe_usd=probe_usd,

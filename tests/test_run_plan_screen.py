@@ -5,7 +5,7 @@ from __future__ import annotations
 from textual.app import App
 from textual.widgets import DataTable, Static
 
-from orq_arena.preflight import CallCounts, CostCeiling, CostRow
+from orq_arena.preflight import CallCounts, CostProjection, CostRow
 from orq_arena.tui.screens.title import RunPlanScreen
 
 
@@ -27,8 +27,9 @@ def _plan(*, unpriced: bool = False) -> dict:
     ]
     if unpriced:
         rows = [CostRow(r.role, r.model_id, r.calls, None, None, None) for r in rows]
-    ceiling = CostCeiling(
-        total_usd=0.0 if unpriced else 0.51,
+    cost = CostProjection(
+        projected_usd=0.0 if unpriced else 0.51,
+        worst_case_usd=0.0 if unpriced else 0.92,
         models_usd=0.42,
         judges_usd=0.08,
         probe_usd=0.01,
@@ -37,7 +38,7 @@ def _plan(*, unpriced: bool = False) -> dict:
     )
     return {
         "counts": CallCounts(1, 5, 10, 30, 2),
-        "ceiling": ceiling,
+        "cost": cost,
         "overlap": ["prov"],
         "probe_lines": [],
         "n_candidates": 2,
@@ -58,7 +59,7 @@ async def test_plan_screen_lists_every_model_and_prices():
         cells = " ".join(str(table.get_cell_at((r, 0))) for r in range(table.row_count))
         for model in ("model-a", "model-b", "judge-1", "Thinking probe"):
             assert model in cells
-        assert "MAXIMUM SPEND" in cells
+        assert "PROJECTED SPEND" in cells
         consent = str(app.screen.query_one("#consent", Static).render())
         assert "$0.51" in consent
         # sampling caveat: 5 of 30
@@ -73,7 +74,7 @@ async def test_plan_screen_degrades_without_pricing():
         await app.push_screen(RunPlanScreen(_plan(unpriced=True)))
         await pilot.pause()
         consent = str(app.screen.query_one("#consent", Static).render())
-        assert "$" not in consent  # no dollar figure without a ceiling
+        assert "$" not in consent  # no dollar figure without a projection
         table = app.screen.query_one("#plan", DataTable)
         last = str(table.get_cell_at((table.row_count - 1, 4)))
         assert "unavailable" in last

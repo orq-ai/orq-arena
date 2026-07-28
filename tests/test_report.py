@@ -91,7 +91,11 @@ def test_report_renders_every_section():
         report=REPORT,
         manifest=MANIFEST,
     )
-    assert "model-a" in html and ("statistically" in html)  # verdict banner headline
+    assert "model-a" in html  # verdict banner headline
+    # Overlapping intervals never license a tie claim, so the page must not make
+    # one (this run records no separation measurement at all).
+    assert "statistically tied" not in html
+    assert "STATISTICAL TIE" not in html
     for section in (
         "Leaderboard",
         "Win grid",
@@ -104,8 +108,9 @@ def test_report_renders_every_section():
         assert section in html
     assert "Category" not in html  # category table removed: not universal across datasets
     assert "10.0 MIN" in html  # duration rides in the header metadata strip (uppercased)
-    # runner-up hi (1100) >= champion lo (900): top spot not separated
-    assert "indistinguishable at this sample size" in html
+    # No separation measurement recorded, so the page makes no claim either way
+    # (it used to infer "indistinguishable" from the marginal intervals here).
+    assert "Top-spot separation" not in html
     assert "thinking" in html  # model-b badge
     # house style: no em-dashes anywhere, literal or HTML-entity
     assert not any(d in html for d in ("—", "&mdash;", "&#8212;", "&#x2014;"))

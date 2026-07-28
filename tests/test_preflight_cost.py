@@ -1,8 +1,13 @@
-"""Spend-ceiling math: exact counts x config caps x catalog prices."""
+"""Spend-projection math: exact counts x config caps x catalog prices."""
 
 from orq_arena.config import ArenaConfig
 from orq_arena.data.prompts import PromptItem
-from orq_arena.preflight import _JUDGE_WRAPPER_TOKENS, _PROBE_MAX_TOKENS, call_counts, cost_ceiling
+from orq_arena.preflight import (
+    _JUDGE_WRAPPER_TOKENS,
+    _PROBE_MAX_TOKENS,
+    call_counts,
+    cost_projection,
+)
 
 PROMPTS = [PromptItem(text="x" * 400), PromptItem(text="y" * 200)]  # max = 100 tok
 
@@ -19,11 +24,11 @@ def _cfg(**over) -> ArenaConfig:
     return ArenaConfig.model_validate({**base, **over})
 
 
-def test_ceiling_is_exact_arithmetic():
+def test_projection_is_exact_arithmetic():
     cfg = _cfg()
     counts = call_counts(cfg, PROMPTS)  # 1 match x 2 rounds
     prices = {"a/one": (1.0, 2.0), "b/two": (4.0, 8.0), "c/judge": (10.0, 20.0)}
-    c = cost_ceiling(cfg, PROMPTS, counts, prices)
+    c = cost_projection(cfg, PROMPTS, counts, prices)
 
     cap_default = cfg.gateway.candidate_max_tokens  # 2048
     # a/one: 2 streams x (1*100 + 2*2048) / 1e6; b/two: 2 x (4*100 + 8*1000) / 1e6
@@ -33,14 +38,14 @@ def test_ceiling_is_exact_arithmetic():
     assert abs(c.models_usd - candidates) < 1e-12
     assert abs(c.judges_usd - judges) < 1e-12
     assert c.probe_usd == 0
-    assert abs(c.total_usd - (candidates + judges)) < 1e-12
+    assert abs(c.projected_usd - (candidates + judges)) < 1e-12
     assert c.unpriced == []
 
 
 def test_unpriced_models_are_excluded_and_reported():
     cfg = _cfg()
     counts = call_counts(cfg, PROMPTS)
-    c = cost_ceiling(cfg, PROMPTS, counts, {"a/one": (1.0, 2.0)})
+    c = cost_projection(cfg, PROMPTS, counts, {"a/one": (1.0, 2.0)})
     assert c.unpriced == ["b/two", "c/judge"]
     assert c.judges_usd == 0
     assert c.models_usd > 0
@@ -50,7 +55,7 @@ def test_probe_priced_only_when_enabled():
     cfg = _cfg(preflight={"thinking_probe": True})
     counts = call_counts(cfg, PROMPTS)
     prices = {"a/one": (1.0, 2.0), "b/two": (4.0, 8.0), "c/judge": (10.0, 20.0)}
-    c = cost_ceiling(cfg, PROMPTS, counts, prices)
+    c = cost_projection(cfg, PROMPTS, counts, prices)
     assert c.probe_usd > 0
     # dominated by the output cap: 2 candidates x cout x _PROBE_MAX_TOKENS
     assert c.probe_usd < (2 + 8) * (_PROBE_MAX_TOKENS + 100) / 1e6
@@ -59,8 +64,8 @@ def test_probe_priced_only_when_enabled():
 def test_empty_price_map_prices_nothing():
     cfg = _cfg()
     counts = call_counts(cfg, PROMPTS)
-    c = cost_ceiling(cfg, PROMPTS, counts, {})
-    assert c.total_usd == 0
+    c = cost_projection(cfg, PROMPTS, counts, {})
+    assert c.projected_usd == 0
     assert set(c.unpriced) == {"a/one", "b/two", "c/judge"}
 
 
@@ -68,7 +73,7 @@ def test_rows_sum_to_totals():
     cfg = _cfg(preflight={"thinking_probe": True})
     counts = call_counts(cfg, PROMPTS)
     prices = {"a/one": (1.0, 2.0), "b/two": (4.0, 8.0), "c/judge": (10.0, 20.0)}
-    c = cost_ceiling(cfg, PROMPTS, counts, prices)
+    c = cost_projection(cfg, PROMPTS, counts, prices)
 
     by_role = lambda role: [r for r in c.rows if r.role == role]  # noqa: E731
     assert abs(sum(r.usd for r in by_role("candidate")) - c.models_usd) < 1e-12
@@ -81,7 +86,7 @@ def test_rows_sum_to_totals():
 def test_unpriced_model_gets_row_with_none_usd():
     cfg = _cfg()
     counts = call_counts(cfg, PROMPTS)
-    c = cost_ceiling(cfg, PROMPTS, counts, {"a/one": (1.0, 2.0)})
+    c = cost_projection(cfg, PROMPTS, counts, {"a/one": (1.0, 2.0)})
     rows = {r.model_id: r for r in c.rows}
     assert rows["b/two"].usd is None
     assert rows["b/two"].price_in is None
@@ -94,5 +99,5 @@ def test_no_probe_row_when_probe_disabled():
     cfg = _cfg()  # thinking_probe False
     counts = call_counts(cfg, PROMPTS)
     prices = {"a/one": (1.0, 2.0), "b/two": (4.0, 8.0), "c/judge": (10.0, 20.0)}
-    c = cost_ceiling(cfg, PROMPTS, counts, prices)
+    c = cost_projection(cfg, PROMPTS, counts, prices)
     assert not [r for r in c.rows if r.role == "probe"]

@@ -9,7 +9,7 @@
 # candidates: that's expected, and the report flags it as a caveat.
 #
 # Cost: 16 models = C(16,2)=120 matches. The preflight prints an exact spend
-# ceiling and asks once before anything runs. Consider --rounds to trim, or a
+# projection and asks once before anything runs. Consider --rounds to trim, or a
 # smaller --prompts slice.
 #
 # Run: orq-arena run --config configs/frontier_16.yaml --prompts your_prompts.jsonl

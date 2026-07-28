@@ -47,24 +47,29 @@ def _win_pct(grid: dict[str, dict[str, float]], name: str) -> str:
 
 
 def _verdict_line(ended: TournamentEnded) -> str | None:
-    """The report banner's headline call: a winner, or an honest tie."""
+    """The terminal's headline call, held to the same bar as the report page.
+
+    Reads the run's own separation measurement (the bootstrap of the top two's
+    difference). It used to compare the two marginal intervals and call an
+    overlap a statistical tie, which overlap never licenses: the intervals are
+    drawn from the same resamples and move together.
+    """
     r: dict[str, Any] = ended.report or {}
     ranked = _ranked(ended)
     if not ranked:
         return None
     if len(ranked) == 1:
         return f"🏆 {ranked[0][0]} wins"
-    ci = r.get("elo_ci") or {}
-    (n1, e1), (n2, e2) = ranked[0], ranked[1]
-    lo1, hi1 = ci.get(n1, (e1, e1))
-    lo2, hi2 = ci.get(n2, (e2, e2))
-    if ci and lo1 <= hi2 and lo2 <= hi1:
-        return (
-            f"🏆 {n1} leads, but {n2} is statistically tied "
-            f"(CIs overlap at {r.get('rated_rounds', 0)} rated rounds; "
-            "the report page has the tie-breakers)"
-        )
-    return f"🏆 {n1} wins"
+    diff = r.get("top_difference")
+    if not diff:
+        return f"🏆 {ranked[0][0]} has the best rating"
+    if diff["separated"]:
+        return f"🏆 {diff['champion']} wins"
+    return (
+        f"🏆 {diff['champion']} leads, but {r.get('rated_rounds', 0)} rated rounds "
+        f"cannot separate it from {diff['runner_up']} "
+        f"(ahead in {diff['win_rate']:.0%} of resamples; the report page has the tie-breakers)"
+    )
 
 
 def _final_table(ended: TournamentEnded) -> Table:

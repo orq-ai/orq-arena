@@ -83,3 +83,57 @@ def test_draw_prints_a_draw_line():
 
     asyncio.run(_drive_draw())
     assert "draw" in err_buf.getvalue()
+
+
+# --- the terminal verdict, held to the report page's bar ------------------
+
+
+def _verdict(top_difference, elo=None):
+    from orq_arena.headless import _verdict_line
+
+    report = {"elo_ci": {"a": (900.0, 1300.0), "b": (700.0, 1100.0)}, "rated_rounds": 40}
+    if top_difference is not None:
+        report["top_difference"] = top_difference
+    return _verdict_line(
+        TournamentEnded(
+            champion="a",
+            elo=elo or {"a": 1100.0, "b": 900.0},
+            battle_log_path="x.jsonl",
+            report=report,
+        )
+    )
+
+
+def test_headless_verdict_separates_on_the_difference_not_on_overlap():
+    """Headless is the default run mode, so this line is what most users see.
+    The marginal intervals here overlap; the measured difference does not."""
+    line = _verdict(
+        {
+            "champion": "a",
+            "runner_up": "b",
+            "lo": 25.0,
+            "hi": 284.0,
+            "win_rate": 0.99,
+            "separated": True,
+        }
+    )
+    assert line == "🏆 a wins"
+
+
+def test_headless_verdict_never_calls_an_unresolved_gap_a_tie():
+    line = _verdict(
+        {
+            "champion": "a",
+            "runner_up": "b",
+            "lo": -120.0,
+            "hi": 284.0,
+            "win_rate": 0.71,
+            "separated": False,
+        }
+    )
+    assert "cannot separate" in line and "71%" in line
+    assert "statistically tied" not in line
+
+
+def test_headless_verdict_claims_nothing_when_nothing_was_measured():
+    assert _verdict(None) == "🏆 a has the best rating"

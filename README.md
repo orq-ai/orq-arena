@@ -34,11 +34,11 @@ Models are called through the [orq.ai router gateway](https://docs.orq.ai/docs/a
 - Re-rank the pool when a new model drops: one command, exact token accounting
 - Generate **pairwise preference data** (`battles.jsonl`) with per-judge votes for later analysis
 - Check whether "thinking" actually helps on your workload (uniform ON vs OFF pools)
-- Pick the strong/economical pair for your [Orq.ai Auto Router](https://docs.orq.ai/docs/ai-gateway/auto-router): the leaderboard shows which cheaper models are statistically tied with your strongest
+- Pick the strong/economical pair for your [Orq.ai Auto Router](https://docs.orq.ai/docs/ai-gateway/auto-router): the leaderboard shows which cheaper models your strongest cannot be told apart from
 
 ## What you get
 
-- **A ranking you can defend.** The rating is [Bradley-Terry](https://en.wikipedia.org/wiki/Bradley%E2%80%93Terry_model), the statistical model behind chess-style ratings, fit over every judged round with bootstrapped 95% confidence intervals. When two models are statistically tied, the report says so instead of hiding it. Judge-agreement stats ship with the standings.
+- **A ranking you can defend.** The rating is [Bradley-Terry](https://en.wikipedia.org/wiki/Bradley%E2%80%93Terry_model), the statistical model behind chess-style ratings, fit over every judged round with bootstrapped 95% confidence intervals. When a run is too small to separate the top two, the report says exactly that, with the measured gap, instead of calling it a tie or hiding it. Judge-agreement stats ship with the standings.
 - **A report you can share.** One HTML per run. Verdict first, then the ELO ladder with error bars, a quality-vs-cost chart, latency, and the exact dollar spend.
 - **Raw data out the back.** Every judged round lands in `battles.jsonl`: both responses, each judge's vote, exact token counts, per-response timing. Real pairwise preference data for whatever you want to do next.
 - **Jury swaps.** The responses are already recorded, so re-judging with a different panel costs judge tokens only, and tells you how much the ranking depends on who judged it.
@@ -90,7 +90,7 @@ orq-arena report examples/quickstart/battles.jsonl \
 orq-arena run --config orq_arena.yaml --prompts your_prompts.jsonl
 ```
 
-Before spending anything, the preflight prints the exact number of API calls and a worst-case dollar ceiling, then asks once. Matches run in parallel with plain log lines. When the last round lands, the **HTML report is written next to the battle log** (`--open` to view it in your browser).
+Before spending anything, the preflight prints the exact number of API calls, what a clean run costs and what it could reach if streams retry, then asks once. Matches run in parallel with plain log lines. When the last round lands, the **HTML report is written next to the battle log** (`--open` to view it in your browser).
 
 ```bash
 # CI/cron-ready: -y skips the confirmation (required in a non-interactive
