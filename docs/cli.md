@@ -222,7 +222,8 @@ preflight: 28 matches × 5 rounds → 280 model streams + 840 judge calls + 8 pr
 │   openai/gpt-5.4-nano                 │   280 │   0.20 │    1.25 │   $0.97  │
 │ Thinking probe                        │     8 │        │         │   $0.09  │
 ├───────────────────────────────────────┼───────┼────────┼─────────┼──────────┤
-│ MAXIMUM SPEND                         │       │        │         │ ≤ $11.87 │
+│ PROJECTED SPEND                       │       │        │         │ ≈ $11.87 │
+│ worst case, retries + stand-ins       │       │        │         │ ≈ $18.22 │
 └───────────────────────────────────────┴───────┴────────┴─────────┴──────────┘
      worst case: every response maxed out at its token cap; typical runs
          cost noticeably less. Exact spend is reported after the run.
@@ -246,8 +247,9 @@ match 3/28 done
 M28 🤝 draw
 match 28/28 done
 
-🏆 gemini-3.5-flash leads, but claude-sonnet-4-6 is statistically tied (CIs
-overlap at 76 rated rounds; the report page has the tie-breakers)
+🏆 gemini-3.5-flash leads, but 76 rated rounds cannot separate it from
+claude-sonnet-4-6 (ahead in 83% of resamples; the report page has the
+tie-breakers)
 
                     Final Results
 ┏━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━┳━━━━━━━━━━━┳━━━━━━┓
@@ -274,7 +276,7 @@ report page → examples/quickstart/battles.report.html
 On a terminal (not piped) the per-round heartbeat lines are replaced by a pinned
 progress bar (spinner, rounds M-of-N, elapsed, current leader) that advances once per
 round, with the per-match lines printing above it; without `-y` the run pauses at
-`Proceed (spends up to $11.87)? [y/N]` after the preflight, before any battle or
+`Proceed (≈ $11.87, up to $18.22 with retries)? [y/N]` after the preflight, before any battle or
 judge call.
 
 See [Match rules, gateway, candidates, and judges](configuration.md) for every YAML key this
@@ -285,11 +287,12 @@ command reads, and [methodology.md](methodology.md) for how matches are schedule
 ## The `--tui` live show
 
 `orq-arena run --tui` opens on the **RUN PLAN screen**: the branding, the prompt set and its
-size, and the full per-model cost table (every candidate and judge listed, worst-case ceiling
-per row), ending in the run's one confirmation, `ENTER fight (spends up to $X)` / `Q quit`.
+size, and the full per-model cost table (every candidate and judge listed, cost per row),
+ending in the run's one confirmation,
+`ENTER fight (≈ $X, up to $Y with retries)` / `Q quit`.
 Nothing has been spent when it renders except the tiny thinking-probe calls; `-y` skips the
 screen and starts the fight directly. On endpoints without catalog pricing the table keeps
-its call counts and the ceiling reads `unavailable`.
+its call counts and the spend line reads `spend projection unavailable`.
 
 ![RUN PLAN screen: prompts block, per-model cost table, consent bar](assets/run-plan.svg)
 
@@ -532,7 +535,7 @@ orq-arena report [LOG_PATH] [--config PATH] [--output PATH]
 | `--output PATH` | `<log>.report.html` | Destination HTML file. |
 
 The page is self-contained (inline CSS, no external assets, works from `file://`): verdict
-headline with a CI-overlap caveat, the ELO ladder with confidence-interval bars and the
+headline stating whether the top two separate, the ELO ladder with confidence-interval bars and the
 len-ctrl column, the win grid, per-judge behaviour, token and cost accounting (catalog
 rates when a key is present: candidate spend exact, jury spend estimated at the panel mean;
 one catalog read, never completion spend), and the
@@ -667,7 +670,7 @@ orq-arena refresh-catalog [--config PATH] [--show/--no-show]
   workspace-enabled, chat-capable catalog live from orq.ai. Non-chat models (embeddings,
   TTS/STT, image, rerank, moderation, etc.) are filtered out. Use `--show` to discover
   model ids for your YAML's `candidates` list; the same catalog also prices the preflight
-  spend ceiling and the report's cost section.
+  spend projection and the report's cost section.
 - **Without `ORQ_API_KEY`:** the command doesn't error, it skips the live fetch and falls
   back to any existing cache; with no cache either, it prints `0 models (source=fallback, ...)`
   (this command passes no fallback ids of its own).

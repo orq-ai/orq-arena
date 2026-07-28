@@ -61,7 +61,7 @@ def _est_tokens(text: str) -> int:
 class CostRow:
     """One line of the run-plan cost table; usd=None means unpriced, not $0."""
 
-    role: str  # "candidate" | "judge" | "probe"
+    role: str  # "candidate" | "judge" | "replacement" | "probe"
     model_id: str
     calls: int  # streams for candidates, judge calls for judges, probes for probe
     price_in: float | None  # $/M input tokens; None when absent from the catalog
@@ -148,11 +148,35 @@ def cost_projection(
             probe_usd += (cin * probe_prompt_tok + cout * _PROBE_MAX_TOKENS) / 1e6
         rows.append(CostRow("probe", "thinking probe", counts.probe_calls, None, None, probe_usd))
 
+    # Stand-ins are priced at their own worst rate, not the primary panel's: a
+    # cheap panel backed by an expensive replacement would otherwise slip past
+    # the figure entirely.
+    replacement_usd = 0.0
+    if cfg.replacement_judges:
+        per_call = [
+            (prices[j][0] * judge_in_tok + prices[j][1] * cfg.gateway.judge_max_tokens) / 1e6
+            for j in cfg.replacement_judges
+            if j in prices
+        ]
+        unpriced.extend(j for j in cfg.replacement_judges if j not in prices)
+        # Every primary call failing and being stood in for is the bound.
+        replacement_usd = max(per_call, default=0.0) * calls_per_judge * len(cfg.judges)
+        rows.append(
+            CostRow(
+                "replacement",
+                ", ".join(cfg.replacement_judges),
+                0,  # only on failure; no call is scheduled up front
+                None,
+                None,
+                replacement_usd or None,
+            )
+        )
+
     projected = models_usd + judges_usd + probe_usd
     # Failure paths that spend money without adding a call to any count:
     # `_generate_side` retries a dead stream once, and evaluatorq promotes a
     # stand-in for a judge call that errors outright.
-    worst_case = projected + models_usd + (judges_usd if cfg.replacement_judges else 0.0)
+    worst_case = projected + models_usd + replacement_usd
     return CostProjection(
         projected_usd=projected,
         worst_case_usd=worst_case,

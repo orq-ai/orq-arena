@@ -197,8 +197,9 @@ match 3/28 done
 M28 🤝 draw
 match 28/28 done
 
-🏆 gemini-3.5-flash leads, but claude-sonnet-4-6 is statistically tied (CIs
-overlap at 76 rated rounds; the report page has the tie-breakers)
+🏆 gemini-3.5-flash leads, but 76 rated rounds cannot separate it from
+claude-sonnet-4-6 (ahead in 83% of resamples; the report page has the
+tie-breakers)
 
                     Final Results
 ┏━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━┳━━━━━━━━━━━┳━━━━━━┓

@@ -83,3 +83,84 @@ def test_no_outcomes_is_not_a_separation_claim():
 def test_seeded_and_reproducible():
     m = _lead()
     assert paired_difference(m, MODELS, "a", "b") == paired_difference(m, MODELS, "a", "b")
+
+
+# --- the rule as the reader meets it -------------------------------------
+
+from orq_arena.config import ArenaConfig  # noqa: E402
+from orq_arena.data.schemas import BattleRecord  # noqa: E402
+from orq_arena.report import build_report_html  # noqa: E402
+
+_CFG = ArenaConfig.model_validate(
+    {"candidates": [{"model_id": "p/a"}, {"model_id": "p/b"}], "judges": ["p/j1", "p/j2"]}
+)
+_RECORDS = [
+    BattleRecord(
+        prompt_hash="h",
+        prompt_text="p",
+        model_a="a",
+        model_b="b",
+        response_a="x",
+        response_b="y",
+        majority_verdict="A",
+        winner="a",
+        judge_votes=[{"model": "p/j1", "vote": "A"}],
+    )
+]
+# Marginal intervals that overlap heavily: the old rule read these as a tie.
+_OVERLAPPING_CI = {"a": (900.0, 1300.0), "b": (700.0, 1100.0)}
+
+
+def _page(top_difference) -> str:
+    report = {"elo_ci": _OVERLAPPING_CI, "rated_rounds": 40}
+    if top_difference is not None:
+        report["top_difference"] = top_difference
+    return build_report_html(
+        cfg=_CFG,
+        records=_RECORDS,
+        elo={"a": 1100.0, "b": 900.0},
+        report=report,
+        manifest={},
+    )
+
+
+def _diff(**over) -> dict:
+    base = {"champion": "a", "runner_up": "b", "lo": 25.0, "hi": 284.0, "win_rate": 0.99}
+    return {**base, "separated": base["lo"] > 0} | over
+
+
+def test_page_separates_on_the_difference_even_though_the_bars_overlap():
+    """The whole point: overlapping marginal intervals, separated top spot."""
+    page = _page(_diff())
+    assert "TOP SPOT SEPARATED" in page
+    assert "Adopt a" in page
+    assert "holds across resamples" in page
+
+
+def test_page_never_calls_an_unresolved_gap_a_tie():
+    page = _page(_diff(lo=-120.0, hi=284.0, win_rate=0.71, separated=False))
+    assert "NOT RESOLVED" in page
+    assert "ahead in 71% of resamples" in page
+    for banned in (
+        "statistically tied",
+        "STATISTICAL TIE",
+        "indistinguishable",
+        "effectively tied",
+    ):
+        assert banned not in page
+
+
+def test_a_run_with_no_measurement_claims_nothing_either_way():
+    """Runs recorded before this existed carry no difference. The page must not
+    invent one, in either direction."""
+    page = _page(None)
+    assert "SEPARATION NOT MEASURED" in page
+    assert "NOT RESOLVED" not in page
+    assert "TOP SPOT SEPARATED" not in page
+    assert "too small to call it" not in page
+
+
+def test_the_page_reports_the_pair_the_difference_was_measured_between():
+    """Not a separately derived ranking that could disagree with it."""
+    page = _page(_diff(champion="b", runner_up="a", lo=-284.0, hi=-25.0, win_rate=0.01))
+    assert "b" in page

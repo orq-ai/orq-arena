@@ -56,9 +56,17 @@ fit (Bradley & Terry, 1952) over every judged round, refit as the tournament pro
 count as half a win for each side. This is the same statistical core as Chatbot Arena's
 leaderboard (Chiang et al., 2024). Ratings are anchored so the field's average sits at 1000.
 
-**Confidence intervals.** A 200-resample bootstrap gives each candidate a 95% CI. On a small
-run the intervals are wide and overlapping; that is the honest output, and overlapping CIs
-should be read as "not statistically distinguishable at this sample size", not as a tie.
+**Confidence intervals.** A 1000-resample bootstrap gives each candidate a 95% CI. On a small
+run the intervals are wide and overlapping; that is the honest output. Those intervals are
+*marginal*, so read one at a time: two of them overlapping does not mean the two models are
+tied, or even that they are indistinguishable. Both are drawn from the same resamples and
+share the anchoring, so they move together.
+
+**Separation.** Whether the top two actually differ is a question about their *difference*,
+bootstrapped within each resample: the top spot is separated when that difference interval
+excludes 0. When it does not, the run reports the measured gap and how often the leader came
+out ahead ("ahead in 71% of resamples") rather than declaring a tie, which the data cannot
+support either way.
 
 **Length control.** Seat-swapping fixes position bias, not verbosity bias: a jury that likes
 longer answers likes them in both orders. Following length-controlled AlpacaEval (Dubois et

@@ -97,7 +97,7 @@ class RunPlanScreen(Screen):
                 yield Static(
                     "no catalog price (self-hosted or unpriced): "
                     + ", ".join(cost.unpriced)
-                    + "; excluded from the total",
+                    + "; excluded from both figures",
                     classes="muted",
                 )
             yield Static(
@@ -128,7 +128,7 @@ class RunPlanScreen(Screen):
     def on_mount(self) -> None:
         cost = self._plan["cost"]
         table = self.query_one("#plan", DataTable)
-        for col in ("Model", "Calls", "$/M in", "$/M out", "Ceiling"):
+        for col in ("Model", "Calls", "$/M in", "$/M out", "Cost"):
             table.add_column(col)
         for role, header in (
             ("candidate", "Candidates"),
@@ -168,7 +168,10 @@ class RunPlanScreen(Screen):
         cost = self._plan["cost"]
         if cost.projected_usd > 0:
             suffix = " + ?" if cost.unpriced else ""
-            fight = f"ENTER  fight (≈ ${cost.projected_usd:.2f}{suffix})"
+            fight = (
+                f"ENTER  fight (≈ ${cost.projected_usd:.2f}{suffix}, "
+                f"up to ${cost.worst_case_usd:.2f} with retries)"
+            )
         else:
             fight = "ENTER  fight"
         return f"[ {fight} ]      [ Q  quit ]"

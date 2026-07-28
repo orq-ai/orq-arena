@@ -356,8 +356,9 @@ def _print_run_plan(cost) -> None:
     table = Table(
         title="RUN PLAN",
         caption=(
-            "worst case: every response maxed out at its token cap; typical runs\n"
-            "cost noticeably less. Exact spend is reported after the run."
+            "every response is assumed to hit its token cap, so a typical run costs less;\n"
+            "prompt tokens are estimated, so neither figure is a hard cap.\n"
+            "Exact spend is reported after the run."
         ),
     )
     columns: list[tuple[str, Literal["left", "right"]]] = [
@@ -365,7 +366,7 @@ def _print_run_plan(cost) -> None:
         ("Calls", "right"),
         ("$/M in", "right"),
         ("$/M out", "right"),
-        ("Ceiling", "right"),
+        ("Cost", "right"),
     ]
     for col, justify in columns:
         table.add_column(col, justify=justify)

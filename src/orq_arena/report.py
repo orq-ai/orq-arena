@@ -543,6 +543,8 @@ def build_report_html(
     # intervals overlapping would say nothing: they share the anchoring and move
     # together, so overlap is routine even for a lead that never reverses.
     # None when there's no runner-up, or a run recorded before this was measured.
+    # Three states, not two. A run recorded before this was measured must not
+    # be described as unresolved: nothing was measured, so nothing is claimed.
     top_diff = report.get("top_difference") or None
     top_separated: bool | None = top_diff["separated"] if top_diff else None
 
@@ -670,7 +672,9 @@ def build_report_html(
             )
         )
     if top_diff:
-        runner_name = ranked[1][0]
+        # The names the difference was measured between, never a separately
+        # derived ranking that could disagree with it.
+        champ_name, runner_name = top_diff["champion"], top_diff["runner_up"]
         rate = f"{top_diff['win_rate']:.0%}"
         if top_separated:
             signal_rows.append(
@@ -690,7 +694,7 @@ def build_report_html(
                     "Top-spot separation",
                     f"not resolved at this sample size: the gap to {_e(runner_name)} spans "
                     f"<b>{top_diff['lo']:.0f} to {top_diff['hi']:.0f}</b> rating points, with "
-                    f"{_e(champion)} ahead in {rate} of resamples",
+                    f"{_e(champ_name)} ahead in {rate} of resamples",
                     " warn",
                 )
             )
@@ -856,11 +860,11 @@ def build_report_html(
             f"{_e(champion)} beat every other model in this pool on your prompts and its lead "
             f"over {_e(runner_name)} exceeds the uncertainty of a run this size."
         )
-    else:
+    elif top_diff:
         # Unresolved is not tied. The models may well differ; this run is too
         # small to say. Report which way it leans and how often, and let the
         # reader decide whether to spend more rounds or pick on cost.
-        lean = f"{top_diff['win_rate']:.0%}" if top_diff else ""
+        lean = f"{top_diff['win_rate']:.0%}"
         vclass, headline = (
             " tied",
             (
@@ -869,15 +873,30 @@ def build_report_html(
             ),
         )
         expl = (
-            f"{_e(champion)} has the best rating"
-            + (f" and stays ahead of {_e(runner_name)} in {lean} of resamples" if lean else "")
-            + f", but at {len(records)} rounds the gap could still be either way. That is not "
-            f"evidence they are equal, only that this run cannot separate them. The value map "
-            f"below breaks the deadlock on cost; more rounds would settle it on quality."
+            f"{_e(champion)} has the best rating and stays ahead of {_e(runner_name)} in "
+            f"{lean} of resamples, but at {len(records)} rounds the gap could still be either "
+            f"way. That is not evidence they are equal, only that this run cannot separate "
+            f"them. The value map below breaks the deadlock on cost; more rounds would settle "
+            f"it on quality."
         )
-    status = (
-        "&#10003; TOP SPOT SEPARATED" if separated else "&#9888; TOP SPOT NOT RESOLVED AT THIS SIZE"
-    )
+    else:
+        # Nothing was measured (a run recorded before separation was computed),
+        # so the page claims nothing either way rather than inventing a verdict.
+        vclass, headline = (
+            " tied",
+            f"{_e(champion)} has the best rating in this pool.",
+        )
+        expl = (
+            f"This run predates the separation check, so whether the gap to {_e(runner_name)} "
+            f"is real was never measured. Regenerate the report from the battle log to find "
+            f"out: <code>orq-arena report &lt;log&gt;</code>."
+        )
+    if separated:
+        status = "&#10003; TOP SPOT SEPARATED"
+    elif top_diff:
+        status = "&#9888; TOP SPOT NOT RESOLVED AT THIS SIZE"
+    else:
+        status = "SEPARATION NOT MEASURED"
     top3 = []
     for i, (nm, e0) in enumerate(ranked[:3]):
         cls = " state" if i == 0 else ""

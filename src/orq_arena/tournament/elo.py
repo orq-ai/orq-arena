@@ -128,16 +128,18 @@ def style_controlled_elo(
 BOOTSTRAP_ITERATIONS = 1000
 
 
-def _resampled_ratings(
+def bootstrap_draws(
     matches: list[tuple[str, str, str]],
     models: list[str],
-    iterations: int,
-    seed: int,
+    iterations: int = BOOTSTRAP_ITERATIONS,
+    seed: int = 42,
 ) -> list[dict[str, float]]:
     """One refitted rating vector per resample, kept whole.
 
-    Every summary below reads these same vectors, so a difference is always
-    taken within one resample rather than between two summaries of them.
+    Callers summarize these same draws rather than resampling per question, so
+    an interval and a difference computed for one report always describe the
+    same bootstrap. Resampling twice would agree only for as long as both call
+    sites happened to pass the same seed.
     """
     import random
 
@@ -176,7 +178,15 @@ def bootstrap_ci(
     """
     if not matches:
         return {m: (1000.0, 1000.0) for m in models}
-    draws = _resampled_ratings(matches, models, iterations, seed)
+    return ci_from_draws(bootstrap_draws(matches, models, iterations, seed), models)
+
+
+def ci_from_draws(
+    draws: list[dict[str, float]], models: list[str]
+) -> dict[str, tuple[float, float]]:
+    """Marginal 95% intervals from pre-computed draws."""
+    if not draws:
+        return {m: (1000.0, 1000.0) for m in models}
     return {m: _percentiles([d[m] for d in draws]) for m in models}
 
 
@@ -197,7 +207,8 @@ class Difference:
 
     @property
     def separated(self) -> bool:
-        return self.lo > 0.0
+        """True when the interval excludes 0, in either direction."""
+        return self.lo > 0.0 or self.hi < 0.0
 
 
 def paired_difference(
@@ -216,6 +227,13 @@ def paired_difference(
     """
     if not matches:
         return Difference(lo=0.0, hi=0.0, win_rate=0.5)
-    diffs = [d[a] - d[b] for d in _resampled_ratings(matches, models, iterations, seed)]
+    return difference_from_draws(bootstrap_draws(matches, models, iterations, seed), a, b)
+
+
+def difference_from_draws(draws: list[dict[str, float]], a: str, b: str) -> Difference:
+    """``rating[a] - rating[b]`` from pre-computed draws, differenced per draw."""
+    if not draws:
+        return Difference(lo=0.0, hi=0.0, win_rate=0.5)
+    diffs = [d[a] - d[b] for d in draws]
     lo, hi = _percentiles(diffs)
     return Difference(lo=lo, hi=hi, win_rate=sum(d > 0 for d in diffs) / len(diffs))

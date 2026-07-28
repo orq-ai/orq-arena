@@ -11,7 +11,7 @@ page. Regenerate it from the recorded log at any time (no model calls):
 orq-arena report examples/quickstart/battles.jsonl
 ```
 
-Reproduce the whole run (needs `ORQ_API_KEY`, ~$12 ceiling, several minutes):
+Reproduce the whole run (needs `ORQ_API_KEY`, ~$12 projected, several minutes):
 
 ```bash
 orq-arena run --config examples/quickstart/config.yaml \

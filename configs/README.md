@@ -15,7 +15,7 @@ coherent, no makeweights padding a "frontier" field, no giants lurking in a
 | [`frontier_16.yaml`](frontier_16.yaml) | 16 | 8 | ~29-56 | Big-field stress test + preference-data generation |
 
 Pool size drives cost: an N-model pool runs C(N,2) matches (28 for 8, 120 for
-16), each `match.max_rounds` rounds. Every run prints an exact spend ceiling and
+16), each `match.max_rounds` rounds. Every run prints a spend projection and
 asks once before spending anything.
 
 Notes:

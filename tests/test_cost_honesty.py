@@ -19,7 +19,7 @@ PRICES = {
     "prov/a": (1.0, 3.0),
     "prov/b": (1.0, 3.0),
     "prov/judge-1": (0.5, 1.5),
-    "prov/stand-in": (0.5, 1.5),
+    "prov/stand-in": (5.0, 15.0),  # 10x the primary panel, on purpose
 }
 
 
@@ -59,25 +59,42 @@ def test_worst_case_covers_replacement_judges_when_configured():
     )
 
 
+def test_stand_ins_are_priced_at_their_own_rate_not_the_panel_s():
+    """A cheap panel backed by an expensive stand-in must not slip past the
+    figure: `prov/stand-in` costs 10x `prov/judge-1` in PRICES."""
+    p = _project(_cfg(replacement_judges=["prov/stand-in"]))
+    replacement_headroom = p.worst_case_usd - p.projected_usd - p.models_usd
+    assert replacement_headroom > p.judges_usd * 5, (
+        "the stand-in was priced at the primary panel's rate"
+    )
+
+
+def test_an_unpriced_stand_in_is_reported_not_silently_free():
+    p = _project(_cfg(replacement_judges=["prov/no-price"]))
+    assert "prov/no-price" in p.unpriced
+
+
 def test_no_replacement_judges_means_no_replacement_headroom():
     p = _project(_cfg())
     assert p.worst_case_usd - p.projected_usd == pytest.approx(p.models_usd)  # retry only
 
 
-def test_projection_is_not_advertised_as_a_bound():
-    """The type carries both numbers, so no caller has to guess which it holds."""
+def test_the_projection_is_the_number_a_clean_run_spends():
+    """Both figures exist and differ, so no caller has to guess which it holds."""
     p = _project(_cfg())
-    assert hasattr(p, "projected_usd") and hasattr(p, "worst_case_usd")
-    assert not hasattr(p, "total_usd"), "the old name asserted a bound it never was"
+    assert 0 < p.projected_usd < p.worst_case_usd
 
 
-def test_prompt_tokens_are_estimated_and_the_type_says_so():
-    """chars/4 under-counts CJK, code and dense punctuation, so neither figure
-    is a hard guarantee and the docstring must not claim one."""
-    assert "estimat" in (cost_projection.__doc__ or "").lower()
-    from orq_arena import preflight
-
-    assert "never over" not in (preflight.__doc__ or "")
+def test_prompt_tokens_are_estimated_so_neither_figure_is_a_hard_cap():
+    """chars/4 under-counts dense scripts, so the same prompt length in CJK
+    prices identically to ASCII while really costing more. Demonstrates why
+    neither figure may be presented as a guaranteed cap."""
+    ascii_prompts = [PromptItem(text="a" * 400)]
+    cjk_prompts = [PromptItem(text="\u6f22" * 400)]
+    cfg = _cfg()
+    a = cost_projection(cfg, ascii_prompts, call_counts(cfg, ascii_prompts), PRICES)
+    c = cost_projection(cfg, cjk_prompts, call_counts(cfg, cjk_prompts), PRICES)
+    assert a.projected_usd == c.projected_usd
 
 
 def test_unpriced_models_still_do_not_inflate_either_figure():

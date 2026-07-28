@@ -29,9 +29,11 @@ from ..events import ArenaEvent, StandingsUpdated, TournamentEnded
 from ..providers.orq_gateway import OrqGateway
 from .elo import (
     bootstrap_ci,
+    bootstrap_draws,
     bradley_terry_mle,
     build_wins_matrix,
-    paired_difference,
+    ci_from_draws,
+    difference_from_draws,
     style_controlled_elo,
 )
 
@@ -100,18 +102,16 @@ def _rebuild_comparisons(records: list[BattleRecord]) -> list[PairwiseComparison
     return comps
 
 
-def _top_difference(outcomes: list[Outcome], names: list[str]) -> dict | None:
-    """Bootstrap of (champion - runner-up), or None when there is no pair."""
-    triples = _triples(outcomes)
-    if len(names) < 2 or not triples:
+def _top_difference(draws: list[dict[str, float]], ranked: list[tuple[str, float]]) -> dict | None:
+    """Bootstrap of (champion - runner-up), from the report's own draws.
+
+    Carries the two names it was computed from, so a reader can never pair
+    these numbers with a different runner-up than the one measured.
+    """
+    if len(ranked) < 2 or not draws:
         return None
-    ranked = sorted(
-        bradley_terry_mle(build_wins_matrix(triples), names).items(),
-        key=lambda kv: kv[1],
-        reverse=True,
-    )
-    (champion, _), (runner, _) = ranked[0], ranked[1]
-    diff = paired_difference(triples, names, champion, runner)
+    champion, runner = ranked[0][0], ranked[1][0]
+    diff = difference_from_draws(draws, champion, runner)
     return {
         "champion": champion,
         "runner_up": runner,
@@ -189,11 +189,21 @@ def _final_report(
         and rec.model_b in orc_by_model
     ]
     elo_sc, length_coef = style_controlled_elo(style_rows, names)
+    # One bootstrap, summarized two ways: the marginal intervals below and the
+    # top-two difference. Resampling separately per question would leave them
+    # agreeing only for as long as both call sites passed the same seed.
+    triples = _triples(outcomes)
+    draws = bootstrap_draws(triples, names) if triples else []
+    ranked_now = sorted(
+        bradley_terry_mle(build_wins_matrix(triples), names).items(),
+        key=lambda kv: kv[1],
+        reverse=True,
+    )
     return {
-        "elo_ci": bootstrap_ci(_triples(outcomes), names),
+        "elo_ci": ci_from_draws(draws, names) if draws else bootstrap_ci(triples, names),
         # Whether the top two actually differ is a question about their
         # difference, not about whether two marginal intervals happen to touch.
-        "top_difference": _top_difference(outcomes, names),
+        "top_difference": _top_difference(draws, ranked_now),
         "elo_style_controlled": elo_sc if style_rows else None,
         "length_coef": length_coef if style_rows else None,
         "elo_by_category": elo_by_category(outcomes),

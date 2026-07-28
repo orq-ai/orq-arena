@@ -44,14 +44,15 @@ library for exactly this kind of jury.
 - Re-rank the pool when a new model drops: one command, exact token accounting
 - Generate **pairwise preference data** (`battles.jsonl`) with per-judge votes for later analysis
 - Check whether "thinking" actually helps on your workload (uniform ON vs OFF pools)
-- Pick the strong/economical pair for your [Orq.ai Auto Router](https://docs.orq.ai/docs/ai-gateway/auto-router): the leaderboard shows which cheaper models are statistically tied with your strongest
+- Pick the strong/economical pair for your [Orq.ai Auto Router](https://docs.orq.ai/docs/ai-gateway/auto-router): the leaderboard shows which cheaper models your strongest cannot be told apart from
 
 ## What you get
 
 - **A ranking you can defend.** The rating is
   [Bradley-Terry](https://en.wikipedia.org/wiki/Bradley%E2%80%93Terry_model), the statistical
   model behind chess-style ratings, fit over every judged round with bootstrapped 95% confidence
-  intervals. When two models are statistically tied, the report says so instead of hiding it.
+  intervals. When a run is too small to separate the top two, the report says exactly that
+  instead of calling it a tie.
   Judge-agreement stats ship with the standings.
 - **A report you can share.** One HTML per run. Verdict first, then the ELO ladder with
   error bars, a quality-vs-cost chart, latency, and the exact dollar spend.
