@@ -44,7 +44,7 @@ library for exactly this kind of jury.
 - Re-rank the pool when a new model drops: one command, exact token accounting
 - Generate **pairwise preference data** (`battles.jsonl`) with per-judge votes for later analysis
 - Check whether "thinking" actually helps on your workload (uniform ON vs OFF pools)
-- Pick the strong/economical pair for your [Orq.ai Auto Router](https://docs.orq.ai/docs/ai-gateway/auto-router): the leaderboard shows which cheaper models your strongest cannot be told apart from
+- Pick the strong/economical pair for your [Orq.ai Auto Router](https://docs.orq.ai/docs/ai-gateway/auto-router): the report's quality-vs-cost map puts every model's rating against what it costs, so the cheap end of the field is easy to read off
 
 ## What you get
 
@@ -55,7 +55,8 @@ library for exactly this kind of jury.
   instead of calling it a tie.
   Judge-agreement stats ship with the standings.
 - **A report you can share.** One HTML per run. Verdict first, then the ELO ladder with
-  error bars, a quality-vs-cost chart, latency, and the exact dollar spend.
+  error bars, a quality-vs-cost chart, latency, and the dollar spend: exact per model at
+  catalog rates, marked `≈` for the jury, whose spend is estimated at the panel's mean rate.
 - **Raw data out the back.** Every judged round lands in `battles.jsonl`: both responses, each
   judge's vote, exact token counts, per-response timing. Real pairwise preference data for
   whatever you want to do next.

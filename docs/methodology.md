@@ -32,14 +32,17 @@ flowchart TD
     rec -- no --> flip["abstain, flipped=True"]
     rec -- "a call failed" --> fail["abstain, not a flip"]
     vote --> quorum{"≥ 2 decisive votes?"}
-    quorum -- yes --> verdict["round verdict: A / B / tie"]
     quorum -- no --> inc["inconclusive,<br/>never reaches the rating"]
+    quorum -- yes --> plur{"strict plurality<br/>among them?"}
+    plur -- yes --> verdict["round verdict: A / B / tie"]
+    plur -- no --> inc
 ```
 
 A judge that gives a different verdict in each order abstains for that round, and the flip is
-recorded. A round needs at least two decisive votes (configurable) to produce a verdict;
-otherwise it is dropped from the rating rather than decided by a jury that could not agree
-with itself.
+recorded. A round needs at least two decisive votes (configurable) to produce a verdict, and
+that quorum is necessary but not sufficient: the surviving votes still have to reach a strict
+plurality. Two decisive votes that disagree one-all produce no plurality, so the round is
+dropped from the rating rather than decided by a jury that could not agree with itself.
 
 **Self-preference.** LLM judges recognize and favor their own family's prose (Panickssery et
 al., 2024). A judge that is also a contestant is excluded from its own matches, and the
@@ -71,9 +74,10 @@ support either way.
 **Length control.** Seat-swapping fixes position bias, not verbosity bias: a jury that likes
 longer answers likes them in both orders. Following length-controlled AlpacaEval (Dubois et
 al., 2024) and LMArena's style control, the fit is repeated with a length term, producing the
-jury's length coefficient (printed with the standings) and a len-ctrl rating column with that
-preference priced out. A big raw-vs-len-ctrl gap means verbosity, not quality, is doing the
-separating. Length is the only style axis controlled today; markdown formatting is not.
+jury's length coefficient (printed with the standings) and a second rating column with that
+preference priced out (`length-adj.` on the report page, `len-ctrl` in the live TUI). A big
+gap between a model's two ratings means verbosity, not quality, is doing the separating.
+Length is the only style axis controlled today; markdown formatting is not.
 
 **Per-category slices.** Ratings are also refit per prompt category, but only for categories
 with enough comparisons to mean anything; thin slices are dropped instead of shown with
@@ -117,10 +121,13 @@ not mistaken for the same set.
 Rounds are written to the battle log as they resolve, not batched to the end of a match, so a run
 interrupted partway keeps every round it already paid for. Each record carries the full router id
 of both models alongside the short display name, because short names collide across providers
-(`openai/gpt-oss-120b` and `groq/gpt-oss-120b`). Every per-model view is keyed on that full id, not
-just the leaderboard: the rating, the length-controlled rating, verbosity, cost and speed, so two
-providers of one model can never be apart in one panel and merged in another. When two candidates
-would share a display name, both fall back to their full ids and the preflight says so.
+(`openai/gpt-oss-120b` and `groq/gpt-oss-120b`). Every view the run and its report produce is keyed
+on that full id, not just the leaderboard: the rating, the length-controlled rating, verbosity, cost
+and speed, so two providers of one model can never be apart in one panel and merged in another.
+When two candidates would share a display name, both fall back to their full ids and the preflight
+says so. One gap is still open: `rejudge` builds its old-vs-new ranking off the short names, so a
+colliding pool merges those two models in that one table (the rejudge comparator itself excludes
+self-judging on the full id, as live matches do).
 
 `orq-arena report <log>` rebuilds from that manifest, not from the live YAML: model names, the
 judge panel and the reasoning flags come from the run itself, so regenerating a page after the

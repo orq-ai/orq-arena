@@ -20,10 +20,10 @@ asks once before spending anything.
 
 Notes:
 - **Thinking on/off.** The default and `reasoning_arena` pin a uniform reasoning
-  effort for a fair comparison. `frontier_*` let reasoning-native models run at
-  their default (best) effort, so they compare at full strength, not under a
-  cap. `budget_8` pins only gemini thinking-OFF and lets the preflight probe
-  report the rest.
+  effort for a fair comparison. `frontier_*` and `budget_8` set no `reasoning:`
+  key at all, so every model runs at its vendor default (best) effort and
+  compares at full strength rather than under a cap; the preflight thinking
+  probe reports what each one actually did.
 - **Judge/candidate family overlap.** In wide pools the cheap judge trio shares
   provider families with several candidates. That's expected; the report flags
   it. Swap in out-of-family judges when you intend to defend the numbers.

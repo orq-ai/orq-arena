@@ -17,8 +17,10 @@ The project uses [uv](https://docs.astral.sh/uv/) for environment and dependency
 git clone https://github.com/<your-username>/orq-arena.git
 cd orq-arena
 
-# 2. Install (runtime + dev dependencies; the TUI extra is needed for the render tests)
-uv sync --extra tui
+# 2. Install (runtime + dev dependencies). `uv sync` alone is enough to run the
+#    whole suite: the dev group pins textual directly for the render tests.
+#    Add --extra tui only if you also want to *use* `orq-arena run --tui`.
+uv sync
 
 # 3. Verify
 uv run pytest            # full suite, no network
@@ -39,7 +41,7 @@ template. If you add a new credential, wire it through an environment variable a
 
 - `src/orq_arena/`: the benchmark core. `tournament/` (scheduling, Bradley-Terry + CIs),
   `arena/` (one battle: stream → judge → record), `providers/` (orq router client,
-  model catalog), `analysis/` (κ, post-mortems), `data/` (schema-v4 records), `rejudge.py`,
+  model catalog), `analysis/` (κ), `data/` (schema-v4 records), `rejudge.py`,
   `anchor.py` (human annotation), `report.py` (the HTML report).
 - `src/orq_arena/tui/`: the Textual show, behind the optional `[tui]` extra. Strictly a
   consumer of the event stream; nothing in here may affect a verdict (HP/damage is computed
@@ -51,7 +53,7 @@ template. If you add a new credential, wire it through an environment variable a
 
 1. Create a topic branch off `master` (`feat/...` or `fix/...`, CI runs on both).
 2. Keep the diff small and the vocabulary local: match the surrounding code's style; the
-   methodology invariants in the README ("How the number is made") are load-bearing;
+   methodology invariants in [`docs/methodology.md`](docs/methodology.md) are load-bearing;
    changes to judging, rating, or void policy need a plan-level discussion first.
 3. Add or update a test when behaviour changes. Textual widgets get a headless render test
    (that pattern has caught real bugs twice).
