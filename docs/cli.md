@@ -410,8 +410,12 @@ orq-arena rejudge --compare REPORT_JSON [--compare REPORT_JSON ...]
   a legitimate 1- or 2-judge rejudge is never rejected by a quorum meant for a bigger jury.
 - **Report contents:**
   - `re-judged {N} rounds, {M} verdicts changed` (vs. the recorded `majority_verdict`)
-  - Spearman rank correlation between the old and new Bradley-Terry rankings, labeled
-    `judge-robust ranking` at `>= 0.8`, otherwise `ranking is panel-sensitive; treat with care`
+  - Spearman rank correlation between the old and new Bradley-Terry rankings, printed with
+    the model and round counts behind it (`0.80 over 8 models, 140 rounds, ...`). The verdict
+    word needs a pool of at least 5 models to be earned: at 4 the only reachable values at or
+    above the 0.8 bar are 0.8 and 1.0, so smaller pools print
+    `too few models (N) for a robustness verdict` instead. At 5+ models, `>= 0.8` reads
+    `judge-robust ranking`, below it `ranking is panel-sensitive; treat with care`.
   - `old ranking: A > B > C ...` and `new ranking: ...` strings
   - a **"new jury behaviour"** table, one row per judge: `A-lean`, `B-lean`, `flip rate`
     (position bias, how often a judge's verdict flips depending on seat order), `tie rate`
@@ -462,7 +466,7 @@ $ orq-arena rejudge examples/quickstart/battles.jsonl --judge openai/gpt-5.1
 re-judging 140 rounds with panel: openai/gpt-5.1
 
 re-judged 140 rounds, 23 verdicts changed
-rank correlation (Spearman) old→new: 0.80 , judge-robust ranking
+rank correlation (Spearman) old→new: 0.80 over 8 models, 140 rounds, judge-robust ranking
 old ranking: gemini-3.5-flash > claude-sonnet-4-6 > gpt-5.4-mini > mistral-medium-2604
 new ranking: claude-sonnet-4-6 > gemini-3.5-flash > gpt-5.4-mini > mistral-medium-2604
        new jury behaviour
@@ -473,10 +477,11 @@ new ranking: claude-sonnet-4-6 > gemini-3.5-flash > gpt-5.4-mini > mistral-mediu
 └─────────┴────────┴────────┴───────────┴──────────┘
 ```
 
-Below a Spearman of 0.8 the second line reads
-`, ranking is panel-sensitive; treat with care` instead, and a
-`mean inter-judge agreement: NN%` line follows the table whenever the panel
-has more than one judge.
+Below a Spearman of 0.8 the second line ends
+`ranking is panel-sensitive; treat with care` instead, and on a pool of fewer
+than 5 models it ends `too few models (N) for a robustness verdict`, since the
+statistic is too coarse there to grade. A `mean inter-judge agreement: NN%`
+line follows the table whenever the panel has more than one judge.
 
 ---
 
@@ -651,9 +656,13 @@ orq-arena anchor BATTLE_LOG VOTES_JSON [VOTES_JSON ...] [--json]
 Output, per annotator: rounds voted, rounds usable for κ (the panel must have been decisive;
 inconclusive rounds are excluded from κ but still feed the human Bradley-Terry fit), Cohen's
 κ vs the panel majority with its Landis-Koch label, and the Spearman correlation between the
-human-vote Bradley-Terry ranking and the panel's. With two or more vote files it also prints
-each rater pair's inter-annotator κ over their shared rounds. Votes whose key matches no
-round in the log are counted and warned, never crash.
+human-vote Bradley-Terry ranking and the panel's, **both fit on the rounds that rater
+actually voted**: the panel side is refit on the same subset, a model with fewer than 3
+co-voted comparisons earns no place in either ranking (it would sit at the 1000 default and
+the correlation would partly measure that filler), and the `ρ models` column carries the n so
+a correlation over 4 models cannot read like one over 40. With two or more vote files it also
+prints each rater pair's inter-annotator κ over their shared rounds. Votes whose key matches
+no round in the log are counted and warned, never crash.
 
 ```bash
 orq-arena anchor outputs/g1/battles.jsonl votes-h1.json votes-h2.json
@@ -666,13 +675,13 @@ there is nothing committed here to reproduce them from. To get your own, run
 `votes-*.json` files.
 
 ```text
-                         human anchor vs panel
-┏━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━┳━━━━━━━━┓
-┃ annotator ┃ voted ┃ κ rounds ┃ κ vs panel ┃ label          ┃ rank ρ ┃
-┡━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━╇━━━━━━━━┩
-│ h1        │ 29    │ 19       │ 0.90       │ almost perfect │ 0.80   │
-│ h2        │ 27    │ 19       │ 0.80       │ substantial    │ 0.80   │
-└───────────┴───────┴──────────┴────────────┴────────────────┴────────┘
+                             human anchor vs panel
+┏━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━┓
+┃ annotator ┃ voted ┃ κ rounds ┃ κ vs panel ┃ label          ┃ rank ρ ┃ ρ models ┃
+┡━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━┩
+│ h1        │ 29    │ 19       │ 0.90       │ almost perfect │ 0.80   │ 6        │
+│ h2        │ 27    │ 19       │ 0.80       │ substantial    │ 0.80   │ 6        │
+└───────────┴───────┴──────────┴────────────┴────────────────┴────────┴──────────┘
 inter-annotator h1 × h2: κ=0.44 (moderate, 26 rounds)
 ```
 

@@ -151,7 +151,10 @@ The jury metrics above measure the panel against itself; the human-anchor workfl
 it against people. `annotate` renders a recorded run into a blind annotation page (no model
 names, no jury votes, sides swapped per round) you can send to raters; `anchor` merges their
 votes back and reports each rater's kappa against the panel majority and the rank correlation
-between the human ranking and the panel's. Usage: [cli.md](cli.md#annotate).
+between the human ranking and the panel's. Both rankings behind that correlation are fit on
+the rounds the rater actually voted: models below a minimum comparison count are left out
+rather than seated at the default rating, and the model count prints beside every
+correlation. Usage: [cli.md](cli.md#annotate).
 
 ## Current limitations
 

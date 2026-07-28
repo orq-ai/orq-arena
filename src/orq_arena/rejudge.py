@@ -212,6 +212,24 @@ def write_rejudged(
             fh.write(row.model_dump_json() + "\n")
 
 
+# The verdict word needs a field the statistic can express itself on. Spearman
+# over n models takes finitely many values: at 4 models the only ones clearing
+# 0.8 are 0.8 and 1.0 (a single adjacent swap is the whole distance between
+# "judge-robust" and "panel-sensitive"), and at 3 the grade could only ever
+# fire on a perfect match. Below this floor the number prints with its n and
+# no verdict word attaches (RES-1153).
+MIN_VERDICT_MODELS = 5
+
+
+def spearman_verdict(rho: float, n_models: int) -> str:
+    """The grade a rejudge Spearman has earned, or why it gets none."""
+    if n_models < MIN_VERDICT_MODELS:
+        return f"too few models ({n_models}) for a robustness verdict"
+    if rho >= 0.8:
+        return "judge-robust ranking"
+    return "ranking is panel-sensitive; treat with care"
+
+
 def render_result(result: dict) -> None:
     from rich.console import Console
     from rich.table import Table
@@ -222,13 +240,11 @@ def render_result(result: dict) -> None:
         f"\n[bold]re-judged {result['total']} rounds[/bold], "
         f"{result['changed_verdicts']} verdicts changed"
     )
+    n_models = len(result["old_ranking"])
     console.print(
-        f"rank correlation (Spearman) old→new: [bold]{result['spearman']:.2f}[/bold]"
-        + (
-            " , judge-robust ranking"
-            if result["spearman"] >= 0.8
-            else " , ranking is panel-sensitive; treat with care"
-        )
+        f"rank correlation (Spearman) old→new: [bold]{result['spearman']:.2f}[/bold] "
+        f"over {n_models} models, {result['total']} rounds, "
+        + spearman_verdict(result["spearman"], n_models)
     )
     console.print(f"old ranking: {' > '.join(result['old_ranking'])}")
     console.print(f"new ranking: {' > '.join(result['new_ranking'])}")

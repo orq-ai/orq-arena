@@ -417,6 +417,21 @@ def _ranking(records, majorities, models) -> list[str]:
     return sorted(models, key=lambda m: elo[m], reverse=True)
 
 
+# A model enters a rater's ranking only with this many co-voted rounds behind
+# it. Below the floor its rating is noise ordered among ties, and the reported
+# rho starts measuring the filler, not the rater (RES-1153).
+MIN_RANK_COMPARISONS = 3
+
+
+def _rankable_models(recs) -> list[str]:
+    """Models with enough co-voted rounds to earn a place in the ranking."""
+    counts: dict[str, int] = {}
+    for r in recs:
+        counts[r.model_a] = counts.get(r.model_a, 0) + 1
+        counts[r.model_b] = counts.get(r.model_b, 0) + 1
+    return sorted(m for m, n in counts.items() if n >= MIN_RANK_COMPARISONS)
+
+
 def _pair_kappa(rounds: list, a: str, b: str) -> dict:
     return next(
         iter(cohen_kappa_pairs(rounds, [a, b]).values()),
@@ -425,7 +440,15 @@ def _pair_kappa(rounds: list, a: str, b: str) -> dict:
 
 
 def anchor_result(records, votesets: list[VoteSet]) -> dict:
-    """Human-vs-panel kappa + rank correlation; humans are just more judges."""
+    """Human-vs-panel kappa + rank correlation; humans are just more judges.
+
+    Both rankings behind each rho are fit on the same population: the rounds
+    that rater actually voted. The panel ranking used to be fit over *every*
+    record while the human one covered only the co-voted subset, and models
+    the rater never saw still entered the human fit at the 1000 default,
+    ordered alphabetically among their ties, so the reported correlation was
+    partly an artifact of that filler (RES-1153).
+    """
     keyed = {record_key(r): r for r in records}
     models = sorted({m for r in records for m in (r.model_a, r.model_b)})
     panel_rank = _ranking(records, [r.majority_verdict for r in records], models)
@@ -445,7 +468,14 @@ def anchor_result(records, votesets: list[VoteSet]) -> dict:
         ]
         pair = _pair_kappa(rounds, _PANEL, label)
         recs = [keyed[k] for k in co]
-        human_rank = _ranking(recs, list(co.values()), models)
+        ranked = _rankable_models(recs)
+        if len(ranked) >= 2:
+            panel_sub = _ranking(recs, [keyed[k].majority_verdict for k in co], ranked)
+            human_rank = _ranking(recs, list(co.values()), ranked)
+            rho = spearman(panel_sub, human_rank)
+        else:
+            # one rankable model orders nothing; no ranking claim at all
+            rho = float("nan")
         per_annotator.append(
             {
                 "annotator": vs.annotator,
@@ -453,8 +483,10 @@ def anchor_result(records, votesets: list[VoteSet]) -> dict:
                 "n_kappa": pair["rounds"],
                 "kappa": pair["kappa"],
                 "kappa_label": pair["label"],
-                # no co-voted rounds -> no ranking claim, not an alphabetical one
-                "spearman": spearman(panel_rank, human_rank) if co else float("nan"),
+                "spearman": rho,
+                # the n behind every rho: 0.80 over 4 models must never read
+                # like 0.80 over 40
+                "n_rank_models": len(ranked),
             }
         )
 
@@ -560,7 +592,7 @@ def render_anchor_result(result: dict) -> None:
     from rich.table import Table
 
     t = Table(title="human anchor vs panel")
-    for col in ("annotator", "voted", "κ rounds", "κ vs panel", "label", "rank ρ"):
+    for col in ("annotator", "voted", "κ rounds", "κ vs panel", "label", "rank ρ", "ρ models"):
         t.add_column(col)
     for row in result["per_annotator"]:
         t.add_row(
@@ -570,6 +602,7 @@ def render_anchor_result(result: dict) -> None:
             "n/a" if row["kappa"] is None else f"{row['kappa']:.2f}",
             row["kappa_label"],
             "n/a" if row["spearman"] != row["spearman"] else f"{row['spearman']:.2f}",
+            str(row.get("n_rank_models", "?")),
         )
     console = Console()
     console.print(t)

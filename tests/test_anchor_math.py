@@ -80,3 +80,68 @@ def test_zero_covoted_rounds_yields_nan_spearman_not_alphabetical():
     res = anchor_result(RECORDS, [_vs("h1", {"deadbeefdeadbeef": "A"})])
     row = res["per_annotator"][0]
     assert row["spearman"] != row["spearman"]  # NaN
+
+
+def _multi_rec(i: int, a: str, b: str, verdict: str):
+    from orq_arena.data.schemas import BattleRecord
+
+    return BattleRecord(
+        prompt_hash=f"mh{i}",
+        prompt_text=f"p{i}",
+        model_a=a,
+        model_b=b,
+        response_a="ra",
+        response_b="rb",
+        majority_verdict=verdict,
+        match_id=f"m{a}{b}",
+        round_number=i,
+    )
+
+
+def test_rho_is_fit_on_the_covoted_rounds_with_no_filler_models():
+    """The RES-1153 repro. The rater voted only a-vs-b rounds and agreed with
+    the panel on every one, so their rho is 1.0 by construction. The old code
+    fit the panel ranking over the whole log (where unvoted a-vs-c rounds put
+    c on top) and the human ranking over all models (seating never-seen c at
+    the 1000 default), and reported 0.50: an artifact of the filler, not a
+    measure of the rater."""
+    records = [_multi_rec(i, "a", "b", "A") for i in range(4)] + [
+        _multi_rec(10 + i, "a", "c", "B") for i in range(6)
+    ]
+    voted = {record_key(r): "A" for r in records[:4]}
+    row = anchor_result(records, [_vs("h1", voted)])["per_annotator"][0]
+    assert row["n_rank_models"] == 2  # a and b; c never entered a voted round
+    assert row["spearman"] == 1.0
+
+
+def test_panel_side_is_fit_on_the_covoted_rounds_not_the_whole_log():
+    """Same models, different populations. The panel's verdict over the whole
+    log is b > a (6 of 10 rounds), but over the rounds this rater voted it is
+    a > b, and the rater agreed with every one of those. Their rho is 1.0; a
+    panel side fit on the whole log would report -1.0 and call this rater
+    maximally wrong for agreeing with the panel."""
+    voted_recs = [_multi_rec(i, "a", "b", "A") for i in range(4)]
+    unvoted = [_multi_rec(10 + i, "a", "b", "B") for i in range(6)]
+    voted = {record_key(r): "A" for r in voted_recs}
+    row = anchor_result(voted_recs + unvoted, [_vs("h1", voted)])["per_annotator"][0]
+    assert row["spearman"] == 1.0
+    assert row["n_rank_models"] == 2
+
+
+def test_models_below_the_comparison_floor_are_left_out():
+    """Two co-voted rounds do not earn c a rank; its votes still count."""
+    records = [_multi_rec(i, "a", "b", "A") for i in range(4)] + [
+        _multi_rec(20 + i, "a", "c", "A") for i in range(2)
+    ]
+    voted = {record_key(r): "A" for r in records}
+    row = anchor_result(records, [_vs("h1", voted)])["per_annotator"][0]
+    assert row["n_voted"] == 6
+    assert row["n_rank_models"] == 2
+
+
+def test_fewer_than_two_rankable_models_is_no_ranking_claim():
+    records = [_multi_rec(i, "a", "b", "A") for i in range(2)]
+    voted = {record_key(r): "A" for r in records}
+    row = anchor_result(records, [_vs("h1", voted)])["per_annotator"][0]
+    assert row["n_rank_models"] == 0  # both sides sit below the floor
+    assert row["spearman"] != row["spearman"]  # NaN, not an alphabetical tie
