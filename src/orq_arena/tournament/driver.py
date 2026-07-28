@@ -123,10 +123,25 @@ def record_names(records: list[BattleRecord], candidates: list[CandidateSpec]) -
     # Start from the pool so a candidate with no rounds still has a name; then
     # records add anything the pool no longer lists.
     alias: dict[str, str] = {c.model_id: c.name for c in candidates}
+    record_keys: set[str] = set()
     for rec in records:
         for short, full in ((rec.model_a, rec.model_a_id), (rec.model_b, rec.model_b_id)):
             key = full or short
+            record_keys.add(key)
             alias[key] = (by_id.get(full, "") if full else by_short.get(short, "")) or short
+    # A drifted YAML must not re-merge a colliding pool (review, RES-1152): a
+    # record whose full id the pool no longer lists fell through to the bare
+    # short name, so both providers of one model shared a display name again.
+    # A name claimed by two distinct *record* keys sends each claimant back to
+    # its own key, the same fallback colliding candidates get. Judged over
+    # record keys only: a pool id and a v3 short key naming the same model is
+    # one model twice, not a collision.
+    claimants: dict[str, set[str]] = {}
+    for key in record_keys:
+        claimants.setdefault(alias[key], set()).add(key)
+    for key in record_keys:
+        if len(claimants[alias[key]]) > 1:
+            alias[key] = key
     return alias
 
 

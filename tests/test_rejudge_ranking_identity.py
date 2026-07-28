@@ -71,6 +71,22 @@ async def test_a_colliding_pool_stays_two_models_in_the_ranking(stub_jury):
     assert result["new_ranking"][0] == "openai/gpt-oss-120b"
 
 
+async def test_a_drifted_yaml_does_not_remerge_the_colliding_pool(stub_jury):
+    """Review-found leak: rejudge names via the live YAML, and when that YAML
+    no longer lists the colliding ids, both fell through record_names' bare
+    short-name fallback and merged again. Two distinct record keys sharing a
+    display name now both fall back to their full keys."""
+    drifted = ArenaConfig.model_validate(
+        {
+            "candidates": [{"model_id": "prov/other-1"}, {"model_id": "prov/other-2"}],
+            "judges": ["prov/j1", "prov/j2"],
+        }
+    )
+    records = [_rec(i, "A", a_id="openai/gpt-oss-120b", b_id="groq/gpt-oss-120b") for i in range(4)]
+    result = await rejudge_mod.rejudge_run(cfg=drifted, records=records, judges=["prov/j1"])
+    assert set(result["old_ranking"]) == {"openai/gpt-oss-120b", "groq/gpt-oss-120b"}
+
+
 async def test_a_v3_log_without_ids_still_ranks_on_short_names(stub_jury):
     cfg = ArenaConfig.model_validate(
         {
