@@ -98,12 +98,64 @@ class StyleFit:
 def _style_loglik(
     theta: list[float], gamma: float, feats: list[tuple[int, int, float, float]]
 ) -> float:
+    """Bernoulli log-likelihood of the joint fit; ties contribute half each way."""
     s = 0.0
     for a, b, y, d in feats:
         z = max(-30.0, min(30.0, theta[a] - theta[b] + gamma * d))
         p = 1.0 / (1.0 + math.exp(-z))
         s += y * math.log(max(p, 1e-12)) + (1.0 - y) * math.log(max(1.0 - p, 1e-12))
     return s
+
+
+# Identifiability probe: refit theta with gamma pinned this far from the
+# optimum and demand the profile likelihood actually drops. On collinear data
+# (a single length ratio makes d a linear function of the pair indicator) the
+# likelihood is flat along a theta/gamma ridge, every per-parameter curvature
+# looks healthy, and the "optimum" is wherever the path stopped: the exact
+# arbitrary-coefficient failure this module exists to refuse. Measured margins
+# on the committed run: the drop at +0.5 is ~1e-3; on an exact ridge it is 0
+# to float precision, so the tolerance sits orders of magnitude from both.
+_PROBE_GAMMA_SHIFT = 0.5
+_PROBE_FLAT_TOL = 1e-6
+
+
+def _profile_loglik_at(
+    feats: list[tuple[int, int, float, float]],
+    theta0: list[float],
+    gamma: float,
+    played: set[int],
+    gtol: float,
+    max_iter: int = 200,
+) -> float:
+    """Max log-likelihood over theta with gamma pinned, warm-started."""
+    theta = list(theta0)
+    ll = _style_loglik(theta, gamma, feats)
+    for _ in range(max_iter):
+        g_theta = [0.0] * len(theta)
+        h_theta = [1e-9] * len(theta)
+        for a, b, y, d in feats:
+            z = max(-30.0, min(30.0, theta[a] - theta[b] + gamma * d))
+            p = 1.0 / (1.0 + math.exp(-z))
+            w = max(p * (1.0 - p), 1e-9)
+            g_theta[a] += y - p
+            g_theta[b] -= y - p
+            h_theta[a] += w
+            h_theta[b] += w
+        if max(abs(g) for g in g_theta) < gtol:
+            break
+        step = 1.0
+        while step > 1e-8:
+            cand = [t + step * g_theta[i] / h_theta[i] for i, t in enumerate(theta)]
+            mean = sum(cand[i] for i in played) / len(played)
+            cand = [t - mean for t in cand]
+            cand_ll = _style_loglik(cand, gamma, feats)
+            if cand_ll > ll:
+                break
+            step /= 2
+        else:
+            break
+        theta, ll = cand, cand_ll
+    return ll
 
 
 def style_controlled_elo(
@@ -151,8 +203,15 @@ def style_controlled_elo(
         # spending its whole budget mid-climb and being miscounted.
         theta = [(warm.elo.get(m, 1000.0) - 1000.0) * ln10 / 400.0 for m in models]
         gamma = warm.gamma
-    ll = _style_loglik(theta, gamma, feats)
     played = {a for a, _b, _y, _d in feats} | {b for _a, b, _y, _d in feats}
+    if warm is not None and played:
+        # Re-anchor over the models this data actually plays, up front: a
+        # resample can be missing a model, and a fit that accepts zero steps
+        # (the warm point is already its optimum) would otherwise return
+        # ratings still centered on the ghost. Uniform shift, loglik-invariant.
+        mean0 = sum(theta[i] for i in played) / len(played)
+        theta = [t - mean0 for t in theta]
+    ll = _style_loglik(theta, gamma, feats)
     has_length_signal = any(f[3] != 0.0 for f in feats)
     converged = False
     gamma_converged = False
@@ -188,8 +247,11 @@ def style_controlled_elo(
         while step > 1e-8:
             cand_theta = [t + step * g_theta[i] / h_theta[i] for i, t in enumerate(theta)]
             cand_gamma = gamma + step * g_gamma / h_gamma
-            mean = sum(cand_theta) / len(cand_theta)
-            cand_theta = [t - mean for t in cand_theta]  # loglik-invariant anchor
+            # Anchor over played models only, loglik-invariant either way: a
+            # warm-started resample can be missing a model entirely, and a
+            # mean over its ghost theta would shift every real rating.
+            mean = sum(cand_theta[i] for i in played) / len(played)
+            cand_theta = [t - mean for t in cand_theta]
             cand_ll = _style_loglik(cand_theta, cand_gamma, feats)
             if cand_ll > ll:
                 break
@@ -201,6 +263,19 @@ def style_controlled_elo(
             # perfectly good maximum). The whole fit stays unconverged.
             break
         theta, gamma, ll = cand_theta, cand_gamma, cand_ll
+    if gamma_converged and has_length_signal:
+        # Per-parameter curvature cannot see a flat *direction*: with a single
+        # length ratio, d is a linear function of the pair indicator and the
+        # likelihood is constant along a theta/gamma ridge, so the "optimum"
+        # is path-dependent. Pin gamma off to one side, refit theta, and
+        # demand the profile likelihood drop; on a ridge it will not.
+        probed = _profile_loglik_at(feats, theta, gamma + _PROBE_GAMMA_SHIFT, played, gtol)
+        if ll - probed < _PROBE_FLAT_TOL:
+            gamma_converged = False
+            converged = False
+    for i in range(len(theta)):
+        if i not in played:
+            theta[i] = 0.0  # a model with no rows keeps the 1000 anchor, warm or not
     elo = {m: 400 * theta[i] / ln10 + 1000 for m, i in idx.items()}
     return StyleFit(elo, gamma, converged, gamma_converged)
 
@@ -217,7 +292,9 @@ class GammaInterval:
 
     lo: float | None
     hi: float | None
-    separated: int  # draws whose fit ran off without a finite maximum
+    # Draws whose gamma has no finite identified maximum: true separation, a
+    # flat ridge, or a budget that ran out mid-climb. All refuse the same way.
+    separated: int
     draws: int
 
     @property
@@ -241,10 +318,9 @@ def bootstrap_gamma(
     Its own resample: the rating bootstrap's draws carry (a, b, verdict)
     triples with no lengths, so gamma cannot be read off them. Pass the
     full-data fit as ``warm`` so each draw starts at that optimum.
-
+    """
     # ponytail: a draw that hasn't converged by max_iter counts as separated,
     # which can only widen the interval; raise max_iter if that margin matters
-    """
     import random
 
     rng = random.Random(seed)
@@ -260,7 +336,11 @@ def bootstrap_gamma(
             vals.append(fit.gamma)
         else:
             separated += 1
-            vals.append(math.copysign(math.inf, fit.gamma))
+            # Signed by the direction the draw ran. A draw stalled at exactly
+            # 0.0 has no direction of its own; fall back to the full-data
+            # fit's, which is always present on the driver path (warm=fit).
+            direction = fit.gamma or (warm.gamma if warm is not None else 0.0) or 1.0
+            vals.append(math.copysign(math.inf, direction))
     lo, hi = _percentiles(vals)
     return GammaInterval(
         lo=None if math.isinf(lo) else lo,

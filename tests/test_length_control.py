@@ -112,19 +112,80 @@ def test_gamma_interval_excludes_zero_semantics():
     assert not GammaInterval(lo=None, hi=None, separated=100, draws=100).excludes_zero
 
 
+def test_a_single_length_ratio_is_a_ridge_and_publishes_nothing():
+    """One length ratio makes d collinear with the pair indicator: the
+    likelihood is flat along a theta/gamma line, so any gamma "fits" and the
+    returned value measures the optimizer's path, not the jury. The exact
+    arbitrary-number failure this ticket exists to refuse, found by review:
+    the per-parameter curvature check cannot see a flat direction."""
+    # d is exactly +-0.6 * (seat indicator), so theta and gamma trade off
+    # freely: unit-level ridge.
+    rows = (
+        [("a", "b", 1.0, 400, 100)] * 8
+        + [("b", "a", 0.0, 100, 400)] * 8
+        + [("a", "b", 0.0, 400, 100)] * 2
+        + [("b", "a", 1.0, 100, 400)] * 2
+    )
+    fit = style_controlled_elo(rows, ["a", "b"])
+    assert not fit.gamma_converged
+    assert not fit.converged
+
+    # And end to end: records pin the seat, so the ridge there is every round
+    # sharing one length arrangement. The count survives, the model does not.
+    records = [_record(i, "A", 400, 100) for i in range(16)] + [
+        _record(16 + i, "B", 400, 100) for i in range(4)
+    ]
+    _, report = rebuild_from_log(CFG, records)
+    assert report["length_pref"] == {"longer_wins": 16, "rounds": 20}
+    assert report["length_coef"] is None
+    assert report["elo_style_controlled"] is None
+
+
+def test_a_warm_started_resample_missing_a_model_stays_anchored():
+    """A bootstrap draw can drop a model entirely. Warm-starting hands the fit
+    that model's old theta anyway; anchoring the mean over the ghost shifted
+    every real rating (played means drifted hundreds of points off 1000)."""
+    rows_full = (
+        [("a", "b", 1.0, 400, 100)] * 9
+        + [("a", "b", 0.0, 100, 400)] * 7
+        + [("a", "b", 1.0, 300, 200)] * 5
+        + [("a", "b", 0.0, 200, 300)] * 5
+        + [("a", "c", 1.0, 300, 200)] * 3
+        + [("c", "b", 0.0, 200, 300)] * 3
+    )
+    warm = style_controlled_elo(rows_full, ["a", "b", "c"])
+    without_c = [r for r in rows_full if "c" not in (r[0], r[1])]
+    # Zero-step case: the warm point is already this data's optimum, so only
+    # the up-front re-anchor can save it.
+    fit = style_controlled_elo(without_c, ["a", "b", "c"], warm=warm)
+    played_mean = (fit.elo["a"] + fit.elo["b"]) / 2
+    assert abs(played_mean - 1000.0) < 1.0, f"played mean drifted to {played_mean:.0f}"
+    assert fit.elo["c"] == 1000.0  # no rows, no rating: the anchor, not a ghost
+    # Multi-step case: flip a few outcomes so the optimum moves and steps are
+    # taken; each step's anchor must also skip the ghost.
+    shifted = without_c[:-4] + [("a", "b", 0.0, 400, 100)] * 4
+    fit2 = style_controlled_elo(shifted, ["a", "b", "c"], warm=warm)
+    assert abs(fit2.gamma - warm.gamma) > 1.0, "fixture took no steps; rebuild it"
+    played_mean2 = (fit2.elo["a"] + fit2.elo["b"]) / 2
+    assert abs(played_mean2 - 1000.0) < 1.0, f"played mean drifted to {played_mean2:.0f}"
+
+
 def test_a_cratered_model_does_not_masquerade_as_gamma_separation():
     """One model losing every round separates *its rating*, not gamma. The
     whole fit rightly refuses, but the gamma-specific verdict stands, so a
     bootstrap draw like this lands in the interval instead of at infinity."""
     rows = (
-        # c loses everything, at mixed lengths, so theta_c has no floor...
+        # c loses everything, so theta_c has no floor. Its rounds saturate out
+        # of the likelihood, which means the a-vs-b rounds must identify gamma
+        # on their own: two length ratios, mostly-longer-wins, near-balanced.
         [("a", "c", 1.0, 300, 200)] * 6
         + [("c", "b", 0.0, 200, 300)] * 6
-        # ...while a-vs-b rounds carry a finite, unremarkable length signal.
-        + [("a", "b", 1.0, 400, 100)] * 4
-        + [("b", "a", 0.0, 100, 400)] * 4
+        + [("a", "b", 1.0, 400, 100)] * 9
+        + [("a", "b", 0.0, 100, 400)] * 7
         + [("a", "b", 0.0, 400, 100)] * 2
-        + [("b", "a", 1.0, 100, 400)] * 2
+        + [("a", "b", 1.0, 100, 400)] * 2
+        + [("a", "b", 1.0, 300, 200)] * 5
+        + [("a", "b", 0.0, 200, 300)] * 5
     )
     fit = style_controlled_elo(rows, ["a", "b", "c"])
     assert not fit.converged

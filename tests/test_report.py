@@ -181,7 +181,7 @@ def test_length_row_descriptive_first_and_coefficient_gated():
         manifest=MANIFEST,
     )
     assert "won <b>54%</b> of decisive rounds (40/74)" in html
-    assert "too few rounds to identify a length coefficient" in html
+    assert "not statistically identified on this run" in html
     assert "length-adj." not in html
 
 

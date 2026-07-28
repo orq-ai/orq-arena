@@ -41,23 +41,31 @@ def test_ties_shift_ratings_symmetrically():
     assert ratings["a"] > ratings["c"]
 
 
+# The longer answer usually wins, at TWO distinct length ratios, with wins
+# nearly balanced between the models. All three properties are load-bearing:
+# counterexamples keep the MLE finite (a clean sweep is separable), the second
+# ratio keeps gamma identified (a single ratio makes d collinear with the pair
+# indicator, a flat ridge on which any gamma fits equally well and the answer
+# is path-dependent), and balance keeps the model term from soaking up the
+# likelihood before the length term is measured.
+STYLE_ROWS = (
+    [("a", "b", 1.0, 400, 100)] * 18
+    + [("a", "b", 0.0, 100, 400)] * 14
+    + [("a", "b", 0.0, 400, 100)] * 4
+    + [("a", "b", 1.0, 100, 400)] * 4
+    + [("a", "b", 1.0, 300, 200)] * 10
+    + [("a", "b", 0.0, 200, 300)] * 10
+)
+
+
 def test_style_control_absorbs_length_wins():
     from orq_arena.tournament.elo import style_controlled_elo
 
-    # A answers 4x longer and wins most of the time, equally often as seat A
-    # or B. Not always: a clean sweep is separable (no finite MLE) and the fit
-    # rightly refuses those; the mixed record keeps the maximum finite.
-    rows = (
-        [("a", "b", 1.0, 400, 100)] * 8
-        + [("b", "a", 0.0, 100, 400)] * 8
-        + [("a", "b", 0.0, 400, 100)] * 2
-        + [("b", "a", 1.0, 100, 400)] * 2
-    )
-    fit = style_controlled_elo(rows, ["a", "b"])
+    fit = style_controlled_elo(STYLE_ROWS, ["a", "b"])
     assert fit.converged
     assert fit.gamma > 0  # the jury's length preference is exposed
     raw = bradley_terry_mle(
-        build_wins_matrix([("a", "b", "winner")] * 16 + [("b", "a", "winner")] * 4), ["a", "b"]
+        build_wins_matrix([("a", "b", "winner")] * 32 + [("b", "a", "winner")] * 28), ["a", "b"]
     )
     # pricing length out shrinks the gap vs the raw fit
     assert abs(fit.elo["a"] - fit.elo["b"]) < abs(raw["a"] - raw["b"])
@@ -97,19 +105,16 @@ def test_style_control_gamma_is_stable_under_a_bigger_budget():
     """The regression that shipped: gamma tracked the iteration count.
 
     2000 fixed gradient steps reported 3.44 on the example run while the MLE
-    was 18.3; doubling the budget moved the answer. A converged fit must give
-    the same gamma no matter how much extra budget it is offered.
+    was 18.3; raising the budget moved the answer. A converged fit must give
+    the same gamma no matter how much extra budget it is offered. The fixture
+    has to carry two length ratios: on single-ratio (ridge) data the old
+    estimator was *also* budget-stable, parked at an arbitrary point, and this
+    test would discriminate nothing.
     """
     from orq_arena.tournament.elo import style_controlled_elo
 
-    rows = (
-        [("a", "b", 1.0, 400, 100)] * 8
-        + [("b", "a", 0.0, 100, 400)] * 8
-        + [("a", "b", 0.0, 400, 100)] * 2
-        + [("b", "a", 1.0, 100, 400)] * 2
-    )
-    small = style_controlled_elo(rows, ["a", "b"], max_iter=500)
-    big = style_controlled_elo(rows, ["a", "b"], max_iter=15000)
+    small = style_controlled_elo(STYLE_ROWS, ["a", "b"], max_iter=500)
+    big = style_controlled_elo(STYLE_ROWS, ["a", "b"], max_iter=15000)
     assert small.converged and big.converged
     assert abs(small.gamma - big.gamma) < 1e-4
 

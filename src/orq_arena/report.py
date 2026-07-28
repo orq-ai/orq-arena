@@ -749,8 +749,9 @@ def build_report_html(
             )
         else:
             detail += (
-                "; too few rounds to identify a length coefficient, so no "
-                "length-adjusted column is shown"
+                "; the modelled length coefficient is not statistically "
+                "identified on this run (its interval reaches 0, or the fit "
+                "has no finite estimate), so no length-adjusted column is shown"
             )
         signal_rows.append(("Did length sway the jury", detail, ""))
     signal_rows.append(("Judges agreeing on decisive rounds", f"<b>{_pct(agreement)}</b>", ""))
