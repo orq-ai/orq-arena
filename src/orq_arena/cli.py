@@ -172,7 +172,7 @@ def run(
 
     from .preflight import (
         call_counts,
-        cost_ceiling,
+        cost_projection,
         judge_family_overlaps,
         surprises,
         thinking_probe,
@@ -242,22 +242,26 @@ def run(
     # Persist the caveat so the manifest and forwarded report carry it, not
     # just this console line (the report is the thing users hand to others).
     preflight_data: dict = {"counts": counts.__dict__, "family_overlaps": overlap}
-    ceiling = cost_ceiling(cfg, prompts, counts, asyncio.run(fetch_price_map(cfg.gateway)))
-    unpriced_suffix = " + unpriced" if ceiling.unpriced else ""
-    if ceiling.total_usd > 0:
+    cost = cost_projection(cfg, prompts, counts, asyncio.run(fetch_price_map(cfg.gateway)))
+    unpriced_suffix = " + unpriced" if cost.unpriced else ""
+    if cost.projected_usd > 0:
         from dataclasses import asdict
 
-        preflight_data["cost_ceiling"] = asdict(ceiling)
+        preflight_data["cost_projection"] = asdict(cost)
         # Cost is warning-class, not narration: --quiet drops the table but
         # never the number. Silent-until-invoice is the failure mode.
         if quiet:
-            warn(f"maximum spend ≤ ${ceiling.total_usd:.2f}{unpriced_suffix} (worst case)")
+            warn(
+                f"projected spend ≈ ${cost.projected_usd:.2f}{unpriced_suffix}, "
+                f"up to ${cost.worst_case_usd:.2f} if streams retry and stand-in "
+                "judges step in"
+            )
         elif not tui:
-            _print_run_plan(ceiling)
-    if ceiling.unpriced:
+            _print_run_plan(cost)
+    if cost.unpriced:
         warn(
             f"  no catalog price (self-hosted or unpriced): "
-            f"{', '.join(ceiling.unpriced)}; excluded from total"
+            f"{', '.join(cost.unpriced)}; excluded from both figures"
         )
     probe_lines: list[str] = []
     if cfg.preflight.thinking_probe:
@@ -280,8 +284,11 @@ def run(
 
     if not tui and not assume_yes:
         question = "Proceed?"
-        if ceiling.total_usd > 0:
-            question = f"Proceed (spends up to ${ceiling.total_usd:.2f}{unpriced_suffix})?"
+        if cost.projected_usd > 0:
+            question = (
+                f"Proceed (≈ ${cost.projected_usd:.2f}{unpriced_suffix}, "
+                f"up to ${cost.worst_case_usd:.2f} with retries)?"
+            )
         click.confirm(question, abort=True, err=True)
 
     if tui:
@@ -293,7 +300,7 @@ def run(
             prompts_label = prompts_path
         plan = {
             "counts": counts,
-            "ceiling": ceiling,
+            "cost": cost,
             "overlap": overlap,
             "probe_lines": probe_lines,
             "n_candidates": len(cfg.candidates),
@@ -332,7 +339,7 @@ def run(
     _open_report(output_path, open_browser, announce=tui)
 
 
-def _print_run_plan(ceiling) -> None:
+def _print_run_plan(cost) -> None:
     """Run-plan cost table on stderr; the approval decision reads off this.
 
     Every candidate and judge gets a row (unpriced ones show n/a and ?, they
@@ -345,7 +352,7 @@ def _print_run_plan(ceiling) -> None:
     from rich.console import Console
     from rich.table import Table
 
-    total = f"≤ ${ceiling.total_usd:.2f}" + (" + ?" if ceiling.unpriced else "")
+    total = f"≈ ${cost.projected_usd:.2f}" + (" + ?" if cost.unpriced else "")
     table = Table(
         title="RUN PLAN",
         caption=(
@@ -374,7 +381,7 @@ def _print_run_plan(ceiling) -> None:
         ("judge", "Judges (×2 seat orders)"),
         ("probe", None),
     ):
-        rows = [r for r in ceiling.rows if r.role == role]
+        rows = [r for r in cost.rows if r.role == role]
         if not rows:
             continue
         if header:
@@ -391,7 +398,14 @@ def _print_run_plan(ceiling) -> None:
                     money(r.usd),
                 )
     table.add_section()
-    table.add_row("[bold]MAXIMUM SPEND[/bold]", "", "", "", f"[bold]{total}[/bold]")
+    table.add_row("[bold]PROJECTED SPEND[/bold]", "", "", "", f"[bold]{total}[/bold]")
+    table.add_row(
+        "[dim]worst case, retries + stand-ins[/dim]",
+        "",
+        "",
+        "",
+        f"[dim]≈ ${cost.worst_case_usd:.2f}[/dim]",
+    )
     Console(file=sys.stderr).print(table)
 
 

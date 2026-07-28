@@ -126,10 +126,10 @@ Every key, default, and per-model override is documented in
 [configuration.md](configuration.md). The run walks through three stages:
 
 1. **Preflight.** The exact call counts print up front, then a **RUN PLAN table**: one row
-   per candidate and judge with its call count, catalog price, and worst-case cost, closing
-   with the maximum the run can spend. A tiny thinking probe runs per candidate, then the
-   run pauses at `Proceed (spends up to $X)? [y/N]` before any battle or judge call. Pass
-   `--yes`/`-y` to skip the pause in CI or scripts.
+   per candidate and judge with its call count, catalog price, and cost, closing with the
+   projected spend and the worst case beneath it. A tiny thinking probe runs per candidate,
+   then the run pauses at `Proceed (≈ $X, up to $Y with retries)? [y/N]` before any battle or
+   judge call. Pass `--yes`/`-y` to skip the pause in CI or scripts.
 2. **The matches.** Every pair of candidates meets once (a full round-robin), matches in
    parallel. For each prompt, both candidates stream through the router, the jury votes in
    both seat orders, and the round is logged.
@@ -147,7 +147,7 @@ preflight: 28 matches × 5 rounds → 280 model streams + 840 judge calls + 8 pr
   ⚖ judge/contestant family overlap: anthropic/claude-haiku-4-5-20251001, google/gemini-2.5-flash-lite, openai/gpt-5.4-nano. Self-preference bias is not corrected by seat swapping; prefer judges from families outside the pool.
                                    RUN PLAN
 ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━┓
-┃ Model                                 ┃ Calls ┃ $/M in ┃ $/M out ┃ Ceiling  ┃
+┃ Model                                 ┃ Calls ┃ $/M in ┃ $/M out ┃ Cost     ┃
 ┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━┩
 │ Candidates                            │       │        │         │          │
 │   anthropic/claude-opus-4-8           │    35 │   5.00 │   25.00 │   $1.80  │
@@ -164,22 +164,24 @@ preflight: 28 matches × 5 rounds → 280 model streams + 840 judge calls + 8 pr
 │   openai/gpt-5.4-nano                 │   280 │   0.20 │    1.25 │   $0.97  │
 │ Thinking probe                        │     8 │        │         │   $0.09  │
 ├───────────────────────────────────────┼───────┼────────┼─────────┼──────────┤
-│ MAXIMUM SPEND                         │       │        │         │ ≤ $11.87 │
+│ PROJECTED SPEND                       │       │        │         │ ≈ $11.87 │
+│ worst case, retries + stand-ins       │       │        │         │ ≈ $18.22 │
 └───────────────────────────────────────┴───────┴────────┴─────────┴──────────┘
-     worst case: every response maxed out at its token cap; typical runs
-         cost noticeably less. Exact spend is reported after the run.
+   every response is assumed to hit its token cap, so a typical run costs less;
+    the worst case adds one retry per stream. Exact spend is reported after the run.
 thinking probe…
   pool is thinking-clean ✓
-Proceed (spends up to $11.87)? [y/N]:
+Proceed (≈ $11.87, up to $18.22 with retries)? [y/N]:
 ```
 
 **This pause is the cost gate.** Everything above was (almost) free: only the tiny probe
-calls have been made, no battle has run. The RUN PLAN table shows the worst case per model,
-and the `Proceed` question repeats the maximum the run can spend. Answer `n` and nothing
-happens; answer `y` and the matches start:
+calls have been made, no battle has run. The RUN PLAN table shows the cost per model, and
+the `Proceed` question carries both figures: what a clean run costs, and what it could reach
+if streams retry. Neither is a hard cap, since prompt tokens are estimated from characters.
+Answer `n` and nothing happens; answer `y` and the matches start:
 
 ```text
-Proceed (spends up to $11.87)? [y/N]: y
+Proceed (≈ $11.87, up to $18.22 with retries)? [y/N]: y
 M1 round 1: inconclusive
 M1 round 1: A
 M1 round 2: inconclusive

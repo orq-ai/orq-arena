@@ -92,11 +92,11 @@ class RunPlanScreen(Screen):
 
             yield Static("RUN PLAN", classes="section")
             yield DataTable(id="plan", cursor_type="none", zebra_stripes=False)
-            ceiling = p["ceiling"]
-            if ceiling.unpriced:
+            cost = p["cost"]
+            if cost.unpriced:
                 yield Static(
                     "no catalog price (self-hosted or unpriced): "
-                    + ", ".join(ceiling.unpriced)
+                    + ", ".join(cost.unpriced)
                     + "; excluded from the total",
                     classes="muted",
                 )
@@ -126,7 +126,7 @@ class RunPlanScreen(Screen):
         yield Static(self._consent_label(), id="consent", markup=False)
 
     def on_mount(self) -> None:
-        ceiling = self._plan["ceiling"]
+        cost = self._plan["cost"]
         table = self.query_one("#plan", DataTable)
         for col in ("Model", "Calls", "$/M in", "$/M out", "Ceiling"):
             table.add_column(col)
@@ -135,7 +135,7 @@ class RunPlanScreen(Screen):
             ("judge", "Judges (×2 seat orders)"),
             ("probe", None),
         ):
-            rows = [r for r in ceiling.rows if r.role == role]
+            rows = [r for r in cost.rows if r.role == role]
             if not rows:
                 continue
             if header:
@@ -150,17 +150,25 @@ class RunPlanScreen(Screen):
                     _money(r.usd),
                 )
         total = (
-            f"≤ ${ceiling.total_usd:.2f}" + (" + ?" if ceiling.unpriced else "")
-            if ceiling.total_usd > 0
-            else "spend ceiling unavailable"
+            f"≈ ${cost.projected_usd:.2f}" + (" + ?" if cost.unpriced else "")
+            if cost.projected_usd > 0
+            else "spend projection unavailable"
         )
-        table.add_row("MAXIMUM SPEND", "", "", "", total)
+        table.add_row("PROJECTED SPEND", "", "", "", total)
+        if cost.projected_usd > 0:
+            table.add_row(
+                "worst case, retries + stand-ins",
+                "",
+                "",
+                "",
+                f"≈ ${cost.worst_case_usd:.2f}",
+            )
 
     def _consent_label(self) -> str:
-        ceiling = self._plan["ceiling"]
-        if ceiling.total_usd > 0:
-            suffix = " + ?" if ceiling.unpriced else ""
-            fight = f"ENTER  fight (spends up to ${ceiling.total_usd:.2f}{suffix})"
+        cost = self._plan["cost"]
+        if cost.projected_usd > 0:
+            suffix = " + ?" if cost.unpriced else ""
+            fight = f"ENTER  fight (≈ ${cost.projected_usd:.2f}{suffix})"
         else:
             fight = "ENTER  fight"
         return f"[ {fight} ]      [ Q  quit ]"

@@ -136,19 +136,27 @@ rounds, every round streams both contestants once and is scored by each judge tw
 per seat order).
 
 **Preflight: the RUN PLAN table** (see the expected output below). One row per candidate and
-judge (call count, catalog price in $/M in / $/M out, worst-case cost), closing with a bold
-`MAXIMUM SPEND ≤ $X` row.
+judge (call count, catalog price in $/M in / $/M out, cost), closing with a bold
+`PROJECTED SPEND ≈ $X` row and a dimmer worst-case row beneath it.
 
-- The total is an **upper bound**, not a prediction: it assumes every response hits its
-  output token cap. Prices come from the router's Model Garden catalog.
+- **Two figures, because one cannot answer both questions honestly.** The projection prices
+  the calls a clean run makes, assuming every response hits its output token cap. The worst
+  case adds the failure paths that spend money without appearing in any call count: the one
+  retry each stream takes, and a replacement panel for every judge call when
+  `replacement_judges` is set.
+- **Neither is a hard guarantee.** Prices are real (the router's Model Garden catalog) and
+  call counts are exact, but prompt tokens are estimated from character count, which
+  under-counts CJK, code and dense punctuation. Treat the projection as a good estimate, not
+  a cap your invoice cannot exceed.
 - **Unpriced models** (normal for self-hosted) keep their row with `n/a` prices and a `?`
-  cost; the total renders `≤ $X + ?` with a `no catalog price (self-hosted or unpriced): …`
+  cost; the total renders `≈ $X + ?` with a `no catalog price (self-hosted or unpriced): …`
   note below. If pricing is entirely unreachable the table is skipped. Pricing never blocks
   the run.
-- **`--quiet`** suppresses the table but a one-line `maximum spend ≤ $X (worst case)` still
+- **`--quiet`** suppresses the table but a one-line
+  `projected spend ≈ $X, up to $Y if streams retry and stand-in judges step in` still
   prints, cost survives quiet mode.
-- The ceiling and its per-row breakdown land in the run manifest under
-  `preflight.cost_ceiling`.
+- Both figures and the per-row breakdown land in the run manifest under
+  `preflight.cost_projection`.
 
 **Preflight: the thinking probe** (`preflight.thinking_probe`, default `true`). A
 `thinking probe…` line, then one line per candidate that failed
@@ -156,9 +164,9 @@ judge (call count, catalog price in $/M in / $/M out, worst-case cost), closing 
 (`🧠 {name} ({model}): thinks despite config …, ranking will be footnoted`). No surprises →
 `pool is thinking-clean ✓`.
 
-**Confirmation.** Unless `--yes`/`-y` is given, the CLI prompts `Proceed (spends up to $X)?`,
-so the dollar bound sits in the approval question itself (plain `Proceed?` when nothing could
-be priced). Declining aborts before any battle or judge calls (the thinking probe, when
+**Confirmation.** Unless `--yes`/`-y` is given, the CLI prompts
+`Proceed (≈ $X, up to $Y with retries)?`, so both dollar figures sit in the approval question
+itself (plain `Proceed?` when nothing could be priced). Declining aborts before any battle or judge calls (the thinking probe, when
 enabled, has already made its one probe stream per model). When stdin is not an interactive
 terminal the run errors out with a "pass `--yes`" hint instead of prompting.
 
