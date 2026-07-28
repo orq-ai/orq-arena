@@ -287,7 +287,7 @@ further model calls:
 |---|---|
 | `battles.jsonl` | One JSON line per judged round: both responses, reconciled per-judge votes, token/TTFT accounting. |
 | `battles.run.json` | The run manifest: the config it ran, config/prompt hashes, candidate pool, judge panel, seed, and (once finished) agreement stats. No credential ever lands in it. |
-| `battles.report.html` | A single-file HTML report, no server, no external assets. Verdict banner with the top 3 models up top, then the ELO ladder with error bars, a quality-vs-cost value map, speed, and the exact dollar spend. Share it with anyone. |
+| `battles.report.html` | A single-file HTML report, no server, no external assets. Verdict banner with the top 3 models up top, then the ELO ladder with error bars, a quality-vs-cost value map, speed, and the dollar spend (exact per model, `≈` for the jury, which is estimated at the panel's mean rate). Share it with anyone. |
 
 ![HTML report page: verdict banner with the top three models, badges, ELO leaderboard with CI bars, and the ELO-vs-cost value map](assets/report-page.png)
 
