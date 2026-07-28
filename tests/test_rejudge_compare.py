@@ -70,9 +70,24 @@ def test_compare_reports_rows(tmp_path):
     b = _write(tmp_path, "b.json", 0.50, 0.25)
     rows = compare_reports([a, b])
     assert [r["spearman"] for r in rows] == [0.83, 0.50]
+    # a correlation never travels without its n; derived from the saved
+    # ranking, so pre-existing report JSONs yield it too
+    assert [r["models"] for r in rows] == [2, 2]
     assert rows[0]["worst_flip_judge"] == "j1"
     assert rows[0]["inconclusive"] == 0.5
     assert rows[1]["panel"] == "j1"
+
+
+def test_compare_table_prints_the_n_beside_the_correlation(tmp_path, capsys, monkeypatch):
+    """Through the renderer, not just the row dicts: the table is what a
+    reader quotes, and it graded juries on a bare Spearman until RES-1153."""
+    from orq_arena.rejudge import render_comparison
+
+    monkeypatch.setenv("COLUMNS", "200")  # keep rich from wrapping the cell
+    a = _write(tmp_path, "a.json", 0.83, 0.34)
+    render_comparison(compare_reports([a]))
+    out = " ".join(capsys.readouterr().out.split())
+    assert "0.83 over 2" in out
 
 
 def test_short_map_from_manifest_prefers_run_pool(tmp_path):
