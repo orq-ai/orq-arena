@@ -133,9 +133,7 @@ of both models alongside the short display name, because short names collide acr
 on that full id, not just the leaderboard: the rating, the length-controlled rating, verbosity, cost
 and speed, so two providers of one model can never be apart in one panel and merged in another.
 When two candidates would share a display name, both fall back to their full ids and the preflight
-says so. One gap is still open: `rejudge` builds its old-vs-new ranking off the short names, so a
-colliding pool merges those two models in that one table (the rejudge comparator itself excludes
-self-judging on the full id, as live matches do).
+says so.
 
 `orq-arena report <log>` rebuilds from that manifest, not from the live YAML: model names, the
 judge panel and the reasoning flags come from the run itself, so regenerating a page after the
