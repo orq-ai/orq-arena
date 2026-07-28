@@ -9,18 +9,34 @@ judge-agreement stats for a panel that never judged that run.
 from __future__ import annotations
 
 import json
+import pathlib
 
-from orq_arena.config import ArenaConfig
+import pytest
+from click.testing import Result
+
+from orq_arena.config import ORQ_API_KEY_ENV, ArenaConfig
 from orq_arena.data.schemas import BattleRecord
 from orq_arena.tournament.driver import (
+    IDENTITY_FIELDS,
     config_from_manifest,
     config_sha256,
     read_manifest,
     rebuild_from_log,
 )
 
-# An env var nobody sets, so the report's catalog read stays offline in tests.
-OFFLINE = {"api_key_env": "ORQ_ARENA_TEST_NO_KEY"}
+
+@pytest.fixture(autouse=True)
+def _offline(monkeypatch):
+    """No network. `report` prices its cost section from the live catalog when a
+    key is around, and a developer machine usually has one; dropping the key is
+    what makes that a no-op (`fetch_price_map` returns {} without one)."""
+    monkeypatch.delenv(ORQ_API_KEY_ENV, raising=False)
+
+    async def _no_prices(_gw):
+        return {}
+
+    monkeypatch.setattr("orq_arena.providers.models_list.fetch_price_map", _no_prices)
+
 
 RAN_WITH = ArenaConfig.model_validate(
     {
@@ -30,7 +46,6 @@ RAN_WITH = ArenaConfig.model_validate(
         ],
         "judges": ["prov/judge-1", "prov/judge-2"],
         "min_successful_judges": 2,
-        "gateway": OFFLINE,
     }
 )
 
@@ -43,7 +58,6 @@ DRIFTED = ArenaConfig.model_validate(
             {"model_id": "prov/model-b"},
         ],
         "judges": ["other/judge-9"],
-        "gateway": OFFLINE,
     }
 )
 
@@ -156,52 +170,122 @@ def _write_run(tmp_path, *, with_manifest: bool = True, with_yaml: bool = True):
     return log, drifted
 
 
-def _report(args: list[str], cwd) -> tuple[object, str]:
+def _report(args: list[str], cwd, monkeypatch) -> tuple[Result, str]:
     """Run `orq-arena report` from `cwd` and return (result, rendered page)."""
-    import os
-
     from click.testing import CliRunner
 
     from orq_arena.cli import cli
 
-    here = os.getcwd()
-    os.chdir(cwd)
-    try:
-        res = CliRunner().invoke(cli, ["report", *args])
-    finally:
-        os.chdir(here)
+    monkeypatch.chdir(cwd)
+    res = CliRunner().invoke(cli, ["report", *args])
     page = (cwd / "battles.report.html").read_text(encoding="utf-8") if res.exit_code == 0 else ""
     return res, page
 
 
-def test_report_defaults_to_the_manifest_even_with_a_drifted_yaml_present(tmp_path):
+def test_report_defaults_to_the_manifest_even_with_a_drifted_yaml_present(tmp_path, monkeypatch):
     log, _ = _write_run(tmp_path)
-    res, page = _report([str(log)], tmp_path)
+    res, page = _report([str(log)], tmp_path, monkeypatch)
     assert res.exit_code == 0, res.output
     assert "our-default" not in page  # the run's own names survive the edit
     assert "may have drifted" not in page  # nothing to disclose, identity is the run's
 
 
-def test_report_needs_no_config_file_at_all_when_the_log_is_manifested(tmp_path):
+def test_report_needs_no_config_file_at_all_when_the_log_is_manifested(tmp_path, monkeypatch):
     log, _ = _write_run(tmp_path, with_yaml=False)
-    res, page = _report([str(log)], tmp_path)
+    res, page = _report([str(log)], tmp_path, monkeypatch)
     assert res.exit_code == 0, res.output
     assert "model-a" in page
 
 
-def test_explicit_config_wins_and_the_page_says_it_did(tmp_path):
+def test_explicit_config_wins_and_the_page_says_it_did(tmp_path, monkeypatch):
     log, drifted = _write_run(tmp_path)
-    res, page = _report([str(log), "--config", str(drifted)], tmp_path)
+    res, page = _report([str(log), "--config", str(drifted)], tmp_path, monkeypatch)
     assert res.exit_code == 0, res.output
     assert "our-default" in page  # the operator asked for their file
     assert "may have drifted since the run" in page
     assert "not the config this run used" in res.output
 
 
-def test_a_log_without_a_manifest_discloses_the_fallback(tmp_path):
+def test_a_log_without_a_manifest_discloses_the_fallback(tmp_path, monkeypatch):
     log, _ = _write_run(tmp_path, with_manifest=False)
-    res, page = _report([str(log)], tmp_path)
+    res, page = _report([str(log)], tmp_path, monkeypatch)
     assert res.exit_code == 0, res.output
     assert "our-default" in page  # nothing on disk to correct it
     assert "may have drifted since the run" in page
     # The no-manifest-and-no-config error lives in tests/test_cli_errors.py.
+
+
+def test_the_writer_records_what_the_reader_needs(tmp_path):
+    """The write side, which nothing else covers: delete the recorded config
+    from `_write_manifest` and every other test here still passes, because they
+    all hand-build their manifests."""
+    from orq_arena.data.prompts import PromptItem
+    from orq_arena.tournament.driver import _write_manifest, manifest_path_for
+
+    log = tmp_path / "battles.jsonl"
+    _write_manifest(
+        manifest_path_for(log),
+        cfg=RAN_WITH,
+        prompts=[PromptItem(text="p?")],
+        seed=42,
+        tournament_id="bench-1",
+        started_at=0.0,
+    )
+    manifest = read_manifest(log)
+    assert manifest["config_sha256"] == config_sha256(RAN_WITH)
+
+    cfg, source = config_from_manifest(manifest, DRIFTED)
+    assert source == "manifest"
+    assert cfg.model_dump(include=set(IDENTITY_FIELDS)) == RAN_WITH.model_dump(
+        include=set(IDENTITY_FIELDS)
+    )
+
+
+def test_the_committed_example_run_rebuilds_from_its_own_manifest():
+    """A real pre-change manifest, not a synthetic one: the partial path has to
+    survive the shape actually on disk, which a mirror of the writer can't prove."""
+    log = pathlib.Path("examples/quickstart/battles.jsonl")
+    manifest = read_manifest(log)
+    assert "config" not in manifest, "committed example is no longer a pre-change manifest"
+
+    cfg, source = config_from_manifest(manifest, DRIFTED)
+    assert source == "manifest-partial"
+    assert {c.name for c in cfg.candidates} == set(manifest["candidates"])
+    assert list(cfg.judges) == manifest["judges"]
+
+    records = [
+        BattleRecord.model_validate_json(line)
+        for line in log.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    _, report = rebuild_from_log(cfg, records, preflight=manifest.get("preflight"))
+    assert report["fleiss"]["kappa"] == manifest["fleiss"]["kappa"]
+    assert report["mean_agreement"] == manifest["mean_agreement"]
+
+
+def test_a_manifest_never_steers_where_this_machine_sends_its_key():
+    """Manifests get forwarded (bug reports ask for one). Rebuilding through a
+    recorded `base_url` would let a file someone else wrote choose the host the
+    report's authenticated catalog read goes to."""
+    hostile = ArenaConfig.model_validate(
+        {
+            **RAN_WITH.model_dump(),
+            "gateway": {"base_url": "https://attacker.example/v3/router"},
+        }
+    )
+    local = DRIFTED.gateway.base_url
+
+    from_blob, _ = config_from_manifest({"config": hostile.model_dump(mode="json")}, DRIFTED)
+    from_map, _ = config_from_manifest(_manifest(hostile, with_config=False), DRIFTED)
+    assert from_blob.gateway.base_url == local
+    assert from_map.gateway.base_url == local
+    # ...while still taking the identity it is there to carry.
+    assert [c.name for c in from_blob.candidates] == [c.name for c in RAN_WITH.candidates]
+
+
+def test_a_manifested_log_survives_an_unreadable_config_file(tmp_path, monkeypatch):
+    log, drifted = _write_run(tmp_path)
+    drifted.write_text("candidates: [oops\n  broken: yaml", encoding="utf-8")
+    res, page = _report([str(log)], tmp_path, monkeypatch)
+    assert res.exit_code == 0, res.output
+    assert "our-default" not in page

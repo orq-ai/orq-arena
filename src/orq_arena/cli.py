@@ -576,11 +576,14 @@ def report_cmd(log_path: str, config_path: str, output_path: str | None) -> None
     import asyncio
     from pathlib import Path
 
+    import yaml
     from click.core import ParameterSource
+    from pydantic import ValidationError
 
     from .data.schemas import BattleRecord
     from .report import build_report_html, report_path_for
     from .tournament.driver import (
+        IdentitySource,
         config_from_manifest,
         config_sha256,
         read_manifest,
@@ -605,32 +608,40 @@ def report_cmd(log_path: str, config_path: str, output_path: str | None) -> None
         click.get_current_context().get_parameter_source("config_path")
         == ParameterSource.COMMANDLINE
     )
+    identity: IdentitySource
+    drift = "model names, judge panel and reasoning flags"
     if explicit_config:
         cfg = _load_config(config_path)
-        identity = "manifest" if manifest.get("config_sha256") == config_sha256(cfg) else "config"
+        recorded_sha = manifest.get("config_sha256")
+        identity = "manifest" if recorded_sha == config_sha256(cfg) else "config"
         if identity == "config":
+            mismatch = (
+                "which is not the config this run used"
+                if recorded_sha
+                else "and this log records no config of its own"
+            )
             click.echo(
-                f"  ⚠ rebuilding with --config {config_path}, which is not the config this run "
-                "used; model names, judge panel and reasoning flags follow your file, not the run",
+                f"  ⚠ rebuilding with --config {config_path}, {mismatch}; "
+                f"{drift} follow your file, not the run",
                 err=True,
             )
     else:
         # A manifested log carries its own identity, so the default YAML only
-        # has to exist when the log has no manifest to speak for it.
+        # has to be readable when the log has no manifest to speak for it.
         try:
             fallback = load_config(config_path)
-        except FileNotFoundError:
+        except (FileNotFoundError, ValidationError, yaml.YAMLError):
             fallback = None
         cfg, identity = config_from_manifest(manifest, fallback)
         if cfg is None:
             raise click.ClickException(
-                f"{log_path} has no usable run manifest and {config_path} is not there; "
-                "pass --config <your.yaml> (see docs/configuration.md for the format)."
+                f"{log_path} has no usable run manifest, and {config_path} is missing or "
+                "unreadable; pass --config <your.yaml> (see docs/configuration.md for the format)."
             )
         if identity == "config":
             click.echo(
-                f"  ⚠ no run manifest next to {log_path}; model names, judge panel and reasoning "
-                f"flags come from {config_path}, which may have drifted since the run",
+                f"  ⚠ no run manifest next to {log_path}; {drift} come from "
+                f"{config_path}, which may have drifted since the run",
                 err=True,
             )
 

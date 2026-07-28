@@ -62,5 +62,5 @@ template. If you add a new credential, wire it through an environment variable a
 ## Reporting bugs
 
 Open a GitHub issue with: what you ran, what you expected, what happened, and, if a live run
-is involved, the `*.run.json` manifest of the run (it contains no secrets: hashes, model ids,
-panel, and agreement stats).
+is involved, the `*.run.json` manifest of the run (it contains no secrets: the config it ran,
+hashes, model ids, panel, and agreement stats, but never a key).

@@ -14,6 +14,7 @@ import random
 import time
 from itertools import combinations
 from pathlib import Path
+from typing import Literal
 
 from evaluatorq import PairwiseComparison, build_report
 from pydantic import ValidationError
@@ -245,31 +246,33 @@ def read_manifest(log_path: str | Path) -> dict:
     return data if isinstance(data, dict) else {}
 
 
-def config_from_manifest(
-    manifest: dict, fallback: ArenaConfig | None = None
-) -> tuple[ArenaConfig | None, str]:
-    """The config the run actually used, so a rebuilt report describes that run.
+# Exactly the fields a rebuild reads. Everything else in a manifest's recorded
+# config stays local, so a forwarded manifest can describe a run without also
+# steering where this machine sends its API key (see config_from_manifest).
+IDENTITY_FIELDS = ("candidates", "judges", "replacement_judges", "min_successful_judges")
 
-    Rebuilds read model names, the judge panel and the thinking flags from the
-    manifest the run wrote, never from a YAML that may have moved on since.
-    Returns ``(cfg, source)`` with source ``manifest`` (full recorded config),
-    ``manifest-partial`` (pre-config-blob manifests, whose candidate/judge
-    records still pin every field a rebuild reads), or ``config`` (nothing
-    usable on disk, the caller should say so out loud). ``cfg`` is None only
-    when the manifest is unusable and no fallback config was supplied.
+IdentitySource = Literal["manifest", "manifest-partial", "config"]
+
+
+def _identity_from_recorded_config(recorded: dict) -> dict | None:
+    """Identity fields out of a manifest's full recorded config."""
+    if not isinstance(recorded.get("candidates"), list) or not recorded.get("judges"):
+        return None
+    return {k: recorded[k] for k in IDENTITY_FIELDS if k in recorded}
+
+
+def _identity_from_candidate_map(manifest: dict) -> dict | None:
+    """Identity fields out of a pre-config-blob manifest's own bookkeeping.
+
+    Those manifests recorded the pool as ``{display name: {model, reasoning}}``
+    with reasoning collapsed to the string ``"vendor-default"`` when unset, which
+    still pins every field a rebuild reads.
     """
-    recorded = manifest.get("config")
-    if isinstance(recorded, dict):
-        try:
-            return ArenaConfig.model_validate(recorded), "manifest"
-        except ValidationError:
-            pass  # a hand-edited manifest is not worth dying over
-
     candidates = manifest.get("candidates") or {}
-    judges = manifest.get("judges") or []
-    if candidates and judges:
-        merged = fallback.model_dump() if fallback is not None else {}
-        merged["candidates"] = [
+    if not candidates or not manifest.get("judges"):
+        return None
+    identity = {
+        "candidates": [
             {
                 "model_id": spec["model"],
                 "name": name,
@@ -279,15 +282,55 @@ def config_from_manifest(
             }
             for name, spec in candidates.items()
             if isinstance(spec, dict) and spec.get("model")
-        ]
-        merged["judges"] = list(judges)
-        merged["replacement_judges"] = list(manifest.get("replacement_judges") or [])
-        if manifest.get("min_successful_judges") is not None:
-            merged["min_successful_judges"] = manifest["min_successful_judges"]
+        ],
+        "judges": list(manifest["judges"]),
+        "replacement_judges": list(manifest.get("replacement_judges") or []),
+    }
+    if manifest.get("min_successful_judges") is not None:
+        identity["min_successful_judges"] = manifest["min_successful_judges"]
+    return identity
+
+
+def config_from_manifest(
+    manifest: dict, fallback: ArenaConfig | None = None
+) -> tuple[ArenaConfig | None, IdentitySource]:
+    """The config the run actually used, so a rebuilt report describes that run.
+
+    Rebuilds read model names, the judge panel and the thinking flags from the
+    manifest the run wrote, never from a YAML that may have moved on since.
+
+    Only ``IDENTITY_FIELDS`` are taken from the manifest. The gateway in
+    particular is never adopted: a manifest is meant to be forwarded (bug
+    reports ask for one), and rebuilding through its ``base_url`` would let a
+    file someone else wrote choose the host this machine sends ``ORQ_API_KEY``
+    to on the report's catalog read.
+
+    Returns ``(cfg, source)``: ``manifest`` (identity from the recorded
+    config), ``manifest-partial`` (identity reconstructed from a pre-config-blob
+    manifest's candidate/judge entries), or ``config`` (nothing usable on disk,
+    the caller should say so out loud). ``cfg`` is None only when the manifest
+    is unusable and no fallback config was supplied.
+    """
+    recorded = manifest.get("config")
+    sources: list[tuple[dict | None, IdentitySource]] = [
+        (
+            _identity_from_recorded_config(recorded) if isinstance(recorded, dict) else None,
+            "manifest",
+        ),
+        (_identity_from_candidate_map(manifest), "manifest-partial"),
+    ]
+    for identity, source in sources:
+        if identity is None:
+            continue
+        # ponytail: everything outside IDENTITY_FIELDS (gateway, criteria, match
+        # rules) comes from the local config. None of it reaches the rating, so
+        # the rebuild is exact; widen this only for a field a report actually reads.
+        merged = fallback.model_dump() if fallback is not None else {}
+        merged.update(identity)
         try:
-            return ArenaConfig.model_validate(merged), "manifest-partial"
+            return ArenaConfig.model_validate(merged), source
         except ValidationError:
-            pass
+            continue  # a hand-edited manifest is not worth dying over
 
     return fallback, "config"
 
@@ -372,7 +415,7 @@ async def run_tournament(
 
     gateway = OrqGateway(cfg.gateway)
     log = BattleLog(battle_log_path)
-    manifest_path = Path(battle_log_path).with_suffix(".run.json")
+    manifest_path = manifest_path_for(battle_log_path)
 
     names = [w.name for w in cfg.candidates]
     schedule = round_robin_schedule(cfg.candidates, seed)
