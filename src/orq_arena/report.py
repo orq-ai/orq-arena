@@ -12,10 +12,13 @@ from __future__ import annotations
 import html
 import time
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .config import ArenaConfig
 from .data.schemas import BattleRecord
+
+if TYPE_CHECKING:  # driver imports this module at render time; keep it type-only
+    from .tournament.driver import IdentitySource
 
 # Official orq.ai symbol (docs.orq.ai brand asset), recolored via currentColor.
 _MARK = (
@@ -506,8 +509,14 @@ def build_report_html(
     report: dict[str, Any],
     manifest: dict[str, Any],
     prices: dict[str, tuple[float, float]] | None = None,
+    identity_source: IdentitySource = "manifest",
 ) -> str:
-    """Render the run report page as a self-contained HTML string."""
+    """Render the run report page as a self-contained HTML string.
+
+    ``identity_source`` says where the model names, judge panel and reasoning
+    flags came from: the run's manifest, or a YAML that may have drifted since
+    (``"config"``), which the page then discloses rather than the console only.
+    """
     judged = [r for r in records if r.error is None]
     voids = len(records) - len(judged)
     verdicts = {"A": 0, "B": 0, "tie": 0, "inconclusive": 0}
@@ -639,6 +648,19 @@ def build_report_html(
     # Confidence & methodology: one aligned row per run-confidence signal
     # (reads far better than ragged pills). (label, reading html, td class).
     signal_rows: list[tuple[str, str, str]] = []
+    # This page gets forwarded, so a caveat folded into a closed drawer is a
+    # caveat nobody reads: an unverified identity opens the drawer it sits in.
+    conf_open = ""
+    if identity_source == "config":
+        conf_open = " open"
+        signal_rows.append(
+            (
+                "Run identity",
+                "model names, judge panel and reasoning flags were rebuilt from a config file, "
+                "not from the run's own manifest, so they may have drifted since the run",
+                " warn",
+            )
+        )
     if family_overlaps:
         signal_rows.append(
             (
@@ -944,7 +966,7 @@ flags a judge to distrust. Judges also agree with one another (0 = chance, 1 = p
 setup. Inconclusive rounds carry no signal and are dropped from the rating, never counted as ties.{" An errored round is a network or infrastructure failure, not a model failure; it is logged and excluded." if voids else ""}</p>
 </details>
 
-<details class="method"><summary>Confidence stats</summary>
+<details class="method"{conf_open}><summary>Confidence stats</summary>
 <div class="tablewrap"><table>
 <thead><tr><th>Signal</th><th>Reading</th></tr></thead>
 <tbody>{meth_rows}</tbody></table></div>

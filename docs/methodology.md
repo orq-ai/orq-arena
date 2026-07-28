@@ -97,8 +97,17 @@ Every run reports the numbers needed to challenge its own ranking:
 ## Reproducibility
 
 Every run is seeded (schedule and prompt draws) and writes a manifest next to the battle log
-with content hashes of the config and prompt set, the judge panel, and the closing agreement
-stats, so two runs are provably comparable and any rating can be re-derived from its log.
+with the config it ran, content hashes of that config and the prompt set, the judge panel, and the
+closing agreement stats, so two runs are provably comparable and any rating can be re-derived from
+its log.
+
+`orq-arena report <log>` rebuilds from that manifest, not from the live YAML: model names, the
+judge panel and the reasoning flags come from the run itself, so regenerating a page after the
+config moved on cannot relabel a model or compute &kappa; against a panel that never judged the
+run. Runs recorded before the full config was stored still pin all three from the manifest's
+candidate and judge entries. When identity has to come from a config file instead (no readable
+manifest, or an explicit `--config` that disagrees with the recorded `config_sha256`), the page
+says so in its Confidence stats, so a forwarded report carries the caveat with it.
 
 ## Human anchor: does the panel agree with people?
 

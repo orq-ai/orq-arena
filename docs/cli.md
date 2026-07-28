@@ -503,6 +503,14 @@ Render the single-file HTML report page from a recorded run. Reads `battles.json
 key is present). The same page is written automatically at the end
 of every run (`<log>.report.html` next to the log).
 
+**The manifest is the source of truth for run identity.** Model names, the judge panel and the
+reasoning flags come from the manifest the run wrote, not from whatever the YAML says today, so a
+page rebuilt months later still describes that run. A manifested log therefore needs no config file
+at all. Two cases break that chain, and both are stated on the page itself rather than only on the
+console: a log with no readable manifest (identity falls back to `--config`), and an explicit
+`--config` whose contents don't match the run's recorded `config_sha256` (your file wins, by
+request).
+
 ![HTML report page: verdict banner with the top three models, badges, ELO leaderboard with CI bars, and the ELO-vs-cost value map](assets/report-page.png)
 
 ```text
@@ -512,7 +520,7 @@ orq-arena report [LOG_PATH] [--config PATH] [--output PATH]
 | Flag / arg | Default | Effect |
 |---|---|---|
 | `LOG_PATH` (positional) | `battles.jsonl` | The recorded run to render. |
-| `--config PATH` | `orq_arena.yaml` | Supplies the judge panel and the model-name mapping for the report's statistics rebuild; match rules are not consulted. |
+| `--config PATH` | `orq_arena.yaml`, only as a fallback | Overrides the run's recorded identity (judge panel, model-name mapping, reasoning flags) when passed explicitly, and the page discloses that it was overridden. Left alone, it is used only when the log has no usable manifest; match rules are never consulted. |
 | `--output PATH` | `<log>.report.html` | Destination HTML file. |
 
 The page is self-contained (inline CSS, no external assets, works from `file://`): verdict

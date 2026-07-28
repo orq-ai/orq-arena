@@ -17,6 +17,7 @@ from evaluatorq import PairwiseComparison, build_report, llm_jury_pairwise
 from .config import ArenaConfig
 from .data.schemas import BattleRecord
 from .providers.orq_gateway import OrqGateway
+from .tournament.driver import manifest_path_for
 from .tournament.elo import bradley_terry_mle, build_wins_matrix
 
 Outcome = tuple[str, str, str]
@@ -82,7 +83,7 @@ def short_map_from_manifest(log_path: str | Path) -> dict[str, str] | None:
     exclusion stays correct even after the YAML candidates drift. Returns None
     when the manifest (or its candidates map) is missing or unreadable.
     """
-    manifest_path = Path(log_path).with_suffix(".run.json")
+    manifest_path = manifest_path_for(log_path)
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, ValueError):

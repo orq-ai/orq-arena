@@ -14,8 +14,10 @@ import random
 import time
 from itertools import combinations
 from pathlib import Path
+from typing import Literal
 
 from evaluatorq import PairwiseComparison, build_report
+from pydantic import ValidationError
 
 from ..arena.battle import Battle
 from ..candidates import CandidateSpec
@@ -224,6 +226,115 @@ def rebuild_from_log(
     return elo, report
 
 
+MANIFEST_SUFFIX = ".run.json"
+
+
+def manifest_path_for(log_path: str | Path) -> Path:
+    return Path(log_path).with_suffix(MANIFEST_SUFFIX)
+
+
+def config_sha256(cfg: ArenaConfig) -> str:
+    return hashlib.sha256(cfg.model_dump_json().encode("utf-8")).hexdigest()[:16]
+
+
+def read_manifest(log_path: str | Path) -> dict:
+    """The run's manifest, or ``{}`` when it's missing or unreadable."""
+    try:
+        data = json.loads(manifest_path_for(log_path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+# Exactly the fields a rebuild reads. Everything else in a manifest's recorded
+# config stays local, so a forwarded manifest can describe a run without also
+# steering where this machine sends its API key (see config_from_manifest).
+IDENTITY_FIELDS = ("candidates", "judges", "replacement_judges", "min_successful_judges")
+
+IdentitySource = Literal["manifest", "manifest-partial", "config"]
+
+
+def _identity_from_recorded_config(recorded: dict) -> dict | None:
+    """Identity fields out of a manifest's full recorded config."""
+    if not isinstance(recorded.get("candidates"), list) or not recorded.get("judges"):
+        return None
+    return {k: recorded[k] for k in IDENTITY_FIELDS if k in recorded}
+
+
+def _identity_from_candidate_map(manifest: dict) -> dict | None:
+    """Identity fields out of a pre-config-blob manifest's own bookkeeping.
+
+    Those manifests recorded the pool as ``{display name: {model, reasoning}}``
+    with reasoning collapsed to the string ``"vendor-default"`` when unset, which
+    still pins every field a rebuild reads.
+    """
+    candidates = manifest.get("candidates") or {}
+    if not candidates or not manifest.get("judges"):
+        return None
+    identity = {
+        "candidates": [
+            {
+                "model_id": spec["model"],
+                "name": name,
+                "reasoning": None
+                if spec.get("reasoning") == "vendor-default"
+                else spec.get("reasoning"),
+            }
+            for name, spec in candidates.items()
+            if isinstance(spec, dict) and spec.get("model")
+        ],
+        "judges": list(manifest["judges"]),
+        "replacement_judges": list(manifest.get("replacement_judges") or []),
+    }
+    if manifest.get("min_successful_judges") is not None:
+        identity["min_successful_judges"] = manifest["min_successful_judges"]
+    return identity
+
+
+def config_from_manifest(
+    manifest: dict, fallback: ArenaConfig | None = None
+) -> tuple[ArenaConfig | None, IdentitySource]:
+    """The config the run actually used, so a rebuilt report describes that run.
+
+    Rebuilds read model names, the judge panel and the thinking flags from the
+    manifest the run wrote, never from a YAML that may have moved on since.
+
+    Only ``IDENTITY_FIELDS`` are taken from the manifest. The gateway in
+    particular is never adopted: a manifest is meant to be forwarded (bug
+    reports ask for one), and rebuilding through its ``base_url`` would let a
+    file someone else wrote choose the host this machine sends ``ORQ_API_KEY``
+    to on the report's catalog read.
+
+    Returns ``(cfg, source)``: ``manifest`` (identity from the recorded
+    config), ``manifest-partial`` (identity reconstructed from a pre-config-blob
+    manifest's candidate/judge entries), or ``config`` (nothing usable on disk,
+    the caller should say so out loud). ``cfg`` is None only when the manifest
+    is unusable and no fallback config was supplied.
+    """
+    recorded = manifest.get("config")
+    sources: list[tuple[dict | None, IdentitySource]] = [
+        (
+            _identity_from_recorded_config(recorded) if isinstance(recorded, dict) else None,
+            "manifest",
+        ),
+        (_identity_from_candidate_map(manifest), "manifest-partial"),
+    ]
+    for identity, source in sources:
+        if identity is None:
+            continue
+        # ponytail: everything outside IDENTITY_FIELDS (gateway, criteria, match
+        # rules) comes from the local config. None of it reaches the rating, so
+        # the rebuild is exact; widen this only for a field a report actually reads.
+        merged = fallback.model_dump() if fallback is not None else {}
+        merged.update(identity)
+        try:
+            return ArenaConfig.model_validate(merged), source
+        except ValidationError:
+            continue  # a hand-edited manifest is not worth dying over
+
+    return fallback, "config"
+
+
 def _write_manifest(
     path: Path,
     *,
@@ -247,7 +358,10 @@ def _write_manifest(
         "tournament_id": tournament_id,
         "started_at": started_at,
         "seed": seed,
-        "config_sha256": hashlib.sha256(cfg.model_dump_json().encode("utf-8")).hexdigest()[:16],
+        "config_sha256": config_sha256(cfg),
+        # The whole config, so a report rebuilt months later describes this run
+        # rather than whatever the YAML says by then.
+        "config": cfg.model_dump(mode="json"),
         "prompts_sha256": hashlib.sha256(
             "\n".join(p.text for p in prompts).encode("utf-8")
         ).hexdigest()[:16],
@@ -301,7 +415,7 @@ async def run_tournament(
 
     gateway = OrqGateway(cfg.gateway)
     log = BattleLog(battle_log_path)
-    manifest_path = Path(battle_log_path).with_suffix(".run.json")
+    manifest_path = manifest_path_for(battle_log_path)
 
     names = [w.name for w in cfg.candidates]
     schedule = round_robin_schedule(cfg.candidates, seed)
