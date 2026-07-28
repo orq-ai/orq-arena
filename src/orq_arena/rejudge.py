@@ -17,7 +17,7 @@ from evaluatorq import PairwiseComparison, build_report, llm_jury_pairwise
 from .config import ArenaConfig
 from .data.schemas import BattleRecord
 from .providers.orq_gateway import OrqGateway
-from .tournament.driver import manifest_path_for
+from .tournament.driver import manifest_path_for, record_names
 from .tournament.elo import bradley_terry_mle, build_wins_matrix
 
 Outcome = tuple[str, str, str]
@@ -170,7 +170,16 @@ async def rejudge_run(
 
     comparisons = await asyncio.gather(*(score(r) for r in records))
 
-    pairs = [(r.model_a, r.model_b) for r in records]
+    # Rank on the same key every other view uses: the full router id where the
+    # record carries one, rendered as the display name the report would show.
+    # Ranking on short names merged a colliding pool (one model via two
+    # providers) into a single entry, and the Spearman compared rankings over a
+    # field one model short: RES-1149 fixed the comparator key and missed this
+    # sibling (RES-1152). Display names, not raw ids, so a non-colliding pool
+    # prints exactly what it always printed; a colliding one shows full ids,
+    # the same fallback the leaderboard uses.
+    alias = record_names(records, cfg.candidates)
+    pairs = [(alias[r.rating_key("a")], alias[r.rating_key("b")]) for r in records]
     models = sorted({m for p in pairs for m in p})
     old_outcomes = outcomes_from_majorities(pairs, [r.majority_verdict for r in records])
     new_outcomes = outcomes_from_majorities(pairs, [c.winner for c in comparisons])
