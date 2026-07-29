@@ -138,6 +138,23 @@ class ArenaConfig(BaseModel):
         return self
 
 
+def known_config_keys() -> list[str]:
+    """Every settable key across the config surface, for did-you-mean hints.
+
+    Lives beside the models so a new sub-model added here cannot silently
+    drop out of the CLI's suggestion pool.
+    """
+    models = (ArenaConfig, MatchRules, OrqAIGatewayConfig, PreflightConfig, CandidateSpec)
+    return sorted(
+        {
+            name
+            for model in models
+            for name, field in model.model_fields.items()
+            if field.init is not False  # 'renamed' is output-only, never a valid key
+        }
+    )
+
+
 def load_config(path: str | Path) -> ArenaConfig:
     """Parse a YAML config into an ``ArenaConfig``."""
     with open(path, encoding="utf-8") as fh:

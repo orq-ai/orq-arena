@@ -47,23 +47,9 @@ def _config_error(path: str, exc: ValidationError) -> str:
     """
     import difflib
 
-    from .candidates import CandidateSpec
-    from .config import ArenaConfig, MatchRules, OrqAIGatewayConfig, PreflightConfig
+    from .config import known_config_keys
 
-    known = sorted(
-        {
-            name
-            for model in (
-                ArenaConfig,
-                MatchRules,
-                OrqAIGatewayConfig,
-                PreflightConfig,
-                CandidateSpec,
-            )
-            for name, field in model.model_fields.items()
-            if field.init is not False  # 'renamed' is output-only, never a valid key
-        }
-    )
+    known = known_config_keys()
     lines = [f"{path} is not a valid config:"]
     for err in exc.errors():
         loc = ".".join(str(part) for part in err["loc"])

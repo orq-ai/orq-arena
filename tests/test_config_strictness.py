@@ -43,6 +43,16 @@ def test_unknown_gateway_key_rejected(tmp_path: Path) -> None:
         load_config(_write(tmp_path, {**BASE, "gateway": {"base_uri": "https://x"}}))
 
 
+def test_unknown_match_key_rejected(tmp_path: Path) -> None:
+    with pytest.raises(ValidationError, match="max_round"):
+        load_config(_write(tmp_path, {**BASE, "match": {"max_round": 3}}))
+
+
+def test_unknown_preflight_key_rejected(tmp_path: Path) -> None:
+    with pytest.raises(ValidationError, match="thinking_prob"):
+        load_config(_write(tmp_path, {**BASE, "preflight": {"thinking_prob": False}}))
+
+
 def test_unknown_candidate_key_rejected(tmp_path: Path) -> None:
     cfg = {**BASE, "candidates": [{"model_id": "x/a", "reasonning": {}}, {"model_id": "x/b"}]}
     with pytest.raises(ValidationError, match="reasonning"):
@@ -85,6 +95,15 @@ def test_cli_still_renders_non_extra_errors(tmp_path: Path) -> None:
 )
 def test_every_shipped_yaml_still_loads(path: Path) -> None:
     assert load_config(path).candidates
+
+
+def test_suggestion_pool_omits_output_only_fields() -> None:
+    from orq_arena.config import known_config_keys
+
+    keys = known_config_keys()
+    assert "replacement_judges" in keys
+    # 'renamed' is computed by validation, never a key a user may write.
+    assert "renamed" not in keys
 
 
 def test_quickstart_manifest_rebuild_survives_strictness() -> None:
