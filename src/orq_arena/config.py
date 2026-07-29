@@ -6,12 +6,17 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .candidates import CandidateSpec
 
 
 class MatchRules(BaseModel):
+    # extra="forbid" on every config-surface model (RES-1156): pydantic's
+    # default silently drops unknown keys, so a typo like replacment_judges:
+    # configured nothing while the preflight consent read as if it had.
+    model_config = ConfigDict(extra="forbid")
+
     max_rounds: int = 5
     # HP + damage tiers are TUI presentation only (the live show's health bars);
     # the rating never sees them, it's fed per-round verdicts. The TUI derives
@@ -30,6 +35,8 @@ DEFAULT_ORQ_HOST = "https://api.orq.ai"
 
 
 class OrqAIGatewayConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     base_url: str = "https://api.orq.ai/v3/router"
     candidate_max_tokens: int = 2048
     # A cap, not a target, free headroom for judges that think by default
@@ -44,6 +51,8 @@ class OrqAIGatewayConfig(BaseModel):
 
 
 class PreflightConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     # One tiny call per candidate before the run: flags models that think
     # despite their config (vendor defaults the router can't disable).
     thinking_probe: bool = True
@@ -51,6 +60,8 @@ class PreflightConfig(BaseModel):
 
 class ArenaConfig(BaseModel):
     """Top-level orq-arena config."""
+
+    model_config = ConfigDict(extra="forbid")
 
     match: MatchRules = Field(default_factory=MatchRules)
     preflight: PreflightConfig = Field(default_factory=PreflightConfig)

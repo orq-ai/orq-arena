@@ -6,6 +6,7 @@ from typing import Literal
 
 import click
 from loguru import logger
+from pydantic import ValidationError
 
 from .config import load_config
 from .data.prompts import load_prompts
@@ -37,8 +38,46 @@ _TUI_HINT = (
 )
 
 
+def _config_error(path: str, exc: ValidationError) -> str:
+    """One line per problem, with a spelling suggestion for unknown keys.
+
+    The config models forbid unknown keys (RES-1156), so a typo surfaces here
+    rather than silently configuring nothing; the suggestion pool is every
+    settable field across all config models.
+    """
+    import difflib
+
+    from .candidates import CandidateSpec
+    from .config import ArenaConfig, MatchRules, OrqAIGatewayConfig, PreflightConfig
+
+    known = sorted(
+        {
+            name
+            for model in (
+                ArenaConfig,
+                MatchRules,
+                OrqAIGatewayConfig,
+                PreflightConfig,
+                CandidateSpec,
+            )
+            for name, field in model.model_fields.items()
+            if field.init is not False  # 'renamed' is output-only, never a valid key
+        }
+    )
+    lines = [f"{path} is not a valid config:"]
+    for err in exc.errors():
+        loc = ".".join(str(part) for part in err["loc"])
+        if err["type"] == "extra_forbidden":
+            close = difflib.get_close_matches(str(err["loc"][-1]), known, n=1)
+            hint = f"; did you mean {close[0]!r}?" if close else ""
+            lines.append(f"  unknown setting {loc!r}{hint}")
+        else:
+            lines.append(f"  {loc}: {err['msg']}")
+    return "\n".join(lines)
+
+
 def _load_config(path: str):
-    """load_config with a clean CLI error when the YAML isn't there."""
+    """load_config with a clean CLI error when the YAML isn't there or invalid."""
     try:
         return load_config(path)
     except FileNotFoundError:
@@ -46,6 +85,8 @@ def _load_config(path: str):
             f"{path} not found. Run from a checkout that has it, or pass "
             "--config <your.yaml> (see docs/configuration.md for the format)."
         ) from None
+    except ValidationError as exc:
+        raise click.ClickException(_config_error(path, exc)) from None
 
 
 def _quiet_logs() -> None:
@@ -601,7 +642,6 @@ def report_cmd(log_path: str, config_path: str, output_path: str | None) -> None
 
     import yaml
     from click.core import ParameterSource
-    from pydantic import ValidationError
 
     from .data.schemas import BattleRecord
     from .report import build_report_html, report_path_for

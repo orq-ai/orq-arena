@@ -58,7 +58,9 @@ what the shell hasn't set. A missing `.env` is silently fine.
 Any YAML path can be passed to `--config`; `load_config()` (`src/orq_arena/config.py`) reads it
 with `yaml.safe_load` and validates it into an `ArenaConfig` via
 `ArenaConfig.model_validate(raw)`. There is no `${VAR}` environment-variable substitution inside
-the YAML, every value is literal.
+the YAML, every value is literal. Unknown keys are rejected, not ignored: a typo such as
+`replacment_judges:` fails the load with a did-you-mean suggestion instead of silently
+configuring nothing.
 
 ### Which commands take `--config`
 
