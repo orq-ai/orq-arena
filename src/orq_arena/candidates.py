@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class CandidateSpec(BaseModel):
@@ -16,6 +16,8 @@ class CandidateSpec(BaseModel):
     providers of the same model share a short name, so ``ArenaConfig`` falls
     both back to their full ids rather than rate them as one model.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     model_id: str = Field(description="orq.ai gateway model slug, e.g. 'anthropic/claude-opus-4-8'")
     name: str = ""

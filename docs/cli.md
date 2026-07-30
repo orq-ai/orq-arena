@@ -68,6 +68,8 @@ A few things apply across every subcommand and are only documented once, here:
   cross-checks, etc.) regardless of which fields a given subcommand actually uses. An
   invalid config file fails the same way for `pool` or `refresh-catalog` as it does for
   `run`, see [Required vs Optional Settings](configuration.md#required-vs-optional-settings).
+  Unknown keys are part of that validation: a misspelled setting is rejected with a
+  did-you-mean suggestion rather than silently ignored.
 - **Default paths**: every default path in the tables below is one of these four, all
   relative to the current working directory:
 
