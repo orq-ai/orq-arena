@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import Sequence
 from pathlib import Path
 
 from evaluatorq import PairwiseComparison, build_report, llm_jury_pairwise
@@ -196,6 +197,7 @@ async def rejudge_run(
         "new_ranking": new_rank,
         "spearman": spearman(old_rank, new_rank),
         "changed_verdicts": changed,
+        "decisive": decisive_count(comparisons),
         "total": len(records),
     }
 
@@ -239,21 +241,49 @@ def spearman_verdict(rho: float, n_models: int) -> str:
     return "ranking is panel-sensitive; treat with care"
 
 
+def decisive_count(comparisons: Sequence[PairwiseComparison]) -> int:
+    """Comparisons that expressed a preference, ties included.
+
+    'inconclusive' is evaluatorq's word for a panel that never reached quorum:
+    the judges errored, abstained, or contradicted themselves across the seat
+    orders. A tie is a decision; inconclusive is the absence of one.
+    """
+    return sum(1 for c in comparisons if c.winner != "inconclusive")
+
+
 def render_result(result: dict) -> None:
     from rich.console import Console
     from rich.table import Table
 
     console = Console()
     report = result["report"]
+    total = result["total"]
+    # Absent on a report loaded from an older JSON; assume it decided something
+    # rather than accusing a historical run of having collapsed.
+    decisive = result.get("decisive", total)
     console.print(
-        f"\n[bold]re-judged {result['total']} rounds[/bold], "
-        f"{result['changed_verdicts']} verdicts changed"
+        f"\n[bold]re-judged {total} rounds[/bold], {result['changed_verdicts']} verdicts changed"
     )
+
+    # No decision anywhere means there is no ranking to show and nothing to
+    # correlate. Printing them would dress a dead panel (bad credential, every
+    # judge erroring, quorum never met) as a result.
+    if not decisive:
+        console.print(
+            f"[bold red]the jury produced no usable verdict in {decisive} of {total} "
+            "rounds[/bold red] — no ranking and no rank correlation follow from this run"
+        )
+        console.print("check the panel is reachable and the credential is valid, then re-run")
+        return
+
     n_models = len(result["old_ranking"])
+    # A clean run reads the way it always did (RES-1153). A partial collapse
+    # says so inline, because the correlation was fit on the decided subset and
+    # the reader would otherwise price it against the full round count.
+    rounds = f"{total} rounds" if decisive == total else f"{decisive} of {total} rounds decided"
     console.print(
         f"rank correlation (Spearman) old→new: [bold]{result['spearman']:.2f}[/bold] "
-        f"over {n_models} models, {result['total']} rounds, "
-        + spearman_verdict(result["spearman"], n_models)
+        f"over {n_models} models, {rounds}, " + spearman_verdict(result["spearman"], n_models)
     )
     console.print(f"old ranking: {' > '.join(result['old_ranking'])}")
     console.print(f"new ranking: {' > '.join(result['new_ranking'])}")
