@@ -27,9 +27,10 @@ from orq_arena.tournament.driver import (
 
 @pytest.fixture(autouse=True)
 def _offline(monkeypatch):
-    """No network. `report` prices its cost section from the live catalog when a
-    key is around, and a developer machine usually has one; dropping the key is
-    what makes that a no-op (`fetch_price_map` returns {} without one)."""
+    """No network. `report` prices its cost section from the live catalog, which
+    is public now, so dropping the key no longer makes that a no-op: the stub
+    below is what keeps it offline. The key still goes, because the
+    workspace-enabled narrowing does read it."""
     monkeypatch.delenv(ORQ_API_KEY_ENV, raising=False)
 
     async def _no_prices(_gw):

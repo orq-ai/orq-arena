@@ -1,13 +1,22 @@
-"""Fetch the list of workspace-enabled, chat-capable models from orq.ai.
+"""Model metadata from the orq.ai catalog, plus the workspace-enabled subset.
 
-Endpoint strategy (ported from the chennai research):
+Two questions, two sources, because only one of them needs a credential:
 
-* ``GET /v2/router/models``, the **workspace-enabled subset**: models
-  disabled in the Model Garden simply don't appear. Primary source.
-* ``GET /v3/router/models``, full routable catalog; fallback.
-* ``GET /v2/models``, full Model Garden with an authoritative ``type``
-  field; used to narrow to ``type == "chat"``. Regex patterns stay as a
-  safety net when it's unreachable.
+* **What exists, what it costs, what it can do** comes from
+  ``GET {host}/v2/model-catalog``. It is public, needs no key, and states
+  ``endpoints``, ``pricing`` per 1M tokens, ``deprecated`` and
+  ``context_window`` outright. This is why the model picker and the cost
+  projection work before the user has authenticated at all.
+* **What this workspace turned on** comes from ``GET {host}/v2/router/models``,
+  which does need a key. Models disabled in the Model Garden simply don't
+  appear. When a key is present the catalog is narrowed to that subset; when it
+  isn't, the full catalog stands, which is a better answer than the empty list
+  the old key-gated path returned.
+
+This replaced a substring regex over model ids that guessed chat capability
+from fragments like "whisper" and "dall-e", and a price reader that reconciled
+two different Model Garden cost representations by hand. The catalog states
+both, so neither guess is needed.
 
 Results cache for 24h at ``~/.cache/orq-arena/models.json``.
 """
@@ -16,7 +25,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -30,36 +38,39 @@ CACHE_DIR = Path.home() / ".cache" / "orq-arena"
 CACHE_FILE = CACHE_DIR / "models.json"
 CACHE_TTL_SECONDS = 24 * 3600
 
-_NON_CHAT_PATTERNS: tuple[str, ...] = (
-    "embedding",
-    "text-embedding",
-    "-embed",
-    "tts",
-    "-tts-",
-    "stt",
-    "-stt-",
-    "whisper",
-    "moderation",
-    "rerank",
-    "ocr",
-    "dall-e",
-    "imagen",
-    "gpt-image",
-    "image-",
-    "-image-",
-    "speech-",
-    "voice-",
-)
-_NON_CHAT_RE = re.compile("|".join(re.escape(p) for p in _NON_CHAT_PATTERNS), re.I)
+# The cached rows carry catalog fields now. A file written before that lacks
+# `endpoints`, and reading it as though it had them would drop every model from
+# the picker, so the old shape is ignored rather than misread.
+CACHE_VERSION = 2
 
 
 @dataclass
 class ModelEntry:
-    """A single gateway-routable model."""
+    """A model as the catalog describes it.
+
+    ``endpoints`` is the authoritative capability statement: ``"chat"`` for
+    chat completions, ``"responses"`` for the Responses API that evaluatorq
+    1.32.4 prefers for judges because it is the endpoint the router prices.
+    ``price_in`` / ``price_out`` are dollars per 1M tokens, ``None`` when the
+    catalog carries no price, which is not the same as free.
+    """
 
     id: str
     provider: str
     created: int = 0
+    endpoints: tuple[str, ...] = ()
+    deprecated: bool = False
+    context_window: int | None = None
+    price_in: float | None = None
+    price_out: float | None = None
+
+    @property
+    def is_chat(self) -> bool:
+        return "chat" in self.endpoints
+
+    @property
+    def has_responses(self) -> bool:
+        return "responses" in self.endpoints
 
 
 @dataclass
@@ -69,60 +80,6 @@ class ModelList:
     models: list[ModelEntry]
     source: str  # "live" | "cache" | "fallback"
     fetched_at: float = field(default_factory=time.time)
-
-
-def _strip_noise(models: list[ModelEntry]) -> list[ModelEntry]:
-    kept: list[ModelEntry] = []
-    seen: set[str] = set()
-    for m in models:
-        if _NON_CHAT_RE.search(m.id) or m.id in seen:
-            continue
-        seen.add(m.id)
-        kept.append(m)
-    return kept
-
-
-def _parse_payload(data: dict) -> list[ModelEntry]:
-    entries: list[ModelEntry] = []
-    for row in data.get("data", []):
-        model_id = row.get("id")
-        if not isinstance(model_id, str):
-            continue
-        if row.get("object") not in (None, "model"):
-            continue
-        provider = row.get("owned_by") or model_id.split("/", 1)[0]
-        entries.append(
-            ModelEntry(id=model_id, provider=str(provider), created=int(row.get("created") or 0))
-        )
-    return _strip_noise(entries)
-
-
-def _write_cache(models: list[ModelEntry]) -> None:
-    try:
-        CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        CACHE_FILE.write_text(
-            json.dumps(
-                {
-                    "fetched_at": time.time(),
-                    "data": [
-                        {"id": m.id, "owned_by": m.provider, "created": m.created} for m in models
-                    ],
-                }
-            ),
-            encoding="utf-8",
-        )
-    except OSError:
-        pass  # cache is advisory
-
-
-def _read_cache() -> tuple[list[ModelEntry], float] | None:
-    if not CACHE_FILE.exists():
-        return None
-    try:
-        raw = json.loads(CACHE_FILE.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    return _parse_payload(raw), float(raw.get("fetched_at") or 0.0)
 
 
 def catalog_host(cfg: OrqAIGatewayConfig) -> str:
@@ -142,84 +99,167 @@ def catalog_host(cfg: OrqAIGatewayConfig) -> str:
     return f"{parsed.scheme}://{parsed.netloc}"
 
 
-def _catalog_urls(cfg: OrqAIGatewayConfig) -> list[str]:
-    host = catalog_host(cfg)
-    urls = [f"{host}/v2/router/models", f"{host}/v3/router/models"]
-    configured = cfg.base_url.rstrip("/") + "/models"
-    if configured not in urls:
-        urls.append(configured)
-    return urls
-
-
-async def _fetch_type_map(
-    client: httpx.AsyncClient, cfg: OrqAIGatewayConfig, api_key: str
-) -> dict[str, str]:
-    """``{model_id: type}`` from the Model Garden; empty dict on failure."""
+def _as_int(value: object) -> int | None:
+    """The catalog sends ``created`` and ``context_window`` as numeric strings."""
     try:
-        resp = await client.get(
-            f"{catalog_host(cfg)}/v2/models", headers={"Authorization": f"Bearer {api_key}"}
-        )
-        resp.raise_for_status()
-        payload = resp.json()
-        rows = (
-            payload
-            if isinstance(payload, list)
-            else (payload.get("data") or payload.get("models") or [])
-        )
-        return {
-            row["id"]: row.get("type", "")
-            for row in rows
-            if isinstance(row, dict) and isinstance(row.get("id"), str)
-        }
-    except (httpx.HTTPError, ValueError, KeyError):
-        return {}
+        return int(str(value))
+    except (TypeError, ValueError):
+        return None
 
 
-def _filter_by_type(entries: list[ModelEntry], type_map: dict[str, str]) -> list[ModelEntry]:
-    if not type_map:
-        return entries
-    return [m for m in entries if not type_map.get(m.id) or type_map[m.id] == "chat"]
+def _price(pricing: object, side: str) -> float | None:
+    """Dollars per 1M tokens for one side of a catalog ``pricing`` block."""
+    if not isinstance(pricing, dict):
+        return None
+    leg = pricing.get(side)
+    if not isinstance(leg, dict):
+        return None
+    cost, per = leg.get("cost"), leg.get("per")
+    if not isinstance(cost, (int, float)):
+        return None
+    # Every row observed states `per: 1000000`; normalise rather than assume it.
+    scale = 1_000_000 / per if isinstance(per, (int, float)) and per else 1.0
+    return float(cost) * scale
+
+
+def _parse_catalog(rows: list) -> dict[str, ModelEntry]:
+    out: dict[str, ModelEntry] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        model_id = row.get("id")
+        if not isinstance(model_id, str):
+            continue
+        provider = row.get("provider")
+        provider_id = (
+            provider.get("id") if isinstance(provider, dict) else provider
+        ) or model_id.split("/", 1)[0]
+        out[model_id] = ModelEntry(
+            id=model_id,
+            provider=str(provider_id),
+            created=_as_int(row.get("created")) or 0,
+            endpoints=tuple(e for e in (row.get("endpoints") or []) if isinstance(e, str)),
+            deprecated=bool(row.get("deprecated")),
+            context_window=_as_int(row.get("context_window")),
+            price_in=_price(row.get("pricing"), "input"),
+            price_out=_price(row.get("pricing"), "output"),
+        )
+    return out
+
+
+def _write_cache(catalog: dict[str, ModelEntry]) -> None:
+    try:
+        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        CACHE_FILE.write_text(
+            json.dumps(
+                {
+                    "v": CACHE_VERSION,
+                    "fetched_at": time.time(),
+                    "data": [
+                        {
+                            "id": m.id,
+                            "provider": {"id": m.provider},
+                            "created": m.created,
+                            "endpoints": list(m.endpoints),
+                            "deprecated": m.deprecated,
+                            "context_window": m.context_window,
+                            "pricing": {
+                                "input": {"cost": m.price_in, "per": 1_000_000},
+                                "output": {"cost": m.price_out, "per": 1_000_000},
+                            },
+                        }
+                        for m in catalog.values()
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+    except OSError:
+        pass  # cache is advisory
+
+
+def _read_cache() -> tuple[dict[str, ModelEntry], float] | None:
+    if not CACHE_FILE.exists():
+        return None
+    try:
+        raw = json.loads(CACHE_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(raw, dict) or raw.get("v") != CACHE_VERSION:
+        return None  # written by an older shape; refetch rather than misread
+    return _parse_catalog(raw.get("data") or []), float(raw.get("fetched_at") or 0.0)
+
+
+async def fetch_catalog(
+    cfg: OrqAIGatewayConfig,
+    *,
+    force_refresh: bool = False,
+) -> dict[str, ModelEntry]:
+    """``{router_id: ModelEntry}`` from the public catalog; ``{}`` on failure.
+
+    Sends no Authorization header. The endpoint is public, and attaching a key
+    would make it fail closed for exactly the users who have none.
+    """
+    now = time.time()
+    cached = _read_cache()
+    if cached is not None and not force_refresh and now - cached[1] < CACHE_TTL_SECONDS:
+        return cached[0]
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(f"{catalog_host(cfg)}/v2/model-catalog")
+            resp.raise_for_status()
+            payload = resp.json()
+    except (httpx.HTTPError, ValueError):
+        # A stale catalog beats no catalog: the run still gets prices and
+        # capabilities, just older ones.
+        return cached[0] if cached is not None else {}
+
+    rows = payload.get("data") if isinstance(payload, dict) else payload
+    catalog = _parse_catalog(rows or [])
+    if catalog:
+        _write_cache(catalog)
+    return catalog
 
 
 async def fetch_price_map(cfg: OrqAIGatewayConfig) -> dict[str, tuple[float, float]]:
-    """``{router_id: ($/M input, $/M output)}`` from the Model Garden.
+    """``{router_id: ($/M input, $/M output)}``.
 
-    Garden rows key as ``provider/model_id``, which is exactly the router
-    slug (verified 12/12 against the shipped config). Empty dict on any
-    failure; pricing is advisory, never blocks a run.
+    Only models the catalog prices on both sides appear; a half-priced row is
+    no more usable than an absent one, and preflight reports the difference
+    between priced and unpriced rather than inventing a zero. Empty dict on any
+    failure: pricing is advisory and never blocks a run.
     """
-    api_key = os.environ.get(ORQ_API_KEY_ENV, "")
-    if not api_key:
-        return {}
+    catalog = await fetch_catalog(cfg)
+    return {
+        m.id: (m.price_in, m.price_out)
+        for m in catalog.values()
+        if m.price_in is not None and m.price_out is not None
+    }
+
+
+async def _workspace_enabled_ids(cfg: OrqAIGatewayConfig, api_key: str) -> set[str]:
+    """Router ids this workspace has enabled; empty set when unavailable.
+
+    An empty result means "could not narrow", not "nothing is enabled", so the
+    caller keeps the full catalog rather than showing the user nothing.
+    """
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(
-                f"{catalog_host(cfg)}/v2/models", headers={"Authorization": f"Bearer {api_key}"}
+                f"{catalog_host(cfg)}/v2/router/models",
+                headers={"Authorization": f"Bearer {api_key}"},
             )
             resp.raise_for_status()
             payload = resp.json()
     except (httpx.HTTPError, ValueError):
-        return {}
-    rows = (
-        payload
-        if isinstance(payload, list)
-        else (payload.get("data") or payload.get("models") or [])
-    )
-    prices: dict[str, tuple[float, float]] = {}
-    for row in rows:
-        if not isinstance(row, dict) or not row.get("model_id"):
-            continue
-        rid = f"{row.get('provider')}/{row['model_id']}"
-        md = row.get("metadata") or {}
-        cin = md.get("million_tokens_input_cost")
-        cout = md.get("million_tokens_output_cost")
-        if cin is None:
-            cin = (row.get("input_cost") or 0.0) * 1000  # input_cost is $/1k tok
-        if cout is None:
-            cout = (row.get("output_cost") or 0.0) * 1000
-        if isinstance(cin, (int, float)) and isinstance(cout, (int, float)):
-            prices[rid] = (float(cin), float(cout))
-    return prices
+        return set()
+    rows = payload.get("data") if isinstance(payload, dict) else payload
+    return {
+        row["id"]
+        for row in (rows or [])
+        if isinstance(row, dict) and isinstance(row.get("id"), str)
+    }
 
 
 async def fetch_chat_models(
@@ -227,29 +267,31 @@ async def fetch_chat_models(
     *,
     force_refresh: bool = False,
 ) -> ModelList:
-    """Chat-capable, workspace-active models; cached, with graceful fallback."""
-    api_key = os.environ.get(ORQ_API_KEY_ENV, "")
+    """Chat-capable models, narrowed to the workspace's own when a key allows.
+
+    Chat capability is read from the catalog's ``endpoints``, not inferred from
+    the model id. Deprecated models are left out of the picker, because offering
+    one for a new run is a recommendation; a deprecated model already named in a
+    config is preflight's business, and gets flagged there rather than silently
+    dropped here.
+    """
     now = time.time()
+    served_from_cache = _read_cache() is not None and not force_refresh
+    catalog = await fetch_catalog(cfg, force_refresh=force_refresh)
+    if not catalog:
+        return ModelList(models=[], source="fallback", fetched_at=now)
 
-    cached = _read_cache()
-    if cached is not None and not force_refresh and now - cached[1] < CACHE_TTL_SECONDS:
-        return ModelList(models=cached[0], source="cache", fetched_at=cached[1])
+    models = [m for m in catalog.values() if m.is_chat and not m.deprecated]
 
+    api_key = os.environ.get(ORQ_API_KEY_ENV, "")
     if api_key:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            type_map = await _fetch_type_map(client, cfg, api_key)
-            for url in _catalog_urls(cfg):
-                try:
-                    resp = await client.get(url, headers={"Authorization": f"Bearer {api_key}"})
-                    resp.raise_for_status()
-                    models = _filter_by_type(_parse_payload(resp.json()), type_map)
-                    if models:
-                        _write_cache(models)
-                        return ModelList(models=models, source="live", fetched_at=now)
-                except (httpx.HTTPError, ValueError):
-                    continue
+        enabled = await _workspace_enabled_ids(cfg, api_key)
+        if enabled:
+            narrowed = [m for m in models if m.id in enabled]
+            # An empty intersection is far likelier to mean the two id spaces
+            # disagree than that the workspace enabled nothing at all.
+            if narrowed:
+                models = narrowed
 
-    if cached is not None:
-        return ModelList(models=cached[0], source="cache", fetched_at=cached[1])
-
-    return ModelList(models=[], source="fallback", fetched_at=now)
+    models.sort(key=lambda m: m.id)
+    return ModelList(models=models, source="cache" if served_from_cache else "live", fetched_at=now)
