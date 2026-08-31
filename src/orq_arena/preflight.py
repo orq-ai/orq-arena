@@ -22,6 +22,7 @@ from typing import Any
 from .candidates import CandidateSpec
 from .config import ArenaConfig
 from .data.prompts import PromptItem
+from .providers.models_list import ModelEntry
 from .providers.orq_gateway import OrqGateway
 
 _PROBE_PROMPT = "Reply with the single word: ok"
@@ -186,6 +187,64 @@ def cost_projection(
         unpriced=sorted(set(unpriced)),
         rows=tuple(rows),
     )
+
+
+def config_warnings(cfg: ArenaConfig, catalog: dict[str, ModelEntry]) -> list[str]:
+    """What the catalog knows that the config should hear about, or ``[]``.
+
+    Advisory only. Every one of these describes a run that still works, so none
+    of them blocks: the catalog's list omits deprecated entries, which makes
+    "absent" a statement about the catalog rather than about the model, and the
+    shipped configs already name models that have aged out of it.
+
+    An empty catalog means it could not be reached, not that every model is
+    unknown, so it produces no warnings at all. Warning on a network blip would
+    teach the reader to skip the section that matters.
+    """
+    if not catalog:
+        return []
+
+    judges = list(cfg.judges) + list(cfg.replacement_judges)
+    referenced = [w.model_id for w in cfg.candidates] + judges
+
+    unknown: list[str] = []
+    deprecated: list[str] = []
+    seen: set[str] = set()
+    for model_id in referenced:
+        if model_id in seen:
+            continue
+        seen.add(model_id)
+        entry = catalog.get(model_id)
+        if entry is None:
+            unknown.append(model_id)
+        elif entry.deprecated:
+            deprecated.append(model_id)
+
+    # Only judges take evaluatorq's Responses path; a candidate is streamed over
+    # chat completions regardless of what else it supports.
+    no_responses = sorted(
+        {j for j in judges if (e := catalog.get(j)) is not None and not e.has_responses}
+    )
+
+    warnings: list[str] = []
+    if unknown:
+        warnings.append(
+            f"not in the model catalog, so deprecated or unknown: {', '.join(sorted(unknown))}. "
+            "The run still calls them; the cost projection cannot price them."
+        )
+    if deprecated:
+        warnings.append(
+            f"the catalog lists these as deprecated: {', '.join(sorted(deprecated))}. "
+            "They still route today, but pick a successor before they stop."
+        )
+    if no_responses:
+        warnings.append(
+            f"judges without a responses endpoint: {', '.join(no_responses)}. "
+            "evaluatorq judges over the router's Responses endpoint because that is the "
+            "one the router prices; these fall back to chat completions and their judge "
+            "cost goes unattributed."
+        )
+    return warnings
 
 
 async def _probe_one(gateway: OrqGateway, w: CandidateSpec) -> tuple[str, dict[str, Any]]:

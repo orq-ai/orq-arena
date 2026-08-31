@@ -199,12 +199,13 @@ def run(
 
     from .preflight import (
         call_counts,
+        config_warnings,
         cost_projection,
         judge_family_overlaps,
         surprises,
         thinking_probe,
     )
-    from .providers.models_list import fetch_price_map
+    from .providers.models_list import fetch_catalog, fetch_price_map
 
     _quiet_logs()
 
@@ -296,6 +297,14 @@ def run(
             f"  no catalog price (self-hosted or unpriced): "
             f"{', '.join(cost.unpriced)}; excluded from both figures"
         )
+
+    # What the catalog knows about the config, from the same cached fetch the
+    # prices came from. All advisory: every one of these still runs.
+    cfg_warnings = config_warnings(cfg, asyncio.run(fetch_catalog(cfg.gateway)))
+    if cfg_warnings:
+        preflight_data["config_warnings"] = cfg_warnings
+        for line in cfg_warnings:
+            warn(f"  {line}")
     probe_lines: list[str] = []
     if cfg.preflight.thinking_probe:
         status("thinking probe…")
