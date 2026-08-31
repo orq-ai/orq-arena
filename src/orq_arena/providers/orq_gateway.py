@@ -43,16 +43,16 @@ class OrqGateway:
             try:
                 resolved = resolve_llm_client(default_orq_host=DEFAULT_ORQ_HOST, require_orq=True)
             except MissingLLMCredentialsError as exc:
-                raise RuntimeError(
-                    f"{ORQ_API_KEY_ENV} is not set. Export it before running orq-arena."
-                ) from exc
+                from .credentials import credential_hint
+
+                raise RuntimeError(credential_hint()) from exc
             self._client = resolved.client.with_options(timeout=timeout)
         else:  # BYO endpoint: the YAML named the endpoint and key explicitly.
             api_key = os.environ.get(ORQ_API_KEY_ENV, "")
             if not api_key:
-                raise RuntimeError(
-                    f"{ORQ_API_KEY_ENV} is not set. Export it before running orq-arena."
-                )
+                from .credentials import credential_hint
+
+                raise RuntimeError(credential_hint())
             self._client = AsyncOpenAI(api_key=api_key, base_url=cfg.base_url, timeout=timeout)
 
     @property

@@ -1,0 +1,143 @@
+"""Credential advice from the orq CLI, and one probe that the key actually works.
+
+The arena reads its key from ``ORQ_API_KEY`` and nothing else. That is the same
+precedence ``orq launch`` documents ("an exported key overrides the workspace
+picked by orq auth login"), and disagreeing with the rest of a user's orq
+tooling would be its own kind of surprise.
+
+What the CLI is used for here is **advice, not tokens**. It can say whether you
+are logged in and which workspace is active, which makes the error message
+actionable and gives the manifest its provenance. It is deliberately not used
+as a credential source: the CLI states that a login session expires after about
+an hour, and a tournament routinely runs longer, so borrowing that token would
+trade a loud failure at minute zero for a silent one at minute ninety.
+
+The probe exists because the failure it catches is invisible otherwise. A stale
+key produced 401 on every judge call of a real rejudge and still rendered a
+leaderboard, and ``orq doctor`` reported healthy the whole time, because it
+checks auth and endpoint reachability but never exercises router inference.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import subprocess
+
+import httpx
+
+from ..config import ORQ_API_KEY_ENV, OrqAIGatewayConfig
+
+_CLI = "orq"
+_CLI_TIMEOUT_S = 10
+
+
+def _whoami() -> dict | None:
+    """``orq auth whoami --json`` as a dict, or None if that is not available.
+
+    Never raises: the CLI may be absent, logged out, an unrelated binary of the
+    same name, or simply slow. All of those mean "no advice to offer", which is
+    a fine answer.
+    """
+    if shutil.which(_CLI) is None:
+        return None
+    try:
+        proc = subprocess.run(  # noqa: S603
+            [_CLI, "auth", "whoami", "--json"],
+            capture_output=True,
+            text=True,
+            timeout=_CLI_TIMEOUT_S,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0:
+        return None
+    try:
+        data = json.loads(proc.stdout)
+    except (ValueError, TypeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def active_workspace() -> str | None:
+    """The workspace the CLI is logged into, for the run manifest.
+
+    A leaderboard is a claim about models as a particular workspace can reach
+    them, so recording which one produced it is provenance, not decoration.
+    None when unknown, which is recorded as unknown rather than guessed.
+    """
+    data = _whoami()
+    if not data:
+        return None
+    key = data.get("active_workspace_key")
+    return key if isinstance(key, str) and key else None
+
+
+def credential_hint() -> str:
+    """The message for a run that has no key, with the commands to fix it."""
+    base = f"{ORQ_API_KEY_ENV} is not set."
+    workspace = active_workspace()
+    if workspace:
+        return (
+            f"{base} The orq CLI is logged in to workspace '{workspace}', but its login "
+            "session expires after about an hour and a tournament can run longer, so "
+            "the arena will not borrow it. Mint a key that outlives the run:\n"
+            f"    orq api-keys create --name orq-arena --json\n"
+            f"then export it as {ORQ_API_KEY_ENV}."
+        )
+    return (
+        f"{base} Get one with:\n"
+        "    orq auth login\n"
+        "    orq api-keys create --name orq-arena --json\n"
+        f"then export it as {ORQ_API_KEY_ENV}."
+    )
+
+
+async def verify_credential(
+    cfg: OrqAIGatewayConfig,
+    *,
+    client: httpx.AsyncClient | None = None,
+) -> tuple[bool | None, str]:
+    """One cheap call to see whether the router accepts the key.
+
+    Returns ``(ok, detail)``. ``ok`` is True when accepted, False when the
+    router rejected the credential, and **None when the question could not be
+    answered** (offline, 5xx, timeout). None matters: being unable to reach the
+    router is not a verdict on the key, and refusing to run on that basis would
+    be wrong in exactly the situation where the user can least afford it.
+
+    Lists models rather than generating anything, so the check costs no tokens.
+    """
+    api_key = os.environ.get(ORQ_API_KEY_ENV, "")
+    if not api_key:
+        return False, credential_hint()
+
+    owned = client is None
+    probe = client or httpx.AsyncClient(base_url=cfg.base_url, timeout=15.0)
+    try:
+        resp = await probe.get("/models", headers={"Authorization": f"Bearer {api_key}"})
+    except httpx.HTTPError as exc:
+        return None, f"could not reach the router to check the credential: {exc}"
+    finally:
+        if owned:
+            await probe.aclose()
+
+    if resp.status_code in (401, 403):
+        detail = ""
+        try:
+            body = resp.json()
+            detail = (body.get("error") or {}).get("message") or ""
+        except (ValueError, AttributeError):
+            pass
+        workspace = active_workspace()
+        where = f" The orq CLI's active workspace is '{workspace}'." if workspace else ""
+        return False, (
+            f"the router rejected {ORQ_API_KEY_ENV} ({resp.status_code}). {detail}{where} "
+            "A key is scoped to one workspace, so a key from another will fail exactly "
+            "like this. Mint one for the workspace you mean:\n"
+            "    orq api-keys create --name orq-arena --json"
+        )
+    if resp.status_code >= 500:
+        return None, f"the router returned {resp.status_code}; credential not verified"
+    return True, ""

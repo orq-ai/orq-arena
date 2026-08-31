@@ -194,9 +194,11 @@ def run(
       orq-arena run --config orq_arena.yaml --prompts orq:my_dataset --output runs/today.jsonl
     """
     import asyncio
+    import os
     import sys
     from pathlib import Path
 
+    from .config import ORQ_API_KEY_ENV
     from .preflight import (
         call_counts,
         config_warnings,
@@ -205,6 +207,7 @@ def run(
         surprises,
         thinking_probe,
     )
+    from .providers.credentials import verify_credential
     from .providers.models_list import fetch_catalog, fetch_price_map
 
     _quiet_logs()
@@ -305,6 +308,18 @@ def run(
         preflight_data["config_warnings"] = cfg_warnings
         for line in cfg_warnings:
             warn(f"  {line}")
+
+    # One listing call, before any spend. A key that is merely absent is already
+    # refused loudly by the gateway, so this asks the question only that check
+    # cannot: whether the key that *is* set is one the router accepts. A stale
+    # one answers 401 to every judge call and the run still finishes.
+    if os.environ.get(ORQ_API_KEY_ENV):
+        credential_ok, credential_detail = asyncio.run(verify_credential(cfg.gateway))
+        if credential_ok is False:
+            raise SystemExit(f"orq-arena: {credential_detail}")
+        if credential_ok is None and credential_detail:
+            # Unreachable is not a verdict on the key; say so and let the run try.
+            warn(f"  {credential_detail}")
     probe_lines: list[str] = []
     if cfg.preflight.thinking_probe:
         status("thinking probe…")
