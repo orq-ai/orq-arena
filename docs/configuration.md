@@ -26,15 +26,16 @@ cp .env.example .env
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `ORQ_API_KEY` | Required for live runs | (none) | The only secret orq-arena needs. Every candidate, judge, and preflight-probe call goes through the orq.ai router gateway with this one key; the run fails up front with `ORQ_API_KEY is not set. Export it before running orq-arena.` if it is missing. Create one in your workspace settings, as [`.env.example`](https://github.com/orq-ai/orq-arena/blob/master/.env.example) points to, or per the [API keys guide](https://docs.orq.ai/docs/ai-studio/organization/api-keys). |
+| `ORQ_API_KEY` | Required for live runs | (none) | The only secret orq-arena needs. Every candidate, judge, and preflight-probe call goes through the orq.ai router gateway with this one key; the run fails up front with `ORQ_API_KEY is not set.` followed by the commands that mint one (`orq auth login`, `orq api-keys create --name orq-arena --json`). A key that is set but rejected by the router is caught by the preflight credential probe, before the run spends anything. Create one in your workspace settings, as [`.env.example`](https://github.com/orq-ai/orq-arena/blob/master/.env.example) points to, or per the [API keys guide](https://docs.orq.ai/docs/ai-studio/organization/api-keys). |
 | `ORQ_BASE_URL` | No | `https://api.orq.ai` | Points completions **and** the model/price catalog at a different orq.ai host (staging, a proxy). Honoured only while `gateway.base_url` is left at its default: setting that key in the YAML is a bring-your-own-endpoint opt-out that wins outright, so the run can never be split between two hosts. Not read from `.env.example`; export it yourself when you need it. |
 
 Notes:
 
 - `ORQ_API_KEY` is **not** required for `orq-arena pool` (prints the candidate pool, never
-  constructs a gateway) or the log-reading commands (`report`, `annotate`, `anchor`). Note
-  that `report` does use it when present, for the one catalog read that prices the cost
-  section; without a key the page renders with that section omitted.
+  constructs a gateway), the log-reading commands (`report`, `annotate`, `anchor`), or
+  `refresh-catalog`. The model catalog is a public endpoint, so prices and the model list
+  are available with no key at all; a key only narrows the list to what your workspace has
+  enabled.
 
 ### `.env` loading
 

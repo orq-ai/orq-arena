@@ -88,10 +88,11 @@ A few things apply across every subcommand and are only documented once, here:
 
   | Command | Needs a live API key? |
   |---|---|
-  | `run` | Yes, model streams, judge calls, and (if enabled) the thinking probe all call the gateway. |
+  | `run` | Yes, model streams, judge calls, and (if enabled) the thinking probe all call the gateway. A key that is set but rejected is caught by the preflight probe before any spend. |
   | `pool` | No, prints the parsed config only. |
   | `rejudge` | Yes, re-scores recorded responses with a live judge panel. |
-  | `report` | No. One optional catalog read prices the cost section, and that read does need a key: without one the page renders with the cost section omitted (the model-id cache holds no prices). |
+  | `report` | No. The catalog read that prices the cost section is public, so the cost section renders with or without a key. |
+  | `refresh-catalog` | No. The model catalog is public. A key only narrows the list to the models your workspace has enabled. |
   | `annotate` / `anchor` | No, both work entirely from the recorded log and vote files. |
   | `refresh-catalog` | Effectively yes, without it, falls back to any existing cache, then an empty result. See [`refresh-catalog`](#refresh-catalog). |
 
@@ -704,16 +705,18 @@ orq-arena refresh-catalog [--config PATH] [--show/--no-show]
 
 **Behavior notes:**
 
-- Bypasses the 24h cache at `~/.cache/orq-arena/models.json` and re-fetches the
-  workspace-enabled, chat-capable catalog live from orq.ai. Non-chat models (embeddings,
-  TTS/STT, image, rerank, moderation, etc.) are filtered out. Use `--show` to discover
-  model ids for your YAML's `candidates` list; the same catalog also prices the preflight
-  spend projection and the report's cost section.
-- **Without `ORQ_API_KEY`:** the command doesn't error, it skips the live fetch and falls
-  back to any existing cache; with no cache either, it prints `0 models (source=fallback, ...)`
-  (this command passes no fallback ids of its own).
-- Only a **successful** live fetch overwrites the cache file, without a key, or if every
-  candidate URL fails, the existing cache (if any) is left untouched and simply re-reported.
+- Bypasses the 24h cache at `~/.cache/orq-arena/models.json` and re-fetches the catalog
+  live from orq.ai. Non-chat models (embeddings, TTS/STT, image, rerank, moderation, etc.)
+  are excluded because the catalog states each model's `endpoints`, not because their ids
+  look a certain way; deprecated models are excluded too. Use `--show` to discover model
+  ids for your YAML's `candidates` list; the same catalog also prices the preflight spend
+  projection and the report's cost section.
+- **Without `ORQ_API_KEY`:** the catalog is public, so the fetch still happens and you get
+  the full chat-capable list. A key adds one thing: the list is narrowed to the models your
+  workspace has enabled. If that narrowing call fails or returns nothing, the full catalog
+  stands rather than showing you nothing.
+- Only a **successful** live fetch overwrites the cache file; if the fetch fails, the
+  existing cache (if any) is left untouched and simply re-reported.
 - Always prints one summary line (to stderr, per the stream contract; `--show`'s model list
   is the stdout payload):
   `{count} models (source={live|cache|fallback}, age={seconds}s, cache={path})`.

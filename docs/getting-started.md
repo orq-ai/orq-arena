@@ -301,12 +301,21 @@ next to the log. `orq-arena report <log>` regenerates the report page on demand,
 
 ## Troubleshooting
 
-??? failure "`RuntimeError: ORQ_API_KEY is not set. Export it before running orq-arena.`"
+??? failure "`RuntimeError: ORQ_API_KEY is not set.`"
 
-    `.env` is missing, empty, or still the blank template. Run `cp .env.example .env`, fill in a
-    real key (created per the [API keys guide](https://docs.orq.ai/docs/ai-studio/organization/api-keys)), and re-run. This
-    only fires on `run` or `rejudge`; `report`, `annotate`, and `anchor` work from the recorded
-    log with no key at all.
+    `.env` is missing, empty, or still the blank template. The message names the commands that
+    mint a key (`orq auth login`, then `orq api-keys create --name orq-arena --json`); you can
+    also create one per the [API keys guide](https://docs.orq.ai/docs/ai-studio/organization/api-keys).
+    Fill it into `.env` (`cp .env.example .env`) and re-run. This only fires on `run` or
+    `rejudge`; `report`, `annotate`, `anchor`, and `refresh-catalog` all work with no key.
+
+??? failure "`orq-arena: the router rejected ORQ_API_KEY (401)`"
+
+    The key is set but not valid for the workspace you are calling. An orq API key is scoped to
+    one workspace, so a key minted elsewhere fails exactly this way. The preflight probe catches
+    it with one listing call before the run spends anything, which matters because otherwise
+    every judge call returns 401 and the run still produces a leaderboard-shaped result. Mint a
+    key for the right workspace with `orq api-keys create --name orq-arena --json`.
 
 ??? warning "A response shows `✂ truncated` in the live `--tui` show"
 
