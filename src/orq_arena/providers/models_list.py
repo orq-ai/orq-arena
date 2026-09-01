@@ -99,6 +99,20 @@ def catalog_host(cfg: OrqAIGatewayConfig) -> str:
     return f"{parsed.scheme}://{parsed.netloc}"
 
 
+def router_base_url(cfg: OrqAIGatewayConfig) -> str:
+    """The router base a completion actually goes to, resolved like the catalog.
+
+    Same rule as :func:`catalog_host`, kept beside it so the one-host guarantee
+    has one home: at default config evaluatorq's resolver builds the client from
+    ``ORQ_BASE_URL`` + ``/v3/router``, and a YAML ``base_url`` is the
+    bring-your-own opt-out that wins outright. Anything checking the credential
+    has to resolve the host this way or it checks a router the run never calls.
+    """
+    if cfg.base_url == OrqAIGatewayConfig().base_url:
+        return f"{catalog_host(cfg)}/v3/router"
+    return cfg.base_url
+
+
 def _as_int(value: object) -> int | None:
     """The catalog sends ``created`` and ``context_window`` as numeric strings."""
     try:

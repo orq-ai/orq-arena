@@ -95,10 +95,13 @@ def test_unparseable_cli_output_is_not_a_crash(monkeypatch):
     assert "orq auth login" in cred.credential_hint()
 
 
-def _client(handler) -> httpx.AsyncClient:
-    return httpx.AsyncClient(
-        base_url="https://api.orq.ai/v3/router", transport=httpx.MockTransport(handler)
-    )
+def _transport(handler) -> httpx.MockTransport:
+    """A transport, not a client: the probe must resolve its own host.
+
+    Injecting a ready-made client hid which router was asked. The handler now
+    sees the URL `verify_credential` actually built.
+    """
+    return httpx.MockTransport(handler)
 
 
 @pytest.fixture
@@ -115,7 +118,7 @@ async def test_a_run_with_no_key_at_all_never_reaches_the_router():
         calls.append(str(request.url))
         return httpx.Response(200, json={})
 
-    ok, detail = await cred.verify_credential(OrqAIGatewayConfig(), client=_client(handler))
+    ok, detail = await cred.verify_credential(OrqAIGatewayConfig(), transport=_transport(handler))
 
     assert ok is False
     assert calls == []
@@ -131,7 +134,7 @@ async def test_a_rejected_key_is_reported_before_the_run(with_key):
             401, json={"error": {"message": "API key is not valid for this workspace."}}
         )
 
-    ok, detail = await cred.verify_credential(OrqAIGatewayConfig(), client=_client(handler))
+    ok, detail = await cred.verify_credential(OrqAIGatewayConfig(), transport=_transport(handler))
 
     assert ok is False
     assert "401" in detail
@@ -142,7 +145,7 @@ async def test_an_accepted_key_passes_quietly(with_key):
     def handler(request):
         return httpx.Response(200, json={"data": [{"id": "openai/gpt-5.4-nano"}]})
 
-    ok, detail = await cred.verify_credential(OrqAIGatewayConfig(), client=_client(handler))
+    ok, detail = await cred.verify_credential(OrqAIGatewayConfig(), transport=_transport(handler))
 
     assert ok is True
     assert detail == ""
@@ -155,7 +158,7 @@ async def test_a_network_failure_is_not_a_credential_verdict(with_key):
     def handler(request):
         raise httpx.ConnectError("no route to host")
 
-    ok, detail = await cred.verify_credential(OrqAIGatewayConfig(), client=_client(handler))
+    ok, detail = await cred.verify_credential(OrqAIGatewayConfig(), transport=_transport(handler))
 
     assert ok is None
     assert "could not" in detail.lower()
@@ -165,6 +168,44 @@ async def test_a_server_error_is_not_a_credential_verdict(with_key):
     def handler(request):
         return httpx.Response(503, json={})
 
-    ok, _detail = await cred.verify_credential(OrqAIGatewayConfig(), client=_client(handler))
+    ok, _detail = await cred.verify_credential(OrqAIGatewayConfig(), transport=_transport(handler))
 
     assert ok is None, "a 503 says the router is unwell, not that the key is wrong"
+
+
+async def test_the_probe_asks_the_router_the_run_will_actually_call(with_key, monkeypatch):
+    """The probe follows ORQ_BASE_URL, like completions and the catalog do.
+
+    It used to build its client from the static `gateway.base_url` default, so a
+    staging run checked its key against production: a staging-only key was
+    rejected and the run aborted, and a production key passed the probe and then
+    401'd on every judge call. That is the failure this module exists to catch,
+    committed by the check itself.
+    """
+    monkeypatch.setenv("ORQ_BASE_URL", "https://staging.orq.ai")
+    asked: list[str] = []
+
+    def handler(request):
+        asked.append(str(request.url))
+        return httpx.Response(200, json={"data": []})
+
+    ok, _detail = await cred.verify_credential(OrqAIGatewayConfig(), transport=_transport(handler))
+
+    assert ok is True
+    assert asked == ["https://staging.orq.ai/v3/router/models"]
+
+
+async def test_a_byo_endpoint_is_probed_as_written(with_key, monkeypatch):
+    """A YAML `base_url` is the opt-out, and it wins here as it does elsewhere."""
+    monkeypatch.setenv("ORQ_BASE_URL", "https://staging.orq.ai")
+    asked: list[str] = []
+
+    def handler(request):
+        asked.append(str(request.url))
+        return httpx.Response(200, json={"data": []})
+
+    cfg = OrqAIGatewayConfig(base_url="https://proxy.internal/llm")
+    ok, _detail = await cred.verify_credential(cfg, transport=_transport(handler))
+
+    assert ok is True
+    assert asked == ["https://proxy.internal/llm/models"]

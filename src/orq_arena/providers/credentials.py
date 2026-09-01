@@ -28,6 +28,7 @@ import subprocess
 import httpx
 
 from ..config import ORQ_API_KEY_ENV, OrqAIGatewayConfig
+from .models_list import router_base_url
 
 _CLI = "orq"
 _CLI_TIMEOUT_S = 10
@@ -97,7 +98,7 @@ def credential_hint() -> str:
 async def verify_credential(
     cfg: OrqAIGatewayConfig,
     *,
-    client: httpx.AsyncClient | None = None,
+    transport: httpx.AsyncBaseTransport | None = None,
 ) -> tuple[bool | None, str]:
     """One cheap call to see whether the router accepts the key.
 
@@ -107,21 +108,25 @@ async def verify_credential(
     router is not a verdict on the key, and refusing to run on that basis would
     be wrong in exactly the situation where the user can least afford it.
 
+    The host comes from ``router_base_url`` rather than ``cfg.base_url``, so the
+    probe asks about the router the run will actually call: at default config
+    that is ``ORQ_BASE_URL``, and checking a staging key against production
+    answers a question nobody asked. Tests inject a ``transport``, not a client,
+    so the resolved URL stays under test.
+
     Lists models rather than generating anything, so the check costs no tokens.
     """
     api_key = os.environ.get(ORQ_API_KEY_ENV, "")
     if not api_key:
         return False, credential_hint()
 
-    owned = client is None
-    probe = client or httpx.AsyncClient(base_url=cfg.base_url, timeout=15.0)
-    try:
-        resp = await probe.get("/models", headers={"Authorization": f"Bearer {api_key}"})
-    except httpx.HTTPError as exc:
-        return None, f"could not reach the router to check the credential: {exc}"
-    finally:
-        if owned:
-            await probe.aclose()
+    async with httpx.AsyncClient(
+        base_url=router_base_url(cfg), timeout=15.0, transport=transport
+    ) as probe:
+        try:
+            resp = await probe.get("/models", headers={"Authorization": f"Bearer {api_key}"})
+        except httpx.HTTPError as exc:
+            return None, f"could not reach the router to check the credential: {exc}"
 
     if resp.status_code in (401, 403):
         detail = ""
