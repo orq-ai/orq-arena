@@ -81,8 +81,28 @@ Commands:
 cp .env.example .env
 ```
 
-Then fill in the one variable it asks for, an API key from your workspace
-(create one per the [API keys guide](https://docs.orq.ai/docs/ai-studio/organization/api-keys)):
+Then fill in the one variable it asks for, an API key from your workspace. Two ways to
+get one:
+
+=== "From the web app"
+
+    Create a key per the
+    [API keys guide](https://docs.orq.ai/docs/ai-studio/organization/api-keys) and copy it
+    out of workspace settings.
+
+=== "With the orq CLI"
+
+    If you have the [orq CLI](https://github.com/orq-ai/orq-cli) installed:
+
+    ```bash
+    orq auth login
+    orq api-keys create --name orq-arena --json
+    ```
+
+    The response contains the raw key (`sk-orq-...`), shown once and never retrievable
+    again — copy it now. Mint a real API key rather than reusing the login session: an
+    API key outlives a long benchmark run, which is what the CLI itself recommends for
+    long sessions.
 
 ```bash
 ORQ_API_KEY=your-orq-api-key
