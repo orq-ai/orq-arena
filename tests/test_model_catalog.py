@@ -302,3 +302,64 @@ async def test_a_live_fetch_is_reported_as_live(patched_client, monkeypatch):
     ml_result = await ml.fetch_chat_models(OrqAIGatewayConfig())
 
     assert ml_result.source == "live"
+
+
+def test_the_price_unit_is_normalised_from_what_the_row_states():
+    """The live catalog states `per` as 1000000, 1000 and 1 across families.
+
+    Reading a per-1k or per-token cost as though it were per-1M understates it
+    by 1000x or 1e6x, and the run plan prints the result as a measured figure.
+    """
+    assert ml._price({"input": {"cost": 0.14, "per": 1_000_000}}, "input") == 0.14
+    assert ml._price({"input": {"cost": 0.006, "per": 1000}}, "input") == 6.0
+    assert ml._price({"input": {"cost": 0.00002, "per": 1}}, "input") == 20.0
+
+
+def test_a_row_with_no_usable_unit_is_unpriced_rather_than_assumed():
+    assert ml._price({"input": {"cost": 0.5}}, "input") is None
+    assert ml._price({"input": {"cost": 0.5, "per": 0}}, "input") is None
+    assert ml._price({"input": {"cost": 0.5, "per": "1000000"}}, "input") is None
+
+
+def test_a_price_in_another_currency_is_unpriced_not_read_as_dollars():
+    """The cost path is dollars end to end, and the catalog prices in EUR too.
+
+    37 chat-capable models are priced in EUR today. Summing those into
+    `projected_usd` at 1:1 reports a spend figure nobody measured, so they are
+    named as unpriced instead. A missing `currency` is read as USD, which is
+    what every row that carries one states.
+    """
+    usd = {"cost": 1.0, "currency": "USD", "per": 1_000_000}
+    eur = {"cost": 1.0, "currency": "EUR", "per": 1_000_000}
+    assert ml._price({"input": usd}, "input") == 1.0
+    assert ml._price({"input": eur}, "input") is None
+    assert ml._price({"input": {"cost": 1.0, "per": 1_000_000}}, "input") == 1.0
+
+
+async def test_a_euro_priced_model_never_reaches_the_dollar_price_map(patched_client, monkeypatch):
+    """End to end: the projection can only see models it can price in dollars."""
+    monkeypatch.delenv("ORQ_API_KEY", raising=False)
+    euro_catalog = {
+        "object": "list",
+        "data": [
+            _entry("anthropic/claude-haiku-4-5"),
+            _entry(
+                "greenpt/glm-5.2",
+                pricing={
+                    "input": {"cost": 0.05, "currency": "EUR", "per": 1_000_000},
+                    "output": {"cost": 0.25, "currency": "EUR", "per": 1_000_000},
+                },
+            ),
+        ],
+    }
+
+    def handler(request):
+        assert request.url.path == "/v2/model-catalog"
+        return httpx.Response(200, json=euro_catalog)
+
+    patched_client(httpx.MockTransport(handler))
+
+    prices = await ml.fetch_price_map(OrqAIGatewayConfig())
+
+    assert "anthropic/claude-haiku-4-5" in prices
+    assert "greenpt/glm-5.2" not in prices

@@ -130,7 +130,14 @@ def _as_int(value: object) -> int | None:
 
 
 def _price(pricing: object, side: str) -> float | None:
-    """Dollars per 1M tokens for one side of a catalog ``pricing`` block."""
+    """Dollars per 1M tokens for one side of a catalog ``pricing`` block.
+
+    ``None`` for anything that cannot be stated in dollars per 1M tokens. Those
+    models land in preflight's ``unpriced`` list, which names them and excludes
+    them from both figures. That is the honest answer, and the alternative in
+    both cases reads as good news: a guessed unit understates a price by up to
+    1e6, and euros read as dollars is a number nobody measured.
+    """
     if not isinstance(pricing, dict):
         return None
     leg = pricing.get(side)
@@ -139,9 +146,19 @@ def _price(pricing: object, side: str) -> float | None:
     cost, per = leg.get("cost"), leg.get("per")
     if not isinstance(cost, (int, float)):
         return None
-    # Every row observed states `per: 1000000`; normalise rather than assume it.
-    scale = 1_000_000 / per if isinstance(per, (int, float)) and per else 1.0
-    return float(cost) * scale
+    # The arena's cost path is dollars end to end (`projected_usd`). The live
+    # catalog prices 48 models in EUR, 37 of them chat-capable, and reading
+    # those as dollars silently understates a projection the user consents to
+    # before spending. No conversion here: a rate nobody pinned is not a price.
+    currency = leg.get("currency")
+    if currency is not None and currency != "USD":
+        return None
+    # `per` is 1000000, 1000 or 1 depending on the model family, so the unit is
+    # normalised from what the row states and never assumed. A row that states
+    # no usable unit is unpriced rather than read as though it said 1M.
+    if not isinstance(per, (int, float)) or per <= 0:
+        return None
+    return float(cost) * (1_000_000 / per)
 
 
 def _parse_catalog(rows: list) -> dict[str, ModelEntry]:
