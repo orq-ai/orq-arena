@@ -26,6 +26,9 @@ def _result(n_models: int, rho: float) -> dict:
     ranking = [f"m{i}" for i in range(n_models)]
     return {
         "total": 30,
+        # These cases are about the verdict wording of a jury that worked, so
+        # they say so rather than leaving it to a default.
+        "decisive": 30,
         "changed_verdicts": 3,
         "spearman": rho,
         "old_ranking": ranking,

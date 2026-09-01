@@ -40,7 +40,11 @@ def _result(*, decisive: int, total: int = 30) -> dict:
         "spearman": 1.0,
         "old_ranking": ranking,
         "new_ranking": list(reversed(ranking)),
-        "report": SimpleNamespace(per_judge=[], mean_agreement=None),
+        "report": SimpleNamespace(
+            per_judge=[],
+            mean_agreement=None,
+            model_dump=lambda: {"per_judge": [], "inconclusive_rate": 1.0},
+        ),
     }
 
 
@@ -59,8 +63,15 @@ def test_a_fully_collapsed_jury_prints_no_ranking_and_no_correlation(capsys):
 
 
 def test_a_fully_collapsed_jury_says_how_many_rounds_it_lost(capsys):
+    """The count printed is the count that failed.
+
+    The line used to interpolate `decisive`, which is 0 on this branch, so it
+    read "no usable verdict in 0 of 48 rounds": literally, that zero rounds
+    went wrong.
+    """
     out = _rendered(capsys, _result(decisive=0, total=48))
-    assert "0 of 48" in out
+    assert "in any of 48 rounds" in out
+    assert "0 of 48" not in out
 
 
 def test_a_working_jury_still_renders_the_ranking(capsys):
@@ -121,3 +132,92 @@ def test_a_live_run_that_decides_nothing_rates_nobody():
     # no rating, and therefore no champion for the standings to crown
     assert report.get("elo") is None
     assert report.get("top_difference") is None
+
+
+class _AllInconclusive:
+    """Stands in for evaluatorq's jury when every panel collapses."""
+
+    async def compare(self, **_kw):
+        from evaluatorq import PairwiseComparison
+
+        return PairwiseComparison.model_validate({"winner": "inconclusive", "votes": []})
+
+
+async def test_rejudge_run_reports_a_collapsed_panel_as_zero_decisive(monkeypatch):
+    """The count comes from the real run, not from a hand-built dict.
+
+    Every other test here builds `result` itself, so dropping the `decisive`
+    key from `rejudge_run` left the suite green while `render_result` fell back
+    to "everything decided" and printed a ranking again. This is the test that
+    fails when the key goes.
+    """
+    from types import SimpleNamespace
+
+    from orq_arena import rejudge as rejudge_mod
+    from orq_arena.config import ArenaConfig
+    from orq_arena.data.schemas import BattleRecord
+
+    monkeypatch.setattr(rejudge_mod, "OrqGateway", lambda cfg: SimpleNamespace(client=object()))
+    monkeypatch.setattr(rejudge_mod, "llm_jury_pairwise", lambda **_kw: _AllInconclusive())
+
+    cfg = ArenaConfig.model_validate(
+        {"candidates": [{"model_id": "p/a"}, {"model_id": "p/b"}], "judges": ["p/j1", "p/j2"]}
+    )
+    records = [
+        BattleRecord(
+            prompt_hash=f"h{i}",
+            prompt_text="q",
+            model_a="a",
+            model_b="b",
+            model_a_id="p/a",
+            model_b_id="p/b",
+            response_a="ra",
+            response_b="rb",
+            majority_verdict="A",
+            match_id="m1",
+            round_number=i,
+        )
+        for i in range(6)
+    ]
+
+    result = await rejudge_mod.rejudge_run(cfg=cfg, records=records, judges=["p/j1"])
+
+    assert result["decisive"] == 0
+    assert result["total"] == 6
+
+
+def test_the_saved_report_does_not_carry_a_ranking_the_terminal_refused(tmp_path):
+    """`--report-json` is the artifact a reader reuses, and it kept the number.
+
+    The terminal said "no usable verdict" while the file next to it carried a
+    full ranking and a Spearman, and `--compare` printed that Spearman as a
+    panel's robustness score.
+    """
+    import json
+
+    from orq_arena.rejudge import compare_reports, save_report_json
+
+    path = tmp_path / "panel.json"
+    save_report_json(path, _result(decisive=0, total=48))
+    saved = json.loads(path.read_text(encoding="utf-8"))
+
+    assert saved["decisive"] == 0
+    assert saved["spearman"] is None
+    assert saved["new_ranking"] is None
+    # and the jury-selection table cannot resurrect it
+    (row,) = compare_reports([path])
+    assert row["spearman"] is None
+
+
+def test_a_decided_report_is_saved_exactly_as_before(tmp_path):
+    import json
+
+    from orq_arena.rejudge import save_report_json
+
+    path = tmp_path / "panel.json"
+    save_report_json(path, _result(decisive=30, total=30))
+    saved = json.loads(path.read_text(encoding="utf-8"))
+
+    assert saved["decisive"] == 30
+    assert saved["spearman"] == 1.0
+    assert saved["new_ranking"] == list(reversed([f"m{i}" for i in range(8)]))

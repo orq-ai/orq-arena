@@ -258,9 +258,10 @@ def render_result(result: dict) -> None:
     console = Console()
     report = result["report"]
     total = result["total"]
-    # Absent on a report loaded from an older JSON; assume it decided something
-    # rather than accusing a historical run of having collapsed.
-    decisive = result.get("decisive", total)
+    # Read, not defaulted. A `.get(..., total)` here meant that dropping the key
+    # upstream restored the whole bug in silence, because "missing" resolved to
+    # "every round decided", which is the one answer that prints a ranking.
+    decisive = result["decisive"]
     console.print(
         f"\n[bold]re-judged {total} rounds[/bold], {result['changed_verdicts']} verdicts changed"
     )
@@ -270,8 +271,8 @@ def render_result(result: dict) -> None:
     # judge erroring, quorum never met) as a result.
     if not decisive:
         console.print(
-            f"[bold red]the jury produced no usable verdict in {decisive} of {total} "
-            "rounds[/bold red] — no ranking and no rank correlation follow from this run"
+            f"[bold red]the jury produced no usable verdict in any of {total} "
+            "rounds[/bold red]: no ranking and no rank correlation follow from this run"
         )
         console.print("check the panel is reachable and the credential is valid, then re-run")
         return
@@ -305,12 +306,23 @@ def render_result(result: dict) -> None:
 
 
 def save_report_json(path: str | Path, result: dict) -> None:
+    """The saved report says the same thing the terminal said.
+
+    `render_result` refuses to print a ranking for a jury that decided nothing,
+    but the file kept both the ranking and the correlation, and `--compare` then
+    tabulated that Spearman as a panel's robustness score. The ranking is an
+    artifact of `_ranking` falling through to `sorted(models)` with no decisive
+    outcome to fit, so it is written as null rather than as a result. `decisive`
+    goes in the payload too: the collapse has to survive the round trip.
+    """
+    decisive = result["decisive"]
     payload = {
         "total": result["total"],
+        "decisive": decisive,
         "changed_verdicts": result["changed_verdicts"],
-        "spearman": result["spearman"],
+        "spearman": result["spearman"] if decisive else None,
         "old_ranking": result["old_ranking"],
-        "new_ranking": result["new_ranking"],
+        "new_ranking": result["new_ranking"] if decisive else None,
         "jury": result["report"].model_dump(),
     }
     Path(path).write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")

@@ -614,6 +614,11 @@ def rejudge(
     if report_json:
         save_report_json(report_json, result)
         click.echo(f"summary -> {report_json}")
+    # After the files are written, so a collapsed run still leaves its evidence,
+    # but never exits 0: a caller that only checks the status code was told a
+    # dead panel had succeeded.
+    if not result["decisive"]:
+        raise SystemExit(1)
 
 
 @cli.command("report")
