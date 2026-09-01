@@ -24,6 +24,7 @@ import json
 import os
 import shutil
 import subprocess
+from functools import cache
 
 import httpx
 
@@ -34,12 +35,19 @@ _CLI = "orq"
 _CLI_TIMEOUT_S = 10
 
 
+@cache
 def _whoami() -> dict | None:
     """``orq auth whoami --json`` as a dict, or None if that is not available.
 
     Never raises: the CLI may be absent, logged out, an unrelated binary of the
     same name, or simply slow. All of those mean "no advice to offer", which is
     a fine answer.
+
+    Cached for the life of the process. The active workspace cannot change
+    under a running tournament, and three call sites asked independently: the
+    401 branch, the hint it builds, and every manifest write. Each was a fresh
+    subprocess with a ten second ceiling, one of them from inside the async
+    tournament loop, where a hung CLI would stall every in-flight stream.
     """
     if shutil.which(_CLI) is None:
         return None
@@ -67,6 +75,12 @@ def active_workspace() -> str | None:
     A leaderboard is a claim about models as a particular workspace can reach
     them, so recording which one produced it is provenance, not decoration.
     None when unknown, which is recorded as unknown rather than guessed.
+
+    This is the CLI's workspace, not necessarily the key's: an exported
+    ``ORQ_API_KEY`` outranks the login session by design, so the two disagree
+    whenever someone exported a key minted elsewhere. The manifest field is
+    named ``orq_cli_workspace`` for that reason, and callers should not read it
+    as a statement about where the run's traffic went.
     """
     data = _whoami()
     if not data:

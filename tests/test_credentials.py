@@ -230,3 +230,37 @@ async def test_an_unexpected_status_is_not_a_pass(with_key):
 
         assert ok is None, f"{status} is not a verdict on the credential"
         assert str(status) in detail
+
+
+def _manifest(tmp_path):
+    from orq_arena.config import ArenaConfig
+    from orq_arena.data.prompts import PromptItem
+    from orq_arena.tournament.driver import _write_manifest, manifest_path_for, read_manifest
+
+    cfg = ArenaConfig.model_validate(
+        {"candidates": [{"model_id": "p/a"}, {"model_id": "p/b"}], "judges": ["p/j1", "p/j2"]}
+    )
+    log = tmp_path / "battles.jsonl"
+    _write_manifest(
+        manifest_path_for(log),
+        cfg=cfg,
+        prompts=[PromptItem(text="p")],
+        seed=42,
+        tournament_id="bench-1",
+        started_at=0.0,
+        prompts_path="prompts/starter.jsonl",
+    )
+    return read_manifest(log)
+
+
+def test_the_manifest_records_the_workspace_when_the_cli_can_say(tmp_path, monkeypatch):
+    """A leaderboard is a claim about models as one workspace can reach them."""
+    _cli(monkeypatch, whoami=WHOAMI)
+    assert _manifest(tmp_path)["orq_cli_workspace"] == "orq-research"
+
+
+def test_the_manifest_records_an_unknown_workspace_as_unknown(tmp_path, monkeypatch):
+    """Absent provenance is recorded as absent, never guessed, and never
+    inherited from whichever machine happened to write the run."""
+    _cli(monkeypatch, present=False)
+    assert _manifest(tmp_path)["orq_cli_workspace"] is None

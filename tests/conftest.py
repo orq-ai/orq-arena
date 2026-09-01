@@ -36,3 +36,27 @@ def no_real_network(monkeypatch):
 
     monkeypatch.setattr(httpx.AsyncHTTPTransport, "handle_async_request", _async_boom)
     monkeypatch.setattr(httpx.HTTPTransport, "handle_request", _sync_boom)
+
+
+@pytest.fixture(autouse=True)
+def no_orq_cli(monkeypatch):
+    """The suite does not consult the developer's own orq login either.
+
+    Blocking httpx was not enough. `_write_manifest` calls `active_workspace()`,
+    which shells out to `orq auth whoami --json`, so on a machine with the CLI
+    installed the manifest tests embedded whoever happened to be logged in and
+    made a real network call through a subprocess the httpx guard cannot see. On
+    CI, with no CLI, the same tests took the other branch. A test whose result
+    depends on the machine's login state is not testing the code.
+
+    The CLI is absent by default. A test that wants its advice says so, the way
+    `test_credentials.py` does, and gets it because monkeypatch applies in order.
+    """
+    from orq_arena.providers import credentials
+
+    monkeypatch.setattr(credentials.shutil, "which", lambda _name: None)
+    # `_whoami` is process-cached, which is right for a run and wrong for a
+    # suite: one test's stubbed CLI would answer for every later test.
+    credentials._whoami.cache_clear()
+    yield
+    credentials._whoami.cache_clear()
