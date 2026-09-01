@@ -363,3 +363,54 @@ async def test_a_euro_priced_model_never_reaches_the_dollar_price_map(patched_cl
 
     assert "anthropic/claude-haiku-4-5" in prices
     assert "greenpt/glm-5.2" not in prices
+
+
+def _narrowing_transport(*, router_status: int = 200, enabled: list[str] | None = None):
+    """Serves the public catalog, and the workspace's enabled ids separately."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v2/model-catalog":
+            return httpx.Response(200, json=CATALOG)
+        if request.url.path == "/v2/router/models":
+            if router_status != 200:
+                return httpx.Response(router_status, json={"error": "nope"})
+            return httpx.Response(200, json={"data": [{"id": i} for i in enabled or []]})
+        return httpx.Response(404, json={"error": "unexpected path"})
+
+    return httpx.MockTransport(handler)
+
+
+async def test_a_key_narrows_the_picker_to_the_workspaces_own_models(patched_client, monkeypatch):
+    monkeypatch.setenv("ORQ_API_KEY", "sk-orq-test")
+    patched_client(_narrowing_transport(enabled=["anthropic/claude-haiku-4-5"]))
+
+    result = await ml.fetch_chat_models(OrqAIGatewayConfig())
+
+    assert [m.id for m in result.models] == ["anthropic/claude-haiku-4-5"]
+
+
+async def test_an_unreachable_narrowing_call_keeps_the_full_catalog(patched_client, monkeypatch):
+    """ "Could not narrow" is not "nothing is enabled".
+
+    Without this the picker empties whenever /v2/router/models has a bad day,
+    and the user is told their workspace has no models at all.
+    """
+    monkeypatch.setenv("ORQ_API_KEY", "sk-orq-test")
+    patched_client(_narrowing_transport(router_status=503))
+
+    result = await ml.fetch_chat_models(OrqAIGatewayConfig())
+
+    assert "anthropic/claude-haiku-4-5" in [m.id for m in result.models]
+    assert "openai/gpt-5.4-nano" in [m.id for m in result.models]
+
+
+async def test_a_disjoint_id_space_keeps_the_full_catalog(patched_client, monkeypatch):
+    """An empty intersection is likelier to mean the two id spaces disagree than
+    that the workspace enabled nothing, and emptying the picker on that guess
+    leaves the user with no way forward."""
+    monkeypatch.setenv("ORQ_API_KEY", "sk-orq-test")
+    patched_client(_narrowing_transport(enabled=["some-other-namespace/model"]))
+
+    result = await ml.fetch_chat_models(OrqAIGatewayConfig())
+
+    assert "anthropic/claude-haiku-4-5" in [m.id for m in result.models]
