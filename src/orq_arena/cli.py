@@ -783,7 +783,7 @@ def report_cmd(log_path: str, config_path: str, output_path: str | None) -> None
 )
 @click.option("--show/--no-show", default=False, help="Print model ids grouped by provider.")
 def refresh_models(config_path: str, show: bool) -> None:
-    """Re-fetch the workspace-enabled chat model catalog from orq.ai.
+    """Re-fetch the chat model catalog from orq.ai (public; a key narrows it).
 
     Bypasses the 24h cache at ~/.cache/orq-arena/models.json.
     """

@@ -28,7 +28,7 @@ Commands:
   anchor           Merge human vote files against a recorded run: κ +...
   annotate         Render a blinded human-annotation page from a recorded...
   pool             Print the configured candidate pool.
-  refresh-catalog  Re-fetch the workspace-enabled chat model catalog from...
+  refresh-catalog  Re-fetch the chat model catalog from orq.ai (public; a...
   rejudge          Re-judge a recorded run with a different panel, zero...
   report           Render the single-file HTML report page from a...
   run              Run the arena benchmark (hits orq.ai): headless logs...
@@ -50,7 +50,7 @@ full `orq_arena.yaml` key reference, see [configuration.md](configuration.md).
 | [`report`](#report) | Render the single-file HTML report page from a recorded run; no model calls, one optional catalog read for prices. |
 | [`annotate`](#annotate) | Render a blinded human-annotation page from a recorded run; no API calls. |
 | [`anchor`](#anchor) | Merge human vote files back against a run: panel↔human κ + rank correlation; no API calls. |
-| [`refresh-catalog`](#refresh-catalog) | Force re-fetch of the 24h workspace model-catalog cache. |
+| [`refresh-catalog`](#refresh-catalog) | Force re-fetch of the 24h model-catalog cache. |
 
 ---
 
@@ -94,7 +94,6 @@ A few things apply across every subcommand and are only documented once, here:
   | `report` | No. The catalog read that prices the cost section is public, so the cost section renders with or without a key. |
   | `refresh-catalog` | No. The model catalog is public. A key only narrows the list to the models your workspace has enabled. |
   | `annotate` / `anchor` | No, both work entirely from the recorded log and vote files. |
-  | `refresh-catalog` | Effectively yes, without it, falls back to any existing cache, then an empty result. See [`refresh-catalog`](#refresh-catalog). |
 
 ---
 
@@ -692,7 +691,8 @@ inter-annotator h1 × h2: κ=0.44 (moderate, 26 rounds)
 
 ## `refresh-catalog`
 
-Re-fetch the workspace-enabled chat model catalog from orq.ai, bypassing the cache.
+Re-fetch the chat model catalog from orq.ai, bypassing the cache. The catalog is
+public; a key narrows the list to the models your workspace has enabled.
 
 ```text
 orq-arena refresh-catalog [--config PATH] [--show/--no-show]
@@ -808,8 +808,9 @@ the changed-verdict count and the Spearman rank correlation against the original
 orq-arena refresh-catalog --show
 ```
 
-Forces a live re-fetch (bypassing the 24h cache) and lists every workspace-enabled chat model
-id, grouped by provider, ready to paste into your YAML's `candidates` list.
+Forces a live re-fetch (bypassing the 24h cache) and lists every chat-capable model id,
+grouped by provider, ready to paste into your YAML's `candidates` list. With a key set, the
+list is narrowed to the models your workspace has enabled.
 
 ---
 

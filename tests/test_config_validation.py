@@ -11,7 +11,7 @@ before, and none of which may block a run:
   so this is not an error; it silently costs judge-cost attribution, so it is
   worth saying.
 
-Not blocking is the point. The catalog `list` omits deprecated entries, so
+Not blocking is the point. `fetch_catalog` carries deprecated entries with the flag set, so
 "absent" and "unusable" are different claims, and a run whose judge aged out of
 the catalog must still be runnable.
 """
@@ -65,8 +65,11 @@ def test_a_model_absent_from_the_catalog_is_named():
     (warning,) = config_warnings(cfg, HEALTHY)
     assert "p/ghost" in warning
     assert "p/cand-a" not in warning
-    # absence is not a usability claim, and the wording must not imply one
-    assert "deprecated or unknown" in warning
+    # absence is a fact about the catalog, and the wording must not dress it as
+    # a claim about the model: a deprecated model takes the other branch, so
+    # calling this one "deprecated or unknown" was never true here.
+    assert "not listed in the model catalog" in warning
+    assert "deprecated" not in warning
 
 
 def test_a_deprecated_model_is_named_as_deprecated_not_missing():
@@ -113,7 +116,17 @@ def test_each_model_is_reported_once_even_when_it_is_both_absent_and_a_judge():
 
 def test_warnings_are_stable_in_order_and_content():
     """Rendered in a run plan the user reads before paying, so it must not
-    reshuffle between invocations."""
+    reshuffle between invocations.
+
+    Comparing the function against itself proved nothing: it is pure, so the two
+    calls agreed whatever the order was, and removing every `sorted()` left the
+    suite green while the ids came back in set order. The expected string is
+    written out instead, so the ordering is asserted rather than assumed.
+    """
     catalog = HEALTHY | {"p/old": _entry("p/old", deprecated=True)}
     cfg = _cfg(["p/zzz", "p/old"], ["p/judge-1", "p/aaa"])
-    assert config_warnings(cfg, catalog) == config_warnings(cfg, catalog)
+
+    unknown, deprecated = config_warnings(cfg, catalog)
+
+    assert unknown.startswith("not listed in the model catalog: p/aaa, p/zzz.")
+    assert deprecated.startswith("the catalog lists these as deprecated: p/old.")

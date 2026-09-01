@@ -64,7 +64,7 @@ Commands:
   anchor           Merge human vote files against a recorded run: κ +...
   annotate         Render a blinded human-annotation page from a recorded...
   pool             Print the configured candidate pool.
-  refresh-catalog  Re-fetch the workspace-enabled chat model catalog from...
+  refresh-catalog  Re-fetch the chat model catalog from orq.ai (public; a...
   rejudge          Re-judge a recorded run with a different panel, zero...
   report           Render the single-file HTML report page from a...
   run              Run the arena benchmark (hits orq.ai): headless logs...
@@ -100,7 +100,7 @@ get one:
     ```
 
     The response contains the raw key (`sk-orq-...`), shown once and never retrievable
-    again — copy it now. Mint a real API key rather than reusing the login session: an
+    again, so copy it now. Mint a real API key rather than reusing the login session: an
     API key outlives a long benchmark run, which is what the CLI itself recommends for
     long sessions.
 
@@ -293,7 +293,7 @@ it by name.
 
 !!! tip "Which model ids can fight?"
 
-    `orq-arena refresh-catalog --show` lists your workspace-enabled catalog, grouped
+    `orq-arena refresh-catalog --show` lists the chat model catalog, grouped
     by provider, ready to paste into the YAML's `candidates` list.
 
 ---

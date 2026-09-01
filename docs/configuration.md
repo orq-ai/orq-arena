@@ -26,7 +26,7 @@ cp .env.example .env
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `ORQ_API_KEY` | Required for live runs | (none) | The only secret orq-arena needs. Every candidate, judge, and preflight-probe call goes through the orq.ai router gateway with this one key; the run fails up front with `ORQ_API_KEY is not set.` followed by the commands that mint one (`orq auth login`, `orq api-keys create --name orq-arena --json`). A key that is set but rejected by the router is caught by the preflight credential probe, before the run spends anything. Create one in your workspace settings, as [`.env.example`](https://github.com/orq-ai/orq-arena/blob/master/.env.example) points to, or per the [API keys guide](https://docs.orq.ai/docs/ai-studio/organization/api-keys). |
+| `ORQ_API_KEY` | Required for live runs | (none) | The only secret orq-arena needs. Every candidate, judge, and preflight-probe call goes through the orq.ai router gateway with this one key; the run fails up front with `ORQ_API_KEY is not set.` followed by `orq api-keys create --name orq-arena --json`, preceded by `orq auth login` when the CLI is not already logged in. A key that is set but rejected by the router is caught by the preflight credential probe, before the run spends anything. Create one in your workspace settings, as [`.env.example`](https://github.com/orq-ai/orq-arena/blob/master/.env.example) points to, or per the [API keys guide](https://docs.orq.ai/docs/ai-studio/organization/api-keys). |
 | `ORQ_BASE_URL` | No | `https://api.orq.ai` | Points completions **and** the model/price catalog at a different orq.ai host (staging, a proxy). Honoured only while `gateway.base_url` is left at its default: setting that key in the YAML is a bring-your-own-endpoint opt-out that wins outright, so the run can never be split between two hosts. Not read from `.env.example`; export it yourself when you need it. |
 
 Notes:
@@ -324,7 +324,7 @@ its own. The axes for changing behavior between runs are:
   shipped presets are `orq_arena.yaml` (uniform thinking-OFF, the default) and
   `configs/reasoning_arena.yaml` (uniform thinking-ON), run the latter with
   `orq-arena run --config configs/reasoning_arena.yaml`. `load_config()` accepts any path.
-  `orq-arena refresh-catalog --show` lists your workspace-enabled model ids to paste into the
+  `orq-arena refresh-catalog --show` lists the catalog model ids to paste into the
   `candidates` list.
 - **Different jury on an already-recorded run, no regeneration:** `orq-arena rejudge
   <log_path> --judge <id> [--judge <id> ...] [--criteria "..."]` re-scores the responses

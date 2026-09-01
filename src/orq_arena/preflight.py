@@ -193,9 +193,15 @@ def config_warnings(cfg: ArenaConfig, catalog: dict[str, ModelEntry]) -> list[st
     """What the catalog knows that the config should hear about, or ``[]``.
 
     Advisory only. Every one of these describes a run that still works, so none
-    of them blocks: the catalog's list omits deprecated entries, which makes
-    "absent" a statement about the catalog rather than about the model, and the
-    shipped configs already name models that have aged out of it.
+    of them blocks, and the shipped configs already name models the catalog does
+    not list.
+
+    "Absent" and "deprecated" are separate branches because they are separate
+    facts. `fetch_catalog` carries deprecated entries with the flag set, so a
+    model that is missing entirely is one the catalog says nothing about, which
+    is a statement about the catalog rather than a claim about the model. It is
+    the picker in `fetch_chat_models` that omits deprecated models, not this
+    dict.
 
     An empty catalog means it could not be reached, not that every model is
     unknown, so it produces no warnings at all. Warning on a network blip would
@@ -229,8 +235,9 @@ def config_warnings(cfg: ArenaConfig, catalog: dict[str, ModelEntry]) -> list[st
     warnings: list[str] = []
     if unknown:
         warnings.append(
-            f"not in the model catalog, so deprecated or unknown: {', '.join(sorted(unknown))}. "
-            "The run still calls them; the cost projection cannot price them."
+            f"not listed in the model catalog: {', '.join(sorted(unknown))}. "
+            "The catalog says nothing about them, which can mean a model that aged out "
+            "of it. The run still calls them; the cost projection cannot price them."
         )
     if deprecated:
         warnings.append(
