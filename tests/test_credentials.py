@@ -209,3 +209,24 @@ async def test_a_byo_endpoint_is_probed_as_written(with_key, monkeypatch):
 
     assert ok is True
     assert asked == ["https://proxy.internal/llm/models"]
+
+
+async def test_an_unexpected_status_is_not_a_pass(with_key):
+    """404, 429, anything unexpected: the question was not answered.
+
+    These used to fall through to "the router accepts the key", which is the
+    same healthy-but-untested verdict `orq doctor` gave while every judge call
+    401'd. A bring-your-own endpoint with no listing route answers 404, and a
+    rate-limited workspace answers 429.
+    """
+    for status in (400, 404, 429):
+
+        def handler(_request, _status=status):
+            return httpx.Response(_status, json={})
+
+        ok, detail = await cred.verify_credential(
+            OrqAIGatewayConfig(), transport=_transport(handler)
+        )
+
+        assert ok is None, f"{status} is not a verdict on the credential"
+        assert str(status) in detail

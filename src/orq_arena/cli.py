@@ -75,6 +75,35 @@ def _load_config(path: str):
         raise click.ClickException(_config_error(path, exc)) from None
 
 
+def _check_credential(cfg) -> None:
+    """Refuse a key the router rejects, before the command spends anything.
+
+    Shared by `run` and `rejudge` so the two cannot drift: the failure this
+    catches happened in `rejudge`, and a check that only guards one of them
+    guards the wrong one half the time.
+
+    A key that is merely absent is already refused loudly by the gateway, so
+    this asks only the question that check cannot: whether the key that *is* set
+    is one the router accepts. The verdict is three-valued on purpose, and only
+    a rejection stops the command. Being unable to reach the router is not a
+    verdict on the credential, and refusing to run on that basis would be wrong
+    in exactly the situation where the user can least afford it.
+    """
+    import asyncio
+    import os
+
+    from .config import ORQ_API_KEY_ENV
+    from .providers.credentials import verify_credential
+
+    if not os.environ.get(ORQ_API_KEY_ENV):
+        return
+    ok, detail = asyncio.run(verify_credential(cfg.gateway))
+    if ok is False:
+        raise click.ClickException(detail)
+    if ok is None and detail:
+        click.echo(f"  ⚠ {detail}", err=True)
+
+
 def _quiet_logs() -> None:
     """evaluatorq logs via loguru to stderr, which would corrupt the TUI."""
     import sys
@@ -194,11 +223,9 @@ def run(
       orq-arena run --config orq_arena.yaml --prompts orq:my_dataset --output runs/today.jsonl
     """
     import asyncio
-    import os
     import sys
     from pathlib import Path
 
-    from .config import ORQ_API_KEY_ENV
     from .preflight import (
         call_counts,
         config_warnings,
@@ -207,7 +234,6 @@ def run(
         surprises,
         thinking_probe,
     )
-    from .providers.credentials import verify_credential
     from .providers.models_list import fetch_catalog, fetch_price_map
 
     _quiet_logs()
@@ -309,17 +335,10 @@ def run(
         for line in cfg_warnings:
             warn(f"  {line}")
 
-    # One listing call, before any spend. A key that is merely absent is already
-    # refused loudly by the gateway, so this asks the question only that check
-    # cannot: whether the key that *is* set is one the router accepts. A stale
-    # one answers 401 to every judge call and the run still finishes.
-    if os.environ.get(ORQ_API_KEY_ENV):
-        credential_ok, credential_detail = asyncio.run(verify_credential(cfg.gateway))
-        if credential_ok is False:
-            raise SystemExit(f"orq-arena: {credential_detail}")
-        if credential_ok is None and credential_detail:
-            # Unreachable is not a verdict on the key; say so and let the run try.
-            warn(f"  {credential_detail}")
+    # One listing call, before any spend. A stale key answers 401 to every judge
+    # call and the run still finishes, so this is the last honest moment to say
+    # so. `rejudge` runs the same check.
+    _check_credential(cfg)
     probe_lines: list[str] = []
     if cfg.preflight.thinking_probe:
         status("thinking probe…")
@@ -596,6 +615,12 @@ def rejudge(
             "against --config, which may have drifted since the run",
             err=True,
         )
+    # The same probe `run` does, for the same reason and in the command the
+    # failure actually happened in: a stale key answered 401 to all 48 judge
+    # calls of a real rejudge. The dead-jury guard reports that afterwards; this
+    # stops it beforehand, for the price of one listing call and no tokens.
+    _check_credential(cfg)
+
     click.echo(f"re-judging {len(records)} rounds with panel: {', '.join(judges)}", err=True)
     result = asyncio.run(
         rejudge_run(

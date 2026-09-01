@@ -143,6 +143,14 @@ async def verify_credential(
             "like this. Mint one for the workspace you mean:\n"
             "    orq api-keys create --name orq-arena --json"
         )
-    if resp.status_code >= 500:
-        return None, f"the router returned {resp.status_code}; credential not verified"
-    return True, ""
+    # Accepted means the router answered the question. Anything else did not:
+    # a 404 from a bring-your-own endpoint with no listing route, a 429, a 5xx,
+    # a redirect httpx did not follow. Reporting those as True is the same
+    # failure `orq doctor` had, a healthy verdict from a check that never
+    # exercised the thing it claims to cover.
+    if resp.is_success:
+        return True, ""
+    return None, (
+        f"the router answered {resp.status_code} to the credential check at "
+        f"{resp.request.url}; credential not verified"
+    )
