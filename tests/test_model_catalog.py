@@ -414,3 +414,40 @@ async def test_a_disjoint_id_space_keeps_the_full_catalog(patched_client, monkey
     result = await ml.fetch_chat_models(OrqAIGatewayConfig())
 
     assert "anthropic/claude-haiku-4-5" in [m.id for m in result.models]
+
+
+async def test_a_success_code_over_an_unusable_body_is_still_a_failed_fetch(
+    patched_client, monkeypatch
+):
+    """A schema change or a 200-wrapped error would empty everything at once.
+
+    `raise_for_status` passes, `data` is missing, and the parsed catalog is
+    empty: prices blank, the picker empties, and `config_warnings` returns []
+    because an empty catalog means "unreachable, say nothing". A cache on disk
+    was ignored, because the fallback only covered transport errors.
+    """
+    monkeypatch.delenv("ORQ_API_KEY", raising=False)
+    _prime_cache(monkeypatch, age_s=3600)
+
+    def handler(_request):
+        return httpx.Response(200, json={"error": {"message": "upstream is unwell"}})
+
+    patched_client(httpx.MockTransport(handler))
+
+    catalog, source, _at = await ml._fetch_catalog(OrqAIGatewayConfig(), force_refresh=True)
+
+    assert source == "stale"
+    assert "cached/model" in catalog
+
+
+async def test_an_unusable_body_with_no_cache_reports_fallback(patched_client, monkeypatch):
+    monkeypatch.delenv("ORQ_API_KEY", raising=False)
+
+    def handler(_request):
+        return httpx.Response(200, json={"unexpected": "shape"})
+
+    patched_client(httpx.MockTransport(handler))
+
+    catalog, source, _at = await ml._fetch_catalog(OrqAIGatewayConfig())
+
+    assert (catalog, source) == ({}, "fallback")

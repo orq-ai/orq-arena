@@ -260,8 +260,16 @@ async def _fetch_catalog(
 
     rows = payload.get("data") if isinstance(payload, dict) else payload
     catalog = _parse_catalog(rows or [])
-    if catalog:
-        _write_cache(catalog)
+    if not catalog:
+        # 200 with nothing usable in it: a schema change, an error envelope
+        # served with a success code, an empty deploy. That is a failed fetch
+        # wearing a success code, so it is treated as one rather than published
+        # as "the catalog says there are no models", which would empty the
+        # picker, blank every price, and silence preflight's warnings at once.
+        if cached is not None:
+            return cached[0], "stale", cached[1]
+        return {}, "fallback", now
+    _write_cache(catalog)
     return catalog, "live", now
 
 
