@@ -719,7 +719,11 @@ orq-arena refresh-catalog [--config PATH] [--show/--no-show]
   existing cache (if any) is left untouched and simply re-reported.
 - Always prints one summary line (to stderr, per the stream contract; `--show`'s model list
   is the stdout payload):
-  `{count} models (source={live|cache|fallback}, age={seconds}s, cache={path})`.
+  `{count} models (source={live|cache|stale|fallback}, age={seconds}s, cache={path})`.
+  `source` is what the fetch did, and `age` is how old the rows are: `live` came off the
+  network just now, `cache` is a copy still inside its 24h window, `stale` means the fetch
+  failed and the cache was served anyway, and `fallback` means there was nothing to serve.
+  A failed refresh reads as `stale`, never as `live`, which is the whole point of asking.
 - `--show` additionally prints every model id grouped by provider (providers and ids both
   sorted). Which providers and how many ids you see is whatever your workspace has enabled,
   so treat the shape below as the example, not the counts:
@@ -744,12 +748,14 @@ orq-arena refresh-catalog --show
 orq-arena refresh-catalog --config configs/reasoning_arena.yaml --show
 ```
 
-**Expected output** (here keyless, so the live fetch is skipped and the cache re-reported;
-with a key, `source=live` and `age=0s`):
+**Expected output** (here keyless: the catalog is public, so the fetch still happens and the
+full chat-capable list comes back. With a key the count is whatever your workspace has
+enabled, and `source` is `stale` instead of `live` if the fetch failed and a cache was
+served):
 
 ```text
 $ orq-arena refresh-catalog
-137 models (source=cache, age=4528s, cache=/Users/you/.cache/orq-arena/models.json)
+483 models (source=live, age=2s, cache=/Users/you/.cache/orq-arena/models.json)
 ```
 
 ---

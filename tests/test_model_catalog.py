@@ -214,3 +214,91 @@ async def test_a_cache_written_by_an_older_version_is_ignored(patched_client, mo
 
     assert "old/model" not in catalog
     assert "anthropic/claude-haiku-4-5" in catalog
+
+
+def _failing_transport():
+    def handler(_request):
+        raise httpx.ConnectError("no route to host")
+
+    return httpx.MockTransport(handler)
+
+
+def _prime_cache(monkeypatch, *, age_s: float) -> None:
+    """A well-formed cache of the given age, written the way the code writes it."""
+    monkeypatch.setattr(ml.time, "time", lambda: 1_000_000.0)
+    entry = ml.ModelEntry(
+        id="cached/model", provider="cached", endpoints=("chat",), price_in=1.0, price_out=2.0
+    )
+    ml._write_cache({"cached/model": entry})
+    raw = json.loads(ml.CACHE_FILE.read_text(encoding="utf-8"))
+    raw["fetched_at"] = 1_000_000.0 - age_s
+    ml.CACHE_FILE.write_text(json.dumps(raw), encoding="utf-8")
+
+
+async def test_a_fresh_cache_is_reported_as_cache_with_its_real_age(patched_client, monkeypatch):
+    """`age=` is the age of the rows, not the age of the call.
+
+    `fetched_at` used to be stamped `now` on every path, so a 20-hour-old cache
+    printed `age=0s` and the summary line could not answer the one question it
+    exists for.
+    """
+    monkeypatch.delenv("ORQ_API_KEY", raising=False)
+    _prime_cache(monkeypatch, age_s=3600)
+    patched_client(_transport())
+
+    ml_result = await ml.fetch_chat_models(OrqAIGatewayConfig())
+
+    assert ml_result.source == "cache"
+    assert 1_000_000.0 - ml_result.fetched_at == 3600
+
+
+async def test_a_failed_refresh_is_reported_as_stale_not_as_live(patched_client, monkeypatch):
+    """The regression: `refresh-catalog` offline printed `source=live, age=0s`.
+
+    The command exists to answer "is my catalog current?", and it answered by
+    labelling a weeks-old cache a fresh live fetch.
+    """
+    monkeypatch.delenv("ORQ_API_KEY", raising=False)
+    _prime_cache(monkeypatch, age_s=21 * 24 * 3600)
+    patched_client(_failing_transport())
+
+    ml_result = await ml.fetch_chat_models(OrqAIGatewayConfig(), force_refresh=True)
+
+    assert ml_result.source == "stale"
+    assert ml_result.fetched_at == 1_000_000.0 - 21 * 24 * 3600
+    # the rows still come through: a stale catalog beats no catalog
+    assert [m.id for m in ml_result.models] == ["cached/model"]
+
+
+async def test_an_expired_cache_is_refetched(patched_client, monkeypatch):
+    """The 24h TTL. Without this, deleting the expiry check kept the suite green
+    while prices, `deprecated` and `endpoints` froze at the first fetch forever.
+    """
+    monkeypatch.delenv("ORQ_API_KEY", raising=False)
+    _prime_cache(monkeypatch, age_s=25 * 3600)
+    patched_client(_transport())
+
+    catalog, source, _fetched_at = await ml._fetch_catalog(OrqAIGatewayConfig())
+
+    assert source == "live"
+    assert "cached/model" not in catalog
+    assert "anthropic/claude-haiku-4-5" in catalog
+
+
+async def test_a_fetch_failure_with_no_cache_reports_fallback(patched_client, monkeypatch):
+    monkeypatch.delenv("ORQ_API_KEY", raising=False)
+    patched_client(_failing_transport())
+
+    ml_result = await ml.fetch_chat_models(OrqAIGatewayConfig(), force_refresh=True)
+
+    assert ml_result.source == "fallback"
+    assert ml_result.models == []
+
+
+async def test_a_live_fetch_is_reported_as_live(patched_client, monkeypatch):
+    monkeypatch.delenv("ORQ_API_KEY", raising=False)
+    patched_client(_transport())
+
+    ml_result = await ml.fetch_chat_models(OrqAIGatewayConfig())
+
+    assert ml_result.source == "live"

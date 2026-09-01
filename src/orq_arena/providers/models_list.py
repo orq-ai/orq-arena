@@ -75,10 +75,18 @@ class ModelEntry:
 
 @dataclass
 class ModelList:
-    """The result of a fetch, plus provenance for the UI."""
+    """The result of a fetch, plus provenance for the UI.
+
+    ``source`` is what the fetch did, not what was on disk: ``live`` for rows
+    off the network, ``cache`` for a cache still inside its TTL, ``stale`` for a
+    cache served because the fetch failed, ``fallback`` for nothing at all.
+    ``stale`` exists because ``refresh-catalog`` used to report a failed refresh
+    as ``live``, which is the one answer that command must never give.
+    ``fetched_at`` is when the rows were fetched, so an age of 0s means fresh.
+    """
 
     models: list[ModelEntry]
-    source: str  # "live" | "cache" | "fallback"
+    source: str  # "live" | "cache" | "stale" | "fallback"
     fetched_at: float = field(default_factory=time.time)
 
 
@@ -204,20 +212,21 @@ def _read_cache() -> tuple[dict[str, ModelEntry], float] | None:
     return _parse_catalog(raw.get("data") or []), float(raw.get("fetched_at") or 0.0)
 
 
-async def fetch_catalog(
+async def _fetch_catalog(
     cfg: OrqAIGatewayConfig,
     *,
     force_refresh: bool = False,
-) -> dict[str, ModelEntry]:
-    """``{router_id: ModelEntry}`` from the public catalog; ``{}`` on failure.
+) -> tuple[dict[str, ModelEntry], str, float]:
+    """The catalog, what produced it, and when those rows were fetched.
 
-    Sends no Authorization header. The endpoint is public, and attaching a key
-    would make it fail closed for exactly the users who have none.
+    Only this function knows whether the network answered, so it is the only
+    place that can say. Deriving the answer afterwards from "is there a cache
+    file" reported a failed refresh as ``live`` and a live fetch as ``cache``.
     """
     now = time.time()
     cached = _read_cache()
     if cached is not None and not force_refresh and now - cached[1] < CACHE_TTL_SECONDS:
-        return cached[0]
+        return cached[0], "cache", cached[1]
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -226,13 +235,32 @@ async def fetch_catalog(
             payload = resp.json()
     except (httpx.HTTPError, ValueError):
         # A stale catalog beats no catalog: the run still gets prices and
-        # capabilities, just older ones.
-        return cached[0] if cached is not None else {}
+        # capabilities, just older ones. It is reported as stale, because the
+        # user who forced a refresh asked precisely whether this happened.
+        if cached is not None:
+            return cached[0], "stale", cached[1]
+        return {}, "fallback", now
 
     rows = payload.get("data") if isinstance(payload, dict) else payload
     catalog = _parse_catalog(rows or [])
     if catalog:
         _write_cache(catalog)
+    return catalog, "live", now
+
+
+async def fetch_catalog(
+    cfg: OrqAIGatewayConfig,
+    *,
+    force_refresh: bool = False,
+) -> dict[str, ModelEntry]:
+    """``{router_id: ModelEntry}`` from the public catalog.
+
+    ``{}`` only when the fetch failed and there is no cache to fall back on.
+
+    Sends no Authorization header. The endpoint is public, and attaching a key
+    would make it fail closed for exactly the users who have none.
+    """
+    catalog, _source, _fetched_at = await _fetch_catalog(cfg, force_refresh=force_refresh)
     return catalog
 
 
@@ -241,8 +269,9 @@ async def fetch_price_map(cfg: OrqAIGatewayConfig) -> dict[str, tuple[float, flo
 
     Only models the catalog prices on both sides appear; a half-priced row is
     no more usable than an absent one, and preflight reports the difference
-    between priced and unpriced rather than inventing a zero. Empty dict on any
-    failure: pricing is advisory and never blocks a run.
+    between priced and unpriced rather than inventing a zero. Empty dict when
+    the catalog could not be read and no cache stood in for it: pricing is
+    advisory and never blocks a run.
     """
     catalog = await fetch_catalog(cfg)
     return {
@@ -289,11 +318,9 @@ async def fetch_chat_models(
     config is preflight's business, and gets flagged there rather than silently
     dropped here.
     """
-    now = time.time()
-    served_from_cache = _read_cache() is not None and not force_refresh
-    catalog = await fetch_catalog(cfg, force_refresh=force_refresh)
+    catalog, source, fetched_at = await _fetch_catalog(cfg, force_refresh=force_refresh)
     if not catalog:
-        return ModelList(models=[], source="fallback", fetched_at=now)
+        return ModelList(models=[], source=source, fetched_at=fetched_at)
 
     models = [m for m in catalog.values() if m.is_chat and not m.deprecated]
 
@@ -308,4 +335,4 @@ async def fetch_chat_models(
                 models = narrowed
 
     models.sort(key=lambda m: m.id)
-    return ModelList(models=models, source="cache" if served_from_cache else "live", fetched_at=now)
+    return ModelList(models=models, source=source, fetched_at=fetched_at)
