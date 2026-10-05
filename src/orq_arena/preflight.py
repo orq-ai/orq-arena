@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from itertools import combinations
 from typing import Any
 
@@ -189,42 +190,56 @@ def cost_projection(
     )
 
 
+def referenced_models(cfg: ArenaConfig) -> list[str]:
+    """Every model id the config names: candidates, judges, stand-in judges."""
+    return [
+        *(w.model_id for w in cfg.candidates),
+        *cfg.judges,
+        *cfg.replacement_judges,
+    ]
+
+
 def config_warnings(cfg: ArenaConfig, catalog: dict[str, ModelEntry]) -> list[str]:
     """What the catalog knows that the config should hear about, or ``[]``.
 
-    Advisory only. Every one of these describes a run that still works, so none
+    Advisory only. Every one of these describes a run that still starts, so none
     of them blocks, and the shipped configs already name models the catalog does
     not list.
 
-    "Absent" and "deprecated" are separate branches because they are separate
-    facts. `fetch_catalog` carries deprecated entries with the flag set, so a
-    model that is missing entirely is one the catalog says nothing about, which
-    is a statement about the catalog rather than a claim about the model. It is
-    the picker in `fetch_chat_models` that omits deprecated models, not this
-    dict.
+    "Not listed" and "deprecated" are separate facts, and the catalog's list
+    cannot tell them apart: it never includes a deprecated model, so both are
+    simply absent from it. The caller therefore passes a catalog from
+    `fetch_catalog_covering`, which asks for each unlisted model by id. A
+    deprecated model comes back flagged, with its date, and takes the deprecated
+    branch here; one the catalog has no entry for at all stays unlisted.
 
-    An empty catalog means it could not be reached, not that every model is
-    unknown, so it produces no warnings at all. Warning on a network blip would
-    teach the reader to skip the section that matters.
+    An empty catalog means it could not be read, not that every model is
+    unknown, so no per-model warning is made up from it. It is still reported, as
+    one line saying the check did not run. Returning nothing made an outage look
+    exactly like a clean config.
     """
     if not catalog:
-        return []
+        return [
+            "the model catalog could not be read, so this config was not checked "
+            "against it. Unlisted or deprecated models and judges without a responses "
+            "endpoint would not be reported for this run."
+        ]
 
-    judges = list(cfg.judges) + list(cfg.replacement_judges)
-    referenced = [w.model_id for w in cfg.candidates] + judges
+    judges = [*cfg.judges, *cfg.replacement_judges]
 
     unknown: list[str] = []
     deprecated: list[str] = []
-    seen: set[str] = set()
-    for model_id in referenced:
-        if model_id in seen:
-            continue
-        seen.add(model_id)
+    for model_id in dict.fromkeys(referenced_models(cfg)):
         entry = catalog.get(model_id)
         if entry is None:
             unknown.append(model_id)
         elif entry.deprecated:
-            deprecated.append(model_id)
+            dated = (
+                f" (deprecation date {datetime.fromtimestamp(entry.deprecation, timezone.utc).date()})"
+                if entry.deprecation
+                else ""
+            )
+            deprecated.append(f"{model_id}{dated}")
 
     # Only judges take evaluatorq's Responses path; a candidate is streamed over
     # chat completions regardless of what else it supports.
@@ -235,14 +250,14 @@ def config_warnings(cfg: ArenaConfig, catalog: dict[str, ModelEntry]) -> list[st
     warnings: list[str] = []
     if unknown:
         warnings.append(
-            f"not listed in the model catalog: {', '.join(sorted(unknown))}. "
-            "The catalog says nothing about them, which can mean a model that aged out "
-            "of it. The run still calls them; the cost projection cannot price them."
+            f"not in the model catalog: {', '.join(sorted(unknown))}. "
+            "The catalog has no entry for them, so check the id. The run still calls "
+            "them; the cost projection cannot price them."
         )
     if deprecated:
         warnings.append(
-            f"the catalog lists these as deprecated: {', '.join(sorted(deprecated))}. "
-            "They still route today, but pick a successor before they stop."
+            f"the catalog marks these as deprecated: {', '.join(sorted(deprecated))}. "
+            "Pick a successor before they stop routing."
         )
     if no_responses:
         warnings.append(

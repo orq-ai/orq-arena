@@ -60,7 +60,6 @@ CATALOG = {
         ),
         _entry("openai/text-embedding-3-small", endpoints=["embeddings"]),
         _entry("openai/whisper-1", endpoints=["transcriptions"]),
-        _entry("legacy/retired-model", deprecated=True),
         _entry("chatonly/no-responses", endpoints=["chat"]),
     ],
 }
@@ -134,15 +133,96 @@ async def test_chat_capability_is_read_not_guessed(patched_client, monkeypatch):
     assert "openai/whisper-1" not in ids
 
 
-async def test_deprecated_models_are_carried_not_hidden(patched_client, monkeypatch):
-    """Absence and deprecation are different facts, and preflight needs both."""
-    monkeypatch.delenv("ORQ_API_KEY", raising=False)
-    patched_client(_transport())
+def _by_id_transport(entries: dict[str, dict], calls: list[str] | None = None):
+    """The catalog list, plus the by-id route that answers for unlisted models."""
+    prefix = "/v2/model-catalog/"
 
-    catalog = await ml.fetch_catalog(OrqAIGatewayConfig())
+    def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if calls is not None:
+            calls.append(path)
+        if path == "/v2/model-catalog":
+            return httpx.Response(200, json=CATALOG)
+        if path.startswith(prefix):
+            row = entries.get(path[len(prefix) :])
+            if row is None:
+                return httpx.Response(404, json={"code": 5, "message": "entry not found"})
+            return httpx.Response(200, json={"model": row})
+        return httpx.Response(404, json={"error": "unexpected path"})
+
+    return httpx.MockTransport(handler)
+
+
+RETIRED = _entry("legacy/retired-model", deprecated=True, deprecation="1792454400")
+
+
+async def test_a_deprecated_model_is_found_by_asking_for_it_by_id(patched_client, monkeypatch):
+    """The list never includes a deprecated model, so absence cannot mean it.
+
+    This used to assert that the list carried a row with `deprecated: true`. The
+    real endpoint never sends one: every row it lists is live. A deprecated model
+    and a misspelt id are both just missing, and the deprecated warning could
+    not fire against the real API at all. Asking by id is what tells them apart.
+    """
+    monkeypatch.delenv("ORQ_API_KEY", raising=False)
+    patched_client(_by_id_transport({"legacy/retired-model": RETIRED}))
+
+    catalog = await ml.fetch_catalog_covering(
+        OrqAIGatewayConfig(), ["anthropic/claude-haiku-4-5", "legacy/retired-model", "p/typo"]
+    )
 
     assert catalog["legacy/retired-model"].deprecated is True
+    assert catalog["legacy/retired-model"].deprecation == 1792454400
     assert catalog["anthropic/claude-haiku-4-5"].deprecated is False
+    assert "p/typo" not in catalog  # 404: the catalog has no such entry
+
+
+async def test_a_config_the_list_fully_covers_costs_no_extra_request(patched_client, monkeypatch):
+    monkeypatch.delenv("ORQ_API_KEY", raising=False)
+    calls: list[str] = []
+    patched_client(_by_id_transport({}, calls))
+
+    await ml.fetch_catalog_covering(
+        OrqAIGatewayConfig(), ["anthropic/claude-haiku-4-5", "openai/gpt-5.4-nano"]
+    )
+
+    assert calls == ["/v2/model-catalog"]
+
+
+async def test_a_lookup_that_fails_leaves_the_model_unlisted(patched_client, monkeypatch):
+    """Advisory all the way down: a broken by-id route degrades to "not in the
+    catalog", it does not take the preflight with it."""
+    monkeypatch.delenv("ORQ_API_KEY", raising=False)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v2/model-catalog":
+            return httpx.Response(200, json=CATALOG)
+        return httpx.Response(503, json={})
+
+    patched_client(httpx.MockTransport(handler))
+
+    catalog = await ml.fetch_catalog_covering(OrqAIGatewayConfig(), ["legacy/retired-model"])
+
+    assert "legacy/retired-model" not in catalog
+    assert "anthropic/claude-haiku-4-5" in catalog
+
+
+async def test_an_unreadable_catalog_is_not_patched_up_one_model_at_a_time(
+    patched_client, monkeypatch
+):
+    """No list means no check, and that is reported as one fact. Filling an empty
+    catalog from by-id lookups would hide the outage behind a partial answer."""
+    monkeypatch.delenv("ORQ_API_KEY", raising=False)
+    calls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url.path)
+        return httpx.Response(503, json={})
+
+    patched_client(httpx.MockTransport(handler))
+
+    assert await ml.fetch_catalog_covering(OrqAIGatewayConfig(), ["p/any"]) == {}
+    assert calls == ["/v2/model-catalog"]
 
 
 async def test_the_responses_endpoint_is_visible_per_model(patched_client, monkeypatch):

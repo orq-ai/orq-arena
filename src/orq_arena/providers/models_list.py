@@ -23,9 +23,11 @@ Results cache for 24h at ``~/.cache/orq-arena/models.json``.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlparse
@@ -60,6 +62,9 @@ class ModelEntry:
     created: int = 0
     endpoints: tuple[str, ...] = ()
     deprecated: bool = False
+    # Unix seconds, as the catalog states it. Only a direct lookup carries it:
+    # the catalog's list never includes a deprecated model at all.
+    deprecation: int | None = None
     context_window: int | None = None
     price_in: float | None = None
     price_out: float | None = None
@@ -179,6 +184,7 @@ def _parse_catalog(rows: list) -> dict[str, ModelEntry]:
             created=_as_int(row.get("created")) or 0,
             endpoints=tuple(e for e in (row.get("endpoints") or []) if isinstance(e, str)),
             deprecated=bool(row.get("deprecated")),
+            deprecation=_as_int(row.get("deprecation")),
             context_window=_as_int(row.get("context_window")),
             price_in=_price(row.get("pricing"), "input"),
             price_out=_price(row.get("pricing"), "output"),
@@ -287,6 +293,40 @@ async def fetch_catalog(
     """
     catalog, _source, _fetched_at = await _fetch_catalog(cfg, force_refresh=force_refresh)
     return catalog
+
+
+async def _fetch_entry(client: httpx.AsyncClient, host: str, model_id: str) -> ModelEntry | None:
+    """One model by id, or None when the catalog has no such entry or cannot say."""
+    try:
+        resp = await client.get(f"{host}/v2/model-catalog/{model_id}")
+        resp.raise_for_status()
+        payload = resp.json()
+    except (httpx.HTTPError, ValueError):
+        return None
+    row = payload.get("model") if isinstance(payload, dict) else None
+    return _parse_catalog([row]).get(model_id) if isinstance(row, dict) else None
+
+
+async def fetch_catalog_covering(
+    cfg: OrqAIGatewayConfig, model_ids: Iterable[str]
+) -> dict[str, ModelEntry]:
+    """The catalog, plus a direct lookup for each of ``model_ids`` it does not list.
+
+    The list endpoint never includes a deprecated model, so from the list alone a
+    deprecated model and a misspelt one look the same: both are simply absent.
+    Asking for the model by id tells them apart. A deprecated model answers with
+    ``deprecated: true`` and its deprecation date, and an unknown id answers 404.
+    Only the ids the list is missing are asked for, so a healthy config costs no
+    extra request, and a lookup that fails just leaves that model unlisted.
+    """
+    catalog = await fetch_catalog(cfg)
+    missing = [m for m in dict.fromkeys(model_ids) if m not in catalog]
+    if not catalog or not missing:
+        return catalog
+    host = catalog_host(cfg)
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        found = await asyncio.gather(*(_fetch_entry(client, host, m) for m in missing))
+    return catalog | {entry.id: entry for entry in found if entry is not None}
 
 
 async def fetch_price_map(cfg: OrqAIGatewayConfig) -> dict[str, tuple[float, float]]:

@@ -3,17 +3,18 @@
 Three facts the catalog makes available, none of which anything could check
 before, and none of which may block a run:
 
-* a model the catalog does not list at all;
-* a model the catalog lists as deprecated;
+* a model the catalog has no entry for at all;
+* a model the catalog marks as deprecated;
 * a judge whose model has no `responses` endpoint. evaluatorq 1.32.4 sends
   judge calls to the router's Responses endpoint because that is the one the
   router prices, falling back to chat completions per model. The fallback works,
   so this is not an error; it silently costs judge-cost attribution, so it is
   worth saying.
 
-Not blocking is the point. `fetch_catalog` carries deprecated entries with the flag set, so
-"absent" and "unusable" are different claims, and a run whose judge aged out of
-the catalog must still be runnable.
+Not blocking is the point: a run whose judge aged out of the catalog must still
+be runnable. The catalog's list never includes a deprecated model, so the dict
+these tests pass stands for what `fetch_catalog_covering` returns, where each
+unlisted model has been asked for by id and a deprecated one carries its flag.
 """
 
 from __future__ import annotations
@@ -52,12 +53,19 @@ def test_a_healthy_config_says_nothing():
     assert config_warnings(cfg, HEALTHY) == []
 
 
-def test_an_empty_catalog_says_nothing():
-    """The catalog is unreachable, not a verdict on the config. Warning about
-    every model because the network blipped would train the user to skip the
-    whole section."""
+def test_an_unreadable_catalog_says_the_check_did_not_run():
+    """Silence here read as "your config is clean".
+
+    An empty catalog is an outage, not a verdict, so no per-model warning is
+    invented from it: naming every model because the network blipped would
+    train the reader to skip the section. But returning nothing made the outage
+    indistinguishable from a healthy config, so it says one thing, once.
+    """
     cfg = _cfg(["p/cand-a", "p/cand-b"], ["p/judge-1", "p/judge-2"])
-    assert config_warnings(cfg, {}) == []
+    (warning,) = config_warnings(cfg, {})
+    assert "could not be read" in warning
+    assert "not checked" in warning
+    assert "p/cand-a" not in warning
 
 
 def test_a_model_absent_from_the_catalog_is_named():
@@ -68,7 +76,7 @@ def test_a_model_absent_from_the_catalog_is_named():
     # absence is a fact about the catalog, and the wording must not dress it as
     # a claim about the model: a deprecated model takes the other branch, so
     # calling this one "deprecated or unknown" was never true here.
-    assert "not listed in the model catalog" in warning
+    assert "not in the model catalog" in warning
     assert "deprecated" not in warning
 
 
@@ -78,6 +86,15 @@ def test_a_deprecated_model_is_named_as_deprecated_not_missing():
     (warning,) = config_warnings(cfg, catalog)
     assert "p/old" in warning
     assert "deprecated" in warning
+
+
+def test_a_deprecated_model_carries_the_date_the_catalog_gives():
+    """The date is what turns "deprecated" into something to act on."""
+    old = _entry("p/old", deprecated=True)
+    old.deprecation = 1792454400  # 2026-10-20T00:00:00Z, as the catalog sends it
+    cfg = _cfg(["p/cand-a", "p/old"], ["p/judge-1", "p/judge-2"])
+    (warning,) = config_warnings(cfg, HEALTHY | {"p/old": old})
+    assert "p/old (deprecation date 2026-10-20)" in warning
     assert "unknown" not in warning
 
 
@@ -128,5 +145,5 @@ def test_warnings_are_stable_in_order_and_content():
 
     unknown, deprecated = config_warnings(cfg, catalog)
 
-    assert unknown.startswith("not listed in the model catalog: p/aaa, p/zzz.")
-    assert deprecated.startswith("the catalog lists these as deprecated: p/old.")
+    assert unknown.startswith("not in the model catalog: p/aaa, p/zzz.")
+    assert deprecated.startswith("the catalog marks these as deprecated: p/old.")

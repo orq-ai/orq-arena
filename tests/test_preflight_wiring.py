@@ -81,7 +81,7 @@ def test_the_config_warnings_reach_the_run_plan(project, monkeypatch):
     """The catalog's opinion of the config is printed before the user consents."""
     from orq_arena.providers.models_list import ModelEntry
 
-    async def _catalog(_cfg, **_kw):
+    async def _catalog(_cfg, _model_ids):
         return {
             "p/cand-a": ModelEntry(id="p/cand-a", provider="p", endpoints=("chat", "responses")),
             "p/judge-1": ModelEntry(id="p/judge-1", provider="p", endpoints=("chat", "responses")),
@@ -94,7 +94,7 @@ def test_the_config_warnings_reach_the_run_plan(project, monkeypatch):
     async def _verify(_gw, **_kw):
         return True, ""
 
-    monkeypatch.setattr("orq_arena.providers.models_list.fetch_catalog", _catalog)
+    monkeypatch.setattr("orq_arena.providers.models_list.fetch_catalog_covering", _catalog)
     monkeypatch.setattr("orq_arena.providers.models_list.fetch_price_map", _prices)
     monkeypatch.setattr("orq_arena.providers.credentials.verify_credential", _verify)
 
