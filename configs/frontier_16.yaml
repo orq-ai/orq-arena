@@ -22,11 +22,11 @@ candidates:
   - model_id: openai/gpt-5.4-mini                 # AA 40.0
   - model_id: google/gemini-3.5-flash            # AA 50.2
   - model_id: google/gemini-3.1-pro-preview      # AA 46.5
-  - model_id: google/gemini-2.5-pro              # AA ~mid-high
-  - model_id: deepseek/deepseek-v4-pro           # AA 44.3
-  - model_id: deepseek/deepseek-v4-flash         # AA 40.3
+  - model_id: google/gemini-3.7-flash            # replaced gemini-2.5-pro (deprecated 2026-10-20); AA score not looked up
+  - model_id: baseten/deepseek-v4-pro-0813       # AA 44.3 as deepseek-v4-pro; that id is deprecated, this is the same model via baseten
+  - model_id: deepseek/deepseek-flash            # AA 40.3 as deepseek-v4-flash; that id is deprecated, this is its current id
   - model_id: moonshotai/kimi-k2.6               # AA 42.8
-  - model_id: moonshotai/kimi-k2.5               # AA 38.1
+  - model_id: moonshotai/kimi-k3                 # replaced kimi-k2.5 (deprecated 2026-08-31); AA score not looked up
   - model_id: alibaba/qwen3.5-27b                # AA 33.8
   - model_id: alibaba/qwen3.5-35b-a3b            # AA 29.3
   - model_id: xai/grok-4-1-fast                   # AA 30.6 (reasoning)

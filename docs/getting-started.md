@@ -129,7 +129,7 @@ file:
 candidates:                # the model pool: router model ids, any size >= 2
   - model_id: anthropic/claude-sonnet-4-6
   - model_id: openai/gpt-5.4
-  - model_id: deepseek/deepseek-chat
+  - model_id: mistral/mistral-medium-2604
   - model_id: google/gemini-3.5-flash
     reasoning: { thinking: { type: disabled } }   # per-model overrides inline
 

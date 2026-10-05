@@ -33,7 +33,7 @@ gateway:
 # reasoning: raw router fields, forwarded verbatim. Recipes:
 #   OpenAI  -> reasoning: { reasoning_effort: low|medium|high }
 #   Claude  -> reasoning: { thinking: { type: enabled, budget_tokens: 4096 } }
-#   Gemini3 -> reasoning: { thinking: { thinking_level: low|high } }
+#   Gemini3 -> reasoning: { thinking: { type: enabled, thinking_level: low|high } }
 candidates:
   - model_id: anthropic/claude-opus-4-8
   - model_id: anthropic/claude-sonnet-4-6
@@ -45,11 +45,21 @@ candidates:
     reasoning: { thinking: { type: disabled } }
   - model_id: google/gemini-3.5-flash
     reasoning: { thinking: { type: disabled } }
-  - model_id: deepseek/deepseek-chat
+  # DeepSeek V4 Flash as served by inceptron. `deepseek/deepseek-chat`, which
+  # held this slot, stopped being served (404 since at least 2026-10-05). This
+  # offering does not think, measured over six probe calls; DeepSeek's own
+  # `deepseek/deepseek-flash` always does and cannot be switched off, so it does
+  # not fit a uniform thinking-OFF pool.
+  - model_id: inceptron/deepseek-ai/DeepSeek-V4-Flash-0731
+    # named, because the id's own short form is the vendor path
+    # `deepseek-ai/DeepSeek-V4-Flash-0731`, which is no use on a leaderboard
+    name: deepseek-v4-flash
+    reasoning: { thinking: { type: disabled } }
   - model_id: mistral/mistral-medium-2604
 # Excluded from the default pool (thinking can't be disabled via the router,
 # verified 2026-07-11): moonshotai/kimi-k2.6, deepseek/deepseek-v4-pro,
-# alibaba/qwen3.5-flash. They belong in configs/reasoning_arena.yaml.
+# alibaba/qwen3.5-flash, and deepseek/deepseek-flash (verified 2026-10-05).
+# They belong in configs/reasoning_arena.yaml.
 
 # Judge panel, router model ids, judged via evaluatorq's pairwise jury
 # (both orderings per judge; a judge that flips abstains and is recorded).
