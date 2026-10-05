@@ -60,3 +60,20 @@ def no_orq_cli(monkeypatch):
     credentials._whoami.cache_clear()
     yield
     credentials._whoami.cache_clear()
+
+
+@pytest.fixture(autouse=True)
+def cold_catalog_cache(tmp_path, monkeypatch):
+    """Every test starts with an empty model-catalog cache of its own.
+
+    The catalog cache lives in the developer's home directory, and a warm one
+    answers `fetch_catalog` without touching the network. So a test that forgot
+    to stub the catalog passed on any machine that had ever run the tool and
+    failed on CI, where there is no cache and the guard above sees the call.
+    That is how this branch was reported green while CI was red. With the cache
+    pointed at a fresh directory, a missing stub fails the same way everywhere.
+    """
+    from orq_arena.providers import models_list
+
+    monkeypatch.setattr(models_list, "CACHE_DIR", tmp_path / "catalog-cache")
+    monkeypatch.setattr(models_list, "CACHE_FILE", tmp_path / "catalog-cache" / "models.json")

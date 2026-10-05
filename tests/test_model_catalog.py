@@ -66,13 +66,6 @@ CATALOG = {
 }
 
 
-@pytest.fixture(autouse=True)
-def _no_cache(tmp_path, monkeypatch):
-    """Each test starts with a cold cache in its own directory."""
-    monkeypatch.setattr(ml, "CACHE_DIR", tmp_path / "cache")
-    monkeypatch.setattr(ml, "CACHE_FILE", tmp_path / "cache" / "models.json")
-
-
 def _transport(*, expect_no_auth: bool = True, calls: list | None = None):
     def handler(request: httpx.Request) -> httpx.Response:
         if calls is not None:
