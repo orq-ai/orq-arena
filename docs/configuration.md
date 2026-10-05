@@ -189,7 +189,7 @@ comment block in `orq_arena.yaml`):
 ```yaml
 # OpenAI   -> reasoning: { reasoning_effort: low|medium|high }
 # Claude   -> reasoning: { thinking: { type: enabled, budget_tokens: 4096 } }
-# Gemini 3 -> reasoning: { thinking: { thinking_level: low|high } }
+# Gemini 3 -> reasoning: { thinking: { type: enabled, thinking_level: low|high } }
 ```
 
 To explicitly disable a think-by-default model (e.g. some Gemini models) for a uniform

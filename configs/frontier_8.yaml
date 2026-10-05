@@ -10,15 +10,24 @@
 # Cost note: 8 models = C(8,2)=28 matches. Frontier models are pricey; the
 # preflight prints a spend projection before anything runs.
 
+# Output caps: models that always think spend output tokens on reasoning before
+# they answer. Measured 2026-10-05 over the starter prompts with room to think:
+# deepseek-flash and kimi-k3 used up to about 4,200 reasoning tokens per answer,
+# kimi-k2.6 up to about 5,800, deepseek-v4-pro up to about 1,400. At the default
+# 2048 cap they ran out mid-thought and returned empty answers, so each carries
+# its own `max_tokens`. A cap is a ceiling, not a target.
 candidates:
   - model_id: anthropic/claude-opus-4-8          # AA 55.7
   - model_id: anthropic/claude-opus-4-7          # AA 53.5
   - model_id: openai/gpt-5.4                      # AA 51.4
   - model_id: google/gemini-3.5-flash            # AA 50.2
   - model_id: google/gemini-3.1-pro-preview      # AA 46.5
-  - model_id: deepseek/deepseek-v4-pro           # AA 44.3
+  - model_id: baseten/deepseek-v4-pro-0813       # AA 44.3 as deepseek-v4-pro; that id is deprecated, this is the same model via baseten
+    max_tokens: 4096
   - model_id: moonshotai/kimi-k2.6               # AA 42.8
-  - model_id: deepseek/deepseek-v4-flash         # AA 40.3
+    max_tokens: 8000
+  - model_id: deepseek/deepseek-flash            # AA 40.3 as deepseek-v4-flash; that id is deprecated, this is its current id
+    max_tokens: 8000
 
 # Cheap trio for the panel; frontier candidates are judged, not judging, so no
 # self-judge overlap here. Swap in frontier judges (opus/gpt-5.4/gemini-pro) if

@@ -346,7 +346,7 @@ orq-arena pool --config PATH [--json]
   see [configuration.md](configuration.md#candidates-the-model-pool)), and the full `model_id`,
   in config order, 1-indexed.
 
-**Expected output**, against the shipped `orq_arena.yaml` (8 candidates, none with a custom `name`):
+**Expected output**, against the shipped `orq_arena.yaml` (8 candidates, one with a custom `name`):
 
 ```bash
 orq-arena pool --config orq_arena.yaml
@@ -361,7 +361,7 @@ Seed  Name                       Model ID
 4     gpt-5.4-mini               openai/gpt-5.4-mini
 5     gemini-3.1-pro-preview     google/gemini-3.1-pro-preview
 6     gemini-3.5-flash           google/gemini-3.5-flash
-7     deepseek-chat              deepseek/deepseek-chat
+7     deepseek-v4-pro            nebius/deepseek-ai/DeepSeek-V4-Pro
 8     mistral-medium-2604        mistral/mistral-medium-2604
 ```
 

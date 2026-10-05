@@ -7,8 +7,10 @@ and the cheap judge trio that was the default when it was recorded.
 This directory is a record, so `config.yaml` still names the panel the run used. One
 of its judges, `google/gemini-2.5-flash-lite`, is deprecated in the model catalog as of
 2026-10-20, and the shipped configs now use `google/gemini-3.5-flash-lite` in its place.
-To reproduce the run after that date, swap the judge in a copy of the config; the
-result is then a new run with a different jury, not a rerun of this one.
+One of its candidates, `deepseek/deepseek-chat`, is no longer served at all (the router
+answers 404), so the run cannot be reproduced as recorded. To run something close to
+it, copy the config, swap that candidate and the judge for the ones the shipped
+`orq_arena.yaml` uses, and treat the result as a new run with a different pool and jury.
 
 Open **[`battles.report.html`](battles.report.html)** in a browser for the full
 page. Regenerate it from the recorded log at any time (no model calls), writing
