@@ -122,6 +122,28 @@ def test_the_workspace_is_still_read_from_an_older_cli(monkeypatch):
     assert cred.active_workspace() == "orq-research"
 
 
+def test_a_flag_that_exits_zero_without_json_still_tries_the_other_spelling(monkeypatch):
+    """A parse failure is the same "wrong spelling" case as a nonzero exit.
+
+    A CLI that accepts `-o json` but prints something else exits 0. That used
+    to end the search, while a nonzero exit moved on to `--json`.
+    """
+    monkeypatch.setattr(cred.shutil, "which", lambda _n: "/usr/local/bin/orq")
+
+    def fake_run(argv, **_kw):
+        class R:
+            pass
+
+        r = R()
+        r.returncode = 0
+        r.stdout = WHOAMI if argv[3:] == ["--json"] else "active_workspace_key: orq-research"
+        r.stderr = ""
+        return r
+
+    monkeypatch.setattr(cred.subprocess, "run", fake_run)
+    assert cred.active_workspace() == "orq-research"
+
+
 def test_no_cli_means_no_workspace_claim(monkeypatch):
     """Absent provenance is recorded as absent, never guessed."""
     _cli(monkeypatch, present=False)

@@ -71,8 +71,12 @@ def _whoami() -> dict | None:
         try:
             data = json.loads(proc.stdout)
         except (ValueError, TypeError):
-            return None
-        return data if isinstance(data, dict) else None
+            # Exit 0 with output that is not JSON: this CLI took the flag to
+            # mean something else. That is the same "wrong spelling" case as a
+            # nonzero exit, so the other spelling still gets its turn.
+            continue
+        if isinstance(data, dict):
+            return data
     return None
 
 
