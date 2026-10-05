@@ -244,7 +244,7 @@ async def test_an_unreadable_catalog_is_not_patched_up_one_model_at_a_time(
 
 
 async def test_the_responses_endpoint_is_visible_per_model(patched_client, monkeypatch):
-    """evaluatorq 1.32.4 prefers the router's Responses endpoint for judges,
+    """evaluatorq prefers the router's Responses endpoint for judges,
     because that is the endpoint the router prices."""
     monkeypatch.delenv("ORQ_API_KEY", raising=False)
     patched_client(_transport())

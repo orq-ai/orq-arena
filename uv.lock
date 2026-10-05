@@ -459,7 +459,7 @@ wheels = [
 
 [[package]]
 name = "evaluatorq"
-version = "1.32.4"
+version = "1.55.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
@@ -470,9 +470,9 @@ dependencies = [
     { name = "rich" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c2/59/64899cc802fe97fd03e15954ee8dc433c561ea0da5209db12e3865106ef6/evaluatorq-1.32.4.tar.gz", hash = "sha256:0a98a3a265424d9980f9cade436e05e9e1cd4c4a627ba96ff2f624c4cde7891c", size = 13451888, upload-time = "2026-08-31T09:15:27.634Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/2b/90/9fe5931fb1849f08be8f5c632f427fe52f4767e0be8c23a3c8f70981b089/evaluatorq-1.55.1.tar.gz", hash = "sha256:0940a8f7a28a3cd8a347e80880a00764fd811c7b7c988839d95a955468dc0378", size = 17268776, upload-time = "2026-10-05T07:13:37.496Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/49/84/1499cbc5ae9a47044a3d968d046ab8e4b08115201016f771109a54bdd37f/evaluatorq-1.32.4-py3-none-any.whl", hash = "sha256:df7429a9c6a043ef548708c564bbaa6fe446752204a7b45ff0f70c7e22fd6abc", size = 2521109, upload-time = "2026-08-31T09:15:25.62Z" },
+    { url = "https://files.pythonhosted.org/packages/83/22/5beb2e6864fb2195d82aa83671734fcbc4d504dec5cc9b5cd602e9e623bb/evaluatorq-1.55.1-py3-none-any.whl", hash = "sha256:3c14eb35bb7acc193009b4f76895fc9aa9e10ccddbfba2f252392bc0ffe1f262", size = 3633791, upload-time = "2026-10-05T07:13:35.656Z" },
 ]
 
 [[package]]
@@ -1547,7 +1547,7 @@ docs = [
 [package.metadata]
 requires-dist = [
     { name = "click", specifier = ">=8.1" },
-    { name = "evaluatorq", specifier = ">=1.32.4" },
+    { name = "evaluatorq", specifier = ">=1.55.1" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "loguru", specifier = ">=0.7" },
     { name = "openai", specifier = ">=1.50" },

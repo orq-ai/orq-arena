@@ -5,7 +5,7 @@ before, and none of which may block a run:
 
 * a model the catalog has no entry for at all;
 * a model the catalog marks as deprecated;
-* a judge whose model has no `responses` endpoint. evaluatorq 1.32.4 sends
+* a judge whose model has no `responses` endpoint. evaluatorq sends
   judge calls to the router's Responses endpoint because that is the one the
   router prices, falling back to chat completions per model. The fallback works,
   so this is not an error; it silently costs judge-cost attribution, so it is
