@@ -361,7 +361,7 @@ Seed  Name                       Model ID
 4     gpt-5.4-mini               openai/gpt-5.4-mini
 5     gemini-3.1-pro-preview     google/gemini-3.1-pro-preview
 6     gemini-3.5-flash           google/gemini-3.5-flash
-7     deepseek-v4-flash          inceptron/deepseek-ai/DeepSeek-V4-Flash-0731
+7     deepseek-v4-pro            nebius/deepseek-ai/DeepSeek-V4-Pro
 8     mistral-medium-2604        mistral/mistral-medium-2604
 ```
 

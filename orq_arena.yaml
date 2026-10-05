@@ -45,20 +45,23 @@ candidates:
     reasoning: { thinking: { type: disabled } }
   - model_id: google/gemini-3.5-flash
     reasoning: { thinking: { type: disabled } }
-  # DeepSeek V4 Flash as served by inceptron. `deepseek/deepseek-chat`, which
-  # held this slot, stopped being served (404 since at least 2026-10-05). This
-  # offering does not think, measured over six probe calls; DeepSeek's own
-  # `deepseek/deepseek-flash` always does and cannot be switched off, so it does
-  # not fit a uniform thinking-OFF pool.
-  - model_id: inceptron/deepseek-ai/DeepSeek-V4-Flash-0731
+  # DeepSeek V4 Pro as served by nebius. `deepseek/deepseek-chat`, which held
+  # this slot, stopped being served (404 since at least 2026-10-05). Of the 16
+  # DeepSeek offerings the router answered for on that day, four ran without
+  # thinking, and this was the fastest of them by a wide margin: a 6 s median
+  # per answer, against 25 to 31 s for the other three. DeepSeek's own
+  # `deepseek/deepseek-flash` always thinks and ignores `thinking: disabled`, so
+  # it does not fit a uniform thinking-OFF pool.
+  - model_id: nebius/deepseek-ai/DeepSeek-V4-Pro
     # named, because the id's own short form is the vendor path
-    # `deepseek-ai/DeepSeek-V4-Flash-0731`, which is no use on a leaderboard
-    name: deepseek-v4-flash
+    # `deepseek-ai/DeepSeek-V4-Pro`, which is no use on a leaderboard
+    name: deepseek-v4-pro
     reasoning: { thinking: { type: disabled } }
   - model_id: mistral/mistral-medium-2604
 # Excluded from the default pool (thinking can't be disabled via the router,
-# verified 2026-07-11): moonshotai/kimi-k2.6, deepseek/deepseek-v4-pro,
-# alibaba/qwen3.5-flash, and deepseek/deepseek-flash (verified 2026-10-05).
+# verified 2026-07-11): moonshotai/kimi-k2.6, alibaba/qwen3.5-flash, and the
+# DeepSeek-served ids deepseek/deepseek-v4-pro and deepseek/deepseek-flash
+# (verified 2026-10-05; the nebius V4 Pro offering above is the exception).
 # They belong in configs/reasoning_arena.yaml.
 
 # Judge panel, router model ids, judged via evaluatorq's pairwise jury
