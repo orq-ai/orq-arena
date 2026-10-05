@@ -37,7 +37,7 @@ _CLI_TIMEOUT_S = 10
 
 @cache
 def _whoami() -> dict | None:
-    """``orq auth whoami --json`` as a dict, or None if that is not available.
+    """``orq auth whoami`` as a dict, or None if that is not available.
 
     Never raises: the CLI may be absent, logged out, an unrelated binary of the
     same name, or simply slow. All of those mean "no advice to offer", which is
@@ -51,22 +51,29 @@ def _whoami() -> dict | None:
     """
     if shutil.which(_CLI) is None:
         return None
-    try:
-        proc = subprocess.run(  # noqa: S603
-            [_CLI, "auth", "whoami", "--json"],
-            capture_output=True,
-            text=True,
-            timeout=_CLI_TIMEOUT_S,
-        )
-    except (OSError, subprocess.SubprocessError):
-        return None
-    if proc.returncode != 0:
-        return None
-    try:
-        data = json.loads(proc.stdout)
-    except (ValueError, TypeError):
-        return None
-    return data if isinstance(data, dict) else None
+    # The flag that asks for JSON changed between CLI majors: 8.x takes
+    # `-o json` and rejects `--json` as an unknown flag, 5.x took `--json`.
+    # With only the old spelling, every 8.x install answered "unknown flag",
+    # which is indistinguishable from "no advice" and silently switched the
+    # whole feature off. Newest first, since that is what an install gets.
+    for json_flag in (["-o", "json"], ["--json"]):
+        try:
+            proc = subprocess.run(  # noqa: S603
+                [_CLI, "auth", "whoami", *json_flag],
+                capture_output=True,
+                text=True,
+                timeout=_CLI_TIMEOUT_S,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return None
+        if proc.returncode != 0:
+            continue
+        try:
+            data = json.loads(proc.stdout)
+        except (ValueError, TypeError):
+            return None
+        return data if isinstance(data, dict) else None
+    return None
 
 
 def active_workspace() -> str | None:
@@ -98,13 +105,13 @@ def credential_hint() -> str:
             f"{base} The orq CLI is logged in to workspace '{workspace}', but its login "
             "session expires after about an hour and a tournament can run longer, so "
             "the arena will not borrow it. Mint a key that outlives the run:\n"
-            f"    orq api-keys create --name orq-arena --json\n"
+            f"    orq api-keys create --name orq-arena\n"
             f"then export it as {ORQ_API_KEY_ENV}."
         )
     return (
         f"{base} Get one with:\n"
         "    orq auth login\n"
-        "    orq api-keys create --name orq-arena --json\n"
+        "    orq api-keys create --name orq-arena\n"
         f"then export it as {ORQ_API_KEY_ENV}."
     )
 
@@ -155,7 +162,7 @@ async def verify_credential(
             f"the router rejected {ORQ_API_KEY_ENV} ({resp.status_code}). {detail}{where} "
             "A key is scoped to one workspace, so a key from another will fail exactly "
             "like this. Mint one for the workspace you mean:\n"
-            "    orq api-keys create --name orq-arena --json"
+            "    orq api-keys create --name orq-arena"
         )
     # Accepted means the router answered the question. Anything else did not:
     # a 404 from a bring-your-own endpoint with no listing route, a 429, a 5xx,

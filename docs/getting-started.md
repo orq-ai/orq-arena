@@ -96,7 +96,7 @@ get one:
 
     ```bash
     orq auth login
-    orq api-keys create --name orq-arena --json
+    orq api-keys create --name orq-arena
     ```
 
     The response contains the raw key (`sk-orq-...`), shown once and never retrievable
@@ -324,7 +324,7 @@ next to the log. `orq-arena report <log>` regenerates the report page on demand,
 ??? failure "`RuntimeError: ORQ_API_KEY is not set.`"
 
     `.env` is missing, empty, or still the blank template. The message names the commands that
-    mint a key (`orq auth login`, then `orq api-keys create --name orq-arena --json`); you can
+    mint a key (`orq auth login`, then `orq api-keys create --name orq-arena`); you can
     also create one per the [API keys guide](https://docs.orq.ai/docs/ai-studio/organization/api-keys).
     Fill it into `.env` (`cp .env.example .env`) and re-run. This only fires on `run` or
     `rejudge`; `report`, `annotate`, `anchor`, and `refresh-catalog` all work with no key.
@@ -335,7 +335,7 @@ next to the log. `orq-arena report <log>` regenerates the report page on demand,
     one workspace, so a key minted elsewhere fails exactly this way. The preflight probe catches
     it with one listing call before the run spends anything, which matters because otherwise
     every judge call returns 401 and the run still produces a leaderboard-shaped result. Mint a
-    key for the right workspace with `orq api-keys create --name orq-arena --json`.
+    key for the right workspace with `orq api-keys create --name orq-arena`.
 
 ??? warning "A response shows `✂ truncated` in the live `--tui` show"
 

@@ -83,6 +83,45 @@ def test_the_active_workspace_is_readable_for_the_manifest(monkeypatch):
     assert cred.active_workspace() == "orq-research"
 
 
+def _cli_that_accepts(monkeypatch, accepted: list[str]):
+    """An `orq` binary that knows one spelling of the JSON flag and no other."""
+    monkeypatch.setattr(cred.shutil, "which", lambda _n: "/usr/local/bin/orq")
+    seen: list[list[str]] = []
+
+    def fake_run(argv, **_kw):
+        seen.append(argv)
+
+        class R:
+            pass
+
+        r = R()
+        ok = argv[3:] == accepted
+        r.returncode = 0 if ok else 1
+        r.stdout = WHOAMI if ok else ""
+        r.stderr = "" if ok else "Error: unknown flag"
+        return r
+
+    monkeypatch.setattr(cred.subprocess, "run", fake_run)
+    return seen
+
+
+def test_the_workspace_is_read_from_a_current_cli(monkeypatch):
+    """orq CLI 8.x asks for JSON with `-o json` and rejects `--json`.
+
+    The call used `--json` only, so on every current install the CLI answered
+    "unknown flag", `_whoami` took that as "no advice", and the workspace hint
+    and the manifest field went quiet without any error.
+    """
+    seen = _cli_that_accepts(monkeypatch, ["-o", "json"])
+    assert cred.active_workspace() == "orq-research"
+    assert seen == [["orq", "auth", "whoami", "-o", "json"]]
+
+
+def test_the_workspace_is_still_read_from_an_older_cli(monkeypatch):
+    _cli_that_accepts(monkeypatch, ["--json"])
+    assert cred.active_workspace() == "orq-research"
+
+
 def test_no_cli_means_no_workspace_claim(monkeypatch):
     """Absent provenance is recorded as absent, never guessed."""
     _cli(monkeypatch, present=False)

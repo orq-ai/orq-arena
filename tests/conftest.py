@@ -43,7 +43,7 @@ def no_orq_cli(monkeypatch):
     """The suite does not consult the developer's own orq login either.
 
     Blocking httpx was not enough. `_write_manifest` calls `active_workspace()`,
-    which shells out to `orq auth whoami --json`, so on a machine with the CLI
+    which shells out to `orq auth whoami`, so on a machine with the CLI
     installed the manifest tests embedded whoever happened to be logged in and
     made a real network call through a subprocess the httpx guard cannot see. On
     CI, with no CLI, the same tests took the other branch. A test whose result
