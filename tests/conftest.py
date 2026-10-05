@@ -4,7 +4,7 @@ This became worth enforcing when the model catalog moved to a public endpoint.
 Before, every catalog and price fetch was gated on ``ORQ_API_KEY``, so a test
 that forgot to stub one simply got an empty result on a keyless machine. Now
 those fetches need no credential, so the same omission would quietly reach
-``api.orq.ai``: a green suite that depends on the network, a developer's
+``my.orq.ai``: a green suite that depends on the network, a developer's
 workspace entitlements, and someone else's rate limit.
 
 Tests drive these paths through ``httpx.MockTransport`` (see

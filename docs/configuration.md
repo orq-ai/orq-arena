@@ -27,7 +27,7 @@ cp .env.example .env
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `ORQ_API_KEY` | Required for live runs | (none) | The only secret orq-arena needs. Every candidate, judge, and preflight-probe call goes through the orq.ai router gateway with this one key; the run fails up front with `ORQ_API_KEY is not set.` followed by `orq api-keys create --name orq-arena`, preceded by `orq auth login` when the CLI is not already logged in. A key that is set but rejected by the router is caught by the preflight credential probe, before the run spends anything. Create one in your workspace settings, as [`.env.example`](https://github.com/orq-ai/orq-arena/blob/master/.env.example) points to, or per the [API keys guide](https://docs.orq.ai/docs/ai-studio/organization/api-keys). |
-| `ORQ_BASE_URL` | No | `https://api.orq.ai` | Points completions **and** the model/price catalog at a different orq.ai host (staging, a proxy). Honoured only while `gateway.base_url` is left at its default: setting that key in the YAML is a bring-your-own-endpoint opt-out that wins outright, so the run can never be split between two hosts. Not read from `.env.example`; export it yourself when you need it. |
+| `ORQ_BASE_URL` | No | `https://my.orq.ai` | Points completions, the credential probe **and** the model/price catalog at a different orq.ai host (staging, a proxy). Honoured only while `gateway.base_url` names the orq router (the default, or its older spelling `https://api.orq.ai/v3/router`): setting any other URL in the YAML is a bring-your-own-endpoint opt-out that wins outright, so the run can never be split between two hosts. Not read from `.env.example`; export it yourself when you need it. |
 
 Notes:
 
@@ -91,7 +91,7 @@ match:
   damage_majority: 15
 
 gateway:
-  base_url: https://api.orq.ai/v3/router
+  base_url: https://my.orq.ai/v3/router
   candidate_max_tokens: 2048
   judge_max_tokens: 2048
   stream_read_timeout_s: 1200
@@ -147,7 +147,7 @@ on-screen health bar happens to sit.
 
 | Key | Type | Default | Effect |
 |---|---|---|---|
-| `base_url` | `str` | `"https://api.orq.ai/v3/router"` | Base URL for the `AsyncOpenAI` client (`OrqGateway.__init__`, `src/orq_arena/providers/orq_gateway.py`). One OpenAI-compatible endpoint fronts every provider, models, judges, and the preflight probe all share it. Left at the default, host resolution is delegated to evaluatorq and honours `ORQ_BASE_URL`; changing it here opts out of that entirely (see [Alternate configs and overrides](#alternate-configs-and-overrides)). |
+| `base_url` | `str` | `"https://my.orq.ai/v3/router"` | Base URL for the `AsyncOpenAI` client (`OrqGateway.__init__`, `src/orq_arena/providers/orq_gateway.py`). One OpenAI-compatible endpoint fronts every provider, models, judges, and the preflight probe all share it. Left at the default, host resolution is delegated to evaluatorq and honours `ORQ_BASE_URL`. `https://api.orq.ai/v3/router`, the default before `my.orq.ai`, is the same service and is treated the same way, so a config written then keeps working unchanged. Any other URL here opts out of that entirely (see [Alternate configs and overrides](#alternate-configs-and-overrides)). |
 | `candidate_max_tokens` | `int` | `2048` | Default per-response output cap for candidate completions (`stream_completion`'s `max_tokens=max_tokens or self._cfg.candidate_max_tokens`). Too low truncates long or creative answers, a cut response is flagged `✂ truncated` in the TUI response panel (`src/orq_arena/tui/widgets/response_panel.py`) and judges tend to penalize it. Overridden per-candidate by `candidates[].max_tokens`. |
 | `judge_max_tokens` | `int` | `2048` | Output cap for judge calls, passed to evaluatorq's `llm_jury_pairwise(max_tokens=...)`. A **cap, not a target**: it costs nothing extra on frugal judges. Thinking-by-default judges (e.g. `gemini-2.5-flash`) burn reasoning tokens before writing a verdict; a low cap starves the verdict entirely and fails the vote (the codebase's own regression case: `512` produced a `LengthFinishReasonError` on every one of that judge's votes). `2048` leaves headroom without materially raising cost on the cheap default panel. |
 | `stream_read_timeout_s` | `int` | `1200` | Max **silence** between stream chunks, in seconds, before the client treats the connection as dead (`httpx.Timeout(read=float(stream_read_timeout_s), ...)` in `OrqGateway.__init__`). This is a read-gap timeout, not a total-duration cap, a thinking model that pauses for minutes before its first token is fine as long as chunks keep arriving within this gap. A stream that goes silent longer than this is retried once, then the round is voided (logged, shown, excluded from scoring). `1200s` = 20 minutes, deliberately generous. |
@@ -298,7 +298,7 @@ Everything else is a Pydantic default and safe to omit from the YAML entirely:
 | `match.starting_hp` (TUI-only) | `100` |
 | `match.damage_unanimous` (TUI-only) | `30` |
 | `match.damage_majority` (TUI-only) | `15` |
-| `gateway.base_url` | `https://api.orq.ai/v3/router` |
+| `gateway.base_url` | `https://my.orq.ai/v3/router` |
 | `gateway.candidate_max_tokens` | `2048` |
 | `gateway.judge_max_tokens` | `2048` |
 | `gateway.stream_read_timeout_s` | `1200` |

@@ -28,16 +28,32 @@ class MatchRules(BaseModel):
 
 # The one secret orq-arena reads; every gateway/catalog/dataset call uses it.
 ORQ_API_KEY_ENV = "ORQ_API_KEY"
-# The user-facing router host. Completions resolve through evaluatorq, which
-# honours ORQ_BASE_URL; the catalog resolves the same way so one run never
-# straddles two environments (see providers/models_list.catalog_host).
-DEFAULT_ORQ_HOST = "https://api.orq.ai"
+# The orq.ai host a run talks to unless told otherwise. It is the host
+# evaluatorq and the orq CLI default to, so the arena, the judge library under
+# it and the CLI that mints its key all name the same place. Completions resolve
+# through evaluatorq, which honours ORQ_BASE_URL; the catalog resolves the same
+# way so one run never straddles two environments (see
+# providers/models_list.catalog_host).
+DEFAULT_ORQ_HOST = "https://my.orq.ai"
+
+# `api.orq.ai` is the same service under another name, and it was this repo's
+# default before `my.orq.ai`. Every config written then spells the router out as
+# `https://api.orq.ai/v3/router`. Those must keep meaning "the orq router", not
+# "a bring-your-own endpoint": the difference decides whether ORQ_BASE_URL is
+# honoured, and losing that silently is how a staging run ends up priced and
+# probed against production.
+_ORQ_ROUTER_URLS = frozenset({f"{DEFAULT_ORQ_HOST}/v3/router", "https://api.orq.ai/v3/router"})
+
+
+def is_orq_router(base_url: str) -> bool:
+    """True when ``base_url`` is the orq.ai router, under either of its names."""
+    return base_url.rstrip("/") in _ORQ_ROUTER_URLS
 
 
 class OrqAIGatewayConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    base_url: str = "https://api.orq.ai/v3/router"
+    base_url: str = f"{DEFAULT_ORQ_HOST}/v3/router"
     candidate_max_tokens: int = 2048
     # A cap, not a target, free headroom for judges that think by default
     # (G1 finding: 512 starved gemini-2.5-flash's reasoning and killed every
