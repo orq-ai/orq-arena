@@ -241,13 +241,16 @@ MIN_VERDICT_MODELS = 5
 MIN_DECIDED_SHARE = 0.5
 
 
-def spearman_verdict(
-    rho: float, n_models: int, decisive: int | None = None, total: int | None = None
-) -> str:
-    """The grade a rejudge Spearman has earned, or why it gets none."""
+def spearman_verdict(rho: float, n_models: int, decisive: int, total: int) -> str:
+    """The grade a rejudge Spearman has earned, or why it gets none.
+
+    ``decisive`` and ``total`` are required. While they were optional, a caller
+    that left them out skipped the round floor and got "judge-robust ranking"
+    back for a panel that had decided one round.
+    """
     if n_models < MIN_VERDICT_MODELS:
         return f"too few models ({n_models}) for a robustness verdict"
-    if decisive is not None and total and decisive < total * MIN_DECIDED_SHARE:
+    if decisive < total * MIN_DECIDED_SHARE:
         return "too few rounds decided for a robustness verdict"
     if rho >= 0.8:
         return "judge-robust ranking"
