@@ -52,7 +52,7 @@ class ModelEntry:
 
     ``endpoints`` is the authoritative capability statement: ``"chat"`` for
     chat completions, ``"responses"`` for the Responses API that evaluatorq
-    1.32.4 prefers for judges because it is the endpoint the router prices.
+    prefers for judges because it is the endpoint the router prices.
     ``price_in`` / ``price_out`` are dollars per 1M tokens, ``None`` when the
     catalog carries no price, which is not the same as free.
     """
