@@ -88,6 +88,26 @@ def test_a_partly_collapsed_jury_still_ranks_but_shows_the_shortfall(capsys):
     assert "7 of 30" in out
 
 
+def test_a_mostly_collapsed_jury_gets_a_number_but_no_verdict_word(capsys):
+    """One decided round of 48 printed "judge-robust ranking".
+
+    The guard only fired at exactly zero. The correlation is fit on the decided
+    rounds, so a single round can produce rho 1.00, and the grade then vouched
+    for a ranking the panel had almost entirely failed to judge. The number and
+    its count still print; the verdict word does not.
+    """
+    out = _rendered(capsys, _result(decisive=1, total=48))
+    assert "1 of 48 rounds decided" in out
+    assert "too few rounds decided for a robustness verdict" in out
+    assert "judge-robust" not in out
+    assert "panel-sensitive" not in out
+
+
+def test_the_verdict_floor_is_half_the_rounds(capsys):
+    assert "judge-robust ranking" in _rendered(capsys, _result(decisive=24, total=48))
+    assert "judge-robust" not in _rendered(capsys, _result(decisive=23, total=48))
+
+
 def test_a_clean_run_keeps_the_round_phrasing_it_had(capsys):
     """RES-1153 shaped this line; a run that decided everything reads as before,
     so the shortfall wording only appears when there is a shortfall."""

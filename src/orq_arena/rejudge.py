@@ -232,10 +232,23 @@ def write_rejudged(
 MIN_VERDICT_MODELS = 5
 
 
-def spearman_verdict(rho: float, n_models: int) -> str:
+# The same question asked of the rounds. The correlation is fit on the decided
+# rounds only, so a panel that decided 1 of 48 can print rho 1.00, and the grade
+# would call that ranking "judge-robust" on the strength of a single round. Below
+# half, the new ranking is mostly the panel failing rather than the panel judging,
+# and no verdict word attaches. Half is a floor, not a calibration: it is the
+# point past which the undecided rounds outnumber the evidence.
+MIN_DECIDED_SHARE = 0.5
+
+
+def spearman_verdict(
+    rho: float, n_models: int, decisive: int | None = None, total: int | None = None
+) -> str:
     """The grade a rejudge Spearman has earned, or why it gets none."""
     if n_models < MIN_VERDICT_MODELS:
         return f"too few models ({n_models}) for a robustness verdict"
+    if decisive is not None and total and decisive < total * MIN_DECIDED_SHARE:
+        return "too few rounds decided for a robustness verdict"
     if rho >= 0.8:
         return "judge-robust ranking"
     return "ranking is panel-sensitive; treat with care"
@@ -284,7 +297,8 @@ def render_result(result: dict) -> None:
     rounds = f"{total} rounds" if decisive == total else f"{decisive} of {total} rounds decided"
     console.print(
         f"rank correlation (Spearman) old→new: [bold]{result['spearman']:.2f}[/bold] "
-        f"over {n_models} models, {rounds}, " + spearman_verdict(result["spearman"], n_models)
+        f"over {n_models} models, {rounds}, "
+        + spearman_verdict(result["spearman"], n_models, decisive, total)
     )
     console.print(f"old ranking: {' > '.join(result['old_ranking'])}")
     console.print(f"new ranking: {' > '.join(result['new_ranking'])}")
