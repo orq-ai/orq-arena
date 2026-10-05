@@ -1,6 +1,6 @@
 """orq.ai router gateway client, single provider for all model calls.
 
-Uses ``AsyncOpenAI`` pointed at ``api.orq.ai/v3/router``; the gateway is
+Uses ``AsyncOpenAI`` pointed at ``my.orq.ai/v3/router``; the gateway is
 OpenAI-compatible. Judge calls share ``.client`` via evaluatorq.
 
 At default config, credential/host resolution is delegated to evaluatorq's
@@ -20,7 +20,7 @@ from typing import Any
 import httpx
 from openai import AsyncOpenAI
 
-from ..config import DEFAULT_ORQ_HOST, ORQ_API_KEY_ENV, OrqAIGatewayConfig
+from ..config import DEFAULT_ORQ_HOST, ORQ_API_KEY_ENV, OrqAIGatewayConfig, is_orq_router
 
 
 class OrqGateway:
@@ -34,9 +34,9 @@ class OrqGateway:
         timeout = httpx.Timeout(
             connect=10.0, read=float(cfg.stream_read_timeout_s), write=60.0, pool=60.0
         )
-        at_defaults = cfg.base_url == OrqAIGatewayConfig().base_url
-        if at_defaults:
-            # api.orq.ai is the user-facing host; require_orq stops OPENAI_API_KEY
+        if is_orq_router(cfg.base_url):
+            # The orq router, under either of its names: the host comes from the
+            # resolver, so ORQ_BASE_URL applies. require_orq stops OPENAI_API_KEY
             # from silently capturing a run (arena ids are router ids).
             from evaluatorq.common.llm_client import MissingLLMCredentialsError, resolve_llm_client
 

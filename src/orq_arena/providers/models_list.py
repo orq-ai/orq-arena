@@ -34,7 +34,7 @@ from urllib.parse import urlparse
 
 import httpx
 
-from ..config import DEFAULT_ORQ_HOST, ORQ_API_KEY_ENV, OrqAIGatewayConfig
+from ..config import DEFAULT_ORQ_HOST, ORQ_API_KEY_ENV, OrqAIGatewayConfig, is_orq_router
 
 CACHE_DIR = Path.home() / ".cache" / "orq-arena"
 CACHE_FILE = CACHE_DIR / "models.json"
@@ -104,7 +104,7 @@ def catalog_host(cfg: OrqAIGatewayConfig) -> str:
     recorded a host the run never called. A YAML ``base_url`` is still a
     bring-your-own opt-out and wins here exactly as it does for completions.
     """
-    if cfg.base_url == OrqAIGatewayConfig().base_url:
+    if is_orq_router(cfg.base_url):
         base = os.environ.get("ORQ_BASE_URL", DEFAULT_ORQ_HOST).rstrip("/")
     else:
         base = cfg.base_url
@@ -121,7 +121,7 @@ def router_base_url(cfg: OrqAIGatewayConfig) -> str:
     bring-your-own opt-out that wins outright. Anything checking the credential
     has to resolve the host this way or it checks a router the run never calls.
     """
-    if cfg.base_url == OrqAIGatewayConfig().base_url:
+    if is_orq_router(cfg.base_url):
         return f"{catalog_host(cfg)}/v3/router"
     return cfg.base_url
 

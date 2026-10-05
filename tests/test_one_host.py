@@ -20,7 +20,38 @@ def test_staging_traffic_is_priced_against_staging(monkeypatch):
 
 def test_the_default_host_is_used_when_nothing_overrides_it(monkeypatch):
     monkeypatch.delenv("ORQ_BASE_URL", raising=False)
-    assert catalog_host(OrqAIGatewayConfig()) == "https://api.orq.ai"
+    assert catalog_host(OrqAIGatewayConfig()) == "https://my.orq.ai"
+
+
+def test_the_old_router_spelling_resolves_like_the_default(monkeypatch):
+    """One host for the whole run, whichever name the config uses for the router.
+
+    The catalog, the credential probe and the completions each ask "is this the
+    orq router?" separately. If they disagreed about `api.orq.ai`, a config
+    written before the default changed would send completions to one place and
+    price or probe against another.
+    """
+    from orq_arena.providers.models_list import router_base_url
+
+    old = OrqAIGatewayConfig(base_url="https://api.orq.ai/v3/router")
+    monkeypatch.delenv("ORQ_BASE_URL", raising=False)
+    assert catalog_host(old) == "https://my.orq.ai"
+    assert router_base_url(old) == "https://my.orq.ai/v3/router"
+    monkeypatch.setenv("ORQ_BASE_URL", "https://staging.orq.ai")
+    assert catalog_host(old) == "https://staging.orq.ai"
+    assert router_base_url(old) == "https://staging.orq.ai/v3/router"
+
+
+def test_the_committed_quickstart_config_is_still_the_orq_router():
+    """That recording keeps the config it ran with, old spelling included."""
+    from pathlib import Path
+
+    from orq_arena.config import is_orq_router, load_config
+
+    repo = Path(__file__).resolve().parents[1]
+    cfg = load_config(str(repo / "examples" / "quickstart" / "config.yaml"))
+    assert cfg.gateway.base_url == "https://api.orq.ai/v3/router"
+    assert is_orq_router(cfg.gateway.base_url)
 
 
 def test_an_explicit_yaml_base_url_still_wins_over_the_environment(monkeypatch):
