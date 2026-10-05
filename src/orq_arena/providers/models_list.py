@@ -295,38 +295,63 @@ async def fetch_catalog(
     return catalog
 
 
-async def _fetch_entry(client: httpx.AsyncClient, host: str, model_id: str) -> ModelEntry | None:
-    """One model by id, or None when the catalog has no such entry or cannot say."""
+async def _fetch_entry(
+    client: httpx.AsyncClient, host: str, model_id: str
+) -> tuple[ModelEntry | None, bool]:
+    """One model by id, as ``(entry, answered)``.
+
+    ``answered`` is whether the catalog actually answered the question. A 404 is
+    an answer: there is no such entry, so ``(None, True)``. A 503, a 429, a
+    timeout or a body that does not parse is not an answer, so ``(None, False)``.
+    Collapsing the two told the user to "check the id" of a correct model every
+    time the catalog had a bad minute, and reported a deprecated model as an
+    unknown one.
+    """
     try:
         resp = await client.get(f"{host}/v2/model-catalog/{model_id}")
-        resp.raise_for_status()
+    except httpx.HTTPError:
+        return None, False
+    if resp.status_code == 404:
+        return None, True
+    if not resp.is_success:
+        return None, False
+    try:
         payload = resp.json()
-    except (httpx.HTTPError, ValueError):
-        return None
+    except ValueError:
+        return None, False
     row = payload.get("model") if isinstance(payload, dict) else None
-    return _parse_catalog([row]).get(model_id) if isinstance(row, dict) else None
+    entry = _parse_catalog([row]).get(model_id) if isinstance(row, dict) else None
+    return entry, entry is not None
 
 
 async def fetch_catalog_covering(
     cfg: OrqAIGatewayConfig, model_ids: Iterable[str]
-) -> dict[str, ModelEntry]:
-    """The catalog, plus a direct lookup for each of ``model_ids`` it does not list.
+) -> tuple[dict[str, ModelEntry], frozenset[str]]:
+    """The catalog plus a direct lookup for each of ``model_ids`` it does not list.
+
+    Returns ``(catalog, unchecked)``. ``unchecked`` holds the ids whose lookup
+    did not get an answer, so the caller can say "could not be checked" about
+    them instead of "not in the catalog".
 
     The list endpoint never includes a deprecated model, so from the list alone a
     deprecated model and a misspelt one look the same: both are simply absent.
     Asking for the model by id tells them apart. A deprecated model answers with
     ``deprecated: true`` and its deprecation date, and an unknown id answers 404.
     Only the ids the list is missing are asked for, so a healthy config costs no
-    extra request, and a lookup that fails just leaves that model unlisted.
+    extra request.
     """
     catalog = await fetch_catalog(cfg)
     missing = [m for m in dict.fromkeys(model_ids) if m not in catalog]
     if not catalog or not missing:
-        return catalog
+        return catalog, frozenset()
     host = catalog_host(cfg)
     async with httpx.AsyncClient(timeout=10.0) as client:
-        found = await asyncio.gather(*(_fetch_entry(client, host, m) for m in missing))
-    return catalog | {entry.id: entry for entry in found if entry is not None}
+        results = await asyncio.gather(*(_fetch_entry(client, host, m) for m in missing))
+    found = {entry.id: entry for entry, _answered in results if entry is not None}
+    unchecked = frozenset(
+        m for m, (_entry, answered) in zip(missing, results, strict=True) if not answered
+    )
+    return catalog | found, unchecked
 
 
 async def fetch_price_map(cfg: OrqAIGatewayConfig) -> dict[str, tuple[float, float]]:

@@ -98,6 +98,38 @@ def test_a_deprecated_model_carries_the_date_the_catalog_gives():
     assert "unknown" not in warning
 
 
+def test_a_deprecation_value_that_is_not_a_date_does_not_stop_the_run():
+    """An advisory line must not be able to crash the preflight.
+
+    The catalog sends Unix seconds. The same instant in milliseconds is out of
+    range for a date and raised, before the run plan had printed. The model is
+    still reported as deprecated; only the date is dropped.
+    """
+    old = _entry("p/old", deprecated=True)
+    old.deprecation = 1792454400 * 1_000_000
+    cfg = _cfg(["p/cand-a", "p/old"], ["p/judge-1", "p/judge-2"])
+    (warning,) = config_warnings(cfg, HEALTHY | {"p/old": old})
+    assert "p/old" in warning
+    assert "deprecated" in warning
+    assert "deprecation date" not in warning
+
+
+def test_a_model_whose_lookup_got_no_answer_is_not_told_to_check_its_id():
+    """ "Could not be checked" and "not in the catalog" are different claims.
+
+    When the by-id lookup fails, nothing is known about the model. It used to
+    land in the same line as a misspelt id, which told the user their correct
+    id was wrong whenever the catalog had a bad minute.
+    """
+    cfg = _cfg(["p/cand-a", "p/ghost", "p/flaky"], ["p/judge-1", "p/judge-2"])
+    missing, not_checked = config_warnings(cfg, HEALTHY, unchecked={"p/flaky"})
+
+    assert missing.startswith("not in the model catalog: p/ghost.")
+    assert "p/flaky" not in missing
+    assert not_checked.startswith("could not be checked against the model catalog: p/flaky.")
+    assert "check the id" not in not_checked
+
+
 def test_a_judge_without_the_responses_endpoint_is_flagged():
     catalog = HEALTHY | {"p/judge-2": _entry("p/judge-2", endpoints=("chat",))}
     cfg = _cfg(["p/cand-a", "p/cand-b"], ["p/judge-1", "p/judge-2"])

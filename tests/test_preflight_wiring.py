@@ -86,7 +86,7 @@ def test_the_config_warnings_reach_the_run_plan(project, monkeypatch):
             "p/cand-a": ModelEntry(id="p/cand-a", provider="p", endpoints=("chat", "responses")),
             "p/judge-1": ModelEntry(id="p/judge-1", provider="p", endpoints=("chat", "responses")),
             "p/judge-2": ModelEntry(id="p/judge-2", provider="p", endpoints=("chat",)),
-        }
+        }, frozenset()
 
     async def _prices(_cfg, **_kw):
         return {}

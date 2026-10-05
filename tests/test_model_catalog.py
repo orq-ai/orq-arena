@@ -167,7 +167,7 @@ async def test_a_deprecated_model_is_found_by_asking_for_it_by_id(patched_client
     monkeypatch.delenv("ORQ_API_KEY", raising=False)
     patched_client(_by_id_transport({"legacy/retired-model": RETIRED}))
 
-    catalog = await ml.fetch_catalog_covering(
+    catalog, unchecked = await ml.fetch_catalog_covering(
         OrqAIGatewayConfig(), ["anthropic/claude-haiku-4-5", "legacy/retired-model", "p/typo"]
     )
 
@@ -175,6 +175,8 @@ async def test_a_deprecated_model_is_found_by_asking_for_it_by_id(patched_client
     assert catalog["legacy/retired-model"].deprecation == 1792454400
     assert catalog["anthropic/claude-haiku-4-5"].deprecated is False
     assert "p/typo" not in catalog  # 404: the catalog has no such entry
+    # a 404 is an answer, so nothing is left unchecked
+    assert unchecked == frozenset()
 
 
 async def test_a_config_the_list_fully_covers_costs_no_extra_request(patched_client, monkeypatch):
@@ -189,21 +191,37 @@ async def test_a_config_the_list_fully_covers_costs_no_extra_request(patched_cli
     assert calls == ["/v2/model-catalog"]
 
 
-async def test_a_lookup_that_fails_leaves_the_model_unlisted(patched_client, monkeypatch):
-    """Advisory all the way down: a broken by-id route degrades to "not in the
-    catalog", it does not take the preflight with it."""
+@pytest.mark.parametrize("failure", [503, 429, "timeout", "not-json"])
+async def test_a_lookup_that_gets_no_answer_is_unchecked_not_missing(
+    patched_client, monkeypatch, failure
+):
+    """A 503 is not a 404.
+
+    Every failure of the by-id route used to come back as "no entry", and the
+    warning then told the user to check the id of a model that was spelt
+    correctly, and filed a deprecated model under unknown. The catalog returned
+    503 three times on the day this was written. No answer is its own outcome.
+    """
     monkeypatch.delenv("ORQ_API_KEY", raising=False)
 
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/v2/model-catalog":
             return httpx.Response(200, json=CATALOG)
-        return httpx.Response(503, json={})
+        if failure == "timeout":
+            raise httpx.ReadTimeout("too slow")
+        if failure == "not-json":
+            return httpx.Response(200, text="<html>gateway</html>")
+        return httpx.Response(failure, json={})
 
     patched_client(httpx.MockTransport(handler))
 
-    catalog = await ml.fetch_catalog_covering(OrqAIGatewayConfig(), ["legacy/retired-model"])
+    catalog, unchecked = await ml.fetch_catalog_covering(
+        OrqAIGatewayConfig(), ["legacy/retired-model", "anthropic/claude-haiku-4-5"]
+    )
 
     assert "legacy/retired-model" not in catalog
+    assert unchecked == {"legacy/retired-model"}
+    # advisory all the way down: the list itself still stands
     assert "anthropic/claude-haiku-4-5" in catalog
 
 
@@ -221,7 +239,7 @@ async def test_an_unreadable_catalog_is_not_patched_up_one_model_at_a_time(
 
     patched_client(httpx.MockTransport(handler))
 
-    assert await ml.fetch_catalog_covering(OrqAIGatewayConfig(), ["p/any"]) == {}
+    assert await ml.fetch_catalog_covering(OrqAIGatewayConfig(), ["p/any"]) == ({}, frozenset())
     assert calls == ["/v2/model-catalog"]
 
 

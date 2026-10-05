@@ -15,6 +15,7 @@ that produces reasoning despite its config.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from itertools import combinations
@@ -199,7 +200,28 @@ def referenced_models(cfg: ArenaConfig) -> list[str]:
     ]
 
 
-def config_warnings(cfg: ArenaConfig, catalog: dict[str, ModelEntry]) -> list[str]:
+def _deprecation_date(entry: ModelEntry) -> str:
+    """`` (deprecation date YYYY-MM-DD)`` for a warning line, or ``""``.
+
+    The catalog sends Unix seconds. A value in another unit (milliseconds, say)
+    is out of range for a date and raises, and an advisory line is not worth
+    stopping a run before its plan prints. The date is dropped instead; the
+    model is still reported as deprecated.
+    """
+    if not entry.deprecation:
+        return ""
+    try:
+        day = datetime.fromtimestamp(entry.deprecation, timezone.utc).date()
+    except (ValueError, OverflowError, OSError):
+        return ""
+    return f" (deprecation date {day})"
+
+
+def config_warnings(
+    cfg: ArenaConfig,
+    catalog: dict[str, ModelEntry],
+    unchecked: Collection[str] = frozenset(),
+) -> list[str]:
     """What the catalog knows that the config should hear about, or ``[]``.
 
     Advisory only. Every one of these describes a run that still starts, so none
@@ -212,6 +234,11 @@ def config_warnings(cfg: ArenaConfig, catalog: dict[str, ModelEntry]) -> list[st
     `fetch_catalog_covering`, which asks for each unlisted model by id. A
     deprecated model comes back flagged, with its date, and takes the deprecated
     branch here; one the catalog has no entry for at all stays unlisted.
+
+    ``unchecked`` names the models whose lookup got no answer (a 503, a 429, a
+    timeout). Nothing is known about those, so they are reported as not checked.
+    Saying "no entry, check the id" about them would blame a correct id for the
+    catalog's bad minute.
 
     An empty catalog means it could not be read, not that every model is
     unknown, so no per-model warning is made up from it. It is still reported, as
@@ -228,18 +255,14 @@ def config_warnings(cfg: ArenaConfig, catalog: dict[str, ModelEntry]) -> list[st
     judges = [*cfg.judges, *cfg.replacement_judges]
 
     unknown: list[str] = []
+    not_checked: list[str] = []
     deprecated: list[str] = []
     for model_id in dict.fromkeys(referenced_models(cfg)):
         entry = catalog.get(model_id)
         if entry is None:
-            unknown.append(model_id)
+            (not_checked if model_id in unchecked else unknown).append(model_id)
         elif entry.deprecated:
-            dated = (
-                f" (deprecation date {datetime.fromtimestamp(entry.deprecation, timezone.utc).date()})"
-                if entry.deprecation
-                else ""
-            )
-            deprecated.append(f"{model_id}{dated}")
+            deprecated.append(f"{model_id}{_deprecation_date(entry)}")
 
     # Only judges take evaluatorq's Responses path; a candidate is streamed over
     # chat completions regardless of what else it supports.
@@ -253,6 +276,12 @@ def config_warnings(cfg: ArenaConfig, catalog: dict[str, ModelEntry]) -> list[st
             f"not in the model catalog: {', '.join(sorted(unknown))}. "
             "The catalog has no entry for them, so check the id. The run still calls "
             "them; the cost projection cannot price them."
+        )
+    if not_checked:
+        warnings.append(
+            f"could not be checked against the model catalog: {', '.join(sorted(not_checked))}. "
+            "They are not in its list, and the lookup that would say whether they are "
+            "deprecated or unknown did not answer. This says nothing about the ids."
         )
     if deprecated:
         warnings.append(

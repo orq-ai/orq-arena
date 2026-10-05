@@ -330,9 +330,8 @@ def run(
 
     # What the catalog knows about the config, from the same cached fetch the
     # prices came from. All advisory: every one of these still runs.
-    cfg_warnings = config_warnings(
-        cfg, asyncio.run(fetch_catalog_covering(cfg.gateway, referenced_models(cfg)))
-    )
+    catalog, unchecked = asyncio.run(fetch_catalog_covering(cfg.gateway, referenced_models(cfg)))
+    cfg_warnings = config_warnings(cfg, catalog, unchecked)
     if cfg_warnings:
         preflight_data["config_warnings"] = cfg_warnings
         for line in cfg_warnings:
