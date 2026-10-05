@@ -2,7 +2,13 @@
 
 A real, committed orq-arena run so you can inspect the output before spending a
 cent of your own: 8 models across five providers, the 30-prompt starter bank,
-the cheap default judge trio.
+and the cheap judge trio that was the default when it was recorded.
+
+This directory is a record, so `config.yaml` still names the panel the run used. One
+of its judges, `google/gemini-2.5-flash-lite`, is deprecated in the model catalog as of
+2026-10-20, and the shipped configs now use `google/gemini-3.5-flash-lite` in its place.
+To reproduce the run after that date, swap the judge in a copy of the config; the
+result is then a new run with a different jury, not a rerun of this one.
 
 Open **[`battles.report.html`](battles.report.html)** in a browser for the full
 page. Regenerate it from the recorded log at any time (no model calls), writing
