@@ -329,7 +329,7 @@ next to the log. `orq-arena report <log>` regenerates the report page on demand,
     Fill it into `.env` (`cp .env.example .env`) and re-run. This only fires on `run` or
     `rejudge`; `report`, `annotate`, `anchor`, and `refresh-catalog` all work with no key.
 
-??? failure "`orq-arena: the router rejected ORQ_API_KEY (401)`"
+??? failure "`Error: the router rejected ORQ_API_KEY (401).`"
 
     The key is set but not valid for the workspace you are calling. An orq API key is scoped to
     one workspace, so a key minted elsewhere fails exactly this way. The preflight probe catches

@@ -141,3 +141,45 @@ def test_rejudge_checks_the_credential_before_it_spends_judge_tokens(project, mo
     assert result.exit_code != 0
     assert "401" in result.output
     assert judged == []
+
+
+def _run_that_rated(project, monkeypatch, rated_rounds):
+    """Drive `run` to completion with a tournament that rated this many rounds."""
+    import json
+
+    from orq_arena.tournament.driver import manifest_path_for
+
+    _no_catalog(monkeypatch)
+
+    async def _verify(_gw, **_kw):
+        return True, ""
+
+    async def _tournament(*, battle_log_path, **_kw):
+        manifest_path_for(battle_log_path).write_text(
+            json.dumps({"rated_rounds": rated_rounds}), encoding="utf-8"
+        )
+
+    monkeypatch.setattr("orq_arena.providers.credentials.verify_credential", _verify)
+    monkeypatch.setattr("orq_arena.headless.run_headless", _tournament)
+    monkeypatch.setattr("orq_arena.cli._open_report", lambda *a, **k: None)
+    return CliRunner().invoke(
+        cli, ["run", "-y", "--config", "arena.yaml", "--prompts", "prompts.jsonl"]
+    )
+
+
+def test_a_live_run_that_rated_nothing_does_not_exit_zero(project, monkeypatch):
+    """Every judge erroring is a failed run, and CI reads the exit code.
+
+    `rejudge` exits nonzero on a dead jury. `run` did not, so the same collapse
+    on a live tournament printed "0 rated" and reported success.
+    """
+    result = _run_that_rated(project, monkeypatch, 0)
+
+    assert result.exit_code != 0
+    assert "no round was rated" in result.output
+
+
+def test_a_live_run_that_rated_something_exits_zero(project, monkeypatch):
+    result = _run_that_rated(project, monkeypatch, 12)
+
+    assert result.exit_code == 0, result.output

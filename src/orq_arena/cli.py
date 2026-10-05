@@ -416,6 +416,20 @@ def run(
     # exits to a bare terminal, so it still needs one.
     _open_report(output_path, open_browser, announce=tui)
 
+    # A run that rated nothing is a failed run, whatever the terminal showed.
+    # `rejudge` already exits nonzero on a dead jury; without the same here, a
+    # live run where every judge errored exits 0 and reads as success to CI.
+    # Read from the manifest because both the TUI and the headless path write
+    # it. Absent means the run was cut short, which is not this failure.
+    from .tournament.driver import read_manifest
+
+    if read_manifest(output_path).get("rated_rounds") == 0:
+        raise click.ClickException(
+            "no round was rated, so there is no ranking: every judge call failed or "
+            "abstained. Check the panel is reachable and the credential is valid, "
+            "then re-run."
+        )
+
 
 def _print_run_plan(cost) -> None:
     """Run-plan cost table on stderr; the approval decision reads off this.
