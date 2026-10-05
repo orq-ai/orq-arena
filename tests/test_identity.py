@@ -440,7 +440,16 @@ def test_the_preflight_says_which_models_it_renamed(tmp_path, monkeypatch):
     (tmp_path / "c.yaml").write_text(json.dumps(cfg), encoding="utf-8")
     (tmp_path / "p.jsonl").write_text('{"prompt": "hi"}\n', encoding="utf-8")
     monkeypatch.chdir(tmp_path)
-    monkeypatch.delenv(ORQ_API_KEY_ENV, raising=False)  # keeps the catalog read offline
+    # No key, so the credential probe has nothing to ask about. That used to keep
+    # the catalog read offline as well; the catalog is public now, so it is
+    # stubbed, the way tests/test_preflight_wiring.py does it.
+    monkeypatch.delenv(ORQ_API_KEY_ENV, raising=False)
+
+    async def _no_catalog(_cfg, **_kw):
+        return {}
+
+    monkeypatch.setattr("orq_arena.providers.models_list.fetch_catalog", _no_catalog)
+    monkeypatch.setattr("orq_arena.providers.models_list.fetch_price_map", _no_catalog)
 
     async def _no_tournament(**_kw):
         return {}

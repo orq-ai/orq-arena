@@ -15,17 +15,34 @@ from orq_arena.rejudge import MIN_VERDICT_MODELS, render_result, spearman_verdic
 
 
 def test_verdict_word_needs_a_field_wide_enough_to_earn_it():
-    assert spearman_verdict(0.85, 8) == "judge-robust ranking"
-    assert spearman_verdict(0.5, 8) == "ranking is panel-sensitive; treat with care"
+    # every round decided, so only the model count is in play here
+    assert spearman_verdict(0.85, 8, 30, 30) == "judge-robust ranking"
+    assert spearman_verdict(0.5, 8, 30, 30) == "ranking is panel-sensitive; treat with care"
     # 4 models: perfect correlation still gets no verdict word, only the why
-    assert spearman_verdict(1.0, 4) == "too few models (4) for a robustness verdict"
-    assert spearman_verdict(1.0, MIN_VERDICT_MODELS) == "judge-robust ranking"
+    assert spearman_verdict(1.0, 4, 30, 30) == "too few models (4) for a robustness verdict"
+    assert spearman_verdict(1.0, MIN_VERDICT_MODELS, 30, 30) == "judge-robust ranking"
+
+
+def test_the_round_floor_cannot_be_skipped_by_leaving_the_counts_out():
+    """The counts were optional, and omitting them returned "judge-robust".
+
+    A floor that only applies when the caller remembers to ask for it is not a
+    floor. The counts are required, so the omission is a TypeError at the call.
+    """
+    import pytest
+
+    with pytest.raises(TypeError):
+        spearman_verdict(1.0, 8)  # type: ignore[call-arg]
+    assert spearman_verdict(1.0, 8, 1, 48) == "too few rounds decided for a robustness verdict"
 
 
 def _result(n_models: int, rho: float) -> dict:
     ranking = [f"m{i}" for i in range(n_models)]
     return {
         "total": 30,
+        # These cases are about the verdict wording of a jury that worked, so
+        # they say so rather than leaving it to a default.
+        "decisive": 30,
         "changed_verdicts": 3,
         "spearman": rho,
         "old_ranking": ranking,

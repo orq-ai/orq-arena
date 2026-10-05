@@ -9,7 +9,7 @@ match:
   damage_majority: 15
 
 gateway:
-  base_url: https://api.orq.ai/v3/router
+  base_url: https://my.orq.ai/v3/router
   # Thinking eats output budget on some providers; give answers headroom.
   candidate_max_tokens: 16000
   judge_max_tokens: 2048

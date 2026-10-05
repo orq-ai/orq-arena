@@ -15,7 +15,7 @@ def test_default_config_loads_with_full_pool() -> None:
     assert len(cfg.judges) == 3
     assert cfg.match.starting_hp == 100
     assert cfg.match.max_rounds == 5
-    assert cfg.gateway.base_url.startswith("https://api.orq.ai")
+    assert cfg.gateway.base_url == "https://my.orq.ai/v3/router"
 
 
 def test_candidate_short_model_strips_provider_prefix() -> None:

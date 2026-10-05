@@ -26,6 +26,7 @@ from ..data.log import BattleLog
 from ..data.prompts import PromptItem
 from ..data.schemas import BattleRecord
 from ..events import ArenaEvent, StandingsUpdated, TournamentEnded
+from ..providers.credentials import active_workspace
 from ..providers.models_list import catalog_host
 from ..providers.orq_gateway import OrqGateway
 from .elo import (
@@ -487,6 +488,17 @@ def _write_manifest(
         # Where this run's traffic actually went, which ORQ_BASE_URL can move.
         # Provenance only: a rebuild never adopts a manifest's host (RES-1147).
         "effective_host": catalog_host(cfg.gateway),
+        # A leaderboard is a claim about models as one workspace can reach them:
+        # its enabled set, its rate limits, its routing. None when the orq CLI
+        # cannot say, which is recorded as unknown rather than guessed.
+        #
+        # Named for its source, because the source is not authoritative: this is
+        # the workspace the CLI is logged in to, and the run goes wherever
+        # ORQ_API_KEY points. An exported key wins over the login session by
+        # design, so the two disagree exactly when someone exported a key from
+        # another workspace. Recording it as `orq_workspace` would read as a
+        # statement about the run rather than about the machine that started it.
+        "orq_cli_workspace": active_workspace(),
         "candidates": {
             c.name: {"model": c.model_id, "reasoning": c.reasoning or "vendor-default"}
             for c in cfg.candidates

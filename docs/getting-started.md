@@ -64,7 +64,7 @@ Commands:
   anchor           Merge human vote files against a recorded run: κ +...
   annotate         Render a blinded human-annotation page from a recorded...
   pool             Print the configured candidate pool.
-  refresh-catalog  Re-fetch the workspace-enabled chat model catalog from...
+  refresh-catalog  Re-fetch the chat model catalog from orq.ai (public; a...
   rejudge          Re-judge a recorded run with a different panel, zero...
   report           Render the single-file HTML report page from a...
   run              Run the arena benchmark (hits orq.ai): headless logs...
@@ -81,8 +81,28 @@ Commands:
 cp .env.example .env
 ```
 
-Then fill in the one variable it asks for, an API key from your workspace
-(create one per the [API keys guide](https://docs.orq.ai/docs/ai-studio/organization/api-keys)):
+Then fill in the one variable it asks for, an API key from your workspace. Two ways to
+get one:
+
+=== "From the web app"
+
+    Create a key per the
+    [API keys guide](https://docs.orq.ai/docs/ai-studio/organization/api-keys) and copy it
+    out of workspace settings.
+
+=== "With the orq CLI"
+
+    If you have the [orq CLI](https://github.com/orq-ai/orq-cli) installed:
+
+    ```bash
+    orq auth login
+    orq api-keys create --name orq-arena
+    ```
+
+    The response contains the raw key (`sk-orq-...`), shown once and never retrievable
+    again, so copy it now. Mint a real API key rather than reusing the login session: an
+    API key outlives a long benchmark run, which is what the CLI itself recommends for
+    long sessions.
 
 ```bash
 ORQ_API_KEY=your-orq-api-key
@@ -275,7 +295,7 @@ it by name.
 
 !!! tip "Which model ids can fight?"
 
-    `orq-arena refresh-catalog --show` lists your workspace-enabled catalog, grouped
+    `orq-arena refresh-catalog --show` lists the chat model catalog, grouped
     by provider, ready to paste into the YAML's `candidates` list.
 
 ---
@@ -303,12 +323,21 @@ next to the log. `orq-arena report <log>` regenerates the report page on demand,
 
 ## Troubleshooting
 
-??? failure "`RuntimeError: ORQ_API_KEY is not set. Export it before running orq-arena.`"
+??? failure "`RuntimeError: ORQ_API_KEY is not set.`"
 
-    `.env` is missing, empty, or still the blank template. Run `cp .env.example .env`, fill in a
-    real key (created per the [API keys guide](https://docs.orq.ai/docs/ai-studio/organization/api-keys)), and re-run. This
-    only fires on `run` or `rejudge`; `report`, `annotate`, and `anchor` work from the recorded
-    log with no key at all.
+    `.env` is missing, empty, or still the blank template. The message names the commands that
+    mint a key (`orq auth login`, then `orq api-keys create --name orq-arena`); you can
+    also create one per the [API keys guide](https://docs.orq.ai/docs/ai-studio/organization/api-keys).
+    Fill it into `.env` (`cp .env.example .env`) and re-run. This only fires on `run` or
+    `rejudge`; `report`, `annotate`, `anchor`, and `refresh-catalog` all work with no key.
+
+??? failure "`Error: the router rejected ORQ_API_KEY (401).`"
+
+    The key is set but not valid for the workspace you are calling. An orq API key is scoped to
+    one workspace, so a key minted elsewhere fails exactly this way. The preflight probe catches
+    it with one listing call before the run spends anything, which matters because otherwise
+    every judge call returns 401 and the run still produces a leaderboard-shaped result. Mint a
+    key for the right workspace with `orq api-keys create --name orq-arena`.
 
 ??? warning "A response shows `✂ truncated` in the live `--tui` show"
 

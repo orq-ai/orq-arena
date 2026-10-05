@@ -75,6 +75,35 @@ def _load_config(path: str):
         raise click.ClickException(_config_error(path, exc)) from None
 
 
+def _check_credential(cfg) -> None:
+    """Refuse a key the router rejects, before the command spends anything.
+
+    Shared by `run` and `rejudge` so the two cannot drift: the failure this
+    catches happened in `rejudge`, and a check that only guards one of them
+    guards the wrong one half the time.
+
+    A key that is merely absent is already refused loudly by the gateway, so
+    this asks only the question that check cannot: whether the key that *is* set
+    is one the router accepts. The verdict is three-valued on purpose, and only
+    a rejection stops the command. Being unable to reach the router is not a
+    verdict on the credential, and refusing to run on that basis would be wrong
+    in exactly the situation where the user can least afford it.
+    """
+    import asyncio
+    import os
+
+    from .config import ORQ_API_KEY_ENV
+    from .providers.credentials import verify_credential
+
+    if not os.environ.get(ORQ_API_KEY_ENV):
+        return
+    ok, detail = asyncio.run(verify_credential(cfg.gateway))
+    if ok is False:
+        raise click.ClickException(detail)
+    if ok is None and detail:
+        click.echo(f"  ⚠ {detail}", err=True)
+
+
 def _quiet_logs() -> None:
     """evaluatorq logs via loguru to stderr, which would corrupt the TUI."""
     import sys
@@ -199,12 +228,14 @@ def run(
 
     from .preflight import (
         call_counts,
+        config_warnings,
         cost_projection,
         judge_family_overlaps,
+        referenced_models,
         surprises,
         thinking_probe,
     )
-    from .providers.models_list import fetch_price_map
+    from .providers.models_list import fetch_catalog_covering, fetch_price_map
 
     _quiet_logs()
 
@@ -296,6 +327,20 @@ def run(
             f"  no catalog price (self-hosted or unpriced): "
             f"{', '.join(cost.unpriced)}; excluded from both figures"
         )
+
+    # What the catalog knows about the config, from the same cached fetch the
+    # prices came from. All advisory: every one of these still runs.
+    catalog, unchecked = asyncio.run(fetch_catalog_covering(cfg.gateway, referenced_models(cfg)))
+    cfg_warnings = config_warnings(cfg, catalog, unchecked)
+    if cfg_warnings:
+        preflight_data["config_warnings"] = cfg_warnings
+        for line in cfg_warnings:
+            warn(f"  {line}")
+
+    # One listing call, before any spend. A stale key answers 401 to every judge
+    # call and the run still finishes, so this is the last honest moment to say
+    # so. `rejudge` runs the same check.
+    _check_credential(cfg)
     probe_lines: list[str] = []
     if cfg.preflight.thinking_probe:
         status("thinking probe…")
@@ -372,6 +417,20 @@ def run(
     # The headless summary already printed the report-page pointer; the TUI
     # exits to a bare terminal, so it still needs one.
     _open_report(output_path, open_browser, announce=tui)
+
+    # A run that rated nothing is a failed run, whatever the terminal showed.
+    # `rejudge` already exits nonzero on a dead jury; without the same here, a
+    # live run where every judge errored exits 0 and reads as success to CI.
+    # Read from the manifest because both the TUI and the headless path write
+    # it. Absent means the run was cut short, which is not this failure.
+    from .tournament.driver import read_manifest
+
+    if read_manifest(output_path).get("rated_rounds") == 0:
+        raise click.ClickException(
+            "no round was rated, so there is no ranking: every judge call failed or "
+            "abstained. Check the panel is reachable and the credential is valid, "
+            "then re-run."
+        )
 
 
 def _print_run_plan(cost) -> None:
@@ -572,6 +631,12 @@ def rejudge(
             "against --config, which may have drifted since the run",
             err=True,
         )
+    # The same probe `run` does, for the same reason and in the command the
+    # failure actually happened in: a stale key answered 401 to all 48 judge
+    # calls of a real rejudge. The dead-jury guard reports that afterwards; this
+    # stops it beforehand, for the price of one listing call and no tokens.
+    _check_credential(cfg)
+
     click.echo(f"re-judging {len(records)} rounds with panel: {', '.join(judges)}", err=True)
     result = asyncio.run(
         rejudge_run(
@@ -590,6 +655,11 @@ def rejudge(
     if report_json:
         save_report_json(report_json, result)
         click.echo(f"summary -> {report_json}")
+    # After the files are written, so a collapsed run still leaves its evidence,
+    # but never exits 0: a caller that only checks the status code was told a
+    # dead panel had succeeded.
+    if not result["decisive"]:
+        raise SystemExit(1)
 
 
 @cli.command("report")
@@ -729,7 +799,7 @@ def report_cmd(log_path: str, config_path: str, output_path: str | None) -> None
 )
 @click.option("--show/--no-show", default=False, help="Print model ids grouped by provider.")
 def refresh_models(config_path: str, show: bool) -> None:
-    """Re-fetch the workspace-enabled chat model catalog from orq.ai.
+    """Re-fetch the chat model catalog from orq.ai (public; a key narrows it).
 
     Bypasses the 24h cache at ~/.cache/orq-arena/models.json.
     """

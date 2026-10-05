@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import Sequence
 from pathlib import Path
 
 from evaluatorq import PairwiseComparison, build_report, llm_jury_pairwise
@@ -196,6 +197,7 @@ async def rejudge_run(
         "new_ranking": new_rank,
         "spearman": spearman(old_rank, new_rank),
         "changed_verdicts": changed,
+        "decisive": decisive_count(comparisons),
         "total": len(records),
     }
 
@@ -230,13 +232,39 @@ def write_rejudged(
 MIN_VERDICT_MODELS = 5
 
 
-def spearman_verdict(rho: float, n_models: int) -> str:
-    """The grade a rejudge Spearman has earned, or why it gets none."""
+# The same question asked of the rounds. The correlation is fit on the decided
+# rounds only, so a panel that decided 1 of 48 can print rho 1.00, and the grade
+# would call that ranking "judge-robust" on the strength of a single round. Below
+# half, the new ranking is mostly the panel failing rather than the panel judging,
+# and no verdict word attaches. Half is a floor, not a calibration: it is the
+# point past which the undecided rounds outnumber the evidence.
+MIN_DECIDED_SHARE = 0.5
+
+
+def spearman_verdict(rho: float, n_models: int, decisive: int, total: int) -> str:
+    """The grade a rejudge Spearman has earned, or why it gets none.
+
+    ``decisive`` and ``total`` are required. While they were optional, a caller
+    that left them out skipped the round floor and got "judge-robust ranking"
+    back for a panel that had decided one round.
+    """
     if n_models < MIN_VERDICT_MODELS:
         return f"too few models ({n_models}) for a robustness verdict"
+    if decisive < total * MIN_DECIDED_SHARE:
+        return "too few rounds decided for a robustness verdict"
     if rho >= 0.8:
         return "judge-robust ranking"
     return "ranking is panel-sensitive; treat with care"
+
+
+def decisive_count(comparisons: Sequence[PairwiseComparison]) -> int:
+    """Comparisons that expressed a preference, ties included.
+
+    'inconclusive' is evaluatorq's word for a panel that never reached quorum:
+    the judges errored, abstained, or contradicted themselves across the seat
+    orders. A tie is a decision; inconclusive is the absence of one.
+    """
+    return sum(1 for c in comparisons if c.winner != "inconclusive")
 
 
 def render_result(result: dict) -> None:
@@ -245,15 +273,35 @@ def render_result(result: dict) -> None:
 
     console = Console()
     report = result["report"]
+    total = result["total"]
+    # Read, not defaulted. A `.get(..., total)` here meant that dropping the key
+    # upstream restored the whole bug in silence, because "missing" resolved to
+    # "every round decided", which is the one answer that prints a ranking.
+    decisive = result["decisive"]
     console.print(
-        f"\n[bold]re-judged {result['total']} rounds[/bold], "
-        f"{result['changed_verdicts']} verdicts changed"
+        f"\n[bold]re-judged {total} rounds[/bold], {result['changed_verdicts']} verdicts changed"
     )
+
+    # No decision anywhere means there is no ranking to show and nothing to
+    # correlate. Printing them would dress a dead panel (bad credential, every
+    # judge erroring, quorum never met) as a result.
+    if not decisive:
+        console.print(
+            f"[bold red]the jury produced no usable verdict in any of {total} "
+            "rounds[/bold red]: no ranking and no rank correlation follow from this run"
+        )
+        console.print("check the panel is reachable and the credential is valid, then re-run")
+        return
+
     n_models = len(result["old_ranking"])
+    # A clean run reads the way it always did (RES-1153). A partial collapse
+    # says so inline, because the correlation was fit on the decided subset and
+    # the reader would otherwise price it against the full round count.
+    rounds = f"{total} rounds" if decisive == total else f"{decisive} of {total} rounds decided"
     console.print(
         f"rank correlation (Spearman) old→new: [bold]{result['spearman']:.2f}[/bold] "
-        f"over {n_models} models, {result['total']} rounds, "
-        + spearman_verdict(result["spearman"], n_models)
+        f"over {n_models} models, {rounds}, "
+        + spearman_verdict(result["spearman"], n_models, decisive, total)
     )
     console.print(f"old ranking: {' > '.join(result['old_ranking'])}")
     console.print(f"new ranking: {' > '.join(result['new_ranking'])}")
@@ -275,12 +323,23 @@ def render_result(result: dict) -> None:
 
 
 def save_report_json(path: str | Path, result: dict) -> None:
+    """The saved report says the same thing the terminal said.
+
+    `render_result` refuses to print a ranking for a jury that decided nothing,
+    but the file kept both the ranking and the correlation, and `--compare` then
+    tabulated that Spearman as a panel's robustness score. The ranking is an
+    artifact of `_ranking` falling through to `sorted(models)` with no decisive
+    outcome to fit, so it is written as null rather than as a result. `decisive`
+    goes in the payload too: the collapse has to survive the round trip.
+    """
+    decisive = result["decisive"]
     payload = {
         "total": result["total"],
+        "decisive": decisive,
         "changed_verdicts": result["changed_verdicts"],
-        "spearman": result["spearman"],
+        "spearman": result["spearman"] if decisive else None,
         "old_ranking": result["old_ranking"],
-        "new_ranking": result["new_ranking"],
+        "new_ranking": result["new_ranking"] if decisive else None,
         "jury": result["report"].model_dump(),
     }
     Path(path).write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
