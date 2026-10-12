@@ -359,7 +359,10 @@ def manifest_path_for(log_path: str | Path) -> Path:
 
 
 def config_sha256(cfg: ArenaConfig) -> str:
-    return hashlib.sha256(cfg.model_dump_json().encode("utf-8")).hexdigest()[:16]
+    # Keys added after manifests existed are left out while they hold their legacy
+    # value, so an old run's recorded hash still matches its unchanged YAML.
+    legacy = {k for k, v in _LEGACY_IDENTITY.items() if getattr(cfg, k) == v}
+    return hashlib.sha256(cfg.model_dump_json(exclude=legacy).encode("utf-8")).hexdigest()[:16]
 
 
 def read_manifest(log_path: str | Path) -> dict:

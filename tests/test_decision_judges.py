@@ -172,3 +172,18 @@ def test_a_manifest_from_before_judge_api_rebuilds_as_an_llm_run():
     new = {**old, "judges": ["typesafe/jev-latest"], "judge_api": "decisions", "judge_swap": False}
     cfg, _ = config_from_manifest(new, _cfg())
     assert (cfg.judge_api, cfg.judge_swap) == ("decisions", False)
+
+
+def test_new_judge_keys_leave_an_old_runs_config_hash_alone():
+    """The quickstart manifest predates judge_api; its YAML must still hash to what it recorded."""
+    import json
+    from pathlib import Path
+
+    from orq_arena.config import load_config
+    from orq_arena.tournament.driver import config_sha256
+
+    root = Path(__file__).resolve().parent.parent / "examples" / "quickstart"
+    cfg = load_config(root / "config.yaml")
+    recorded = json.loads((root / "battles.run.json").read_text())["config_sha256"]
+    assert config_sha256(cfg) == recorded
+    assert config_sha256(cfg.model_copy(update={"judge_swap": False})) != recorded
