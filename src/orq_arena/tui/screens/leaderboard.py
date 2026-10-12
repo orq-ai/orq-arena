@@ -197,7 +197,10 @@ class LeaderboardScreen(Screen):
                     labels[j["model"]],
                     "–" if j.get("a_rate") is None else f"{j['a_rate']:.0%}",
                     "–" if j.get("b_rate") is None else f"{j['b_rate']:.0%}",
-                    f"{j.get('position_bias', 0):.0%}",
+                    # One seat order means no flip could be seen, not that none happened.
+                    f"{j.get('position_bias', 0):.0%}"
+                    if getattr(self._cfg, "judge_swap", True)
+                    else "n/a (swap off)",
                     f"{j.get('tie_rate', 0):.0%}",
                 )
 
