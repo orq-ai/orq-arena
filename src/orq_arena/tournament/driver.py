@@ -426,6 +426,7 @@ def _identity_from_candidate_map(manifest: dict) -> dict | None:
     }
     if manifest.get("min_successful_judges") is not None:
         identity["min_successful_judges"] = manifest["min_successful_judges"]
+    identity.update({k: manifest[k] for k in _LEGACY_IDENTITY if k in manifest})
     return identity
 
 
