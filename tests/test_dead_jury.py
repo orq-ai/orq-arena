@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import orq_arena.judging as judging_mod
 from orq_arena.rejudge import decisive_count, render_result
 
 
@@ -178,7 +179,7 @@ async def test_rejudge_run_reports_a_collapsed_panel_as_zero_decisive(monkeypatc
     from orq_arena.data.schemas import BattleRecord
 
     monkeypatch.setattr(rejudge_mod, "OrqGateway", lambda cfg: SimpleNamespace(client=object()))
-    monkeypatch.setattr(rejudge_mod, "llm_jury_pairwise", lambda **_kw: _AllInconclusive())
+    monkeypatch.setattr(judging_mod, "llm_jury_pairwise", lambda **_kw: _AllInconclusive())
 
     cfg = ArenaConfig.model_validate(
         {"candidates": [{"model_id": "p/a"}, {"model_id": "p/b"}], "judges": ["p/j1", "p/j2"]}

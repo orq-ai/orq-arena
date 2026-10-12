@@ -8,7 +8,7 @@ import pytest
 from evaluatorq import PairwiseComparison
 from evaluatorq.pairwise import PairwiseVote
 
-import orq_arena.arena.battle as battle_mod
+import orq_arena.judging as judging_mod
 from orq_arena.arena.battle import Battle
 from orq_arena.config import ArenaConfig
 from orq_arena.data.prompts import PromptItem
@@ -64,7 +64,7 @@ class FakeJury:
 
 
 def _build_battle(monkeypatch, gateway, jury) -> tuple[Battle, asyncio.Queue]:
-    monkeypatch.setattr(battle_mod, "llm_jury_pairwise", lambda **kw: jury)
+    monkeypatch.setattr(judging_mod, "llm_jury_pairwise", lambda **kw: jury)
     cfg = _cfg()
     events: asyncio.Queue = asyncio.Queue()
     b = Battle(
@@ -161,7 +161,7 @@ async def test_every_prompt_is_judged(monkeypatch):
         votes=[PairwiseVote(model="x/j1", vote="A"), PairwiseVote(model="x/j2", vote="A")],
     )
     jury = FakeJury(comparison)
-    monkeypatch.setattr(battle_mod, "llm_jury_pairwise", lambda **kw: jury)
+    monkeypatch.setattr(judging_mod, "llm_jury_pairwise", lambda **kw: jury)
     cfg = _cfg()
     cfg.match.max_rounds = 3
     events: asyncio.Queue = asyncio.Queue()

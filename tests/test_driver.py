@@ -64,7 +64,7 @@ class FakeBattle:
 
 def _patch(monkeypatch):
     monkeypatch.setattr(driver_mod, "Battle", FakeBattle)
-    monkeypatch.setattr(driver_mod, "OrqGateway", lambda cfg: object())
+    monkeypatch.setattr(driver_mod, "OrqGateway", lambda cfg: SimpleNamespace(client=None))
 
     async def _no_prices(_gw):
         return {}

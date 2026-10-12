@@ -4,8 +4,10 @@ v2 replaced the hand-rolled judge schema with evaluatorq's reconciled
 ``PairwiseVote`` dumps. v3 drops the arena HP bookkeeping (damage/hp fields):
 HP was never scored, it's a TUI-only presentation the show now derives from
 the judged verdicts. v4 adds `model_a_id`/`model_b_id`: short names collide across providers, so a
-log carrying only the short name cannot always say which model answered. Old v2
-and v3 logs still load (dropped fields are ignored, absent ids read as empty).
+log carrying only the short name cannot always say which model answered. v5 adds
+`judge_cost_usd` and `judge_ms`, what the panel cost and how long it took per
+round. Old v2 to v4 logs still load (dropped fields are ignored, absent ids read
+as empty, absent cost reads as unknown).
 """
 
 from __future__ import annotations
@@ -20,7 +22,7 @@ from pydantic import BaseModel, Field
 class BattleRecord(BaseModel):
     """A single prompt-turn battle record."""
 
-    schema_version: int = 4
+    schema_version: int = 5
 
     prompt_hash: str
     prompt_text: str
@@ -41,7 +43,8 @@ class BattleRecord(BaseModel):
     response_b: str = ""
 
     # evaluatorq PairwiseVote dumps: model, vote, flipped, completed,
-    # replacement, explanation.
+    # replacement, explanation, observations. A decision judge's observations
+    # carry each seat order's probabilities (judging.vote_probabilities).
     judge_votes: list[dict[str, Any]] = Field(default_factory=list)
     majority_verdict: str = "inconclusive"  # 'A' | 'B' | 'tie' | 'inconclusive'
     winner: str = ""  # short_model | 'tie' | 'inconclusive' | 'void'
@@ -60,6 +63,11 @@ class BattleRecord(BaseModel):
     duration_b_ms: int = 0
     judge_tokens_in: int = 0
     judge_tokens_out: int = 0
+    # The panel's spend for this round as priced per call, None when any call went
+    # unpriced or the log predates v5. Wall time of the jury call, both seat
+    # orders and any stand-ins included.
+    judge_cost_usd: float | None = None
+    judge_ms: int = 0
 
     def rating_key(self, side: Literal["a", "b"]) -> str:
         """The key this record's model is known by on ``side``.

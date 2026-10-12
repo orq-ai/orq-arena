@@ -179,3 +179,47 @@ async def verify_credential(
         f"the router answered {resp.status_code} to the credential check at "
         f"{resp.request.url}; credential not verified"
     )
+
+
+async def verify_decisions(
+    cfg: OrqAIGatewayConfig,
+    model: str,
+    *,
+    transport: httpx.AsyncBaseTransport | None = None,
+) -> tuple[bool | None, str]:
+    """One tiny decision call, to see whether the key may use the Decisions API.
+
+    A key needs the ``classify.execute`` permission for it, and one without
+    answers 403 to every judge call while the candidates keep streaming, so a
+    decisions run would pay for every response and decide nothing. Costs a few
+    dozen input tokens on ``model``. Same three-valued answer as
+    `verify_credential`: only a rejection is False.
+    """
+    api_key = os.environ.get(ORQ_API_KEY_ENV, "")
+    body = {
+        "model": model,
+        "state": "2 + 2 = 4",
+        "questions": {"probe": {"type": "noul", "instructions": "Is the arithmetic correct?"}},
+    }
+    async with httpx.AsyncClient(
+        base_url=router_base_url(cfg), timeout=30.0, transport=transport
+    ) as probe:
+        try:
+            # /classify, not /decisions: it is the path evaluatorq's judges call.
+            resp = await probe.post(
+                "/classify", json=body, headers={"Authorization": f"Bearer {api_key}"}
+            )
+        except httpx.HTTPError as exc:
+            return None, f"could not reach the Decisions API to check the key: {exc}"
+    if resp.status_code in (401, 403):
+        return False, (
+            f"the Decisions API rejected {ORQ_API_KEY_ENV} ({resp.status_code}), so no "
+            "decision judge could vote. The key needs the classify.execute permission; "
+            "mint one that has it, or set judge_api: llm."
+        )
+    if resp.is_success:
+        return True, ""
+    return None, (
+        f"the Decisions API answered {resp.status_code} to a probe on {model}; "
+        "decision judges not verified"
+    )

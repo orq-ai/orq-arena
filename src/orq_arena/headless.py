@@ -130,6 +130,7 @@ def _print_summary(console: Console, ev: TournamentEnded) -> None:
             f"tokens, models {tok.get('models_in', 0):,} in "
             f"/ {tok.get('models_out', 0):,} out"
             f" · jury {tok['judges_in']:,} in / {tok['judges_out']:,} out"
+            + (f", ${r['judge_cost_usd']:.2f}" if r.get("judge_cost_usd") is not None else "")
         )
     console.print()
     console.print(f"battle log → {ev.battle_log_path}")

@@ -77,6 +77,11 @@ class ModelEntry:
     def has_responses(self) -> bool:
         return "responses" in self.endpoints
 
+    @property
+    def has_decisions(self) -> bool:
+        """Serves the router's Decisions API (the catalog still calls it ``classify``)."""
+        return "classify" in self.endpoints
+
 
 @dataclass
 class ModelList:

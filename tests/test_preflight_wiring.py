@@ -131,7 +131,11 @@ def test_rejudge_checks_the_credential_before_it_spends_judge_tokens(project, mo
         judged.append(kw)
         raise AssertionError("rejudge spent judge tokens on a rejected credential")
 
+    async def _catalog(_gw, _ids):
+        return {}, set()
+
     monkeypatch.setattr("orq_arena.providers.credentials.verify_credential", _verify)
+    monkeypatch.setattr("orq_arena.providers.models_list.fetch_catalog_covering", _catalog)
     monkeypatch.setattr("orq_arena.rejudge.rejudge_run", _rejudge_run)
 
     result = CliRunner().invoke(

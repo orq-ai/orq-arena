@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -99,6 +99,18 @@ class ArenaConfig(BaseModel):
     # Fewer decisive reconciled votes than this -> round is \'inconclusive\',
     # never a verdict. Guards against jury-of-one "unanimous" hits.
     min_successful_judges: int = 2
+    # Which router endpoint seats the judges. "llm" prompts chat models for a JSON
+    # verdict; "decisions" asks decision models one A/B/tie choice question through
+    # the Decisions API and gets a probability per option back. One mode per panel:
+    # the catalog marks some chat models as decision-capable too, so the mode, not
+    # the model id, has to say which endpoint a judge answers on.
+    judge_api: Literal["llm", "decisions"] = "llm"
+    # Show each judge both seat orders (A/B, then B/A) and throw out a vote that
+    # flips. Off halves judge calls, and position bias then goes unmeasured.
+    judge_swap: bool = True
+    # Decisions mode only: a vote whose winning option has a lower probability than
+    # this counts as an abstention. None keeps every vote.
+    judge_abstain_below: float | None = Field(default=None, gt=0.0, lt=1.0)
 
     @model_validator(mode="after")
     def _unique_candidate_names(self) -> ArenaConfig:
@@ -144,6 +156,11 @@ class ArenaConfig(BaseModel):
             raise ValueError(f"Need at least 2 candidates, got {len(self.candidates)}")
         if not self.judges:
             raise ValueError("Judge panel is empty")
+        if self.judge_abstain_below is not None and self.judge_api != "decisions":
+            raise ValueError(
+                "judge_abstain_below reads the probabilities a decision model returns; "
+                "set judge_api: decisions or drop it"
+            )
         for c in self.candidates:
             budget = ((c.reasoning or {}).get("thinking") or {}).get("budget_tokens")
             cap = c.max_tokens or self.gateway.candidate_max_tokens

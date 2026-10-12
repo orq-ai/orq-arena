@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import pytest
 
+import orq_arena.judging as judging_mod
 from orq_arena import rejudge as rejudge_mod
 from orq_arena.config import ArenaConfig
 from orq_arena.data.schemas import BattleRecord
@@ -56,7 +57,7 @@ def stub_jury(monkeypatch):
     from types import SimpleNamespace
 
     monkeypatch.setattr(rejudge_mod, "OrqGateway", lambda cfg: SimpleNamespace(client=object()))
-    monkeypatch.setattr(rejudge_mod, "llm_jury_pairwise", lambda **_kw: _FixedComparator())
+    monkeypatch.setattr(judging_mod, "llm_jury_pairwise", lambda **_kw: _FixedComparator())
 
 
 async def test_a_colliding_pool_stays_two_models_in_the_ranking(stub_jury):

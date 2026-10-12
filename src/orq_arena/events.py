@@ -71,9 +71,11 @@ class ResponseComplete(BaseModel):
 class JudgeVerdictEvent(BaseModel):
     type: Literal["judge_verdict"] = "judge_verdict"
     match_id: str
-    judge_name: str
+    judge_name: str  # full router id; the TUI maps it to a label (judging.judge_labels)
     verdict: str  # 'A' | 'B' | 'tie' | 'abstain'
-    reasoning: str
+    reasoning: str  # empty for a decision judge, which returns no prose
+    # Decision judges only: P(A), P(B), P(tie), seat orders averaged and un-swapped.
+    probabilities: dict[str, float] | None = None
     flipped: bool = False  # judge contradicted itself across orderings
     replacement: bool = False  # stand-in for a failed judge
 
