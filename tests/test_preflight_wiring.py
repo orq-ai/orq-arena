@@ -187,3 +187,52 @@ def test_a_live_run_that_rated_something_exits_zero(project, monkeypatch):
     result = _run_that_rated(project, monkeypatch, 12)
 
     assert result.exit_code == 0, result.output
+
+
+def test_rejudge_on_decisions_drops_chat_stand_ins_and_blocks_chat_judges(project, monkeypatch):
+    """A decisions rejudge keeps only stand-ins that can answer there, and says which it dropped."""
+    from orq_arena.providers.models_list import ModelEntry
+
+    (project / "arena.yaml").write_text(
+        CONFIG + "replacement_judges:\n  - p/chat-stand-in\n  - p/decider-stand-in\n",
+        encoding="utf-8",
+    )
+    log = project / "battles.jsonl"
+    log.write_text(
+        '{"prompt_hash":"h","prompt_text":"p","model_a":"a","model_b":"b",'
+        '"response_a":"ra","response_b":"rb","majority_verdict":"A"}\n',
+        encoding="utf-8",
+    )
+    catalog = {
+        "p/chat-stand-in": ModelEntry("p/chat-stand-in", "p", endpoints=("chat",)),
+        "p/decider-stand-in": ModelEntry("p/decider-stand-in", "p", endpoints=("classify",)),
+        "p/decider": ModelEntry("p/decider", "p", endpoints=("classify",)),
+        "p/chat-judge": ModelEntry("p/chat-judge", "p", endpoints=("chat",)),
+    }
+
+    async def _catalog(_gw, _ids):
+        return catalog, set()
+
+    async def _ok(*_a, **_kw):
+        return True, ""
+
+    seen = []
+
+    async def _rejudge_run(**kw):
+        seen.append(kw["cfg"])
+        raise SystemExit(0)
+
+    monkeypatch.setattr("orq_arena.providers.models_list.fetch_catalog_covering", _catalog)
+    monkeypatch.setattr("orq_arena.providers.credentials.verify_credential", _ok)
+    monkeypatch.setattr("orq_arena.providers.credentials.verify_decisions", _ok)
+    monkeypatch.setattr("orq_arena.rejudge.rejudge_run", _rejudge_run)
+
+    args = ["rejudge", str(log), "--config", "arena.yaml", "--judge-api", "decisions"]
+    result = CliRunner().invoke(cli, [*args, "--judge", "p/decider"])
+    assert "stand-in judges dropped" in result.output and "p/chat-stand-in" in result.output
+    assert seen[0].judge_api == "decisions"
+    assert seen[0].replacement_judges == ["p/decider-stand-in"]
+
+    blocked = CliRunner().invoke(cli, [*args, "--judge", "p/chat-judge"])
+    assert blocked.exit_code != 0 and "do not serve the Decisions API" in blocked.output
+    assert len(seen) == 1

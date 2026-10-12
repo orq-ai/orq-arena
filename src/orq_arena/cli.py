@@ -635,7 +635,7 @@ def rejudge(
     if not judges:
         raise click.ClickException("pass --judge <model> (repeatable), or --compare <report.json>")
 
-    from .preflight import judge_api_errors
+    from .preflight import answers_on, judge_api_errors
     from .providers.models_list import fetch_catalog_covering
     from .rejudge import (
         load_records,
@@ -653,22 +653,21 @@ def rejudge(
     )
     # The config's stand-ins were picked for its own panel; keep the ones that
     # can answer on the new panel's endpoint.
-    probe = cfg.model_copy(update={"judge_api": api, "judges": list(judges)})
-    keep = [
-        j
-        for j in cfg.replacement_judges
-        if not judge_api_errors(
-            probe.model_copy(update={"judges": [j], "replacement_judges": []}), catalog
-        )
-    ]
+    keep = [j for j in cfg.replacement_judges if answers_on(api, catalog.get(j))]
     dropped = [j for j in cfg.replacement_judges if j not in keep]
     if dropped:
         click.echo(
             f"  stand-in judges dropped, they do not answer on {api}: {', '.join(dropped)}",
             err=True,
         )
-    floor = cfg.judge_abstain_below if api == "decisions" else None
-    cfg = probe.model_copy(update={"replacement_judges": keep, "judge_abstain_below": floor})
+    cfg = cfg.model_copy(
+        update={
+            "judge_api": api,
+            "judges": list(judges),
+            "replacement_judges": keep,
+            "judge_abstain_below": cfg.judge_abstain_below if api == "decisions" else None,
+        }
+    )
     blocking = judge_api_errors(cfg, catalog)
     if blocking:
         raise click.ClickException("\n".join(blocking))
