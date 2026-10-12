@@ -11,6 +11,8 @@ $error → semantic green/orange/red.
 
 from __future__ import annotations
 
+from evaluatorq.common.reports.palette import COLORS
+from textual.color import Color
 from textual.theme import Theme
 
 INK = "#0b0514"  # near-black with a whisper of violet (never pure #000)
@@ -42,22 +44,24 @@ CRT_THEME = Theme(
     foreground=CHROME,
 )
 
-# orq v2 brand mode: the HTML report's dark-mode design tokens (report.py
-# _ROOT_CSS) mapped onto the same roles. Pulse Orange headings, indigo
-# chrome, neutral black; sides keep the report's own A/B pair.
+# orq brand mode: roles taken from evaluatorq's report palette, the one the
+# HTML report and the annotate page use, so the three read as one system.
+# Sides follow the evaluatorq pairwise chips: A blue, B purple. Purple and
+# red are lifted a step because the brand values are tuned for a light page
+# and read too dark as text on this background.
 ORQ_THEME = Theme(
     name="orq-arena",
     dark=True,
-    primary="#8a8dff",  # indigo: borders, progress
-    secondary="#8a8dff",
-    accent="#ff8f34",  # Pulse Orange: banner + headings
-    success="#4bbe8e",
-    warning="#e0b64a",
-    error="#f28a8a",
-    background="#0a0a0a",
-    surface="#0a0a0a",
-    panel="#171717",
-    foreground="#fafafa",
+    primary=Color.parse(COLORS["purple_400"]).lighten(0.25).hex,  # side B + borders
+    secondary=Color.parse(COLORS["purple_400"]).lighten(0.25).hex,
+    accent=COLORS["blue_400"],  # side A + banner + headings
+    success=COLORS["success_400"],
+    warning=COLORS["orange_300"],  # Pulse Orange
+    error=Color.parse(COLORS["red_400"]).lighten(0.15).hex,
+    background=COLORS["ink_800"],
+    surface=COLORS["ink_800"],
+    panel=COLORS["ink_700"],
+    foreground=COLORS["sand_100"],
 )
 
 THEMES = {t.name: t for t in (CRT_THEME, ORQ_THEME)}

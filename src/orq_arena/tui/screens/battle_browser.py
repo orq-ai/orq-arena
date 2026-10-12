@@ -16,8 +16,9 @@ from textual.screen import Screen
 from textual.widgets import Static
 
 from ...data.schemas import BattleRecord
+from ...judging import judge_labels, vote_probabilities
 
-_VOTE_COLOR = {"A": "#ff3bd4", "B": "#00e5ff", "tie": "#ffd54d"}
+_VOTE_COLOR = {"A": "$accent", "B": "$primary", "tie": "#ffd54d"}
 
 
 class BattleBrowserScreen(Screen):
@@ -49,6 +50,9 @@ class BattleBrowserScreen(Screen):
         super().__init__(**kwargs)
         self._records = records
         self._idx = 0
+        self._labels = judge_labels(
+            [str(v.get("model", "?")) for r in records for v in r.judge_votes]
+        )
         self._header = Static("", markup=True)
         self._prompt = Static("", classes="block", markup=True)
         self._resp_a = Static("", id="resp-a", classes="resp", markup=False)
@@ -85,7 +89,7 @@ class BattleBrowserScreen(Screen):
 
         lines = ["[b]THE JURY[/b]"]
         for v in r.judge_votes:
-            name = str(v.get("model", "?")).split("/")[-1]
+            name = self._labels[str(v.get("model", "?"))]
             vote = v.get("vote")
             color = _VOTE_COLOR.get(str(vote), "red")
             badge = ""
@@ -93,9 +97,15 @@ class BattleBrowserScreen(Screen):
                 badge = " [red]⚖ flipped, vote thrown out[/red]"
             if v.get("replacement"):
                 badge += " [dim](stand-in)[/dim]"
-            reason = str(v.get("explanation") or "")[:220]
+            probs = vote_probabilities(v)
+            if probs is not None:
+                detail = f"   A {probs['A']:.0%} · B {probs['B']:.0%} · tie {probs['tie']:.0%}"
+                reason = ""
+            else:
+                detail = ""
+                reason = str(v.get("explanation") or "")[:220]
             lines.append(
-                f"  [b {color}]{escape(name)} → {vote or 'abstain'}[/b {color}]{badge}"
+                f"  [b {color}]{escape(name)} → {vote or 'abstain'}[/]{detail}{badge}"
                 + (f"\n    [dim]{escape(reason)}[/dim]" if reason else "")
             )
         self._judges.update("\n".join(lines))

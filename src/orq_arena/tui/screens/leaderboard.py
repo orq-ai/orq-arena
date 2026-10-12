@@ -11,6 +11,8 @@ from textual.containers import VerticalScroll
 from textual.screen import Screen
 from textual.widgets import DataTable, Static
 
+from ...judging import judge_labels
+
 
 class LeaderboardScreen(Screen):
     BINDINGS = [
@@ -188,9 +190,11 @@ class LeaderboardScreen(Screen):
         if jury:
             jt = self.query_one("#jury", DataTable)
             jt.add_columns("Judge", "A-lean", "B-lean", "flip rate", "tie rate")
-            for j in jury.get("per_judge", []):
+            per_judge = jury.get("per_judge", [])
+            labels = judge_labels([j["model"] for j in per_judge])
+            for j in per_judge:
                 jt.add_row(
-                    j["model"].split("/")[-1],
+                    labels[j["model"]],
                     "–" if j.get("a_rate") is None else f"{j['a_rate']:.0%}",
                     "–" if j.get("b_rate") is None else f"{j['b_rate']:.0%}",
                     f"{j.get('position_bias', 0):.0%}",

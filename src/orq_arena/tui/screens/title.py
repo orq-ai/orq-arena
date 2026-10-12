@@ -86,7 +86,7 @@ class RunPlanScreen(Screen):
             if counts.rounds_per_match < p["n_prompts"]:
                 yield Static(
                     f"each match samples {counts.rounds_per_match} of {p['n_prompts']} "
-                    f"(seeded slice) — pass --rounds {p['n_prompts']} for all",
+                    f"(seeded slice); pass --rounds {p['n_prompts']} for all",
                     classes="muted",
                 )
 
@@ -110,29 +110,38 @@ class RunPlanScreen(Screen):
                 yield Static(
                     "⚖ judge/candidate family overlap: "
                     + ", ".join(p["overlap"])
-                    + " — the report will carry this caveat; prefer out-of-family "
+                    + ". The report will carry this caveat; prefer out-of-family "
                     "judges to defend the numbers",
                     classes="warn",
                 )
             for line in p.get("probe_lines") or []:
                 yield Static(line, classes="warn")
 
+            cfg = getattr(self.app, "cfg", None)
+            seats = (
+                "in one seat order"
+                if cfg is not None and not cfg.judge_swap
+                else "in both seat orders (a flip = abstain)"
+            )
             yield Static(
-                "What happens next: every pair streams side by side; the jury votes "
-                "in both seat orders (a flip = abstain); standings refit after every "
-                "match.",
+                f"What happens next: every pair streams side by side; the jury votes "
+                f"{seats}; standings refit after every match.",
                 classes="muted",
             )
         yield Static(self._consent_label(), id="consent", markup=False)
 
     def on_mount(self) -> None:
+        from ...cli import judges_header  # lazy: cli imports the TUI lazily too
+
         cost = self._plan["cost"]
+        # The app's config names the judge mode and seat orders; a bare host has none.
+        cfg = getattr(self.app, "cfg", None)
         table = self.query_one("#plan", DataTable)
         for col in ("Model", "Calls", "$/M in", "$/M out", "Cost"):
             table.add_column(col)
         for role, header in (
             ("candidate", "Candidates"),
-            ("judge", "Judges (×2 seat orders)"),
+            ("judge", judges_header(cfg) if cfg is not None else "Judges (×2 seat orders)"),
             ("probe", None),
         ):
             rows = [r for r in cost.rows if r.role == role]

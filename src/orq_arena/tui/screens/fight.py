@@ -13,8 +13,9 @@ Layout:
   │ Judge cards (3 across)                      │
   └─────────────────────────────────────────────┘
 
-Side identity: A is magenta, B is cyan (CRT theme), on the model cards,
-the response panels, and the judge verdict cues.
+Side identity: A is $accent, B is $primary (blue and purple in the orq
+theme, magenta and cyan in crt-neon), on the model cards, the response
+panels, and the judge verdict cues.
 """
 
 from __future__ import annotations
@@ -77,7 +78,9 @@ class FightScreen(Screen):
     }
     """
 
-    def __init__(self, judge_names: list[str], **kwargs) -> None:
+    def __init__(
+        self, judge_names: list[str], *, abstain_below: float | None = None, **kwargs
+    ) -> None:
         super().__init__(**kwargs)
         self._judge_names = judge_names
         self._card_a = ModelCard(side="a")
@@ -85,7 +88,9 @@ class FightScreen(Screen):
         self._prompt = PromptPanel("[dim]waiting for next round...[/dim]")
         self._resp_a = ResponsePanel(side="a")
         self._resp_b = ResponsePanel(side="b")
-        self._judges: dict[str, JudgeCard] = {name: JudgeCard(name) for name in judge_names}
+        self._judges: dict[str, JudgeCard] = {
+            name: JudgeCard(name, abstain_below=abstain_below) for name in judge_names
+        }
         self._ticker = Static("[dim]arena loading...[/dim]", id="ticker-strip")
         self._status = Static("", id="status")
         self._orc_a = ""
@@ -150,7 +155,7 @@ class FightScreen(Screen):
             card.reset()
         self._prompt.clear_prompt()
         self._ko_announced.clear()
-        self._status.update(f"[b #ff3bd4]{orc_a}[/b #ff3bd4] vs [b #00e5ff]{orc_b}[/b #00e5ff]")
+        self._status.update(f"[b $accent]{orc_a}[/] vs [b $primary]{orc_b}[/]")
 
     def set_prompt(self, round_number: int, text: str) -> None:
         self._prompt.set_prompt(round_number, text)
@@ -190,15 +195,25 @@ class FightScreen(Screen):
         verdict: str,
         reasoning: str,
         *,
+        probabilities: dict[str, float] | None = None,
         flipped: bool = False,
         replacement: bool = False,
     ) -> None:
         card = self._judges.get(judge_name)
         if card is not None:
-            card.set_verdict(verdict, reasoning, flipped=flipped, replacement=replacement)
+            card.set_verdict(
+                verdict,
+                reasoning,
+                probabilities=probabilities,
+                flipped=flipped,
+                replacement=replacement,
+            )
             return
         # A stand-in judge has no pre-built card, surface it on the status line.
-        self._status.update(f"[dim]stand-in[/dim] [b]{judge_name}[/b] votes {verdict}")
+        top = (
+            f" ({probabilities[verdict]:.2f})" if probabilities and verdict in probabilities else ""
+        )
+        self._status.update(f"[dim]stand-in[/dim] [b]{judge_name}[/b] votes {verdict}{top}")
 
     def apply_damage(
         self, hp_a: int, hp_b: int, majority: str, damage: int, loser_side: str
