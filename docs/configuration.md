@@ -107,13 +107,14 @@ candidates:
     reasoning: { thinking: { type: disabled } }
   # ...5 more candidates in the shipped orq_arena.yaml
 
+judge_api: decisions
 judges:
-  - anthropic/claude-haiku-4-5-20251001
-  - google/gemini-3.5-flash-lite
-  - openai/gpt-5.4-nano
+  - typesafe/jev-latest
+  - perplexity/pplx-decider-v1-27b
+  - openai/gpt-6-luna
 
 replacement_judges:
-  - mistral/mistral-medium-2604
+  - orq/decider-4b
 
 criteria: >-
   Accuracy and correctness, helpfulness and completeness, clarity, and
@@ -209,7 +210,7 @@ The shipped `orq_arena.yaml` also documents which models it deliberately exclude
 default pool because the router can't disable their thinking (see the comment below the `candidates` list
 in that file), those belong in `configs/reasoning_arena.yaml` instead.
 
-### `judges`, `replacement_judges`, `criteria`, `min_successful_judges`
+### `judges`, `replacement_judges`, `criteria`, `min_successful_judges`, `judge_api`, `judge_swap`, `judge_abstain_below`
 
 | Key | Type | Default | Effect |
 |---|---|---|---|
@@ -217,6 +218,9 @@ in that file), those belong in `configs/reasoning_arena.yaml` instead.
 | `replacement_judges` | `list[str]` | `[]` | Neutral stand-ins promoted when a primary judge errors mid-run (`llm_jury_pairwise(replacement_judges=...)`). |
 | `criteria` | `str` | `"Accuracy and correctness, helpfulness and completeness, clarity, and relevance to the prompt."` | Free-text criteria string every judge is given, what the jury is asked to judge on. Can be overridden for a single re-judge without editing the YAML via `orq-arena rejudge ... --criteria "..."`. |
 | `min_successful_judges` | `int` | `2` | Minimum number of decisive reconciled votes required for a round to produce a real verdict. Fewer than this, and the round is `inconclusive` (dropped from the rating, doesn't count toward `max_rounds`), a guard against a "jury of one" deciding a round. |
+| `judge_api` | `"llm"` or `"decisions"` | `"llm"` | Which router endpoint the judges answer on. `llm` prompts chat models for a JSON verdict with a written reason. `decisions` asks decision models one A/B/tie question through the orq.ai [Decisions API](https://docs.orq.ai/ai-gateway/features/decisions) and gets a probability per option back, billed on input tokens only. One mode per panel: the catalog marks some chat models (claude-haiku-4-5, gpt-oss) as decision-capable too, so the mode, not the model id, decides the endpoint. A judge that cannot answer on the chosen endpoint stops the run in preflight, before any spend; in decisions mode the preflight also checks that the key may call the Decisions API. See [the research note](research/llm-judges-vs-decision-models.md) for how the two compare. |
+| `judge_swap` | `bool` | `true` | Show each judge both seat orders (A then B, B then A) and throw out a vote that flips. Off halves the judge calls, and the report then says position bias was not measured. |
+| `judge_abstain_below` | `float` or `null` | `null` | Decisions mode only (the config refuses it otherwise). A vote whose winning option has a lower probability than this becomes an abstention, the same as a flipped vote. Off by default: a floor raises agreement on the rounds that stay decided but leaves fewer of them. |
 
 **Self-judge exclusion:** per match, any judge whose `model_id` matches either contestant's
 `model_id` is filtered out of that match's panel (`panel = [m for m in cfg.judges if m not in
@@ -308,6 +312,9 @@ Everything else is a Pydantic default and safe to omit from the YAML entirely:
 | `replacement_judges` | `[]` |
 | `criteria` | `"Accuracy and correctness, helpfulness and completeness, clarity, and relevance to the prompt."` |
 | `min_successful_judges` | `2` |
+| `judge_api` | `"llm"` |
+| `judge_swap` | `true` |
+| `judge_abstain_below` | `null` |
 | `candidates[].name` | short model id, or the full id when two candidates would share one |
 | `candidates[].emblem` | `""` |
 | `candidates[].reasoning` | `null` |
@@ -346,5 +353,5 @@ git-ignored (`.gitignore`):
 | File | Written by |
 |---|---|
 | `.env` | Hand-authored from `.env.example`; never committed. |
-| `battles.jsonl` | `orq-arena run`, one row per judged round (`BattleRecord`, schema v4, written as each round resolves; includes per-model `ttft_a_ms`/`ttft_b_ms` and `duration_a_ms`/`duration_b_ms` timing fields). |
+| `battles.jsonl` | `orq-arena run`, one row per judged round (`BattleRecord`, schema v5, written as each round resolves; includes per-model `ttft_a_ms`/`ttft_b_ms` and `duration_a_ms`/`duration_b_ms` timing fields, and the jury's per-round `judge_cost_usd` and `judge_ms`). |
 | `battles.run.json` | `orq-arena run`, the run manifest (the config it ran, config + prompt hashes, the prompts path, the host the run actually used, panel, seed, agreement stats; also a `dataset` key with id, name, and studio URL for dataset-sourced runs). Holds no credential: `ORQ_API_KEY` is read from the environment and never enters the config. |

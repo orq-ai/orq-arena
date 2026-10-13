@@ -26,10 +26,10 @@ judge_api: decisions
 judges:
   - typesafe/jev-latest
   - perplexity/pplx-decider-v1-27b
-  - orq/decider-4b
+  - openai/gpt-6-luna
 
 replacement_judges:
-  - berget/Cloudflare/clef-flash   # slower under load; only called when a primary fails
+  - orq/decider-4b
 
 criteria: >-
   Accuracy and correctness, helpfulness and completeness, clarity, and

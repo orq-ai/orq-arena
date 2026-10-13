@@ -68,18 +68,18 @@ candidates:
 # Decisions API, both seat orders (a judge that flips abstains and is recorded).
 # They bill input tokens only and return a probability per option. Picked by
 # agreement with a strong reference jury over two 140-round pools, see
-# docs/research/llm-judges-vs-decision-models.md. None are from a candidate's
-# family. For a prompted panel that writes its reasons, set judge_api: llm and
+# docs/research/llm-judges-vs-decision-models.md. gpt-6-luna shares OpenAI's
+# family with the gpt candidates and the preflight says so. For a prompted panel that writes its reasons, set judge_api: llm and
 # list chat models, e.g. anthropic/claude-haiku-4-5-20251001,
 # google/gemini-3.5-flash-lite, openai/gpt-5.4-nano.
 judge_api: decisions
 judges:
   - typesafe/jev-latest
   - perplexity/pplx-decider-v1-27b
-  - orq/decider-4b
+  - openai/gpt-6-luna
 
 replacement_judges:
-  - berget/Cloudflare/clef-flash   # slower under load; only called when a primary fails
+  - orq/decider-4b
 
 # What the jury judges on (feeds evaluatorq's pairwise criteria).
 criteria: >-

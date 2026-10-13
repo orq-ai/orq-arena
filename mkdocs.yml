@@ -68,6 +68,7 @@ plugins:
           - configuration.md: Every orq_arena.yaml key, reasoning recipes, defaults.
         Trust the number:
           - methodology.md: How the ranking is made, bias controls, confidence intervals, reproducibility.
+          - research/llm-judges-vs-decision-models.md: LLM judges vs decision models measured on arena rounds, and where each belongs.
 
 markdown_extensions:
   - tables
@@ -98,3 +99,5 @@ nav:
   - CLI Reference: cli.md
   - Configuration: configuration.md
   - Methodology: methodology.md
+  - Research:
+      - LLM judges vs decision models: research/llm-judges-vs-decision-models.md
