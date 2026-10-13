@@ -19,16 +19,17 @@ candidates:
   - model_id: xai/grok-4-1-fast                         # AA 16.9 (non-reasoning)
   - model_id: cohere/command-a-03-2025                  # AA ~8-29 (Command A)
   - model_id: alibaba/qwen3.5-flash                     # small alibaba; thinks by design
-  - model_id: anthropic/claude-haiku-4-5-20251001       # also the anthropic judge below;
-    # self-judge exclusion drops it from the panel for its own matches only.
+  - model_id: anthropic/claude-haiku-4-5-20251001
 
+# Decision-model panel, see docs/research/llm-judges-vs-decision-models.md.
+judge_api: decisions
 judges:
-  - anthropic/claude-haiku-4-5-20251001
-  - google/gemini-3.5-flash-lite
-  - openai/gpt-5.4-nano
+  - typesafe/jev-latest
+  - perplexity/pplx-decider-v1-27b
+  - orq/decider-4b
 
 replacement_judges:
-  - mistral/mistral-medium-2604   # AA ~30, above the candidate pool
+  - berget/Cloudflare/clef-flash   # slower under load; only called when a primary fails
 
 criteria: >-
   Accuracy and correctness, helpfulness and completeness, clarity, and
