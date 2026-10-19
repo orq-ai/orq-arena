@@ -446,3 +446,171 @@ def test_orq_dataset_meta_offline_fallback(monkeypatch):
     monkeypatch.setattr(orq_ai_sdk, "Orq", _boom)
     meta = orq_dataset_meta("ds_42")
     assert meta == {"id": "ds_42", "name": "ds_42", "url": "https://my.orq.ai/datasets/ds_42"}
+
+
+# ---------------------------------------------------------------- harness mode
+
+
+def _trial_dir(root, name, *, patch="", steps=None, tests=""):
+    d = root / name
+    (d / "verifier").mkdir(parents=True)
+    if patch:
+        (d / "diff.patch").write_text(patch, encoding="utf-8")
+    if steps is not None:
+        import json
+
+        (d / "steps.json").write_text(json.dumps(steps), encoding="utf-8")
+    if tests:
+        (d / "verifier" / "test-stdout.txt").write_text(tests, encoding="utf-8")
+    return str(d)
+
+
+def _solution(passed, trial_dir, **over):
+    return {
+        "passed": passed,
+        "reward": 1.0 if passed else 0.0,
+        "cost_usd": 0.42,
+        "tokens_in": 100,
+        "tokens_out": 50,
+        "duration_ms": 680_000,
+        "steps": 23,
+        "commands": 14,
+        "edits": 6,
+        "diff_stat": "+14 -3, 2 files",
+        "diff_note": "",
+        "tests_edited": False,
+        "exit_reason": "finished",
+        "trial_dir": trial_dir,
+    } | over
+
+
+def _harness_setup(tmp_path):
+    cfg = ArenaConfig.model_validate(
+        {
+            "candidates": [
+                {"kind": "harness", "agent": "pi", "model_id": "p/m", "name": "pi"},
+                {"kind": "harness", "agent": "codex", "model_id": "p/m", "name": "codex"},
+            ],
+            "judges": ["prov/judge-1"],
+        }
+    )
+    a_dir = _trial_dir(
+        tmp_path,
+        "a",
+        patch="--- a/tests/t.py\n+++ b/tests/t.py\n@@\n-<script>alert(1)</script>\n+ok\n",
+        steps=[{"kind": "command", "title": "$ pytest <b>", "body": "3 passed", "meta": {}}],
+        tests="FAILED test_history_intact",
+    )
+    b_dir = _trial_dir(tmp_path, "b", patch="--- a/x\n+++ b/x\n@@\n-1\n+2\n")
+    rec = BattleRecord(
+        prompt_hash="h1",
+        prompt_text="fix the repo",
+        prompt_category="easy",
+        model_a="pi",
+        model_b="codex",
+        model_a_id="pi:p/m",
+        model_b_id="codex:p/m",
+        response_a="## Hidden tests: FAILED",
+        response_b="## Hidden tests: PASSED",
+        majority_verdict="B",
+        winner="codex",
+        judge_votes=[
+            {
+                "model": "verifier",
+                "vote": "B",
+                "completed": True,
+                "flipped": False,
+                "replacement": False,
+                "explanation": "hidden tests: A failed, B passed",
+                "observations": [],
+            }
+        ],
+        solution_a=_solution(False, a_dir, tests_edited=True),
+        solution_b=_solution(True, b_dir, exit_reason="max_turns", cost_usd=0.18),
+        judge_cost_usd=0.0,
+    )
+    report = REPORT | {
+        "by_model_names": {"pi:p/m": "pi", "codex:p/m": "codex"},
+        "elo_ci": {"pi": (900.0, 1100.0), "codex": (950.0, 1150.0)},
+        "win_grid": {"pi": {"codex": 0.0}, "codex": {"pi": 1.0}},
+        "harness": {
+            "pi": {
+                "trials": 1,
+                "passed": 0,
+                "verified": 1,
+                "pass_rate": 0.0,
+                "mean_cost_usd": 0.42,
+                "mean_duration_s": 680.0,
+                "tests_edited": 1,
+            },
+            "codex": {
+                "trials": 1,
+                "passed": 1,
+                "verified": 1,
+                "pass_rate": 1.0,
+                "mean_cost_usd": 0.18,
+                "mean_duration_s": 240.0,
+                "tests_edited": 0,
+            },
+        },
+        "gate_rounds": 1,
+    }
+    manifest = MANIFEST | {"harness": {"harbor_version": "0.24.0", "tasks": ["/t/fix-git"]}}
+    return cfg, [rec], report, manifest
+
+
+def test_harness_report_renders_badges_diff_and_gate_label(tmp_path):
+    cfg, records, report, manifest = _harness_setup(tmp_path)
+    html = build_report_html(
+        cfg=cfg,
+        records=records,
+        elo={"pi": 950.0, "codex": 1050.0},
+        report=report,
+        manifest=manifest,
+    )
+    assert "✓ hidden tests PASSED (reward 1)" in html
+    assert "✗ hidden tests FAILED (reward 0)" in html
+    assert "23 steps" in html and "14 cmds" in html and "6 edits" in html and "11m 20s" in html
+    assert "$0.420" not in html and "$0.42 <span class='pw-tag'>observed</span>" in html
+    assert "exit: max_turns" in html
+    assert "⚠ tests/ edited" in html
+    assert "decided by verifier gate" in html and "jury: skipped (gate)" in html
+    assert "trajectory, 1 steps" in html and "test output" in html
+    # the ladder swaps the length column for the three harness columns
+    assert "pass rate" in html and "$/task" in html and "min/task" in html
+    assert "avg length" not in html and "length-adj." not in html
+    assert "0/1" in html and "1/1" in html
+    assert "Agent trials" in html and "observed" in html
+    assert "harbor <code>0.24.0</code> &middot; 1 tasks" in html
+    assert "Harness</th>" in html
+    # untrusted diff and trajectory text is escaped, never injected
+    assert "<script>alert(1)</script>" not in html
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
+    assert "$ pytest &lt;b&gt;" in html
+    assert not any(d in html for d in ("\u2014", "&mdash;", "&#8212;", "&#x2014;"))
+
+
+def test_harness_report_survives_missing_trial_files(tmp_path):
+    cfg, records, report, manifest = _harness_setup(tmp_path)
+    for rec in records:
+        rec.solution_a["trial_dir"] = str(tmp_path / "gone")
+        rec.solution_b["trial_dir"] = ""
+    html = build_report_html(
+        cfg=cfg,
+        records=records,
+        elo={"pi": 950.0, "codex": 1050.0},
+        report=report,
+        manifest=manifest,
+    )
+    assert "✓ hidden tests PASSED" in html
+    assert "trajectory," not in html and "<summary>diff" not in html
+
+
+def test_harness_cost_counts_a_replayed_trial_once(tmp_path):
+    from orq_arena.report import _harness_costs
+
+    cfg, records, _report, _manifest = _harness_setup(tmp_path)
+    again = records[0].model_copy(deep=True)  # same task, same two harnesses: a replay
+    usd, trials, unknown = _harness_costs([*records, again], {"pi:p/m": "pi", "codex:p/m": "codex"})
+    assert (trials, unknown) == (2, 0)
+    assert usd == {"pi": 0.42, "codex": 0.18}

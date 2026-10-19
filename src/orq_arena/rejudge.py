@@ -15,6 +15,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from evaluatorq import PairwiseComparison, build_report
+from evaluatorq.pairwise import PairwiseVote
 
 from .config import ArenaConfig
 from .data.schemas import BattleRecord
@@ -167,6 +168,15 @@ async def rejudge_run(
         return comparators[key]
 
     async def score(rec: BattleRecord) -> tuple[PairwiseComparison, int]:
+        if rec.decided_by_gate:
+            # The hidden tests decided this round; no panel, old or new, reopens it.
+            return (
+                PairwiseComparison(
+                    winner=rec.majority_verdict,
+                    votes=[PairwiseVote.model_validate(v) for v in rec.judge_votes],
+                ),
+                0,
+            )
         async with sem:
             t0 = time.monotonic()
             comparison = await comparator_for(rec).compare(  # type: ignore[attr-defined]
@@ -198,10 +208,14 @@ async def rejudge_run(
     changed = sum(
         1 for rec, c in zip(records, comparisons, strict=True) if rec.majority_verdict != c.winner
     )
+    # The report describes the panel, so rounds the verifier decided stay out of it.
+    jury_comparisons = [
+        c for rec, c in zip(records, comparisons, strict=True) if not rec.decided_by_gate
+    ]
     return {
         "comparisons": comparisons,
         "judge_ms": [ms for _, ms in scored],
-        "report": build_report(comparisons),
+        "report": build_report(jury_comparisons),
         "old_ranking": old_rank,
         "new_ranking": new_rank,
         "spearman": spearman(old_rank, new_rank),

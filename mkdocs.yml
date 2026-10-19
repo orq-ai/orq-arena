@@ -67,6 +67,7 @@ plugins:
           - cli.md: Every command and flag.
           - configuration.md: Every orq_arena.yaml key, reasoning recipes, defaults.
         Trust the number:
+          - harness-mode.md: Rate coding agents on terminal-bench tasks through Harbor; overlay, cache, verifier gate, costs.
           - methodology.md: How the ranking is made, bias controls, confidence intervals, reproducibility.
           - research/llm-judges-vs-decision-models.md: LLM judges vs decision models measured on arena rounds, and where each belongs.
 
@@ -98,6 +99,7 @@ nav:
   - Getting Started: getting-started.md
   - CLI Reference: cli.md
   - Configuration: configuration.md
+  - Harness mode: harness-mode.md
   - Methodology: methodology.md
   - Research:
       - LLM judges vs decision models: research/llm-judges-vs-decision-models.md

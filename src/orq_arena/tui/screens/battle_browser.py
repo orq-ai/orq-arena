@@ -8,6 +8,7 @@ before you believe the leaderboard.
 
 from __future__ import annotations
 
+from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, VerticalScroll
@@ -19,6 +20,45 @@ from ...data.schemas import BattleRecord
 from ...judging import judge_labels, vote_probabilities
 
 _VOTE_COLOR = {"A": "$accent", "B": "$primary", "tie": "#ffd54d"}
+_DOSSIER_CHARS = 3000
+
+
+def _solution_badge(sol: dict) -> Text:
+    """'✓ hidden tests PASSED' plus the trial's counts, colour-coded."""
+    passed = sol.get("passed")
+    if passed is True:
+        head = Text("✓ hidden tests PASSED", style="bold green")
+    elif passed is False:
+        head = Text("✗ hidden tests FAILED", style="bold red")
+    else:
+        head = Text("hidden tests did not run", style="bold yellow")
+    if sol.get("reward") is not None:
+        head.append(f"  (reward {sol['reward']:g})")
+    facts = [
+        f"{sol.get('steps', 0)} steps",
+        f"{sol.get('commands', 0)} cmds",
+        f"{sol.get('edits', 0)} edits",
+    ]
+    if sol.get("cost_usd") is not None:
+        facts.append(f"${sol['cost_usd']:.2f}")
+    if sol.get("exit_reason"):
+        facts.append(f"exit: {sol['exit_reason']}")
+    head.append("\n" + " · ".join(facts), style="dim")
+    if sol.get("diff_stat"):
+        head.append(f"\n{sol['diff_stat']}", style="dim")
+    if sol.get("tests_edited"):
+        head.append("\n⚠ tests/ edited", style="bold red")
+    return head
+
+
+def _response_view(label: str, text: str, sol: dict | None) -> Text | str:
+    """A model round shows the answer; a harness round the badge and the judges' dossier."""
+    if not sol:
+        return f"{label}\n\n{text[:1500]}"
+    view = Text(f"{label}\n")
+    view.append_text(_solution_badge(sol))
+    view.append(f"\n\n{text[:_DOSSIER_CHARS]}")
+    return view
 
 
 class BattleBrowserScreen(Screen):
@@ -40,7 +80,7 @@ class BattleBrowserScreen(Screen):
     BattleBrowserScreen #body { padding: 0 2; height: 1fr; }
     BattleBrowserScreen .block { margin-top: 1; }
     BattleBrowserScreen #responses { layout: grid; grid-size: 2; grid-gutter: 1; height: auto; }
-    BattleBrowserScreen .resp { border: round $primary; padding: 0 1; height: auto; max-height: 18; }
+    BattleBrowserScreen .resp { border: round $primary; padding: 0 1; height: auto; max-height: 30; }
     BattleBrowserScreen #resp-a { border: round $accent; }
     BattleBrowserScreen #resp-b { border: round $primary; }
     BattleBrowserScreen #hint { height: 1; padding: 0 2; color: $text-muted; }
@@ -84,8 +124,8 @@ class BattleBrowserScreen(Screen):
             f"[dim]{r.match_id} · round {r.round_number} · category {r.prompt_category or '-'}[/dim]"
         )
         self._prompt.update(f"[b]PROMPT[/b]\n{escape(r.prompt_text[:600])}")
-        self._resp_a.update(f"A · {r.model_a}\n\n{r.response_a[:1500]}")
-        self._resp_b.update(f"B · {r.model_b}\n\n{r.response_b[:1500]}")
+        self._resp_a.update(_response_view(f"A · {r.model_a}", r.response_a, r.solution_a))
+        self._resp_b.update(_response_view(f"B · {r.model_b}", r.response_b, r.solution_b))
 
         lines = ["[b]THE JURY[/b]"]
         for v in r.judge_votes:
@@ -122,6 +162,11 @@ class BattleBrowserScreen(Screen):
                     else ""
                 )
                 + "[/dim]"
+                + (
+                    "   [dim]decided by the verifier gate, no jury call[/dim]"
+                    if r.decided_by_gate
+                    else ""
+                )
             )
         self._outcome.update(outcome)
         self.query_one("#body", VerticalScroll).scroll_home(animate=False)

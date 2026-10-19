@@ -14,6 +14,25 @@ from textual.widgets import DataTable, Static
 from ...judging import judge_labels
 
 
+def _harness_cells(h: dict[str, Any] | None) -> list[str]:
+    """pass rate, $/task, min/task for one harness; dashes when it has no trials."""
+    if not h:
+        return ["–", "–", "–"]
+    if h.get("verified"):
+        passed = f"{h.get('passed', 0)}/{h['verified']}"
+    elif h.get("pass_rate") is not None:
+        passed = f"{h['pass_rate']:.0%}"
+    else:
+        passed = "–"
+    cost = h.get("mean_cost_usd")
+    secs = h.get("mean_duration_s")
+    return [
+        passed,
+        "–" if cost is None else f"{cost:.2f}",
+        "–" if secs is None else f"{secs / 60:.1f}",
+    ]
+
+
 class LeaderboardScreen(Screen):
     BINDINGS = [
         ("enter,space,q", "quit", "Quit"),
@@ -77,6 +96,18 @@ class LeaderboardScreen(Screen):
                 )
 
             yield DataTable(id="table")
+
+            harness = r.get("harness") or {}
+            if harness:
+                total = r.get("rated_rounds") or 0
+                gate = r.get("gate_rounds") or 0
+                line = f"gate decided {gate} of {total} rounds"
+                if total > gate:
+                    line += f" · jury {total - gate}"
+                edited = sum(h.get("tests_edited", 0) for h in harness.values())
+                if edited:
+                    line += f" · tests/ edited in {edited} trial(s)"
+                yield Static(line, id="gate-line", classes="section")
 
             # Descriptive first (a count, nothing to converge); the modelled
             # coefficient only exists when identified, which is also when the
@@ -146,11 +177,14 @@ class LeaderboardScreen(Screen):
 
         table = self.query_one("#table", DataTable)
         sc = r.get("elo_style_controlled") or {}
-        cols = ["Rank", "Model", "ELO"]
+        harness = r.get("harness") or {}
+        cols = ["Rank", "Harness" if harness else "Model", "ELO"]
         if ci:
             cols.append("95% CI")
         if sc:
             cols.append("len-ctrl")
+        if harness:
+            cols += ["pass rate", "$/task", "min/task"]
         if verbosity:
             cols += ["avg tok", "🧠 tok"]
         table.add_columns(*cols)
@@ -168,6 +202,8 @@ class LeaderboardScreen(Screen):
                 row.append(f"{lo:.0f}–{hi:.0f}")
             if sc:
                 row.append(f"{sc.get(name, elo):.0f}")
+            if harness:
+                row += _harness_cells(harness.get(name))
             if verbosity:
                 row.append(f"{verbosity.get(name, 0):.0f}")
                 row.append(f"{reasoning.get(name, 0):.0f}")

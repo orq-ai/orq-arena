@@ -1,4 +1,4 @@
-"""Battle record, schema v5, one JSONL row per judged (or voided) round.
+"""Battle record, schema v6, one JSONL row per judged (or voided) round.
 
 v2 replaced the hand-rolled judge schema with evaluatorq's reconciled
 ``PairwiseVote`` dumps. v3 drops the arena HP bookkeeping (damage/hp fields):
@@ -6,8 +6,12 @@ HP was never scored, it's a TUI-only presentation the show now derives from
 the judged verdicts. v4 adds `model_a_id`/`model_b_id`: short names collide across providers, so a
 log carrying only the short name cannot always say which model answered. v5 adds
 `judge_cost_usd` and `judge_ms`, what the panel cost and how long it took per
-round. Old v2 to v4 logs still load (dropped fields are ignored, absent ids read
-as empty, absent cost reads as unknown).
+round. v6 adds `solution_a`/`solution_b`, the harness side of a round (hidden-test
+verdict, workspace diff, trajectory counts, cost); for a harness round
+`response_a/b` hold the dossier the judges read, and `model_a_id/model_b_id` hold
+the candidate id (agent, model and setup variant). Old v2 to v5 logs still load
+(dropped fields are ignored, absent ids read as empty, absent cost reads as
+unknown, absent solutions read as None).
 """
 
 from __future__ import annotations
@@ -18,11 +22,14 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+# The synthetic judge a verifier-gated round carries instead of a jury.
+GATE_JUDGE = "verifier"
+
 
 class BattleRecord(BaseModel):
     """A single prompt-turn battle record."""
 
-    schema_version: int = 5
+    schema_version: int = 6
 
     prompt_hash: str
     prompt_text: str
@@ -41,6 +48,10 @@ class BattleRecord(BaseModel):
     model_b_id: str = ""
     response_a: str = ""
     response_b: str = ""
+    # Harness rounds only: {passed, reward, cost_usd, duration_ms, steps, commands,
+    # edits, diff_stat, tests_edited, exit_reason, trial_dir, ...}.
+    solution_a: dict[str, Any] | None = None
+    solution_b: dict[str, Any] | None = None
 
     # evaluatorq PairwiseVote dumps: model, vote, flipped, completed,
     # replacement, explanation, observations. A decision judge's observations
@@ -68,6 +79,11 @@ class BattleRecord(BaseModel):
     # orders and any stand-ins included.
     judge_cost_usd: float | None = None
     judge_ms: int = 0
+
+    @property
+    def decided_by_gate(self) -> bool:
+        """True when the hidden tests decided this round and no jury was called."""
+        return len(self.judge_votes) == 1 and self.judge_votes[0].get("model") == GATE_JUDGE
 
     def rating_key(self, side: Literal["a", "b"]) -> str:
         """The key this record's model is known by on ``side``.

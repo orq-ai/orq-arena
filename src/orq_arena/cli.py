@@ -275,6 +275,10 @@ def run(
         if rounds < 1:
             raise click.ClickException("--rounds must be >= 1")
         cfg.match.max_rounds = rounds
+    elif cfg.has_harness:
+        # A trial is minutes and dollars: every match draws the whole task set, so
+        # a trial run for one match is replayed from the cache in the others.
+        cfg.match.max_rounds = len(prompts)
     if cfg.match.max_rounds < len(prompts):
         warn(
             f"  ⚠ each match samples {cfg.match.max_rounds} of your {len(prompts)} prompts "
@@ -310,6 +314,25 @@ def run(
     # Persist the caveat so the manifest and forwarded report carry it, not
     # just this console line (the report is the thing users hand to others).
     preflight_data: dict = {"counts": counts.__dict__, "family_overlaps": overlap}
+    if cfg.has_harness:
+        from .preflight import harness_checks, harness_plan
+
+        problems = harness_checks(cfg, prompts)
+        if problems:
+            raise click.ClickException(
+                "harness checks failed:\n" + "\n".join(f"  {p}" for p in problems)
+            )
+        harness_block = harness_plan(
+            cfg, prompts, trials_dir=cfg.harness.trials_dir or f"{output_path}.trials"
+        )
+        preflight_data["harness"] = harness_block
+        hp = harness_block["plan"]
+        status(
+            f"harness: {hp['trials']} trials ({hp['cached']} cached) on {len(hp['task_names'])} "
+            f"tasks; {hp['cost_note']}"
+        )
+        for line in harness_block["checks"]:
+            warn(f"  {line}")
     cost = cost_projection(cfg, prompts, counts, asyncio.run(fetch_price_map(cfg.gateway)))
     unpriced_suffix = " + unpriced" if cost.unpriced else ""
     if cost.projected_usd > 0:
@@ -396,6 +419,7 @@ def run(
             "prompts_label": prompts_label,
             "prompt_categories": dict(Counter(pr.category for pr in prompts)),
             "log_path": output_path,
+            "harness": preflight_data.get("harness"),
         }
         assert arena_app_cls is not None  # narrowed by the tui branch
         app = arena_app_cls(
@@ -440,6 +464,78 @@ def run(
             "abstained. Check the panel is reachable and the credential is valid, "
             "then re-run."
         )
+
+
+@cli.group()
+def tasks() -> None:
+    """Terminal-bench tasks for harness mode (no network, reads local task dirs)."""
+
+
+@tasks.command("sample")
+@click.option(
+    "--dataset",
+    default=None,
+    help="Directory of tasks (a terminal-bench-2-1 clone or Harbor's cache). "
+    "Default: Harbor's task cache.",
+)
+@click.option("--n", "n", type=int, default=8, show_default=True, help="Tasks to sample.")
+@click.option("--seed", type=int, default=7, show_default=True, help="Same seed, same sample.")
+@click.option(
+    "--max-timeout",
+    type=float,
+    default=900,
+    show_default=True,
+    help="Skip tasks whose agent timeout (seconds) is longer; 0 keeps every task.",
+)
+@click.option("--include-gpu", is_flag=True, default=False, help="Keep tasks that need a GPU.")
+@click.option(
+    "--output",
+    "-o",
+    "output_path",
+    default="prompts/tb21-sample.jsonl",
+    show_default=True,
+    help="Prompt file to write.",
+)
+def tasks_sample(
+    dataset: str | None,
+    n: int,
+    seed: int,
+    max_timeout: float,
+    include_gpu: bool,
+    output_path: str,
+) -> None:
+    """Sample a difficulty-stratified task set and write it as a prompt file.
+
+    \b
+    Example:
+      orq-arena tasks sample --dataset .context/tb21 --n 8 --seed 7 -o prompts/tb21-sample.jsonl
+    """
+    from pathlib import Path
+
+    from .data.tasks import DEFAULT_DATASET, sample_tasks, scan_tasks, write_prompts
+
+    root = Path(dataset or DEFAULT_DATASET).expanduser()
+    if not root.is_dir():
+        raise click.ClickException(f"{root} is not a directory; pass --dataset <tasks dir>.")
+    found = scan_tasks(root)
+    if not found:
+        raise click.ClickException(
+            f"no tasks under {root} (a task is a directory with task.toml and instruction.md)."
+        )
+    picked = sample_tasks(
+        found,
+        n=n,
+        seed=seed,
+        max_timeout_s=max_timeout or None,
+        exclude_gpu=not include_gpu,
+    )
+    if not picked:
+        raise click.ClickException("every task was filtered out; relax --max-timeout.")
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+    write_prompts(picked, output_path)
+    click.echo(f"{len(picked)} of {len(found)} tasks → {output_path}")
+    for t in picked:
+        click.echo(f"  {t.name:<32} {t.difficulty:<8} {t.timeout_sec:.0f}s")
 
 
 def judges_header(cfg) -> str:

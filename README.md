@@ -44,6 +44,7 @@ Models are called through the [orq.ai router gateway](https://docs.orq.ai/docs/a
 - **Two kinds of jury.** Decision models (the default in the shipped configs; the code default is `judge_api: llm`) answer one A/B/tie question through the orq.ai Decisions API with a probability per option, for input tokens only; prompted LLM judges (`judge_api: llm`) write their reasons. On two 140-round pools the decision panel agreed with a strong reference jury better, decided about a third more rounds and cost about an eleventh as much: [LLM judges vs decision models](docs/research/llm-judges-vs-decision-models.md).
 - **Jury swaps.** The responses are already recorded, so re-judging with a different panel costs judge tokens only, and tells you how much the ranking depends on who judged it.
 - **Human spot-checks.** `annotate` renders a run into a blind page (no model names, no jury votes) you can send to human raters; `anchor` compares their votes with the panel's.
+- **Coding agents too.** A candidate can be an agent (Claude Code, pi, codex) run through Harbor on terminal-bench tasks; hidden tests decide a round when only one side passes, and the jury judges the rest. Same model with and without skills, memory or a system prompt gets its own rating: [Harness mode](docs/harness-mode.md).
 - **Watch live.** `--tui` (optional extra) opens on a Run Plan consent screen (the full per-model cost table), then streams the run as a live arena with health bars and judge cards.
 
 The report is the artifact you can share, one self-contained HTML file:
@@ -137,6 +138,7 @@ Full guides live at **[orq-ai.github.io/orq-arena](https://orq-ai.github.io/orq-
 | [Getting Started](docs/getting-started.md) | Prerequisites, install, first live run, common setup issues |
 | [CLI Reference](docs/cli.md) | Every command and flag: `run`, `pool`, `report`, and the rest |
 | [Configuration](docs/configuration.md) | Every `orq_arena.yaml` key, reasoning recipes, defaults |
+| [Harness mode](docs/harness-mode.md) | Rate coding agents on terminal-bench tasks: setup, overlay, cache, verifier gate, costs |
 | [Methodology](docs/methodology.md) | How the ranking is made, bias controls, confidence intervals, reproducibility |
 
 ## Contributing

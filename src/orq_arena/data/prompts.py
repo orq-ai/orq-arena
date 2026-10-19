@@ -14,6 +14,7 @@ the datapoint's ``inputs``.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from dataclasses import dataclass, field, replace
@@ -29,6 +30,11 @@ class PromptItem:
     category: str = "general"
     # Opaque pass-through: never sliced or judged on, only carried to the log.
     metadata: dict = field(default_factory=dict)
+
+
+def prompt_hash(text: str) -> str:
+    """The id a prompt goes by in the log and in the harness trial cache."""
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
 
 
 def load_prompts(path: str | Path) -> list[PromptItem]:

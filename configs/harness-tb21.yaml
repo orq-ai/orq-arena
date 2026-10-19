@@ -1,0 +1,82 @@
+# Harness arena: coding agents (not bare models) fight on terminal-bench 2.1 tasks.
+#
+# Each candidate is an agent run through Harbor in a fresh container per task. The
+# hidden tests of the task decide a round when exactly one side passes; the jury
+# only sees pairs that both pass or both fail. Everything is billed through the
+# orq router: Harbor is pointed at it with --base-url and --api-key-name.
+#
+# Setup, once:
+#   uv tool install --python 3.13 harbor
+#   orq-arena tasks sample --dataset <terminal-bench-2-1 clone> --n 8 --seed 7 \
+#       -o prompts/tb21-sample.jsonl
+# Run:
+#   orq-arena run --config configs/harness-tb21.yaml --prompts prompts/tb21-sample.jsonl
+#
+# Cost: agent spend is not projected. It is capped per trial by max_budget_usd
+# and max_turns below; expect roughly $0.5 to $1 per trial on a frontier model.
+# See docs/harness-mode.md.
+
+harness:
+  harbor_bin: harbor
+  # Trial cache, keyed (task, candidate). Delete a folder to re-run that trial.
+  # Left out, it defaults to "<battle log>.trials" next to the run's log.
+  trials_dir: outputs/harness/trials
+  max_parallel_trials: 2        # containers at once, across all matches
+  api_key_name: ORQ_API_KEY
+  timeout_multiplier: 1.5       # the task images are linux/amd64; Macs emulate them
+  artifacts: ["/app"]
+  diff: true
+  diff_max_bytes: 200000
+
+verifier_gate: true             # a hidden-test pass beats a fail without a jury call
+judge_api: llm                  # decision models cannot read a trajectory dossier
+
+criteria: >-
+  Which solution better completes the task? Weigh the hidden tests outcome shown,
+  correctness of the final workspace diff, minimal and clean changes, no reward
+  hacking (editing or skipping tests, hardcoding expected output), and efficiency
+  (fewer wasted steps). Ignore prose style.
+
+candidates:
+  - kind: harness
+    name: claude-code
+    agent: claude-code
+    model_id: anthropic/claude-opus-5-5
+    api_format: anthropic_messages        # served at <router>/v3/anthropic
+    agent_kwargs: { max_turns: 60, max_budget_usd: 2.0 }
+
+  - kind: harness
+    name: pi
+    agent: pi
+    model_id: anthropic/claude-opus-5-5
+    api_format: openai_chat_completions   # served at <router>/v3/router
+    agent_kwargs: { max_turns: 60 }
+
+  # Same agent and model as "pi", plus a skills folder and a system prompt:
+  # the pair isolates what the setup is worth. Create harness/skills first (the
+  # preflight names the path if it is missing).
+  - kind: harness
+    name: pi + skills
+    agent: pi
+    model_id: anthropic/claude-opus-5-5
+    api_format: openai_chat_completions
+    agent_kwargs: { max_turns: 60, thinking: medium }
+    overlay:
+      skills: harness/skills
+      system_prompt: "Prefer small diffs; run the tests before you stop."
+
+  - kind: harness
+    name: codex
+    agent: codex
+    model_id: openai/gpt-6-luna
+    api_format: openai_responses          # served at <router>/v3/router
+    # Native-key fallback, only if the router cannot serve codex:
+    # agent_env: { OPENAI_API_KEY: "${OPENAI_API_KEY}" }
+
+# A prompted panel: the dossier is long, so decision models (32k to 64k of
+# context) are not used here. google/gemini-3.1-pro-preview stands in for a
+# newer gemini pro; pick judges outside the agents' model families when you can.
+judges:
+  - openai/gpt-6-luna
+  - google/gemini-3.1-pro-preview
+  - anthropic/claude-sonnet-5-5

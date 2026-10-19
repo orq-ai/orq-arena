@@ -164,6 +164,54 @@ the rounds the rater actually voted: models below a minimum comparison count are
 rather than seated at the default rating, and the model count prints beside every
 correlation. Usage: [cli.md](cli.md#annotate).
 
+## Harness runs: the verifier gate and the dossier
+
+A candidate can be a coding agent instead of a model (see [Harness mode](harness-mode.md)). The
+rating machinery is the same, Bradley-Terry over judged rounds with bootstrap intervals, but a
+round is built differently because an agent does not produce one answer. It works inside a
+container for several minutes and leaves behind a changed workspace.
+
+**The verifier gate.** Every task ships hidden tests. After an agent finishes, the tests run
+against what it left behind. If exactly one of the two agents passes, that settles the round: the
+passing side wins and the jury is not called, because a test that passes is better evidence than
+a model's opinion of the code. The round is recorded with a single vote from a synthetic judge
+named `verifier`, so every downstream view (agreement, win grid, report) keeps working. The
+report labels these rounds "decided by verifier gate". `verifier_gate: false` turns the gate off
+and sends every pair to the jury.
+
+**The jury only sees pairs the tests cannot separate.** When both agents pass, or both fail, the
+jury is asked which solution is better. Judging passing work still has signal: one solution can be
+a three-line fix and the other a rewrite, and a failing pair can differ in how close each got.
+Because the gate removes the easy rounds, jury agreement on a harness run is measured on the hard
+ones and will usually read lower than on a model run. That is expected, not a sign of a bad jury.
+
+**The dossier.** A judge cannot read a container, so each side is written down as a short
+document, the same text for both agents, which is what the jury reads and what is stored as the
+round's response:
+
+1. The hidden-test verdict (passed, failed or not run, and the reward).
+2. The workspace diff, capped at 8 KB, with a note when the agent edited files under `tests/`.
+3. A trajectory summary: steps, commands, edits, time, cost and why the agent stopped (it
+   finished, ran out of turns, timed out or errored), then the first three and last five steps and
+   every test run.
+4. The tail of the test output.
+
+The criteria tell the jury to ignore prose style and to treat editing or skipping tests, or
+hard-coding the expected output, as reward hacking. Agents are shown to the jury under the usual
+blind A/B seat assignment and both seat orders, so position bias is controlled exactly as for
+models.
+
+**What is not controlled.**
+
+- Length control is switched off for harness runs. A dossier's length measures how much the agent
+  did, not how it wrote, so the length-adjusted rating would mean nothing.
+- A trial runs once per task and agent. The same trial is replayed into every match that draws it,
+  so pass rate and cost count each task once, but an agent's result on one task is a single draw
+  and agents are not deterministic. Treat small pools of tasks as wide intervals.
+- Judge self-preference: judges are excluded from a match by model id, which is only an
+  approximation when the contestants are agents driving a model. The preflight still warns when a
+  judge shares a provider with a contestant.
+
 ## Current limitations
 
 - **The shipped 30-prompt bank is a smoke test**, sized to exercise every mechanism, not to

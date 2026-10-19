@@ -39,6 +39,7 @@ class ModelCard(Static):
         self.add_class(f"side-{side}")
         self._display_name = ""
         self._model_id = ""
+        self._label = ""
         self._emblem = ""
         self._thinking = False
         self._max_hp = 100
@@ -72,7 +73,7 @@ class ModelCard(Static):
             prefix = f"{self._emblem}  " if self._emblem else ""
             self._name_w.update(f"{prefix}{self._display_name}{badge}")
         if self._model_w:
-            self._model_w.update(self._model_id)
+            self._model_w.update(self._label or self._model_id)
         if self._hp_bar:
             self._hp_bar.update(total=self._max_hp, progress=self._hp)
         self._update_hp_line()
@@ -92,9 +93,12 @@ class ModelCard(Static):
         emblem: str,
         max_hp: int,
         thinking: bool = False,
+        label: str = "",
     ) -> None:
+        """``label`` replaces the model line, e.g. 'pi · opus-5-5 · skills #a1b2'."""
         self._display_name = name
         self._model_id = model_id
+        self._label = label
         self._emblem = emblem
         self._thinking = thinking
         self._max_hp = max_hp
