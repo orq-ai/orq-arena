@@ -1,0 +1,10 @@
+{"prompt": "Write a Python function that finds the longest palindromic substring in a given string. Explain your approach.", "category": "code", "length_bucket": "medium"}
+{"prompt": "Implement a thread-safe LRU cache in Python using only the standard library. Walk me through the design.", "category": "code", "length_bucket": "medium"}
+{"prompt": "Given a list of integers, find the two numbers that sum to a target value. Optimize for time complexity and explain trade-offs.", "category": "code", "length_bucket": "short"}
+{"prompt": "A number is called 'practical' if every smaller positive integer can be represented as a sum of distinct divisors of it. Is 12 practical? Show your work.", "category": "math", "length_bucket": "short"}
+{"prompt": "Prove that the sum of the first n odd positive integers equals n squared. Offer a visual argument too.", "category": "math", "length_bucket": "short"}
+{"prompt": "Write a short story (under 300 words) about a lighthouse keeper who discovers that the lighthouse has been extinct for a century.", "category": "creative", "length_bucket": "medium"}
+{"prompt": "Compose a haiku sequence (three haikus) about an orc who secretly loves gardening.", "category": "creative", "length_bucket": "short"}
+{"prompt": "Explain the concept of 'technical debt' to a non-technical product manager, using a vivid analogy.", "category": "general", "length_bucket": "short"}
+{"prompt": "What are three common misconceptions about large language models? Explain why each is wrong.", "category": "general", "length_bucket": "medium"}
+{"prompt": "Plan a 3-day trip to Lisbon focused on food and history, with a daily budget of 80 euros.", "category": "general", "length_bucket": "medium"}
