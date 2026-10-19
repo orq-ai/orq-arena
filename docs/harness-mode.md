@@ -250,7 +250,8 @@ costs only that.
 - **A trial that could not run is voided, never lost.** If Harbor fails before the tests run
   (the container did not start, the agent could not be installed, the router refused every model
   call, a hard time limit), the round is voided and nothing is cached, so the next run tries
-  again. Only an agent that ran out of its own time, or whose tests ran and failed, loses a round.
+  again. An agent that ran out of its own time, whose model refused the task, or whose tests ran
+  and failed loses the round.
   Some task images cannot host some agents (a stale package index, for example); the voided
   round names the reason.
 - **Disk.** Docker needs room for every task image (hundreds of MB each, a few GB for some) and
@@ -276,14 +277,32 @@ costs only that.
 
 ## Reference run results
 
-To be filled after the reference run. Nothing below is measured yet.
+The shipped `configs/harness-tb21.yaml` on eight terminal-bench 2.1 tasks, measured on
+2026-10-19. claude-code, pi and pi + skills all run `anthropic/claude-opus-5-5`; codex runs
+`openai/gpt-6-luna`.
 
-| Harness | Pass rate | ELO (95% CI) | $/task (observed) | min/task |
+| Harness | Pass rate | ELO (95% CI) | $/task | min/task |
 |---|---|---|---|---|
-| claude-code | to be filled after the reference run | | | |
-| pi | to be filled after the reference run | | | |
-| pi + skills | to be filled after the reference run | | | |
-| codex | to be filled after the reference run | | | |
+| pi + skills | 8/8 | 1121 (999 to 1334) | 0.21 (estimated) | 1.4 |
+| claude-code | 8/8 | 1060 (914 to 1253) | 0.27 | 1.2 |
+| pi | 7/8 | 982 (851 to 1140) | 0.21 (estimated) | 1.3 |
+| codex | 5/8 | 837 (561 to 968) | 0.01 | 2.1 |
 
-Run conditions to record with the numbers: Harbor version, task sample (`--n`, `--seed`), machine
-and `max_parallel_trials`, wall time, and the share of rounds the verifier gate decided.
+How to read it:
+
+- **The top two are not separated.** pi + skills is ahead of claude-code in 69% of resamples, and
+  the order is not stable: an earlier run that reused the same trials on seven of the eight tasks
+  and only re-ran the jury put claude-code first. Between agents that pass the same tests, the
+  ranking is the jury's preference, and it moves between runs.
+- **The tests separate little at the top.** Four of the eight tasks are passed by every agent.
+  The one task that separates pi from pi + skills is `headless-terminal`, a single trial each:
+  suggestive for the skill, not a measurement.
+- **codex is clearly behind** on these tasks, failing three of them, and also by far the
+  cheapest.
+
+Run conditions: Harbor 0.24.0; `orq-arena tasks sample --n 8 --seed 7` (1 easy, 5 medium,
+2 hard), with `password-recovery` swapped for `cancel-async-tasks` because Opus 5.5 refuses it
+whatever the harness, which tells nothing about the harness; an Apple-silicon Mac with
+`max_parallel_trials: 2`; 32 trials, each run once and cached across runs; 48 rounds, of which
+the verifier gate decided 10 and the jury 38 (16 of those inconclusive); jury agreement 80%,
+jury cost $2.57 for the final run. A refusal counts as a loss, like any other failed task.
