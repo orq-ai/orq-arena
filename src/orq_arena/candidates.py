@@ -125,12 +125,19 @@ class HarnessCandidate(BaseModel):
 
     def _compute_variant(self) -> str:
         overlay_fp = self.overlay.fingerprint() if self.overlay else ""
-        if not (self.agent_kwargs or self.agent_env or self.extra_instructions or overlay_fp):
+        if not (
+            self.agent_kwargs
+            or self.agent_env
+            or self.extra_instructions
+            or self.timeout_multiplier
+            or overlay_fp
+        ):
             return ""
         blob = json.dumps(
             {
                 "kwargs": self.agent_kwargs,
-                "env": sorted(self.agent_env),
+                "env": self.agent_env,  # unexpanded ${VAR} text, so no secret is hashed
+                "timeout_multiplier": self.timeout_multiplier,
                 "instructions": self.extra_instructions,
                 "overlay": overlay_fp,
             },

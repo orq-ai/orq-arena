@@ -67,3 +67,11 @@ def route(agent: str, model_id: str, router_host: str, api_key: str) -> Route:
     if agent == "codex":
         return Route("orq_codex:OrqCodex", model_id, env, pythonpath=str(AGENT_DIR))
     raise ValueError(f"agent {agent!r} is not supported")
+
+
+def harness_model_id(candidate_id: str) -> str:
+    """'claude-code:anthropic/m#a1b2c3' -> 'anthropic/m'; any other id comes back unchanged."""
+    agent, sep, rest = candidate_id.partition(":")
+    if sep and agent in SUPPORTED_AGENTS:
+        return rest.split("#", 1)[0]
+    return candidate_id

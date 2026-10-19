@@ -168,6 +168,41 @@ def load_steps(trial_dir: Path, agent: str) -> list[Step]:
     return _steps_from_log(native_log(trial_dir, agent), agent)
 
 
+def _is_agent_timeout(exception: Any) -> bool:
+    """True only for the agent running out of its own time.
+
+    Judged on the exception's type, never its traceback text: every asyncio
+    cancellation traceback mentions a "timeout" frame, and a setup, image-pull or
+    verifier timeout is Harbor's problem, not the agent's.
+    """
+    kind = exception.get("exception_type", "") if isinstance(exception, dict) else ""
+    return str(kind) == "AgentTimeoutError"
+
+
+def result_problem(result: dict[str, Any], *, has_reward: bool) -> str | None:
+    """Why a finished trial says nothing about the agent, or None if it is a fair result.
+
+    Such a trial voids the round instead of scoring a loss: a model loses on its
+    work, never on the infrastructure under it.
+    """
+    exception = result.get("exception_info")
+    if exception and not has_reward and not _is_agent_timeout(exception):
+        text = exception if isinstance(exception, str) else json.dumps(exception, default=str)
+        kind = exception.get("exception_type", "") if isinstance(exception, dict) else ""
+        detail = (
+            exception.get("exception_message", "") if isinstance(exception, dict) else text
+        ) or text
+        return f"trial failed before the verifier ran: {kind} {str(detail)[:300]}".strip()
+    agent_result = result.get("agent_result") or {}
+    if not (agent_result.get("n_input_tokens") or agent_result.get("n_output_tokens")):
+        # The agent never got a model answer (router refusal, bad key, model not
+        # enabled): the verifier still ran on an untouched workspace and failed it.
+        return "the agent made no model call (the router may have refused it)"
+    if not has_reward and not exception:
+        return "the verifier did not run"
+    return None
+
+
 def load_trial(trial_dir: Path, agent: str) -> Trial:
     """Read a finished trial. A trial with no ``result.json`` carries an error."""
     result = _read_json(trial_dir / "result.json")
@@ -189,17 +224,10 @@ def load_trial(trial_dir: Path, agent: str) -> Trial:
         cost = done.meta.get("cost_usd")
 
     exit_reason = str(done.meta.get("exit", "finished")) if done else "finished"
-    error = None
+    error = result_problem(result, has_reward=reward is not None)
     if exception:
-        text = json.dumps(exception, default=str) if not isinstance(exception, str) else exception
-        if "timeout" in text.lower():
-            exit_reason = "timeout"
-        else:
-            exit_reason = "error"
-            if reward is None:
-                error = f"trial failed before the verifier ran: {text[:300]}"
-
-    if exit_reason == "timeout" and reward is None:
+        exit_reason = "timeout" if _is_agent_timeout(exception) else "error"
+    if exit_reason == "timeout" and reward is None and error is None:
         reward = 0.0  # out of time before the tests could pass is a fail, not "not run"
 
     tests = trial_dir / "verifier" / "test-stdout.txt"

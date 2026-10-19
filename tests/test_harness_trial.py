@@ -52,3 +52,56 @@ def test_an_agent_timeout_without_a_verdict_counts_as_a_fail(tmp_path):
 def test_a_missing_result_is_an_error(tmp_path):
     (tmp_path / "t").mkdir()
     assert load_trial(tmp_path / "t", "pi").error
+
+
+def _write(d: Path, **over) -> Path:
+    base = {
+        "agent_result": {"n_input_tokens": 10, "n_output_tokens": 5, "cost_usd": 0.1},
+        "verifier_result": {"rewards": {"reward": 0.0}},
+        "exception_info": None,
+    }
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "result.json").write_text(json.dumps({**base, **over}))
+    return d
+
+
+def test_a_timeout_word_in_a_traceback_is_not_an_agent_timeout(tmp_path):
+    # Every asyncio cancellation traceback mentions a timeout frame.
+    exc = {
+        "exception_type": "CancelledError",
+        "exception_message": "",
+        "exception_traceback": "File selectors.py, in select(timeout)\n    timeout_sec=timeout_sec",
+    }
+    d = _write(tmp_path / "t", exception_info=exc, verifier_result=None, agent_result=None)
+    t = load_trial(d, "pi")
+    assert t.error and t.passed is None and t.exit_reason == "error"
+
+
+def test_setup_and_verifier_timeouts_void_the_round_but_an_agent_timeout_is_a_fail(tmp_path):
+    for kind in ("EnvironmentStartTimeoutError", "AgentSetupTimeoutError", "VerifierTimeoutError"):
+        exc = {"exception_type": kind, "exception_message": "timed out"}
+        d = _write(tmp_path / kind, exception_info=exc, verifier_result=None)
+        assert load_trial(d, "pi").error, kind
+    exc = {"exception_type": "AgentTimeoutError", "exception_message": "timed out"}
+    d = _write(tmp_path / "agent", exception_info=exc, verifier_result=None)
+    t = load_trial(d, "pi")
+    assert t.error is None and t.passed is False and t.exit_reason == "timeout"
+
+
+def test_an_agent_that_never_got_a_model_answer_is_not_a_loss(tmp_path):
+    d = _write(tmp_path / "t", agent_result={"n_input_tokens": 0, "n_output_tokens": 0})
+    t = load_trial(d, "codex")
+    assert t.error and "no model call" in t.error
+
+
+def test_such_a_trial_is_not_cached_on_disk(tmp_path):
+    from orq_arena.harness.runner import cached_trial_dir
+
+    good = tmp_path / "job-good" / "t__a"
+    _write(good, verifier_result={"rewards": {"reward": 1.0}})
+    (good / "config.json").write_text("{}")
+    bad = tmp_path / "job-bad" / "t__a"
+    _write(bad, agent_result={"n_input_tokens": 0}, verifier_result={"rewards": {"reward": 0.0}})
+    (bad / "config.json").write_text("{}")
+    assert cached_trial_dir(tmp_path, "job-good") is not None
+    assert cached_trial_dir(tmp_path, "job-bad") is None

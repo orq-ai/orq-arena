@@ -19,6 +19,7 @@ from evaluatorq.pairwise import PairwiseVote
 
 from .config import ArenaConfig
 from .data.schemas import BattleRecord
+from .harness.routing import harness_model_id
 from .judging import judge_labels, judged_cost_usd, make_jury, pin_judge_endpoints
 from .providers.orq_gateway import OrqGateway
 from .tournament.driver import manifest_path_for, record_names
@@ -80,7 +81,7 @@ def panel_excluding_contestants(
     to neither falls back to a short-name match, so exclusion stays safe rather
     than silently letting a contestant judge itself.
     """
-    contestants_full = {short_to_full.get(m, m) for m in contestants}
+    contestants_full = {short_to_full.get(m, harness_model_id(m)) for m in contestants}
     unresolved_short = {m for m in contestants if m not in short_to_full}
 
     def is_contestant(j: str) -> bool:

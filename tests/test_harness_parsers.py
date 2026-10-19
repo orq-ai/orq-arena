@@ -122,3 +122,14 @@ def test_real_codex_logs_strip_the_bash_wrapper():
 def test_the_stalled_codex_log_never_looks_finished():
     kinds = _kinds("codex", "codex-failure-bare-model.txt")
     assert "done" not in kinds and "command" not in kinds
+
+
+def test_an_unexpected_shape_is_a_log_line_not_an_exception():
+    odd = [
+        {"type": "assistant", "message": {"content": [{"type": "text", "text": None}]}},
+        {"type": "tool_execution_end", "result": "a string, not a dict"},
+        {"type": "item.completed", "item": "not a dict"},
+    ]
+    for agent, obj in zip(("claude-code", "pi", "codex"), odd, strict=True):
+        steps = parse_line(agent, json.dumps(obj))
+        assert steps and all(s.kind in ("log", "observation") for s in steps)

@@ -289,3 +289,50 @@ async def test_pi_cost_is_estimated_from_tokens_and_tagged(tmp_path):
     finally:
         FakeProc.wait = orig  # type: ignore[method-assign]
     assert trial.cost_estimated and trial.cost_usd == pytest.approx((10 * 1.0 + 5 * 2.0) / 1e6)
+
+
+async def test_a_hard_limit_outranks_the_result_harbor_wrote_on_cancel(tmp_path, monkeypatch):
+    runner = _runner(tmp_path, Spawner())
+    monkeypatch.setattr(runner, "_hard_timeout_s", lambda *_: 0.0)
+
+    class Slow(FakeProc):
+        async def wait(self):
+            if self.returncode is None and not getattr(self, "_cancelled", False):
+                await asyncio.sleep(10)
+            return self.returncode
+
+        def send_signal(self, sig):
+            # Harbor writes a cancelled result with a verifier-less exception
+            trial = Path(self._arg("-o")) / self._arg("--job-name") / "task__x"
+            trial.mkdir(parents=True)
+            (trial / "config.json").write_text("{}")
+            (trial / "result.json").write_text(json.dumps({
+                "exception_info": {"exception_type": "CancelledError"},
+                "verifier_result": None, "agent_result": None,
+            }))  # fmt: skip
+            self._cancelled = True
+            self.returncode = -2
+
+    async def spawn(*argv, **_):
+        return Slow(list(argv))
+
+    runner._spawn = spawn
+    trial = await runner.run_side(
+        item=ITEM, candidate=_cand(), events=asyncio.Queue(), match_id="M", side="a"
+    )
+    assert trial.error and trial.passed is None
+
+
+async def test_an_unexpected_exception_voids_one_round_instead_of_raising(tmp_path, monkeypatch):
+    runner = _runner(tmp_path, Spawner())
+
+    async def boom(*_a, **_k):
+        raise RuntimeError("bug")
+
+    monkeypatch.setattr(runner, "_run_live", boom)
+    trial = await runner.run_side(
+        item=ITEM, candidate=_cand(), events=asyncio.Queue(), match_id="M", side="a"
+    )
+    assert trial.error and "bug" in trial.error
+    # and the key was forgotten, so a later match may try again
+    assert not runner._trials

@@ -31,7 +31,7 @@ from . import tail
 from .diff import RunCmd, run_cmd, workspace_diff
 from .parsers import parse_line
 from .routing import route
-from .trial import Trial, find_trial_dir, load_trial
+from .trial import Trial, find_trial_dir, load_trial, result_problem
 
 EXTRAS_FILE = "orq_arena.json"  # diff stat and notes, next to Harbor's own files
 PATCH_FILE = "diff.patch"
@@ -78,11 +78,11 @@ def finished_trial_dir(trials_dir: Path, name: str) -> Path | None:
 
 
 def cached_trial_dir(trials_dir: Path, name: str) -> Path | None:
-    """A trial worth replaying: finished, with the verifier's verdict.
+    """A trial worth replaying: finished, with the verifier's verdict, and a fair run.
 
     A cancelled or crashed trial also writes ``result.json`` (with an
-    ``exception_info`` and no verifier result), so the file's presence alone says
-    nothing about whether the agent got a fair run.
+    ``exception_info`` and no verifier result), and a trial whose agent never got a
+    model answer has a verdict that says nothing about the agent. Neither is reused.
     """
     trial = finished_trial_dir(trials_dir, name)
     if trial is None:
@@ -91,7 +91,9 @@ def cached_trial_dir(trials_dir: Path, name: str) -> Path | None:
         result = json.loads((trial / "result.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
-    return trial if isinstance(result, dict) and result.get("verifier_result") else None
+    if not isinstance(result, dict) or not result.get("verifier_result"):
+        return None
+    return trial if result_problem(result, has_reward=True) is None else None
 
 
 class HarborRunner:
@@ -225,15 +227,15 @@ class HarborRunner:
                 await self._replay(trial, events, match_id, side)
             else:
                 trial = await self._run_live(item, candidate, name, events, match_id, side)
-        except BaseException as exc:
-            # Nothing finished: forget the key so a later match may try again.
+        except asyncio.CancelledError:
             self._trials.pop(key, None)
-            if isinstance(exc, Exception):
-                fut.set_exception(exc)
-                fut.exception()  # mark retrieved when nobody else is waiting
-            else:
-                fut.cancel()
+            fut.cancel()
             raise
+        except Exception as exc:  # a bug here must void one round, not end the tournament
+            trial = await self._fail(f"harness failure: {exc!r}", candidate, events, match_id, side)
+        if trial.error:
+            # Forget it: a later match may get a better run than this one did.
+            self._trials.pop(key, None)
         fut.set_result(trial)
         return trial
 
@@ -246,8 +248,13 @@ class HarborRunner:
     async def _load(self, trial_dir: Path, item: PromptItem, c: HarnessCandidate) -> Trial:
         trial = self._priced(load_trial(trial_dir, c.agent), c)
         extras_path = trial_dir / EXTRAS_FILE
+        extras: dict[str, Any] | None = None
         if extras_path.exists():
-            extras = json.loads(extras_path.read_text(encoding="utf-8"))
+            try:
+                extras = json.loads(extras_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                extras = None  # recompute the diff below
+        if extras is not None:
             patch = trial_dir / PATCH_FILE
             trial.diff = patch.read_text(encoding="utf-8") if patch.exists() else ""
             trial.diff_stat = extras.get("diff_stat", "")
@@ -395,6 +402,10 @@ class HarborRunner:
                 side,
             )
         trial = self._priced(load_trial(trial_dir, c.agent), c)
+        if error and trial.error is None:
+            trial.error = (
+                error  # our own verdict (hard limit) outranks a result Harbor wrote on cancel
+            )
         if trial.error is None:
             await self._attach_diff(trial, trial_dir, item)
         await events.put(self._ready(trial, match_id, side, replay=False))

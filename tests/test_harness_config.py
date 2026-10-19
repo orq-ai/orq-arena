@@ -149,3 +149,30 @@ def test_decision_judges_are_refused_with_a_harness():
 def test_a_unknown_harness_key_is_a_typo_not_a_silent_drop():
     with pytest.raises(ValidationError):
         _cfg(_h(agnet_kwargs={}), _h(agent="codex", model_id="openai/c"))
+
+
+def test_env_values_and_timeout_multiplier_tell_setups_apart():
+    a = HarnessCandidate.model_validate(_h(agent_env={"K": "8000"}))
+    b = HarnessCandidate.model_validate(_h(agent_env={"K": "32000"}))
+    c = HarnessCandidate.model_validate(_h(timeout_multiplier=3))
+    assert len({a.candidate_id, b.candidate_id, c.candidate_id, _h_id()}) == 4
+
+
+def _h_id() -> str:
+    return HarnessCandidate.model_validate(_h()).candidate_id
+
+
+def test_two_names_for_one_setup_are_rejected():
+    with pytest.raises(ValidationError, match="same agent, model and setup"):
+        _cfg(_h(name="one"), _h(name="two"))
+
+
+def test_rejudge_excludes_a_harness_contestants_model():
+    from orq_arena.rejudge import panel_excluding_contestants
+
+    panel = panel_excluding_contestants(
+        ["anthropic/m", "openai/j", "openai/m"],
+        frozenset({"claude-code:anthropic/m#a1b2c3", "pi:openai/m"}),
+        {},
+    )
+    assert panel == ["openai/j"]

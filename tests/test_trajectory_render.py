@@ -433,7 +433,9 @@ async def test_diff_is_read_from_the_trial_cache(tmp_path):
         trial = tmp_path / job_name(TASK, cfg.candidates[0].candidate_id) / "trial-1"
         trial.mkdir(parents=True)
         (trial / "config.json").write_text("{}")
-        (trial / "result.json").write_text('{"verifier_result": {"rewards": {"reward": 1}}}')
+        (trial / "result.json").write_text(
+            '{"verifier_result": {"rewards": {"reward": 1}}, "agent_result": {"n_input_tokens": 5}}'
+        )
         (trial / PATCH_FILE).write_text("--- a/f\n+++ b/f\n@@ -1 +1 @@\n-1\n+2\n")
         app._handle_event(_solution("a", False))
         await pilot.pause()

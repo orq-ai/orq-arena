@@ -170,7 +170,9 @@ class ArenaApp(App):
             return known
         if self.cfg.has_harness:
             # Never mint a model spec for a harness name; show the bare name.
-            return HarnessCandidate(kind="harness", name=name, agent="?", model_id=name)
+            return HarnessCandidate.model_construct(
+                kind="harness", name=name, agent="?", model_id=name
+            )
         return CandidateSpec(model_id=name)
 
     def _task_line(self, prompt: str) -> str:

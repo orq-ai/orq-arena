@@ -294,4 +294,7 @@ def parse_line(agent: str, line: str) -> list[Step]:
     parser = _PARSERS.get(agent)
     if parser is None:
         return [_log(obj)]
-    return parser(obj)
+    try:
+        return parser(obj)
+    except Exception:  # a shape we did not expect is a log line, never a crashed tournament
+        return [_log(obj)]

@@ -177,6 +177,16 @@ class ArenaConfig(BaseModel):
                 self.renamed.append((name, c.candidate_id))
                 c.name = c.candidate_id
 
+        by_id: dict[str, str] = {}
+        for c in self.candidates:
+            if isinstance(c, HarnessCandidate):
+                if c.candidate_id in by_id:
+                    raise ValueError(
+                        f"Duplicate harness setup: {by_id[c.candidate_id]!r} and {c.name!r} "
+                        f"are the same agent, model and setup ({c.candidate_id})"
+                    )
+                by_id[c.candidate_id] = c.name
+
         seen: dict[str, str] = {}
         for c in self.candidates:
             if c.name in seen:
