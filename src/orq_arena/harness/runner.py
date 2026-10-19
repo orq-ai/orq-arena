@@ -287,6 +287,9 @@ class HarborRunner:
             json.dumps({"diff_stat": d.stat, "diff_note": d.note, "tests_edited": d.tests_edited}),
             encoding="utf-8",
         )
+        # The diff is all the arena needs from the workspace. Some tasks leave
+        # gigabytes in /app (disk images, build trees), times every trial.
+        shutil.rmtree(trial_dir / "artifacts" / "app", ignore_errors=True)
 
     @staticmethod
     def _ready(trial: Trial, match_id: str, side: Literal["a", "b"], replay: bool) -> SolutionReady:
