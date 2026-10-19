@@ -212,9 +212,13 @@ The Decisions API is in beta and carries no evaluators or guardrails yet.
   probabilities, not a prompted verdict. `judge_api` now decides the endpoint and the arena pins
   every judge to it.
 - **Decision judges can hit the workspace rate limit.** A re-judge at concurrency 8 with three
-  decision judges and both seat orders sends more than 1,500 requests a minute, the router's
-  per-workspace cap, and evaluatorq does not retry a 429: the vote is lost. Live runs stay under
-  it (generation is the bottleneck); keep `rejudge --concurrency` at 3 or below for a three-judge decision panel.
+  decision judges and both seat orders wants 48 requests in flight, and a provider behind the
+  router can answer 429. evaluatorq does not retry a 429: the vote is lost. Since evaluatorq 1.74
+  it also caps in-flight judge requests at 10 per process. We measured both on the 140-round
+  quickstart log with the budget panel (October 2026): the default cap took 49 s and a cap raised
+  to 48 took 43 s, and both runs lost pplx-decider-v1-27b votes to 429s. So the cap costs little
+  and does not remove the 429s; we keep it. Live runs stay under it (generation is the
+  bottleneck), and a re-judge that loses votes can be repeated at a lower `--concurrency`.
 - **jev-latest's catalog window (64k) is not its limit:** state plus question must fit 32k.
   Prompt plus two capped responses stays well under that on every shipped config.
 

@@ -246,3 +246,45 @@ def test_new_judge_keys_leave_an_old_runs_config_hash_alone():
     recorded = json.loads((root / "battles.run.json").read_text())["config_sha256"]
     assert config_sha256(cfg) == recorded
     assert config_sha256(cfg.model_copy(update={"judge_swap": False})) != recorded
+
+
+async def test_evaluatorq_caps_in_flight_judge_calls_below_a_rejudge_fan_out(monkeypatch):
+    """`rejudge --concurrency 8` with 3 judges x 2 seat orders wants 48 calls at once.
+
+    evaluatorq 1.74 holds them to 10 per process unless the caller sets a limit.
+    The docs say so; if upstream moves the slot or the default, this fails.
+    """
+    from types import SimpleNamespace
+
+    from evaluatorq import llm_concurrency_limit, llm_slot
+
+    from orq_arena import rejudge
+    from tests.test_rejudge_ranking_identity import _rec
+
+    live = peak = 0
+
+    class _SlotComparator:
+        async def compare(self, **_kw):
+            async def call():
+                nonlocal live, peak
+                async with llm_slot():
+                    live += 1
+                    peak = max(peak, live)
+                    await asyncio.sleep(0.01)
+                    live -= 1
+
+            await asyncio.gather(*(call() for _ in range(6)))  # 3 judges x 2 seat orders
+            return PairwiseComparison.model_validate({"winner": "A", "votes": []})
+
+    monkeypatch.setattr(judging, "llm_jury_pairwise", lambda **_kw: _SlotComparator())
+    monkeypatch.setattr(rejudge, "OrqGateway", lambda cfg: SimpleNamespace(client=object()))
+    cfg = _cfg()
+    records = [_rec(i, "A") for i in range(20)]
+
+    await rejudge.rejudge_run(cfg=cfg, records=records, judges=["prov/j1"], concurrency=8)
+    assert peak == 10
+
+    peak = 0
+    async with llm_concurrency_limit(48):
+        await rejudge.rejudge_run(cfg=cfg, records=records, judges=["prov/j1"], concurrency=8)
+    assert peak == 48

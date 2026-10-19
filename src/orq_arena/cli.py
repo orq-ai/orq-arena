@@ -599,7 +599,7 @@ def pool(config_path: str, as_json: bool) -> None:
     "--concurrency",
     default=4,
     show_default=True,
-    help="Concurrent judge calls.",
+    help="Rounds judged at once (evaluatorq caps in-flight judge calls at 10).",
 )
 def rejudge(
     log_path: str,
