@@ -96,6 +96,8 @@
   .judge button.sel-tie { border-color: var(--yellow); color: var(--yellow); }
   .judge .out { margin-top: 0.6em; padding-top: 0.6em; border-top: 1px dashed var(--line); min-height: 2.8em; }
   .verdict { text-align: center; padding: 1.2vmin; border: 1px solid var(--line); background: var(--ink-raised); }
+  .race { min-height: 22vh; } .stream { font-size: 0.95em; }
+  .facts { font-size: 0.85em; } .stream .bars { font-size: 1em; } #dReading { font-size: 0.9em; }
   #keys {
     display: none; position: fixed; inset: 20vh 30vw; background: var(--ink-raised);
     border: 1px solid var(--a); padding: 3vmin; font-size: 0.8em; z-index: 9;
@@ -205,8 +207,23 @@ match:
 </section>
 
 <section class="slide" id="deciders" data-chapter="6">
-  <h1>Decision models as judges</h1>
-  <p class="say">say: placeholder</p>
+  <h1>Decision models as judges: one round, two ways</h1>
+  <div class="ctl"><button id="dRace">race one round</button><span class="T">same prompt and pair as the jury room <span class="toy-tag">toy</span></span></div>
+  <div class="two">
+    <div class="card race"><h4>LLM judge <span class="T">(claude-haiku, prompted)</span></h4><div id="dLLM" class="stream T">idle</div></div>
+    <div class="card race"><h4>Decision model <span class="T">(jev-latest, /decisions)</span></h4><div id="dDEC" class="stream T">idle</div></div>
+  </div>
+  <div class="two facts">
+    <div><b>LLM trio</b>: <b class="Y">3.4 s</b> a round, <b class="Y">$6.32</b> per 1k rounds, decides <b>55%</b>, κ <b>0.89</b></div>
+    <div><b>decision panel</b>: <b class="G">0.6 s</b> a round, <b class="G">$0.59</b> per 1k rounds, decides <b id="dDecided">77%</b>, κ <b id="dKappa">0.92</b></div>
+  </div>
+  <div class="bars">
+    <div class="bar"><span>LLM trio</span><div class="track"><div class="fill" style="width:55%;background:var(--chrome-dim)"></div></div><span class="val">55% decided</span></div>
+    <div class="bar"><span>decision panel</span><div class="track"><div class="fill" id="dBar" style="width:77%;background:var(--b)"></div></div><span class="val" id="dBarVal">77% decided</span></div>
+  </div>
+  <div class="ctl">abstain floor <input type="range" id="dFloor" min="0" max="3" step="1" value="0"><b id="dFloorLbl">off</b><span class="note" id="dReading"></span></div>
+  <p class="note">Measured against a reference jury on 140 rounds (docs/research/llm-judges-vs-decision-models.md). The panel was picked on these two pools. Decision models give no reasons and read 32k to 64k tokens of context: long transcripts and agent traces still want an LLM panel.</p>
+  <p class="say">say: an LLM judge writes you a paragraph and you parse a letter out of it. A decision model answers the question with probabilities, in about half a second, billed on input only. Same panel size, 40% more rounds decided (77 against 55), better agreement with a $70 per 1k rounds reference jury. Then drag the floor: confidence buys agreement and costs rounds. Say the caveat before anyone asks.</p>
 </section>
 
 <section class="slide" id="ring" data-chapter="7">
@@ -461,6 +478,51 @@ function initJudges() {
   jRender();
 }
 TOY_INITS.push(initJudges);
+
+// ---------- toy 4: decision models as judges
+// docs/research/llm-judges-vs-decision-models.md, judge_abstain_below table, pool 2
+TOY_CHECKS.deciders = () => {
+  if (!(FLOORS[0][1] === 77 && FLOORS[3][1] === 44)) throw new Error('FLOORS');
+};
+const FLOORS = [['off', 77, 0.92], ['0.5', 68, 0.91], ['0.6', 58, 0.97], ['0.7', 44, 0.97]];  // floor, decided %, kappa
+const D_READING = [
+  'every vote counts',
+  'votes under 0.5 confidence abstain',
+  'near-perfect agreement, a quarter of the rounds gone, wider intervals',
+  'agreement flat from 0.6, nearly half the rounds gone',
+];
+const D_PROSE = 'Both responses address the rate limit. Response A identifies that a semaphore bounds requests in flight, which is the actual failure mode. Response B suggests a fixed sleep, a common but fragile workaround that does not bound concurrency. Considering correctness and depth, Response A is better.';
+let dTimers = [];
+function dFloorRender() {
+  const k = +document.getElementById('dFloor').value, [label, decided, kappa] = FLOORS[k];
+  document.getElementById('dFloorLbl').textContent = label;
+  document.getElementById('dDecided').textContent = decided + '%';
+  document.getElementById('dKappa').textContent = kappa.toFixed(2);
+  document.getElementById('dBar').style.width = decided + '%';
+  document.getElementById('dBarVal').textContent = decided + '% decided';
+  document.getElementById('dReading').textContent = `${D_READING[k]}: ${decided}% decided, κ ${kappa.toFixed(2)}`;
+}
+function dRace() {
+  dTimers.forEach(clearTimeout); dTimers = [];
+  const L = document.getElementById('dLLM'), D = document.getElementById('dDEC');
+  L.innerHTML = '<span class="T">thinking...</span>'; D.innerHTML = '<span class="T">...</span>';
+  const prob = (cls, label, p, color) => `<div class="bar"><span class="${cls}">${label}</span><div class="track"><div class="fill" style="width:${p * 100}%;background:${color}"></div></div><span class="val">${p.toFixed(2)}</span></div>`;
+  dTimers.push(setTimeout(() => {
+    D.innerHTML = '<div class="bars">' + prob('A', 'P(A)', 0.81, 'var(--a)') + prob('B', 'P(B)', 0.11, 'var(--b)') + prob('Y', 'P(tie)', 0.08, 'var(--yellow)') + '</div><div class="G" style="margin-top:0.6em">0.6 s, done</div>';
+  }, 600));
+  const words = D_PROSE.split(' '), tick = 3400 / words.length;
+  words.forEach((_, i) => dTimers.push(setTimeout(() => {
+    const done = i === words.length - 1;
+    L.innerHTML = '<span style="color:var(--chrome)">' + words.slice(0, i + 1).join(' ') + '</span>' + (done
+      ? ' <b class="A">Verdict: [[A]]</b><div class="Y" style="margin-top:0.6em">3.4 s, then parse the letter</div>' : ' ▍');
+  }, tick * (i + 1))));
+}
+function initDeciders() {
+  document.getElementById('dRace').onclick = dRace;
+  document.getElementById('dFloor').oninput = dFloorRender;
+  dFloorRender();
+}
+TOY_INITS.push(initDeciders);
 </script>
 
 <script>
