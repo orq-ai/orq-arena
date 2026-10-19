@@ -204,6 +204,20 @@ async def test_the_key_and_the_endpoint_travel_in_the_environment_not_argv(tmp_p
     assert env["ANTHROPIC_BASE_URL"] == "https://my.orq.ai/v3/anthropic"
 
 
+async def test_a_subscription_login_in_the_shell_never_reaches_harbor(tmp_path, monkeypatch):
+    # With these set, Harbor bills the user's Claude or Codex subscription, not the router.
+    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "oauth-token")
+    monkeypatch.setenv("CLAUDE_FORCE_OAUTH", "1")
+    monkeypatch.setenv("CODEX_FORCE_AUTH_JSON", "1")
+    spawn = Spawner()
+    await _runner(tmp_path, spawn).run_side(
+        item=ITEM, candidate=_cand(), events=asyncio.Queue(), match_id="M", side="a"
+    )
+    env = spawn.envs[0]
+    assert not {"CLAUDE_CODE_OAUTH_TOKEN", "CLAUDE_FORCE_OAUTH", "CODEX_FORCE_AUTH_JSON"} & set(env)
+    assert env["ANTHROPIC_API_KEY"] == "sk-test-key"
+
+
 async def test_pi_and_codex_routes(tmp_path):
     spawn = Spawner()
     runner = _runner(tmp_path, spawn)

@@ -77,6 +77,20 @@ def finished_trial_dir(trials_dir: Path, name: str) -> Path | None:
     return trial if trial is not None and (trial / "result.json").exists() else None
 
 
+# Harbor switches an agent to the user's own subscription (Claude, Codex) when these are
+# set. Dropped from the inherited environment so every call bills the orq router.
+SUBSCRIPTION_ENV = frozenset(
+    {
+        "CLAUDE_CODE_OAUTH_TOKEN",
+        "CLAUDE_FORCE_OAUTH",
+        "ANTHROPIC_AUTH_TOKEN",
+        "ANTHROPIC_OAUTH_TOKEN",
+        "CODEX_FORCE_AUTH_JSON",
+        "CODEX_AUTH_JSON_PATH",
+    }
+)
+
+
 def cached_trial_dir(trials_dir: Path, name: str) -> Path | None:
     """A trial worth replaying: finished, with the verifier's verdict, and a fair run.
 
@@ -179,7 +193,8 @@ class HarborRunner:
         )
         if instructions:
             argv += ["--extra-instruction", instructions]
-        env = {**os.environ, **r.env, **self._agent_env(c)}
+        inherited = {k: v for k, v in os.environ.items() if k not in SUBSCRIPTION_ENV}
+        env = {**inherited, **r.env, **self._agent_env(c)}
         if r.pythonpath:
             env["PYTHONPATH"] = os.pathsep.join(
                 p for p in (r.pythonpath, env.get("PYTHONPATH")) if p

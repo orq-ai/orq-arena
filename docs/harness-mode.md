@@ -41,7 +41,9 @@ side's verdict, diff and trajectory.
   The docs were written against Harbor 0.24; the run manifest records the version that ran.
 - **`ORQ_API_KEY`** in the environment, as for any run. It reaches every agent as the router key
   through the Harbor process's environment (never a command-line argument or a file), so one key
-  covers the agents and the judges.
+  covers the agents and the judges. A Claude or Codex subscription login in your shell
+  (`CLAUDE_CODE_OAUTH_TOKEN`, `CLAUDE_FORCE_OAUTH`, `CODEX_FORCE_AUTH_JSON` and the like) is
+  dropped before Harbor starts, so a run never bills your subscription.
 
 `orq-arena run` checks all of this before it spends anything and stops with a list of what is
 missing (see [Preflight](#preflight-and-the-run-plan)).
