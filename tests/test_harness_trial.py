@@ -94,6 +94,20 @@ def test_an_agent_that_never_got_a_model_answer_is_not_a_loss(tmp_path):
     assert t.error and "no model call" in t.error
 
 
+def test_a_model_refusal_is_a_loss_not_a_void(tmp_path):
+    # claude-code reports a refusal with zero tokens, which must not read as a router failure.
+    exc = {"exception_type": "AgentSafetyRefusalError", "exception_message": "refused"}
+    for name, verifier in (("ran", {"rewards": {"reward": 0.0}}), ("skipped", None)):
+        d = _write(
+            tmp_path / name,
+            exception_info=exc,
+            verifier_result=verifier,
+            agent_result={"n_input_tokens": 0, "n_output_tokens": 0, "cost_usd": 0.06},
+        )
+        t = load_trial(d, "claude-code")
+        assert t.error is None and t.passed is False and t.exit_reason == "refused", name
+
+
 def test_such_a_trial_is_not_cached_on_disk(tmp_path):
     from orq_arena.harness.runner import cached_trial_dir
 

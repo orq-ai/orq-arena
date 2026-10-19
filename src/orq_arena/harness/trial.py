@@ -34,7 +34,7 @@ class Trial:
     tokens_in: int = 0
     tokens_out: int = 0
     duration_ms: int = 0
-    exit_reason: str = "finished"  # finished | max_turns | timeout | error
+    exit_reason: str = "finished"  # finished | max_turns | timeout | refused | error
     # Set when the trial never produced a judgeable result (Harbor failed, the
     # agent could not start, the router refused it). The round is voided.
     error: str | None = None
@@ -168,6 +168,10 @@ def load_steps(trial_dir: Path, agent: str) -> list[Step]:
     return _steps_from_log(native_log(trial_dir, agent), agent)
 
 
+def _exception_kind(exception: Any) -> str:
+    return str(exception.get("exception_type", "")) if isinstance(exception, dict) else ""
+
+
 def _is_agent_timeout(exception: Any) -> bool:
     """True only for the agent running out of its own time.
 
@@ -175,8 +179,12 @@ def _is_agent_timeout(exception: Any) -> bool:
     cancellation traceback mentions a "timeout" frame, and a setup, image-pull or
     verifier timeout is Harbor's problem, not the agent's.
     """
-    kind = exception.get("exception_type", "") if isinstance(exception, dict) else ""
-    return str(kind) == "AgentTimeoutError"
+    return _exception_kind(exception) == "AgentTimeoutError"
+
+
+def _is_refusal(exception: Any) -> bool:
+    """True when the model declined the task: the agent's own outcome, so a loss."""
+    return _exception_kind(exception) == "AgentSafetyRefusalError"
 
 
 def result_problem(result: dict[str, Any], *, has_reward: bool) -> str | None:
@@ -186,6 +194,9 @@ def result_problem(result: dict[str, Any], *, has_reward: bool) -> str | None:
     work, never on the infrastructure under it.
     """
     exception = result.get("exception_info")
+    if _is_refusal(exception):
+        # A refusal records no tokens, which would otherwise read as a router failure.
+        return None
     if exception and not has_reward and not _is_agent_timeout(exception):
         text = exception if isinstance(exception, str) else json.dumps(exception, default=str)
         kind = exception.get("exception_type", "") if isinstance(exception, dict) else ""
@@ -225,10 +236,12 @@ def load_trial(trial_dir: Path, agent: str) -> Trial:
 
     exit_reason = str(done.meta.get("exit", "finished")) if done else "finished"
     error = result_problem(result, has_reward=reward is not None)
-    if exception:
+    if _is_refusal(exception):
+        exit_reason = "refused"
+    elif exception:
         exit_reason = "timeout" if _is_agent_timeout(exception) else "error"
-    if exit_reason == "timeout" and reward is None and error is None:
-        reward = 0.0  # out of time before the tests could pass is a fail, not "not run"
+    if exit_reason in ("timeout", "refused") and reward is None and error is None:
+        reward = 0.0  # out of time or refused before the tests could pass is a fail
 
     tests = trial_dir / "verifier" / "test-stdout.txt"
     tail = ""
