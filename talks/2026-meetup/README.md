@@ -12,7 +12,7 @@ offline before the talk.
 | `audience_prompts.py` | form export (CSV) plus `seed.jsonl` to one prompts JSONL |
 | `seed.jsonl` | 10 rows from `prompts/starter.jsonl`, so the run starts with or without submissions |
 | `demo.yaml` | the live run's config: `configs/budget_8.yaml` with its decision-model panel |
-| `fallback/` | a rehearsal run: `battles.jsonl`, its report, and the TUI recording |
+| `fallback/` | not recorded yet: a rehearsal run's `battles.jsonl`, its report, and the TUI recording |
 | `qr.svg`, `qr-repo.svg` | form QR (placeholder) and repo QR |
 
 ## Still to fill in
@@ -21,6 +21,8 @@ offline before the talk.
   `uvx segno --scale 10 --border 2 --dark "#f2ecff" --light "#060310" --output=talks/2026-meetup/qr.svg "<form url>"`.
   The form asks for one field whose name contains "prompt"; nothing else is needed.
 - **LMArena raise.** The hook slide carries `<!-- VERIFY raise figure before talk -->`.
+- **evaluatorq 1.74.** The agents slide says evaluatorq 1.74 renders tool calls for the judge
+  (verified on 1.74.0, `common/messages.py`). Master pins `>=1.55.1`; check the bump has merged.
 - **Rehearsal and fallback.** Not run yet (it spends money). Record wall time, rated rounds
   and cost here, and the pool if it had to be trimmed to finish in 15 minutes.
 
@@ -29,7 +31,10 @@ offline before the talk.
 ### The day before
 
 1. Key: `export ORQ_API_KEY=$(sed 's/^ORQ_API_KEY=//' ~/.orq/api-key)`, then
-   `orq-arena pool --config talks/2026-meetup/demo.yaml`.
+   `orq-arena run --config talks/2026-meetup/demo.yaml --prompts talks/2026-meetup/seed.jsonl --output /tmp/keycheck/battles.jsonl`
+   and answer no at the confirmation pause. The credential check runs before the pause (a
+   stale key fails there); the thinking probe before it costs cents. `orq-arena pool` reads
+   only the YAML and proves nothing about the key.
 2. `python3 talks/2026-meetup/check.py` prints `ok`.
 3. Wifi off: `asciinema play talks/2026-meetup/fallback/demo.cast` plays and
    `open talks/2026-meetup/fallback/battles.report.html` opens from disk.
@@ -44,17 +49,19 @@ Form open, the title slide up with its QR. Export the responses as CSV just befo
 ```bash
 python3 talks/2026-meetup/audience_prompts.py ~/Downloads/form.csv -o /tmp/meetup.jsonl
 orq-arena run --config talks/2026-meetup/demo.yaml --prompts /tmp/meetup.jsonl \
-  --output /tmp/meetup/battles.jsonl --tui
+  --output /tmp/meetup/battles.jsonl --overwrite --tui
 ```
 
-No CSV yet? Leave the CSV out and the run goes on the seed alone. Leave the TUI running in
+`--overwrite` because a practice run may have left a log there. No CSV yet? Leave the CSV
+out and the run goes on the seed alone. Leave the TUI running in
 its own window and go back to the deck.
 
 ### Chapter 8: read the result
 
 The leaderboard shows an `audience` category slice only once there are 20 decided rounds on
 audience prompts (`MIN_CATEGORY_COMPARISONS` in `src/orq_arena/tournament/driver.py`). Under
-20, say the overall ladder is on seed plus audience and move on.
+20, say the overall ladder is on seed plus audience and move on. Rough guide: about 140 rounds
+at 77% decided means three or more submissions usually get there.
 
 Bonus, if time allows: did the jury matter?
 
@@ -67,6 +74,7 @@ orq-arena rejudge /tmp/meetup/battles.jsonl --config orq_arena.yaml --judge-api 
 ### Fallback
 
 Wifi down or 429s piling up: switch to the recording and the saved report, one command each.
+Not recorded yet: until the rehearsal runs, there is no fallback.
 
 ```bash
 asciinema play talks/2026-meetup/fallback/demo.cast

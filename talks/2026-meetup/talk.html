@@ -38,7 +38,7 @@
     display: none; color: var(--chrome-dim); font-size: 0.7em;
     border-left: 3px solid var(--yellow); padding-left: 1vmin;
   }
-  body.say .say { display: block; }
+  body.show-say .say { display: block; }
   .note { color: var(--chrome-dim); font-size: 0.75em; min-height: 1.4em; }
   .A { color: var(--a); } .B { color: var(--b); } .T { color: var(--chrome-dim); }
   .X { color: var(--orange); } .G { color: var(--green); } .Y { color: var(--yellow); } .R { color: var(--red); }
@@ -192,7 +192,7 @@ match:
   <div class="verdict" id="jVerdict"></div>
 <pre>judges: [typesafe/jev-latest, perplexity/pplx-decider-v1-27b, openai/gpt-6-luna]
 min_successful_judges: 2   # quorum</pre>
-  <p class="say">say: every judge reads the pair twice, A first, then B first. If it changes its answer when the seats swap, the vote was about the seat, not the answer, and it abstains. Two valid votes make a quorum; fewer and the round is inconclusive, which is thrown out, not counted as a tie. Fleiss kappa on the report is how often the judges agree beyond chance. Let three people in the room be the judges.</p>
+  <p class="say">say: every judge reads the pair twice, A first, then B first. If it changes its answer when the seats swap, the vote was about the seat, not the answer, and it abstains. Two valid votes make a quorum, and the most common answer wins; fewer votes, or a split with no single top answer, and the round is inconclusive, which is thrown out, not counted as a tie. Fleiss kappa on the report is how often the judges agree beyond chance. Let three people in the room be the judges.</p>
 </section>
 
 <section class="slide" id="bt" data-chapter="5">
@@ -230,7 +230,7 @@ min_successful_judges: 2   # quorum</pre>
   </div>
 
   <div class="beat" id="btBeat3">
-    <p class="say">say: we saw 60 rounds, not 60 thousand. Reshuffle them with replacement, refit, repeat. The spread is how sure we are. While bands overlap it is a tier, not a rank. The report says this on every run.</p>
+    <p class="say">say: we saw 68 rounds, not 68 thousand. Reshuffle them with replacement, refit, repeat. The spread is how sure we are. While bands overlap it is a tier, not a rank. The report says this on every run.</p>
     <div class="ctl">
       <button id="btBoot1">resample once</button><button id="btBoot50">resample 50x</button><button id="btBootReset">reset</button>
       <span id="btBootInfo"></span>
@@ -260,7 +260,7 @@ min_successful_judges: 2   # quorum</pre>
 <pre>judge_api: decisions
 judge_abstain_below: 0.6   # default off</pre>
   <p class="note">Measured against a reference jury on 140 rounds (docs/research/llm-judges-vs-decision-models.md). The panel was picked on these two pools. Decision models give no reasons and read 32k to 64k tokens of context: long transcripts and agent traces still want an LLM panel.</p>
-  <p class="say">say: an LLM judge writes you a paragraph and you parse a letter out of it. A decision model answers the question with probabilities, in about half a second, billed on input only. Same panel size, 40% more rounds decided (77 against 55), better agreement with a $70 per 1k rounds reference jury. Then drag the floor: confidence buys agreement and costs rounds. Say the caveat before anyone asks.</p>
+  <p class="say">say: an LLM judge writes you a paragraph and you parse a letter out of it. A decision model answers the question with probabilities, in about half a second, billed on input only. Same panel size, 40% more rounds decided (77 against 55), better agreement with a $70 per 1k rounds reference jury. Then drag the floor: confidence buys agreement and costs rounds. Say the caveat before anyone asks, and one more: the reference jury seats grok-4.6 and this pool seats a grok, so pool 2's κ 0.92 may be flattered; pool 1, with no such overlap, gave 0.87 against 0.83.</p>
 </section>
 
 <section class="slide" id="ring" data-chapter="7">
@@ -409,9 +409,11 @@ TOY_CHECKS.bt = () => {
   if (Math.abs(winProb(400) - 0.909) > 0.001) throw new Error('400 is 10 to 1');
   if (Math.abs(winProb(0) - 0.5) > 1e-9) throw new Error('even');
   const b = bootstrap(W, 20); if (b.length !== 4 || b[0].length !== 20) throw new Error('bootstrap shape');
+  if (BT_ROUNDS !== 68) throw new Error('BT_W holds 68 rounds');
 };
 const BT_MODELS = ['opus', 'gpt-5.4', 'gemini', 'mistral'];
-const BT_W = [[0, 7, 8, 9], [5, 0, 7, 8], [3, 4, 0, 8], [2, 3, 4, 0]];  // row beat column, 60 rounds
+const BT_W = [[0, 7, 8, 9], [5, 0, 7, 8], [3, 4, 0, 8], [2, 3, 4, 0]];  // row beat column
+const BT_ROUNDS = BT_W.flat().reduce((a, b) => a + b, 0);
 // One MM step; the light prior keeps an unbeaten model finite. Normalised to geometric mean 1.
 function btStep(W, s) {
   const n = W.length;
@@ -478,8 +480,8 @@ function btBootRender() {
     band[i] ? `<div class="ci" style="left:${btPct(band[i][0])}%;width:${btPct(band[i][1]) - btPct(band[i][0])}%"></div>` : ''}<div class="pt" style="left:${btPct(base[i])}%"></div></div><span class="val">${
     band[i] ? Math.round(band[i][0]) + '..' + Math.round(band[i][1]) : Math.round(base[i])}</span></div>`).join('');
   const draws = bt.ghosts[0].length, [top, second] = order;
-  document.getElementById('btBootInfo').innerHTML = `resamples <b>${draws}</b>, 60 rounds each`;
-  document.getElementById('btBootSay').innerHTML = !band[top] ? 'each tick is one refit on a reshuffled set of the same 60 rounds'
+  document.getElementById('btBootInfo').innerHTML = `resamples <b>${draws}</b>, ${BT_ROUNDS} rounds each`;
+  document.getElementById('btBootSay').innerHTML = !band[top] ? `each tick is one refit on a reshuffled set of the same ${BT_ROUNDS} rounds`
     : band[second][1] > band[top][0] ? `<span class="X">${BT_MODELS[top]} and ${BT_MODELS[second]} bands overlap: same tier, not a strict ranking</span>`
     : `<span class="G">${BT_MODELS[top]} is clear of ${BT_MODELS[second]}</span>`;
 }
@@ -511,7 +513,10 @@ TOY_CHECKS.judges = () => {
   if (panelVerdict([v('A', 'B'), v('A', 'B'), v('A', 'B')]).verdict !== 'A') throw new Error('unanimous');
   if (panelVerdict([v('A', 'A'), v('A', 'A'), v('A', 'B')]).verdict !== 'inconclusive') throw new Error('two flips, no quorum');
   const r = panelVerdict([v('A', 'A'), v('B', 'A'), v('B', 'A')]); if (r.verdict !== 'B' || r.abstained !== 1) throw new Error('one flip');
-  if (panelVerdict([v('A', 'B'), v('B', 'A'), v('tie', 'tie')]).verdict !== 'tie') throw new Error('no majority');
+  // evaluatorq's plurality vote: a split with no single top answer is inconclusive, not a tie
+  if (panelVerdict([v('A', 'B'), v('B', 'A'), v('tie', 'tie')]).verdict !== 'inconclusive') throw new Error('split');
+  if (panelVerdict([v('A', 'B'), v('B', 'A'), v('A', 'A')]).verdict !== 'inconclusive') throw new Error('split after a flip');
+  if (panelVerdict([v('tie', 'tie'), v('tie', 'tie'), v('A', 'B')]).verdict !== 'tie') throw new Error('tie plurality');
 };
 const J_NAMES = ['jev-latest', 'pplx-decider', 'gpt-6-luna'];
 const J_SWAP = { A: 'B', B: 'A', tie: 'tie' };
@@ -526,9 +531,10 @@ function panelVerdict(votes) {
   if (cast.includes(null)) return { verdict: 'waiting', abstained: 0, valid: 0 };
   const valid = cast.filter(v => v !== 'abstain'), abstained = cast.length - valid.length;
   if (valid.length < 2) return { verdict: 'inconclusive', abstained, valid: valid.length };
-  const n = k => valid.filter(v => v === k).length;
-  const verdict = n('A') > n('B') && n('A') > n('tie') ? 'A' : n('B') > n('A') && n('B') > n('tie') ? 'B' : 'tie';
-  return { verdict, abstained, valid: valid.length };
+  const n = k => valid.filter(v => v === k).length, top = Math.max(n('A'), n('B'), n('tie'));
+  const leaders = ['A', 'B', 'tie'].filter(k => n(k) === top);
+  if (leaders.length > 1) return { verdict: 'inconclusive', abstained, valid: valid.length, split: true };
+  return { verdict: leaders[0], abstained, valid: valid.length };
 }
 const jVotes = J_NAMES.map(() => ({ ab: null, ba: null }));
 function jRender() {
@@ -547,8 +553,8 @@ function jRender() {
   const r = panelVerdict(jVotes), extra = r.abstained ? `, ${r.abstained} abstained` : '';
   document.getElementById('jVerdict').innerHTML =
     r.verdict === 'waiting' ? '<span class="T">jury room: waiting for all three judges</span>'
-    : r.verdict === 'inconclusive' ? `<span class="X">inconclusive</span>: ${r.abstained} of 3 flipped, no quorum. Round excluded, not a tie.`
-    : r.verdict === 'tie' ? `<span class="Y">tie</span>: no majority among ${r.valid} valid votes${extra}`
+    : r.verdict === 'inconclusive' ? `<span class="X">inconclusive</span>: ${r.split ? `split ${r.valid} ways, no plurality${extra}` : `${r.abstained} of 3 flipped, no quorum`}. Round excluded, not a tie.`
+    : r.verdict === 'tie' ? `<span class="Y">tie</span>: the judges agree neither is better (${r.valid} valid votes${extra})`
     : `<span class="${r.verdict}">${r.verdict} wins</span> (${r.valid} valid votes${extra})`;
 }
 function initJudges() {
@@ -617,11 +623,12 @@ function show(i) {
   document.getElementById('pos').textContent = (cur + 1) + ' / ' + slides.length;
 }
 document.addEventListener('keydown', e => {
-  if (e.target.tagName === 'INPUT' || e.metaKey || e.ctrlKey || e.altKey) return;
   const k = e.key;
+  // a focused slider keeps its arrows; clicker keys (PageUp/PageDown) and letters still drive the deck
+  if ((e.target.tagName === 'INPUT' && k.startsWith('Arrow')) || e.metaKey || e.ctrlKey || e.altKey) return;
   if (k === 'ArrowRight' || k === ' ' || k === 'PageDown') { e.preventDefault(); show(cur + 1); }
   else if (k === 'ArrowLeft' || k === 'PageUp') { e.preventDefault(); show(cur - 1); }
-  else if (k === 's') document.body.classList.toggle('say');
+  else if (k === 's') document.body.classList.toggle('show-say');
   else if (k === '?') document.getElementById('keys').classList.toggle('open');
   else if (k === 'Escape') document.getElementById('keys').classList.remove('open');
   else if (/^[0-9]$/.test(k)) {
@@ -629,6 +636,8 @@ document.addEventListener('keydown', e => {
     if (at >= 0) show(at);
   }
 });
+// let go of a slider after a drag, so the arrows go back to the deck
+document.addEventListener('change', e => { if (e.target.tagName === 'INPUT') e.target.blur(); });
 TOY_INITS.forEach(init => init());
 const fromHash = () => show(Math.max(0, slides.findIndex(s => '#' + s.id === location.hash)));
 window.addEventListener('hashchange', fromHash);
