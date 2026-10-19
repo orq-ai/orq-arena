@@ -29,6 +29,8 @@ site/
 # The committed example run is the exception to the ignores above.
 !examples/**/battles.jsonl
 !examples/**/battles.run.json
+!talks/**/battles.jsonl
+!talks/**/battles.run.json
 examples/**/run.log
 # local run scratch at the repo root
 /newbattles*

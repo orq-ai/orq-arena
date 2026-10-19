@@ -30,7 +30,7 @@
   p { margin: 0; }
   pre {
     margin: 0; padding: 1.2vmin 1.6vmin; background: var(--ink-raised);
-    border-left: 3px solid var(--b); font-size: 0.75em; white-space: pre-wrap; overflow: hidden;
+    border-left: 3px solid var(--b); font-size: 0.8em; font-family: inherit; white-space: pre-wrap; overflow: hidden;
   }
   code { color: var(--yellow); }
   ul { margin: 0; padding-left: 1.2em; } li { margin: 0.3em 0; }
@@ -98,6 +98,12 @@
   .verdict { text-align: center; padding: 1.2vmin; border: 1px solid var(--line); background: var(--ink-raised); }
   .race { min-height: 22vh; } .stream { font-size: 0.95em; }
   .facts { font-size: 0.85em; } .stream .bars { font-size: 1em; } #dReading { font-size: 0.9em; }
+  #hook, #byok, #ring, #result, #agents, #close { font-size: 1.15em; }
+  .big { font-size: 3.4em; } .lead { font-size: 1.15em; color: var(--chrome); }
+  .titlebox { display: flex; gap: 5vmin; align-items: center; justify-content: space-between; flex: 1; }
+  .titlebox > div { display: flex; flex-direction: column; gap: 2.4vmin; }
+  .qr { margin: 0; text-align: center; color: var(--chrome-dim); font-size: 0.7em; }
+  .qr img { width: 34vmin; height: 34vmin; display: block; margin-bottom: 1vmin; }
   #keys {
     display: none; position: fixed; inset: 20vh 30vw; background: var(--ink-raised);
     border: 1px solid var(--a); padding: 3vmin; font-size: 0.8em; z-index: 9;
@@ -109,13 +115,30 @@
 <body>
 
 <section class="slide" id="title" data-chapter="0">
-  <h1>Title</h1>
-  <p class="say">say: placeholder</p>
+  <div class="titlebox">
+    <div>
+      <h1 class="big">orq-arena<span class="sub">your prompts, your judges, your pool</span></h1>
+      <p class="lead">Submit one prompt now: something you would really ask a model at work.<br>
+        Tonight's arena ranks models on it before we finish.</p>
+      <p class="T">Arian Pasquali · orq.ai</p>
+    </div>
+    <figure class="qr"><img src="qr.svg" alt="QR code to the prompt form"><figcaption>one prompt each</figcaption></figure>
+  </div>
+  <p class="say">say: while people sit down, one prompt each, anything you would actually ask a model at work. No names, only the prompt column is kept.</p>
 </section>
 
 <section class="slide" id="hook" data-chapter="1">
-  <h1>Hook</h1>
-  <p class="say">say: placeholder</p>
+  <h1>A public leaderboard answers someone else's question</h1>
+  <ul>
+    <li><b class="Y">LMArena</b>: a Berkeley side project in 2023, now the scoreboard every lab launches against, and a company that raised $100M in May 2025.<!-- VERIFY raise figure before talk --></li>
+    <li><b class="Y">The Leaderboard Illusion</b> (Singh et al., 2025): undisclosed private testing, best-of-N scores, unequal access to the arena's own data.</li>
+    <li>Its prompts are not yours. Neither are its judges, nor its pool.</li>
+  </ul>
+  <p class="lead">Build your own arena, this evening, on your prompts.</p>
+<pre>git clone https://github.com/orq-ai/orq-arena && cd orq-arena
+uv tool install '.[tui]'
+orq-arena run --config configs/budget_8.yaml --prompts your_prompts.jsonl --tui</pre>
+  <p class="say">say: check the raise figure the week of the talk (the brainstorm recalled about $100M in May 2025 and $150M in January 2026). The point is not that LMArena is wrong; it is that it is not yours. Then show the QR again.</p>
 </section>
 
 <section class="slide" id="build" data-chapter="2">
@@ -145,8 +168,17 @@ match:
 </section>
 
 <section class="slide" id="byok" data-chapter="3">
-  <h1>BYOK</h1>
-  <p class="say">say: placeholder</p>
+  <h1>One key, one catalog, one bill</h1>
+  <ul>
+    <li>Every candidate, judge and probe call goes through the orq.ai router: one <code>ORQ_API_KEY</code>.</li>
+    <li>The router's model catalog carries the prices, so the report shows dollars per model.</li>
+    <li>Provider contracts of your own? Bring your own keys to orq.ai: same router, your billing.</li>
+    <li>None of it? Point <code>gateway.base_url</code> at any other endpoint and the run opts out of the router entirely.</li>
+  </ul>
+<pre>gateway:
+  base_url: https://my.orq.ai/v3/router   # the default; any other URL opts out
+  candidate_max_tokens: 2048</pre>
+  <p class="say">say: said before anyone asks. Yes, it is our router, and it is what makes one key and one price table possible. Your own provider keys plug in with BYOK; base_url is the exit.</p>
 </section>
 
 <section class="slide" id="judges" data-chapter="4">
@@ -158,6 +190,8 @@ match:
   </div>
   <div class="three" id="jCards"></div>
   <div class="verdict" id="jVerdict"></div>
+<pre>judges: [typesafe/jev-latest, perplexity/pplx-decider-v1-27b, openai/gpt-6-luna]
+min_successful_judges: 2   # quorum</pre>
   <p class="say">say: every judge reads the pair twice, A first, then B first. If it changes its answer when the seats swap, the vote was about the seat, not the answer, and it abstains. Two valid votes make a quorum; fewer and the round is inconclusive, which is thrown out, not counted as a tie. Fleiss kappa on the report is how often the judges agree beyond chance. Let three people in the room be the judges.</p>
 </section>
 
@@ -203,6 +237,7 @@ match:
     </div>
     <div class="bars" id="btBootBars"></div>
     <p class="note" id="btBootSay"></p>
+<pre>orq-arena report battles.jsonl   # ELO with these bands, every run</pre>
   </div>
 </section>
 
@@ -222,28 +257,74 @@ match:
     <div class="bar"><span>decision panel</span><div class="track"><div class="fill" id="dBar" style="width:77%;background:var(--b)"></div></div><span class="val" id="dBarVal">77% decided</span></div>
   </div>
   <div class="ctl">abstain floor <input type="range" id="dFloor" min="0" max="3" step="1" value="0"><b id="dFloorLbl">off</b><span class="note" id="dReading"></span></div>
+<pre>judge_api: decisions
+judge_abstain_below: 0.6   # default off</pre>
   <p class="note">Measured against a reference jury on 140 rounds (docs/research/llm-judges-vs-decision-models.md). The panel was picked on these two pools. Decision models give no reasons and read 32k to 64k tokens of context: long transcripts and agent traces still want an LLM panel.</p>
   <p class="say">say: an LLM judge writes you a paragraph and you parse a letter out of it. A decision model answers the question with probabilities, in about half a second, billed on input only. Same panel size, 40% more rounds decided (77 against 55), better agreement with a $70 per 1k rounds reference jury. Then drag the floor: confidence buys agreement and costs rounds. Say the caveat before anyone asks.</p>
 </section>
 
 <section class="slide" id="ring" data-chapter="7">
   <h1>Deciders in the ring</h1>
-  <p class="say">say: placeholder</p>
+  <ul>
+    <li>A router is a decider too: given this prompt, which model?</li>
+    <li>Arena data is what trains one: every decided round is a preference pair, on your prompts.</li>
+    <li>And an arena is how you judge one: its pick against the alternatives, same jury.</li>
+  </ul>
+  <p class="T">one record from <code>battles.jsonl</code> (examples/quickstart), trimmed:</p>
+<pre>{
+  "prompt_text": "Compute 2^100 mod 1000 without a calculator. Explain the technique you use.",
+  "model_a": "claude-sonnet-4-6",
+  "model_b": "deepseek-chat",
+  "majority_verdict": "A",
+  "judge_votes": [
+    {"model": "anthropic/claude-haiku-4-5-20251001", "vote": "A", "flipped": false},
+    "..."
+  ]
+}</pre>
+  <p class="say">say: this is the data. Preference pairs on your prompts, with the judges' votes and whether they flipped. Every run writes it; nothing else to collect.</p>
 </section>
 
 <section class="slide" id="result" data-chapter="8">
-  <h1>Live result</h1>
-  <p class="say">say: placeholder</p>
+  <h1>Your prompts, mixed into a seed set</h1>
+  <ul>
+    <li>Back to the terminal: the overall ladder, with its bands.</li>
+    <li>The <code>audience</code> slice: on your prompts alone, this is the order.</li>
+    <li>Wide bands are the lesson from the Bradley-Terry toy, live: a tier, not a rank.</li>
+    <li>Did the jury matter? Re-judge the same responses with an LLM trio, no regeneration.</li>
+  </ul>
+<pre>orq-arena rejudge /tmp/meetup/battles.jsonl --judge-api llm \
+  --judge anthropic/claude-haiku-4-5-20251001 \
+  --judge google/gemini-3.5-flash-lite --judge openai/gpt-5.4-nano</pre>
+  <p class="say">say: the audience slice needs 20 decided audience rounds; under 20 decided audience rounds the slice does not show; say the overall ladder is on seed plus audience and move on. The rejudge prints a Spearman against the decision panel's ranking: close to 1 means the cheap jury told the same story. Skip it if time is short.</p>
 </section>
 
 <section class="slide" id="agents" data-chapter="9">
-  <h1>Agents and harnesses</h1>
-  <p class="say">say: placeholder</p>
+  <h1>Agents and harnesses: not yet</h1>
+  <p class="lead">Nothing in the arena takes an agent today.</p>
+  <div class="two">
+    <div class="card"><h4><span class="G">near</span></h4>An orq agent or deployment as a candidate, same prompts, judged on its final answer. The judging side is close to free: evaluatorq 1.74 already renders tool calls and tool results into the transcript a judge reads.<!-- verified: evaluatorq 1.74.0 common/messages.py, messages_to_text and _tool_call_text --></div>
+    <div class="card"><h4><span class="X">far</span></h4>Judging the trajectory, not the answer: tool execution, multi-turn state, a new record schema, and a TUI that shows tool calls.</div>
+  </div>
+<pre>candidates:                       # sketch, not shipped
+  - model_id: openai/gpt-5.4-mini
+  - agent_key: support-triage     # an orq agent, judged on its final answer</pre>
+  <p class="say">say: first chapter to cut if the slot is short. No claim the tool cannot back: the arena ranks models today; agents are the near tier, trajectories the far one.</p>
 </section>
 
 <section class="slide" id="close" data-chapter="10">
-  <h1>Close</h1>
-  <p class="say">say: placeholder</p>
+  <div class="titlebox">
+    <div>
+      <h1>Private evals on your prompts</h1>
+      <ul>
+        <li>Your prompts, your judges, your pool: one command, one evening.</li>
+        <li>Decision models make the jury cheap enough to run on every change.</li>
+        <li class="T">What if the deciders played, not judged? Robocode tanks, a decider picking each move. Not built.</li>
+      </ul>
+<pre>orq-arena run --config configs/budget_8.yaml --prompts your_prompts.jsonl --tui</pre>
+    </div>
+    <figure class="qr"><img src="qr-repo.svg" alt="QR code to github.com/orq-ai/orq-arena"><figcaption>github.com/orq-ai/orq-arena</figcaption></figure>
+  </div>
+  <p class="say">say: thank the room, show their prompts' ladder one last time if it is still up, then questions.</p>
 </section>
 
 <div class="foot"><span id="pos"></span> · orq-arena</div>
