@@ -12,7 +12,7 @@ A new model ships every few weeks, and each one tops a leaderboard somewhere. Wh
 
 So run your own leaderboard. orq-arena ranks your model pool head-to-head on your own prompts and answers the question directly: **"which of these models actually wins on my data, and can I trust the ranking?"**
 
-One command runs a round-robin tournament over your models. A panel of LLM judges compares every pair of answers blind, in both orders so no judge can favor "whichever answer came first". Out the other end: a chess-style **ELO leaderboard** with confidence intervals.
+One command runs a round-robin tournament over your models. A panel of judges compares every pair of answers blind, in both orders by default (`judge_swap: false` halves judge calls and leaves position bias unmeasured), so no judge can favor "whichever answer came first". Out the other end: a chess-style **ELO leaderboard** with confidence intervals.
 
 Every run opens on the **Run Plan**: the full pool, every judge, and the estimated cost to run the benchmark:
 
@@ -24,7 +24,7 @@ And ends on the **Final Results**: ELO with 95% CIs, the length-controlled ratin
 
 ## Why orq-arena?
 
-Eval suites score models one at a time and stop discriminating once several models pass: everything reads 9/10 and the ranking goes flat. Head-to-head comparison keeps discriminating: show a judge two answers to the same prompt and ask which is better, the same technique the big human-preference leaderboards use, with an LLM jury instead of a crowd. The verdicts are guarded: every pair is judged twice with the answers swapped, a judge that changes its vote when only the order changed is discarded for that round, and if too few trustworthy votes remain the round counts as `inconclusive` rather than a coin flip.
+Eval suites score models one at a time and stop discriminating once several models pass: everything reads 9/10 and the ranking goes flat. Head-to-head comparison keeps discriminating: show a judge two answers to the same prompt and ask which is better, the same technique the big human-preference leaderboards use, with a model jury instead of a crowd. The verdicts are guarded: every pair is judged twice with the answers swapped, a judge that changes its vote when only the order changed is discarded for that round, and if too few trustworthy votes remain the round counts as `inconclusive` rather than a coin flip.
 
 Models are called through the [orq.ai router gateway](https://docs.orq.ai/docs/ai-gateway), so one API key covers every provider; judging is [evaluatorq](https://github.com/orq-ai/evaluatorq), our library for exactly this kind of jury.
 
@@ -39,8 +39,9 @@ Models are called through the [orq.ai router gateway](https://docs.orq.ai/docs/a
 ## What you get
 
 - **A ranking you can defend.** The rating is [Bradley-Terry](https://en.wikipedia.org/wiki/Bradley%E2%80%93Terry_model), the statistical model behind chess-style ratings, fit over every judged round with bootstrapped 95% confidence intervals. When a run is too small to separate the top two, the report says exactly that, with the measured gap, instead of calling it a tie or hiding it. Judge-agreement stats ship with the standings.
-- **A report you can share.** One HTML per run. Verdict first, then the ELO ladder with error bars, a quality-vs-cost chart, latency, and the dollar spend: exact per model at catalog rates, and marked `≈` for the jury, whose spend is estimated at the panel's mean rate because the log stores one token total for the panel.
+- **A report you can share.** One HTML per run. Verdict first, then the ELO ladder with error bars, a quality-vs-cost chart, latency, and the dollar spend: exact per model at catalog rates, and exact for the jury too, priced per judge call (logs recorded before that show the jury marked `≈`, estimated at the panel's mean rate).
 - **Raw data out the back.** Every judged round lands in `battles.jsonl`: both responses, each judge's vote, exact token counts, per-response timing. Real pairwise preference data for whatever you want to do next.
+- **Two kinds of jury.** Decision models (the default in the shipped configs; the code default is `judge_api: llm`) answer one A/B/tie question through the orq.ai Decisions API with a probability per option, for input tokens only; prompted LLM judges (`judge_api: llm`) write their reasons. On two 140-round pools the decision panel agreed with a strong reference jury better, decided about a third more rounds and cost about an eleventh as much: [LLM judges vs decision models](docs/research/llm-judges-vs-decision-models.md).
 - **Jury swaps.** The responses are already recorded, so re-judging with a different panel costs judge tokens only, and tells you how much the ranking depends on who judged it.
 - **Human spot-checks.** `annotate` renders a run into a blind page (no model names, no jury votes) you can send to human raters; `anchor` compares their votes with the panel's.
 - **Watch live.** `--tui` (optional extra) opens on a Run Plan consent screen (the full per-model cost table), then streams the run as a live arena with health bars and judge cards.
@@ -115,7 +116,7 @@ orq-arena run --config orq_arena.yaml --prompts orq:<dataset_id>
 
 Dataset-backed runs record the [Dataset](https://docs.orq.ai/docs/ai-studio/optimize/datasets)'s id, name, and studio URL in the manifest, and the report links it by name. If each match should see every prompt, pass `--rounds <n>`; the preflight warns when it samples a subset.
 
-Set expectations for the out-of-the-box run: the shipped 30-prompt bank and cheap default judge trio are a **smoke test** that exercises every mechanism, not a benchmark. Expect wide, overlapping error bars and a judge/candidate family-overlap caveat on the report; both are the honest output at that scale. A ranking you intend to defend takes your own prompt set (hundreds of rounds) and judges from families outside the pool ([Methodology](docs/methodology.md#current-limitations)).
+Set expectations for the out-of-the-box run: the shipped 30-prompt bank and default judge panel are a **smoke test** that exercises every mechanism, not a benchmark. Expect wide, overlapping error bars; that is the honest output at that scale. A ranking you intend to defend takes your own prompt set (hundreds of rounds) and judges from families outside the pool, which two of the three default decision judges are ([Methodology](docs/methodology.md#current-limitations)).
 
 ## Usage
 

@@ -10,13 +10,15 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from collections.abc import Sequence
 from pathlib import Path
 
-from evaluatorq import PairwiseComparison, build_report, llm_jury_pairwise
+from evaluatorq import PairwiseComparison, build_report
 
 from .config import ArenaConfig
 from .data.schemas import BattleRecord
+from .judging import judge_labels, judged_cost_usd, make_jury, pin_judge_endpoints
 from .providers.orq_gateway import OrqGateway
 from .tournament.driver import manifest_path_for, record_names
 from .tournament.elo import bradley_terry_mle, build_wins_matrix
@@ -125,8 +127,13 @@ async def rejudge_run(
     concurrency: int = 4,
     short_to_full: dict[str, str] | None = None,
 ) -> dict:
-    """Re-score every record; return comparisons, report, and ranking delta."""
+    """Re-score every record; return comparisons, report, and ranking delta.
+
+    ``cfg`` supplies everything about the panel except its members: the judge
+    API, seat swap, abstain floor, replacements and gateway.
+    """
     gateway = OrqGateway(cfg.gateway)
+    await pin_judge_endpoints(cfg.model_copy(update={"judges": judges}), gateway.client)
     sem = asyncio.Semaphore(max(1, concurrency))
 
     # Records carry short names; resolve to full model ids so self-judge
@@ -145,31 +152,32 @@ async def rejudge_run(
             panel = panel_excluding_contestants(judges, key, short_to_full)
             if not panel:
                 raise ValueError(f"every judge is a contestant in {sorted(key)}")
-            comparators[key] = llm_jury_pairwise(
-                judges=panel,
-                criteria=criteria or cfg.criteria,
-                replacement_judges=panel_excluding_contestants(
+            comparators[key] = make_jury(
+                cfg,
+                panel=panel,
+                replacements=panel_excluding_contestants(
                     list(cfg.replacement_judges), key, short_to_full
-                )
-                or None,
+                ),
+                client=gateway.client,
+                criteria=criteria,
                 # A 1-judge rejudge panel is legitimate; don't let the run
                 # config's quorum (sized for its own panel) reject it.
                 min_successful_judges=min(cfg.min_successful_judges, len(panel)),
-                max_tokens=cfg.gateway.judge_max_tokens,
-                timeout_ms=cfg.gateway.judge_timeout_ms,
-                client=gateway.client,
             )
         return comparators[key]
 
-    async def score(rec: BattleRecord) -> PairwiseComparison:
+    async def score(rec: BattleRecord) -> tuple[PairwiseComparison, int]:
         async with sem:
-            return await comparator_for(rec).compare(  # type: ignore[attr-defined]
+            t0 = time.monotonic()
+            comparison = await comparator_for(rec).compare(  # type: ignore[attr-defined]
                 question=rec.prompt_text,
                 response_a=rec.response_a,
                 response_b=rec.response_b,
             )
+            return comparison, int((time.monotonic() - t0) * 1000)
 
-    comparisons = await asyncio.gather(*(score(r) for r in records))
+    scored = await asyncio.gather(*(score(r) for r in records))
+    comparisons = [c for c, _ in scored]
 
     # Rank on the same key every other view uses: the full router id where the
     # record carries one, rendered as the display name the report would show.
@@ -192,6 +200,7 @@ async def rejudge_run(
     )
     return {
         "comparisons": comparisons,
+        "judge_ms": [ms for _, ms in scored],
         "report": build_report(comparisons),
         "old_ranking": old_rank,
         "new_ranking": new_rank,
@@ -203,13 +212,21 @@ async def rejudge_run(
 
 
 def write_rejudged(
-    path: str | Path, records: list[BattleRecord], comparisons: list[PairwiseComparison]
+    path: str | Path,
+    records: list[BattleRecord],
+    comparisons: list[PairwiseComparison],
+    judge_ms: list[int] | None = None,
 ) -> None:
     with Path(path).open("w", encoding="utf-8") as fh:
-        for rec, c in zip(records, comparisons, strict=True):
+        for i, (rec, c) in enumerate(zip(records, comparisons, strict=True)):
+            usage = c.token_usage
             row = rec.model_copy(
                 update={
                     "judge_votes": [v.model_dump() for v in c.votes],
+                    "judge_tokens_in": usage.input_tokens if usage else 0,
+                    "judge_tokens_out": usage.output_tokens if usage else 0,
+                    "judge_cost_usd": judged_cost_usd(c),
+                    "judge_ms": judge_ms[i] if judge_ms else 0,
                     "majority_verdict": c.winner,
                     "winner": (
                         rec.model_a
@@ -309,9 +326,10 @@ def render_result(result: dict) -> None:
     t = Table(title="new jury behaviour")
     for col in ("judge", "A-lean", "B-lean", "flip rate", "tie rate"):
         t.add_column(col)
+    labels = judge_labels([j.model for j in report.per_judge])
     for j in report.per_judge:
         t.add_row(
-            j.model.split("/")[-1],
+            labels[j.model],
             "–" if j.a_rate is None else f"{j.a_rate:.0%}",
             "–" if j.b_rate is None else f"{j.b_rate:.0%}",
             f"{j.position_bias:.0%}",

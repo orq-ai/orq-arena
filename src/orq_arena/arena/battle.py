@@ -21,8 +21,6 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from evaluatorq import llm_jury_pairwise
-
 from ..candidates import CandidateSpec
 from ..config import ArenaConfig
 from ..data.prompts import PromptItem
@@ -39,6 +37,7 @@ from ..events import (
     TurnPrompt,
     TurnResolved,
 )
+from ..judging import judged_cost_usd, make_jury, vote_probabilities
 from ..providers.orq_gateway import OrqGateway
 
 
@@ -177,15 +176,7 @@ class Battle:
                 f"{candidate_b.name}, add a neutral judge to the config."
             )
         replacements = [m for m in cfg.replacement_judges if m not in contestants]
-        self._jury = llm_jury_pairwise(
-            judges=panel,
-            criteria=cfg.criteria,
-            replacement_judges=replacements or None,
-            min_successful_judges=cfg.min_successful_judges,
-            max_tokens=cfg.gateway.judge_max_tokens,
-            timeout_ms=cfg.gateway.judge_timeout_ms,
-            client=gateway.client,
-        )
+        self._jury = make_jury(cfg, panel=panel, replacements=replacements, client=gateway.client)
 
     async def _void_round(
         self,
@@ -290,6 +281,7 @@ class Battle:
                 )
                 continue
 
+            t0 = time.monotonic()
             try:
                 comparison = await self._jury.compare(
                     question=prompt, response_a=res_a.text, response_b=res_b.text
@@ -306,14 +298,18 @@ class Battle:
                     ),
                 )
                 continue
+            judge_ms = int((time.monotonic() - t0) * 1000)
 
             for vote in comparison.votes:
+                probabilities = vote_probabilities(vote)
                 await self.events.put(
                     JudgeVerdictEvent(
                         match_id=self.match_id,
-                        judge_name=vote.model.split("/")[-1],
+                        judge_name=vote.model,
                         verdict=vote.vote or "abstain",
-                        reasoning=vote.explanation,
+                        # A decision judge's explanation only restates its numbers.
+                        reasoning="" if probabilities else vote.explanation,
+                        probabilities=probabilities,
                         flipped=vote.flipped,
                         replacement=vote.replacement,
                     )
@@ -364,6 +360,8 @@ class Battle:
                     duration_b_ms=res_b.duration_ms,
                     judge_tokens_in=judge_usage.input_tokens if judge_usage else 0,
                     judge_tokens_out=judge_usage.output_tokens if judge_usage else 0,
+                    judge_cost_usd=judged_cost_usd(comparison),
+                    judge_ms=judge_ms,
                     tournament_id=self.tournament_id,
                     match_id=self.match_id,
                     round_number=round_number,

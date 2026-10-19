@@ -6,10 +6,18 @@ from textual.widgets import Static
 
 _CUES = {"a": "→ A", "b": "→ B", "tie": "→ TIE", "abstain": "✕ abstain"}
 _VERDICT_CLASSES = ("verdict-a", "verdict-b", "verdict-tie", "verdict-abstain")
+# (probability key, row label, fill colour): sides keep their theme colours.
+_BAR_ROWS = (("A", "A", "$accent"), ("B", "B", "$primary"), ("tie", "=", "#ffd54d"))
+
+
+def _bar(p: float, width: int = 22) -> str:
+    filled = round(max(0.0, min(1.0, p)) * width)
+    return "█" * filled + "░" * (width - filled)
 
 
 class JudgeCard(Static):
-    """One judge's reconciled vote + reasoning snippet."""
+    """One judge's reconciled vote + reasoning snippet, or P(A)/P(B)/P(tie) bars
+    for a decision judge, which returns probabilities and no prose."""
 
     DEFAULT_CSS = """
     JudgeCard {
@@ -27,11 +35,13 @@ class JudgeCard(Static):
     JudgeCard.verdict-abstain { border: round $error; }
     """
 
-    def __init__(self, judge_name: str, **kwargs) -> None:
+    def __init__(self, judge_name: str, *, abstain_below: float | None = None, **kwargs) -> None:
         super().__init__(**kwargs)
         self.judge_name = judge_name
+        self._abstain_below = abstain_below
         self._verdict = ""
         self._reasoning = ""
+        self._probabilities: dict[str, float] | None = None
         self._flipped = False
         self._replacement = False
         self.add_class("waiting")
@@ -42,18 +52,42 @@ class JudgeCard(Static):
         if not self._verdict:
             return f"[b]{name}[/b]\n[dim]deliberating…[/dim]"
         cue = _CUES.get(self._verdict.lower(), self._verdict)
+        probs = self._probabilities
+        if probs is not None and self._verdict in probs:
+            cue += f"  {probs[self._verdict]:.2f}"
         lines = [f"[b]{name}[/b]  {cue}"]
+        if probs is None:
+            if self._flipped:
+                lines.append("[red]⚖ flipped when sides swapped, vote thrown out[/red]")
+            reason = self._reasoning[:110] + ("…" if len(self._reasoning) > 110 else "")
+            lines.append(f"[dim]{reason}[/dim]")
+            return "\n".join(lines)
+        # Short flip line: the title already says abstain, and the bars need the rows.
         if self._flipped:
-            lines.append("[red]⚖ flipped when sides swapped, vote thrown out[/red]")
-        reason = self._reasoning[:110] + ("…" if len(self._reasoning) > 110 else "")
-        lines.append(f"[dim]{reason}[/dim]")
+            lines.append("[red]⚖ flipped when sides swapped[/red]")
+        for key, label, color in _BAR_ROWS:
+            p = probs.get(key, 0.0)
+            bar = _bar(p)
+            filled = bar.count("█")
+            lines.append(f"{label} [{color}]{bar[:filled]}[/][dim]{bar[filled:]}[/dim] {p:.0%}")
+        top = max(probs.values())
+        floor = self._abstain_below
+        if self._verdict == "abstain" and not self._flipped and floor and top < floor:
+            lines.append(f"[dim]top {top:.2f} under the {floor:.2f} floor[/dim]")
         return "\n".join(lines)
 
     def set_verdict(
-        self, verdict: str, reasoning: str, *, flipped: bool = False, replacement: bool = False
+        self,
+        verdict: str,
+        reasoning: str,
+        *,
+        probabilities: dict[str, float] | None = None,
+        flipped: bool = False,
+        replacement: bool = False,
     ) -> None:
         self._verdict = verdict
         self._reasoning = reasoning
+        self._probabilities = probabilities
         self._flipped = flipped
         self._replacement = replacement
         self.remove_class("waiting")
@@ -76,6 +110,7 @@ class JudgeCard(Static):
         self.remove_class("stale")
         self._verdict = ""
         self._reasoning = ""
+        self._probabilities = None
         self._flipped = False
         self._replacement = False
         self.add_class("waiting")

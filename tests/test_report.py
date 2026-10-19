@@ -2,7 +2,7 @@
 
 from orq_arena.config import ArenaConfig
 from orq_arena.data.schemas import BattleRecord
-from orq_arena.report import build_report_html, report_path_for
+from orq_arena.report import _ROUNDS_CAP, build_report_html, report_path_for
 
 CFG = ArenaConfig.model_validate(
     {
@@ -202,9 +202,12 @@ def test_report_cost_column_with_prices():
         prices=prices,
     )
     # warriors: in 2*(10+10)=40 @ $1/M + out 2*(20+25)=90 @ $2/M
-    assert "Estimated total" in html and "costcard" in html
-    # jury estimated at panel mean rate, marked approximate
-    assert "&asymp;" in html
+    assert "Estimated total" in html and "kpi-card" in html
+    # An old log carries no judge cost, so the jury is estimated at the panel
+    # mean rate and marked approximate, whatever the mode.
+    assert "&asymp;" in html and "&middot; estimated" in html and "&middot; measured" not in html
+    assert "Mean confidence" not in html  # prompted judges carry no probabilities
+    assert "Every verdict via evaluatorq&#39;s pairwise jury" in html
 
 
 def test_report_no_cost_without_prices():
@@ -298,7 +301,138 @@ def test_report_with_custom_display_names():
         prices=prices,
     )
     assert "Alpha" in html and "Estimated total" in html
-    assert ">cost</span>" in html  # per-model cost metric rendered via the alias
+    assert "win share &middot; $" in html  # per-model cost rendered via the alias
+
+
+PRICES = {
+    "prov/model-a": (1.0, 2.0),
+    "prov/model-b": (1.0, 2.0),
+}
+
+
+def _decision_vote(model: str, ab: dict, ba: dict, vote: str | None) -> dict:
+    """A stored decision vote: each seat order's raw probabilities, as evaluatorq keeps them."""
+    return {
+        "model": model,
+        "vote": vote,
+        "flipped": False,
+        "completed": True,
+        "replacement": False,
+        "explanation": f"choice={vote!r}",
+        "observations": [
+            {"ordering": "ab", "raw_output": {"probabilities": ab}},
+            {"ordering": "ba", "raw_output": {"probabilities": ba}},
+        ],
+    }
+
+
+def test_decisions_report_measures_jury_cost_and_shows_confidence():
+    cfg = ArenaConfig.model_validate(
+        {
+            "candidates": [{"model_id": "prov/model-a"}, {"model_id": "prov/model-b"}],
+            "judges": ["openai/judge-x", "groq/judge-x"],
+            "judge_api": "decisions",
+            "judge_abstain_below": 0.5,
+        }
+    )
+    records = []
+    for _ in range(2):
+        rec = _record("A")
+        rec.judge_votes = [
+            # The "ba" ordering saw the sides swapped; un-swapped it reads A 0.70.
+            _decision_vote(
+                "openai/judge-x",
+                {"A": 0.72, "B": 0.18, "tie": 0.10},
+                {"A": 0.18, "B": 0.70, "tie": 0.12},
+                "A",
+            ),
+            # Top option 0.45 under the 0.50 floor: an abstention, not a flip.
+            _decision_vote(
+                "groq/judge-x",
+                {"A": 0.45, "B": 0.40, "tie": 0.15},
+                {"A": 0.40, "B": 0.45, "tie": 0.15},
+                None,
+            ),
+        ]
+        rec.judge_cost_usd = 0.02
+        records.append(rec)
+    report = REPORT | {
+        "judge_cost_usd": 0.04,
+        "jury": {
+            "per_judge": [
+                {"model": m, "a_rate": 1.0, "b_rate": 0.0, "position_bias": 0.0, "tie_rate": 0.0}
+                for m in ("openai/judge-x", "groq/judge-x")
+            ]
+        },
+    }
+    html = build_report_html(
+        cfg=cfg,
+        records=records,
+        elo={"model-a": 1050.0, "model-b": 950.0},
+        report=report,
+        manifest=MANIFEST | {"judges": cfg.judges, "judge_api": "decisions"},
+        prices=PRICES,
+    )
+    # Measured jury cost: exact figure, a plain Total card, no approximation.
+    assert "$0.040" in html and "&middot; measured" in html and "Total" in html
+    assert "&asymp;" not in html and "Estimated total" not in html
+    assert "jury cost is what each judge call was priced at" in html
+    # Confidence column: mean of the leading option over every vote, abstained ones too.
+    assert "Mean confidence" in html and "0.71" in html and "0.45" in html
+    assert "2 votes (50%) abstained because the top option fell under the 0.50 floor." in html
+    # Same short name on two providers: both judges keep their own label.
+    assert "openai/judge-x" in html and "groq/judge-x" in html
+    assert "panel: openai/judge-x, groq/judge-x (decision models)" in html
+    assert "Every verdict via the orq.ai Decisions API" in html
+    # Rounds show probabilities, not the synthesized explanation.
+    assert "A 71% &middot; B 18% &middot; tie 11%" in html
+    assert "choice=" not in html
+    assert not any(d in html for d in ("\u2014", "&mdash;", "&#8212;", "&#x2014;"))
+
+
+def test_swap_off_says_position_bias_was_not_measured():
+    cfg = CFG.model_copy(update={"judge_swap": False})
+    html = build_report_html(
+        cfg=cfg,
+        records=[_record("A")],
+        elo={"model-a": 1050.0, "model-b": 950.0},
+        report=REPORT,
+        manifest=MANIFEST,
+    )
+    assert "n/a (swap off)" in html
+    assert "single seat order, so position bias (the flip rate) was not measured" in html
+
+
+def test_rounds_section_renders_chips_and_caps():
+    records = [_record("A") for _ in range(_ROUNDS_CAP + 5)]
+    html = build_report_html(
+        cfg=CFG,
+        records=records,
+        elo={"model-a": 1050.0, "model-b": 950.0},
+        report=REPORT,
+        manifest=MANIFEST,
+    )
+    assert "<h2>Rounds</h2>" in html
+    assert html.count("<details class='pw-cmp'>") == _ROUNDS_CAP
+    assert "pw-chip pw-chip--a" in html
+    assert f"Showing the first {_ROUNDS_CAP} of {_ROUNDS_CAP + 5} judged rounds" in html
+    assert "battle browser" in html
+
+
+def test_report_is_built_on_the_evaluatorq_skin():
+    from evaluatorq.common.reports import load_css
+
+    html = build_report_html(
+        cfg=CFG,
+        records=[_record("A")],
+        elo={"model-a": 1050.0, "model-b": 950.0},
+        report=REPORT,
+        manifest=MANIFEST,
+    )
+    assert load_css().split(".kpi-band", 1)[1][:200] in html  # the shared rules ship verbatim
+    assert "ES Klarheit Kurrent" in html and 'class="hero"' in html
+    for token in ("@import", "http://"):
+        assert token not in html  # self-contained: no font fetch, no namespaced logo
 
 
 def test_orq_dataset_meta_offline_fallback(monkeypatch):

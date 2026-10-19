@@ -22,7 +22,7 @@ from pathlib import Path
 from .analysis.kappa import cohen_kappa_pairs
 from .data.schemas import BattleRecord
 from .rejudge import outcomes_from_majorities, spearman
-from .report import _MARK, _ROOT_CSS
+from .report import _BASE_CSS, _LOGO
 from .tournament.elo import bradley_terry_mle, build_wins_matrix
 
 
@@ -72,53 +72,51 @@ def annotation_items(
 
 
 _PAGE_CSS = (
-    _ROOT_CSS
+    _BASE_CSS
     + """
-*{box-sizing:border-box} body{margin:0;background:var(--paper);color:var(--ink);
-  font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}
 .wrap{max-width:1200px;margin:0 auto;padding:0 24px 90px}
-header{display:flex;gap:10px;align-items:center;padding:26px 0 14px;border-bottom:1px solid var(--line)}
-header .brand{font-weight:600;font-size:17px;letter-spacing:-0.3px}
-header .kind{font-family:var(--mono);font-size:12px;color:var(--muted)}
-header .prog{font-family:var(--mono);font-size:13px;color:var(--muted);margin-left:auto}
-header input{font:inherit;padding:4px 8px;border:1px solid var(--line);border-radius:var(--r-sm)}
-.prompt{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);
-  padding:14px 18px;margin:18px 0;font-size:15px;box-shadow:var(--shadow-xs)}
+header{display:flex;gap:10px;align-items:center;padding:26px 0 14px;border-bottom:var(--border)}
+header .report-brand-logo svg{height:22px;width:auto;display:block}
+header .kind{font-family:var(--mono);font-size:12px;color:var(--gray-500)}
+header .prog{font-family:var(--mono);font-size:13px;color:var(--gray-500);margin-left:auto}
+header input{font:inherit;padding:4px 8px;border:var(--border);border-radius:6px}
+.prompt{background:var(--surface);border:var(--border);border-radius:var(--radius);
+  padding:14px 18px;margin:18px 0;font-size:15px}
 .duel{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media(max-width:900px){.duel{grid-template-columns:1fr}}
-.resp{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);padding:4px 18px 14px;
-  overflow-wrap:break-word;box-shadow:var(--shadow-xs)}
+.resp{background:var(--surface);border:var(--border);border-radius:var(--radius);padding:4px 18px 14px;
+  overflow-wrap:break-word}
 .resp h3{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.08em}
 .resp.left h3{color:var(--a)} .resp.right h3{color:var(--b)}
-.resp.voted{outline:3px solid var(--indigo)}
-.resp pre{background:var(--surface);padding:10px;border-radius:var(--r-md);overflow-x:auto}
-.resp code{font-family:var(--mono);font-size:12.5px;background:var(--surface);padding:1px 4px;border-radius:var(--r-sm)}
-.bar{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--line);
-  display:flex;gap:10px;justify-content:center;padding:12px;flex-wrap:wrap;box-shadow:var(--shadow-sm)}
-.bar button{font:inherit;padding:8px 18px;border:1px solid var(--line);border-radius:var(--r-md);
-  background:var(--surface);color:var(--ink);cursor:pointer}
-.bar button:hover{border-color:var(--indigo)}
-.bar .key{font-family:var(--mono);font-size:11px;color:var(--muted)}
-.gate{max-width:640px;margin:48px auto;background:var(--card);border:1px solid var(--line);
-  border-radius:var(--r-xl);padding:28px 34px;box-shadow:var(--shadow-sm)}
-.gate h2{margin-top:0;color:var(--ink)}
+.resp.voted{outline:3px solid var(--clay)}
+.resp pre{background:var(--gray-100);padding:10px;border-radius:var(--radius-row);overflow-x:auto}
+.resp code{font-size:12.5px;border:none;padding:1px 4px}
+.bar{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:var(--border);
+  display:flex;gap:10px;justify-content:center;padding:12px;flex-wrap:wrap}
+.bar button{font:inherit;padding:8px 18px;border:var(--border);border-radius:var(--radius-row);
+  background:var(--gray-100);color:var(--slate);cursor:pointer}
+.bar button:hover{border-color:var(--clay)}
+.bar .key{font-family:var(--mono);font-size:11px;color:var(--gray-500)}
+.gate{max-width:640px;margin:48px auto;background:var(--surface);border:var(--border);
+  border-radius:var(--radius-panel);padding:28px 34px}
+.gate h2{margin-top:0}
 .gate ul{padding-left:20px} .gate li{margin-bottom:6px}
-.gate .stats{font-family:var(--mono);font-size:13px;color:var(--muted);margin:14px 0}
-.gate input{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:var(--r-md);
-  width:100%;margin:6px 0 16px;background:var(--surface);color:var(--ink)}
-.gate button{font:inherit;padding:10px 22px;border:none;border-radius:var(--r-md);
-  background:var(--indigo);color:#fff;cursor:pointer}
+.gate .stats{font-family:var(--mono);font-size:13px;color:var(--gray-500);margin:14px 0}
+.gate input{font:inherit;padding:8px 10px;border:var(--border);border-radius:var(--radius-row);
+  width:100%;margin:6px 0 16px;background:var(--surface);color:var(--slate)}
+.gate button{font:inherit;padding:10px 22px;border:none;border-radius:var(--radius-row);
+  background:var(--slate);color:#fff;cursor:pointer}
 .gate button:disabled{opacity:.4;cursor:default}
 .gate .big{font-size:17px}
-.hidden{display:none}
 .nav{display:flex;flex-wrap:wrap;gap:4px;padding:10px 0 2px}
-.dot{width:13px;height:13px;border-radius:var(--r-sm);cursor:pointer;
-  background:var(--surface);border:1px solid var(--line)}
-.dot.seen{background:var(--muted);border-color:var(--muted)}
-.dot.voted{background:var(--indigo);border-color:var(--indigo)}
-.dot.tie{background:var(--warn);border-color:var(--warn)}
+.dot{width:13px;height:13px;border-radius:4px;cursor:pointer;
+  background:var(--surface);border:var(--border)}
+.dot.seen{background:var(--gray-500);border-color:var(--gray-500)}
+.dot.voted{background:var(--clay);border-color:var(--clay)}
+.dot.tie{background:var(--c-warn);border-color:var(--c-warn)}
 .dot.cur{outline:2px solid var(--a);outline-offset:1px}
-.legend{font-family:var(--mono);font-size:10.5px;color:var(--muted);padding-bottom:6px}
+.legend{display:block;margin:0;font-family:var(--mono);font-size:10.5px;color:var(--gray-500);padding-bottom:6px}
+.hidden{display:none}
 """
 )
 
@@ -319,12 +317,12 @@ def render_annotate_page(
 <title>orq-arena human annotation</title>
 <style>{_PAGE_CSS}</style></head><body>
 <div class="wrap">
-<header>{_MARK}<span class="brand">orq.ai</span><span class="kind">human annotation</span>
+<header><span class="report-brand-logo">{_LOGO}</span><span class="kind">human annotation</span>
 <input id="annotator" type="hidden">
 <span class="prog" id="prog"></span></header>
 <div class="nav hidden" id="nav"></div>
-<div class="legend hidden" id="legend">■ voted · <span style="color:var(--warn)">■</span> tie ·
-<span style="color:var(--muted)">■</span> skipped · □ unseen · click any dot to jump ·
+<div class="legend hidden" id="legend"><span style="color:var(--clay)">■</span> voted · <span style="color:var(--c-warn)">■</span> tie ·
+<span style="color:var(--gray-500)">■</span> skipped · □ unseen · click any dot to jump ·
 <b>n</b> = next unvoted</div>
 
 <div id="view-intro" class="gate">

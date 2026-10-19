@@ -87,3 +87,28 @@ async def test_enter_begins_and_q_quits():
         await pilot.pause()
         await pilot.press("enter")
         assert app.began
+
+
+async def test_plan_screen_names_the_judge_mode_before_spend():
+    from orq_arena.config import ArenaConfig
+
+    app = _Host()
+    app.cfg = ArenaConfig.model_validate(
+        {
+            "candidates": [
+                {"name": "A", "model_id": "prov/model-a"},
+                {"name": "B", "model_id": "prov/model-b"},
+            ],
+            "judges": ["prov/judge-1"],
+            "judge_api": "decisions",
+            "judge_swap": False,
+        }
+    )
+    async with app.run_test(size=(120, 50)) as pilot:
+        await app.push_screen(RunPlanScreen(_plan()))
+        await pilot.pause()
+        table = app.screen.query_one("#plan", DataTable)
+        cells = " ".join(str(table.get_cell_at((r, 0))) for r in range(table.row_count))
+        assert "Judges (decision models, ×1 seat order)" in cells
+        body = " ".join(str(s.render()) for s in app.screen.query(Static))
+        assert "votes in one seat order" in body

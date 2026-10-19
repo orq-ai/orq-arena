@@ -19,7 +19,7 @@ gateway:
   candidate_max_tokens: 2048
   # Cap, not target, costs nothing on frugal judges, and thinking-by-default
   # judges (e.g. gemini-2.5-flash) burn ~500 reasoning tokens before the
-  # verdict; 512 starves them into failed votes.
+  # verdict; 512 starves them into failed votes. Decision judges ignore it.
   judge_max_tokens: 2048
   # Max silence between stream chunks (seconds). Generous: thinking models may
   # pause for minutes before the first token. Never a total-duration cap.
@@ -64,32 +64,22 @@ candidates:
 # (verified 2026-10-05; the nebius V4 Pro offering above is the exception).
 # They belong in configs/reasoning_arena.yaml.
 
-# Judge panel, router model ids, judged via evaluatorq's pairwise jury
-# (both orderings per judge; a judge that flips abstains and is recorded).
-# None of these are candidates, so self-judge exclusion stays dormant here.
-#
-# Presets, pick your panel for the job:
-#   demo (default): cheap trio below, fast, pennies, fine for the show.
-#   strong: frontier judges for numbers you intend to defend, e.g.
-#     - anthropic/claude-opus-4-8
-#     - openai/gpt-5.4
-#     - google/gemini-3.1-pro-preview
-#   (expect ~10× judge cost; agreement stats will tell you if it mattered.
-#    measured 2026-07-12 over a 140-round log: same champion, Spearman 0.81
-#    vs the cheap trio's ranking, still 22-30% flips. If you do this, raise
-#    judge_max_tokens to ~8000 and judge_timeout_ms to ~180000: thinking
-#    judges burn ~2k reasoning tokens and opus can exceed 90s per verdict.)
+# Judge panel: decision models, each asked one A/B/tie question through the orq.ai
+# Decisions API, both seat orders (a judge that flips abstains and is recorded).
+# They bill input tokens only and return a probability per option. Picked by
+# agreement with a strong reference jury over two 140-round pools, see
+# docs/research/llm-judges-vs-decision-models.md. gpt-6-luna shares OpenAI's
+# family with the gpt candidates and the preflight says so. For a prompted panel that writes its reasons, set judge_api: llm and
+# list chat models, e.g. anthropic/claude-haiku-4-5-20251001,
+# google/gemini-3.5-flash-lite, openai/gpt-5.4-nano.
+judge_api: decisions
 judges:
-  - anthropic/claude-haiku-4-5-20251001
-  - google/gemini-3.5-flash-lite
-  - openai/gpt-5.4-nano
+  - typesafe/jev-latest
+  - perplexity/pplx-decider-v1-27b
+  - openai/gpt-6-luna
 
-# Neutral stand-ins promoted when a primary judge errors. Kept above the primary
-# panel on the Artificial Analysis intelligence index (mistral-medium-2604 ~30,
-# vs the cheap trio ~12-18) so a stand-in never weakens a verdict. NB: don't
-# reach for mistral-large-2411 here, it's the old Large 2 (AA ~9), weaker.
 replacement_judges:
-  - mistral/mistral-medium-2604
+  - orq/decider-4b
 
 # What the jury judges on (feeds evaluatorq's pairwise criteria).
 criteria: >-

@@ -35,7 +35,7 @@ class CallCounts:
     matches: int
     rounds_per_match: int
     model_streams: int
-    judge_calls: int  # panel × both orderings; replacements add more on failure
+    judge_calls: int  # panel × seat orders; replacements add more on failure
     probe_calls: int
 
 
@@ -46,9 +46,14 @@ def call_counts(cfg: ArenaConfig, prompts: list[PromptItem]) -> CallCounts:
         matches=matches,
         rounds_per_match=rounds,
         model_streams=matches * rounds * 2,
-        judge_calls=matches * rounds * len(cfg.judges) * 2,
+        judge_calls=matches * rounds * len(cfg.judges) * seat_orders(cfg),
         probe_calls=len(cfg.candidates) if cfg.preflight.thinking_probe else 0,
     )
+
+
+def seat_orders(cfg: ArenaConfig) -> int:
+    """Calls per judge per round: both seat orders, or one with ``judge_swap`` off."""
+    return 2 if cfg.judge_swap else 1
 
 
 _PROBE_MAX_TOKENS = 1000  # headroom for coerced minimum thinking budgets
@@ -129,15 +134,18 @@ def cost_projection(
         rows.append(CostRow("candidate", w.model_id, streams, cin, cout, usd))
 
     judge_in_tok = prompt_tok + 2 * max_cap + _JUDGE_WRAPPER_TOKENS
+    # A decision judge returns a probability per option, not text: the Decisions
+    # API bills input tokens only, whatever the model's chat output rate is.
+    judge_out_tok = 0 if cfg.judge_api == "decisions" else cfg.gateway.judge_max_tokens
     judges_usd = 0.0
-    calls_per_judge = counts.matches * rounds * 2  # both seat orders
+    calls_per_judge = counts.matches * rounds * seat_orders(cfg)
     for j in cfg.judges:
         if j not in prices:
             unpriced.append(j)
             rows.append(CostRow("judge", j, calls_per_judge, None, None, None))
             continue
         cin, cout = prices[j]
-        usd = calls_per_judge * (cin * judge_in_tok + cout * cfg.gateway.judge_max_tokens) / 1e6
+        usd = calls_per_judge * (cin * judge_in_tok + cout * judge_out_tok) / 1e6
         judges_usd += usd
         rows.append(CostRow("judge", j, calls_per_judge, cin, cout, usd))
 
@@ -157,7 +165,7 @@ def cost_projection(
     replacement_usd = 0.0
     if cfg.replacement_judges:
         per_call = [
-            (prices[j][0] * judge_in_tok + prices[j][1] * cfg.gateway.judge_max_tokens) / 1e6
+            (prices[j][0] * judge_in_tok + prices[j][1] * judge_out_tok) / 1e6
             for j in cfg.replacement_judges
             if j in prices
         ]
@@ -264,10 +272,18 @@ def config_warnings(
         elif entry.deprecated:
             deprecated.append(f"{model_id}{_deprecation_date(entry)}")
 
-    # Only judges take evaluatorq's Responses path; a candidate is streamed over
-    # chat completions regardless of what else it supports.
+    # Only prompted judges take evaluatorq's Responses path; a candidate is
+    # streamed over chat completions regardless of what else it supports, and a
+    # decision judge answers on the Decisions API.
     no_responses = sorted(
-        {j for j in judges if (e := catalog.get(j)) is not None and not e.has_responses}
+        {
+            j
+            for j in judges
+            if cfg.judge_api == "llm"
+            and (e := catalog.get(j)) is not None
+            and not e.has_responses
+            and e.is_chat
+        }
     )
 
     warnings: list[str] = []
@@ -296,6 +312,68 @@ def config_warnings(
             "cost goes unattributed."
         )
     return warnings
+
+
+def answers_on(judge_api: str, entry: ModelEntry | None) -> bool:
+    """Whether a judge can answer on ``judge_api``. A model the catalog does not
+    list gets the benefit of the doubt; `config_warnings` already flags it."""
+    if entry is None:
+        return True
+    if judge_api == "decisions":
+        return entry.has_decisions
+    return entry.is_chat or not entry.has_decisions
+
+
+def judge_api_errors(cfg: ArenaConfig, catalog: dict[str, ModelEntry]) -> list[str]:
+    """Judges that cannot answer on the endpoint ``judge_api`` names. Blocking.
+
+    Every call such a judge makes would fail, so the run would pay for every
+    candidate response and then decide nothing.
+    """
+    wrong = [
+        j
+        for j in dict.fromkeys([*cfg.judges, *cfg.replacement_judges])
+        if not answers_on(cfg.judge_api, catalog.get(j))
+    ]
+    if not wrong:
+        return []
+    if cfg.judge_api == "decisions":
+        return [
+            f"judge_api is decisions, but these judges do not serve the Decisions API: "
+            f"{', '.join(wrong)}. Pick decision models (typesafe/jev-latest, "
+            "orq/decider-4b, openai/gpt-6-luna), or set judge_api: llm."
+        ]
+    return [
+        f"these judges answer only on the Decisions API: {', '.join(wrong)}. "
+        "Set judge_api: decisions to seat them, or pick chat models for an llm panel."
+    ]
+
+
+def judge_context_warnings(
+    cfg: ArenaConfig, prompts: list[PromptItem], catalog: dict[str, ModelEntry]
+) -> list[str]:
+    """Judges whose context window a round may overflow: prompt plus two capped responses.
+
+    Matters most for decision models, whose windows are small (orq/decider-4b
+    has 32k). Advisory: real responses rarely hit the cap.
+    """
+    prompt_tok = max((_est_tokens(p.text) for p in prompts), default=1)
+    max_cap = max(
+        (w.max_tokens or cfg.gateway.candidate_max_tokens for w in cfg.candidates), default=0
+    )
+    need = prompt_tok + 2 * max_cap + _JUDGE_WRAPPER_TOKENS
+    tight = [
+        f"{j} ({e.context_window:,})"
+        for j in dict.fromkeys([*cfg.judges, *cfg.replacement_judges])
+        if (e := catalog.get(j)) is not None and e.context_window and e.context_window < need
+    ]
+    if not tight:
+        return []
+    return [
+        f"a round can reach ~{need:,} judge input tokens (longest prompt plus two responses "
+        f"at their cap), over these judges' context windows: {', '.join(tight)}. "
+        "A round that overflows fails for that judge; lower candidate max_tokens to be safe."
+    ]
 
 
 async def _probe_one(gateway: OrqGateway, w: CandidateSpec) -> tuple[str, dict[str, Any]]:

@@ -92,7 +92,7 @@ async def test_the_driver_writes_rounds_not_matches(tmp_path, monkeypatch):
             )
 
     monkeypatch.setattr(driver_mod, "Battle", FakeBattle)
-    monkeypatch.setattr(driver_mod, "OrqGateway", lambda cfg: object())
+    monkeypatch.setattr(driver_mod, "OrqGateway", lambda cfg: SimpleNamespace(client=None))
     monkeypatch.setattr("orq_arena.report.write_report", lambda **kw: None)
 
     async def _no_prices(_gw):

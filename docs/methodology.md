@@ -22,7 +22,7 @@ For every round, one prompt, two candidates, in a round-robin tournament:
 
 ## Judging
 
-**Both seat orders, always.** LLM judges measurably favor whichever answer they see first
+**Both seat orders, by default.** LLM judges measurably favor whichever answer they see first
 (Zheng et al., 2023), so every judge scores each pair twice with the sides swapped:
 
 ```mermaid
@@ -39,7 +39,8 @@ flowchart TD
     plur -- no --> inc
 ```
 
-A judge that gives a different verdict in each order abstains for that round, and the flip is
+`judge_swap: false` sends one order only: half the judge calls, no flip rule, and position
+bias goes unmeasured. A judge that gives a different verdict in each order abstains for that round, and the flip is
 recorded. A round needs at least two decisive votes (configurable) to produce a verdict, and
 that quorum is necessary but not sufficient: the surviving votes still have to reach a strict
 plurality. Two decisive votes that disagree one-all produce no plurality, so the round is
@@ -52,6 +53,15 @@ is a jury drawn entirely from families outside the pool.
 
 All judges score the same free-text criteria for the whole run (configurable, and swappable
 after the fact with `rejudge`).
+
+**Two kinds of judge.** With `judge_api: llm` each judge is a chat model prompted for a
+verdict and a written reason. With `judge_api: decisions` each judge is a decision model asked
+one question through the orq.ai Decisions API: is A better, B better, or neither? It answers
+with a probability for each option and no prose; the vote is the most likely option, and its
+probability is the judge's confidence. Everything above holds for both: both seat orders, the
+flip rule, the quorum and the plurality. A decision model bills input tokens only, which is
+why a decision jury costs a fraction of a prompted one. How the two compare on real arena
+rounds is in [LLM judges vs decision models](research/llm-judges-vs-decision-models.md).
 
 ## Ratings
 

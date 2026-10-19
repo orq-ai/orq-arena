@@ -26,6 +26,7 @@ from ..data.log import BattleLog
 from ..data.prompts import PromptItem
 from ..data.schemas import BattleRecord
 from ..events import ArenaEvent, StandingsUpdated, TournamentEnded
+from ..judging import pin_judge_endpoints
 from ..providers.credentials import active_workspace
 from ..providers.models_list import catalog_host
 from ..providers.orq_gateway import OrqGateway
@@ -210,6 +211,15 @@ def _final_report(
     model_out = sum(r.tokens_a_out + r.tokens_b_out for r in records)
     judge_in = sum(r.judge_tokens_in for r in records)
     judge_out = sum(r.judge_tokens_out for r in records)
+    # Measured only when every judged round carries its priced cost; a log with
+    # any round missing it (older schema, an unpriced judge) leaves the report to
+    # estimate, rather than presenting a partial sum as the whole.
+    judged = [r for r in records if r.error is None and r.judge_votes]
+    judge_cost = (
+        sum(r.judge_cost_usd or 0.0 for r in judged)
+        if judged and all(r.judge_cost_usd is not None for r in judged)
+        else None
+    )
 
     cat_counts: dict[str, int] = {}
     for o in outcomes:
@@ -287,6 +297,7 @@ def _final_report(
             "judges_in": judge_in,
             "judges_out": judge_out,
         },
+        "judge_cost_usd": judge_cost,
         "jury": jury.model_dump() if jury else None,
         "mean_agreement": jury.mean_agreement if jury else None,
         "fleiss": fleiss,
@@ -348,7 +359,10 @@ def manifest_path_for(log_path: str | Path) -> Path:
 
 
 def config_sha256(cfg: ArenaConfig) -> str:
-    return hashlib.sha256(cfg.model_dump_json().encode("utf-8")).hexdigest()[:16]
+    # Keys added after manifests existed are left out while they hold their legacy
+    # value, so an old run's recorded hash still matches its unchanged YAML.
+    legacy = {k for k, v in _LEGACY_IDENTITY.items() if getattr(cfg, k) == v}
+    return hashlib.sha256(cfg.model_dump_json(exclude=legacy).encode("utf-8")).hexdigest()[:16]
 
 
 def read_manifest(log_path: str | Path) -> dict:
@@ -363,7 +377,19 @@ def read_manifest(log_path: str | Path) -> dict:
 # Exactly the fields a rebuild reads. Everything else in a manifest's recorded
 # config stays local, so a forwarded manifest can describe a run without also
 # steering where this machine sends its API key (see config_from_manifest).
-IDENTITY_FIELDS = ("candidates", "judges", "replacement_judges", "min_successful_judges")
+IDENTITY_FIELDS = (
+    "candidates",
+    "judges",
+    "replacement_judges",
+    "min_successful_judges",
+    "judge_api",
+    "judge_swap",
+    "judge_abstain_below",
+)
+# Identity keys added after manifests already existed. A manifest without them
+# predates them, and such a run judged over chat, in both seat orders, with no
+# floor. Filled in rather than left to the local YAML, which may say otherwise.
+_LEGACY_IDENTITY = {"judge_api": "llm", "judge_swap": True, "judge_abstain_below": None}
 
 IdentitySource = Literal["manifest", "manifest-partial", "config"]
 
@@ -372,7 +398,7 @@ def _identity_from_recorded_config(recorded: dict) -> dict | None:
     """Identity fields out of a manifest's full recorded config."""
     if not isinstance(recorded.get("candidates"), list) or not recorded.get("judges"):
         return None
-    return {k: recorded[k] for k in IDENTITY_FIELDS if k in recorded}
+    return {**_LEGACY_IDENTITY, **{k: recorded[k] for k in IDENTITY_FIELDS if k in recorded}}
 
 
 def _identity_from_candidate_map(manifest: dict) -> dict | None:
@@ -386,6 +412,7 @@ def _identity_from_candidate_map(manifest: dict) -> dict | None:
     if not candidates or not manifest.get("judges"):
         return None
     identity = {
+        **_LEGACY_IDENTITY,
         "candidates": [
             {
                 "model_id": spec["model"],
@@ -402,6 +429,7 @@ def _identity_from_candidate_map(manifest: dict) -> dict | None:
     }
     if manifest.get("min_successful_judges") is not None:
         identity["min_successful_judges"] = manifest["min_successful_judges"]
+    identity.update({k: manifest[k] for k in _LEGACY_IDENTITY if k in manifest})
     return identity
 
 
@@ -506,6 +534,9 @@ def _write_manifest(
         "judges": list(cfg.judges),
         "replacement_judges": list(cfg.replacement_judges),
         "min_successful_judges": cfg.min_successful_judges,
+        "judge_api": cfg.judge_api,
+        "judge_swap": cfg.judge_swap,
+        "judge_abstain_below": cfg.judge_abstain_below,
         "evaluatorq_version": evq_version,
     }
     if finished_at is not None:
@@ -548,6 +579,7 @@ async def run_tournament(
         raise ValueError("Prompt set is empty")
 
     gateway = OrqGateway(cfg.gateway)
+    await pin_judge_endpoints(cfg, gateway.client)
     log = BattleLog(battle_log_path)
     manifest_path = manifest_path_for(battle_log_path)
 

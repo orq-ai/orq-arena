@@ -31,15 +31,12 @@ from ..events import (
     TurnPrompt,
     TurnResolved,
 )
+from ..judging import judge_labels
 from ..tournament.driver import run_tournament
 from .hp import VERDICT_HOLD_S, HPTracker
 from .screens.fight import FightScreen
 from .screens.leaderboard import LeaderboardScreen
 from .screens.title import RunPlanScreen
-
-
-def _judge_display(model_id: str) -> str:
-    return model_id.split("/")[-1]
 
 
 class ArenaApp(App):
@@ -78,6 +75,8 @@ class ArenaApp(App):
         self._dispatcher_task: asyncio.Task | None = None
         self._by_name = {w.name: w for w in cfg.candidates}
         self._fight_screen: FightScreen | None = None
+        # Full router id -> card label, once, so same-suffix judges keep two cards.
+        self._judge_labels = judge_labels([*cfg.judges, *cfg.replacement_judges])
         # HP is a TUI-side show, derived from the judged verdicts.
         self._hp = HPTracker(
             starting_hp=cfg.match.starting_hp,
@@ -107,7 +106,10 @@ class ArenaApp(App):
         """Called from RunPlanScreen when the user presses ENTER."""
         if self._engine_task is not None:
             return  # already running
-        self._fight_screen = FightScreen([_judge_display(m) for m in self.cfg.judges])
+        self._fight_screen = FightScreen(
+            [self._judge_labels[m] for m in self.cfg.judges],
+            abstain_below=self.cfg.judge_abstain_below,
+        )
         self.push_screen(self._fight_screen)
         self._dispatcher_task = asyncio.create_task(self._dispatch_events())
         self._engine_task = asyncio.create_task(self._run_live())
@@ -190,9 +192,10 @@ class ArenaApp(App):
         elif isinstance(ev, JudgeVerdictEvent):
             self._hp.note_vote(ev.verdict)
             fs.set_judge_verdict(
-                ev.judge_name,
+                self._judge_labels.get(ev.judge_name, ev.judge_name),
                 ev.verdict,
                 ev.reasoning,
+                probabilities=ev.probabilities,
                 flipped=ev.flipped,
                 replacement=ev.replacement,
             )

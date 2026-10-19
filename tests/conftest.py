@@ -77,3 +77,26 @@ def cold_catalog_cache(tmp_path, monkeypatch):
 
     monkeypatch.setattr(models_list, "CACHE_DIR", tmp_path / "catalog-cache")
     monkeypatch.setattr(models_list, "CACHE_FILE", tmp_path / "catalog-cache" / "models.json")
+
+
+@pytest.fixture(autouse=True)
+def evaluatorq_catalogue_unknown(monkeypatch):
+    """evaluatorq's own model catalogue knows nothing, and its overrides start empty.
+
+    `judging.pin_judge_endpoints` asks evaluatorq which endpoint each judge is
+    on, which is a fetch of ``/v2/models`` the guard above would refuse. An
+    empty answer is the honest stub: tests that care about routing register the
+    entries they need. Overrides are process-global, so one test's pinning
+    must not decide another's routing.
+    """
+    from evaluatorq.common import model_catalogue
+
+    from orq_arena import judging
+
+    async def _unknown(_model, _client=None):
+        return None
+
+    monkeypatch.setattr(judging, "get_model_info", _unknown)
+    model_catalogue.clear_model_overrides()
+    yield
+    model_catalogue.clear_model_overrides()

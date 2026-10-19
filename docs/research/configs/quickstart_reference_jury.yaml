@@ -1,0 +1,39 @@
+# Reference jury for docs/research/llm-judges-vs-decision-models.md: the quickstart
+# pool, re-judged by three strong chat models from families outside the pool
+# (xAI, Moonshot, Zhipu). Larger judge budget because all three reason first.
+#   orq-arena rejudge examples/quickstart/battles.jsonl \
+#     --config docs/research/configs/quickstart_reference_jury.yaml --judge-api llm \
+#     --judge xai/grok-4.6 --judge moonshotai/kimi-k3 --judge zai/glm-5.3
+
+match:
+  max_rounds: 5
+  starting_hp: 100
+  damage_unanimous: 30
+  damage_majority: 15
+
+gateway:
+  base_url: https://api.orq.ai/v3/router
+  judge_max_tokens: 8000
+  judge_timeout_ms: 240000
+
+preflight:
+  thinking_probe: true
+
+candidates:
+  - model_id: anthropic/claude-opus-4-8
+  - model_id: anthropic/claude-sonnet-4-6
+  - model_id: openai/gpt-5.4
+  - model_id: openai/gpt-5.4-mini
+  - model_id: google/gemini-3.1-pro-preview
+    reasoning: { thinking: { type: disabled } }
+  - model_id: google/gemini-3.5-flash
+    reasoning: { thinking: { type: disabled } }
+  - model_id: deepseek/deepseek-chat
+  - model_id: mistral/mistral-medium-2604
+
+judge_api: llm
+judges:
+  - xai/grok-4.6
+  - moonshotai/kimi-k3
+  - zai/glm-5.3
+

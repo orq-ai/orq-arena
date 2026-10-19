@@ -9,165 +9,106 @@ attached to a PR or linked from a post. Regenerable at any time with
 
 from __future__ import annotations
 
-import html
+import re
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from evaluatorq.common.reports import esc as _e
+from evaluatorq.common.reports import html_table, load_css, load_logo_svg, status_badge
+from evaluatorq.common.reports import pct as _pct
+from evaluatorq.pairwise_reports.sections import POSITION_BIAS_WARN
+
 from .config import ArenaConfig
 from .data.schemas import BattleRecord
+from .judging import floor_abstained, judge_labels, vote_probabilities
 
 if TYPE_CHECKING:  # driver imports this module at render time; keep it type-only
     from .tournament.driver import IdentitySource
 
-# Official orq.ai symbol (docs.orq.ai brand asset), recolored via currentColor.
-_MARK = (
-    '<svg viewBox="14 3 86 94" width="22" height="22" aria-hidden="true">'
-    '<g fill="currentColor">'
-    '<path d="M83.5914 27.8049C83.5914 30.8783 83.5914 32.4151 82.9932 33.589C82.4671 34.6216 81.6276 35.4611 80.595 35.9872C79.4211 36.5854 77.8843 36.5854 74.8109 36.5854H72.8597C69.7862 36.5854 68.2495 36.5854 67.0756 35.9872C66.043 35.4611 65.2035 34.6216 64.6773 33.589C64.0792 32.4151 64.0792 30.8783 64.0792 27.8049V25.6098C64.0792 22.7662 64.0792 21.3444 63.565 20.2417C63.0198 19.0724 62.0799 18.1326 60.9106 17.5873C59.808 17.0732 58.3862 17.0732 55.5426 17.0732C52.699 17.0732 51.2772 17.0732 50.1746 16.559C49.0053 16.0137 48.0654 15.0739 47.5202 13.9046C47.006 12.802 47.006 11.3802 47.006 8.53659C47.006 5.69299 47.006 4.27119 47.5202 3.16856C48.0654 1.99924 49.0053 1.05943 50.1746 0.514165C51.2772 0 52.7091 0 55.573 0C58.4368 0 59.8687 0 60.9714 0.514165C62.1407 1.05943 63.0805 1.99924 63.6258 3.16856C64.1399 4.27119 64.1399 5.69299 64.1399 8.53659C64.1399 11.3802 64.1399 12.802 64.6541 13.9046C65.1994 15.0739 66.1392 16.0137 67.3085 16.559C68.4111 17.0732 69.8329 17.0732 72.6765 17.0732H74.8109C77.8843 17.0732 79.4211 17.0732 80.595 17.6713C81.6276 18.1974 82.4671 19.037 82.9932 20.0696C83.5914 21.2435 83.5914 22.7802 83.5914 25.8537V27.8049Z"/>'
-    '<path d="M28.4694 17.0732C31.5429 17.0732 33.0796 17.0732 34.2535 17.6713C35.2861 18.1974 36.1256 19.037 36.6518 20.0696C37.2499 21.2435 37.2499 22.7802 37.2499 25.8537V27.8049C37.2499 30.8783 37.2499 32.4151 36.6518 33.589C36.1256 34.6216 35.2861 35.4611 34.2535 35.9872C33.0796 36.5854 31.5429 36.5854 28.4694 36.5854H26.2743C23.4307 36.5854 22.0089 36.5854 20.9063 37.0995C19.737 37.6448 18.7971 38.5846 18.2519 39.7539C17.7377 40.8566 17.7377 42.2784 17.7377 45.122C17.7377 47.9656 17.7377 49.3873 17.2236 50.49C16.6783 51.6593 15.7385 52.5991 14.5692 53.1444C13.4665 53.6585 12.0447 53.6585 9.20114 53.6585C6.35754 53.6585 4.93574 53.6585 3.83311 53.1444C2.66379 52.5991 1.72398 51.6593 1.17872 50.49C0.664551 49.3873 0.664551 47.9554 0.664551 45.0916C0.664551 42.2277 0.664551 40.7958 1.17872 39.6932C1.72398 38.5239 2.66379 37.5841 3.83311 37.0388C4.93574 36.5246 6.35754 36.5246 9.20114 36.5246C12.0447 36.5246 13.4665 36.5246 14.5692 36.0105C15.7385 35.4652 16.6783 34.5254 17.2236 33.3561C17.7377 32.2534 17.7377 30.8316 17.7377 27.988V25.8537C17.7377 22.7802 17.7377 21.2435 18.3359 20.0696C18.862 19.037 19.7015 18.1974 20.7341 17.6713C21.908 17.0732 23.4448 17.0732 26.5182 17.0732H28.4694Z"/>'
-    '<path d="M37.2499 91.4634C37.2499 88.6198 37.2499 87.198 36.7357 86.0954C36.1905 84.9261 35.2507 83.9863 34.0814 83.441C32.9787 82.9268 31.5569 82.9268 28.7133 82.9268H26.5182C23.4448 82.9268 21.908 82.9268 20.7341 82.3287C19.7015 81.8026 18.862 80.963 18.3359 79.9304C17.7377 78.7565 17.7377 77.2198 17.7377 74.1463V72.1951C17.7377 69.1217 17.7377 67.5849 18.3359 66.411C18.862 65.3784 19.7015 64.5389 20.7341 64.0128C21.908 63.4146 23.4447 63.4146 26.5182 63.4146L28.4694 63.4146C31.5429 63.4146 33.0796 63.4146 34.2535 64.0128C35.2861 64.5389 36.1256 65.3784 36.6518 66.411C37.2499 67.5849 37.2499 69.1217 37.2499 72.1951V74.3295C37.2499 77.1731 37.2499 78.5949 37.7641 79.6975C38.3093 80.8669 39.2492 81.8067 40.4185 82.3519C41.5211 82.8661 42.9429 82.8661 45.7865 82.8661C48.6301 82.8661 50.0519 82.8661 51.1545 83.3803C52.3238 83.9255 53.2637 84.8653 53.8089 86.0347C54.3231 87.1373 54.3231 88.5692 54.3231 91.433C54.3231 94.2969 54.3231 95.7288 53.8089 96.8314C53.2637 98.0008 52.3238 98.9406 51.1545 99.4858C50.0519 100 48.6301 100 45.7865 100C42.9429 100 41.5211 100 40.4185 99.4858C39.2492 98.9406 38.3093 98.0008 37.7641 96.8315C37.2499 95.7288 37.2499 94.307 37.2499 91.4634Z"/>'
-    '<path d="M72.8597 82.9268C69.7862 82.9268 68.2495 82.9268 67.0756 82.3287C66.043 81.8026 65.2035 80.963 64.6773 79.9304C64.0792 78.7565 64.0792 77.2198 64.0792 74.1463V72.1951C64.0792 69.1217 64.0792 67.5849 64.6773 66.411C65.2035 65.3784 66.043 64.5389 67.0756 64.0128C68.2495 63.4146 69.7862 63.4146 72.8597 63.4146H75.0548C77.8984 63.4146 79.3202 63.4146 80.4228 62.9005C81.5921 62.3552 82.532 61.4154 83.0772 60.2461C83.5914 59.1434 83.5914 57.7217 83.5914 54.8781C83.5914 52.0345 83.5914 50.6127 84.1055 49.51C84.6508 48.3407 85.5906 47.4009 86.7599 46.8556C87.8626 46.3415 89.2844 46.3415 92.128 46.3415C94.9716 46.3415 96.3934 46.3415 97.496 46.8556C98.6653 47.4009 99.6051 48.3407 100.15 49.51C100.665 50.6127 100.665 52.0446 100.665 54.9084C100.665 57.7723 100.665 59.2042 100.15 60.3068C99.6051 61.4761 98.6653 62.4159 97.496 62.9612C96.3934 63.4754 94.9716 63.4754 92.128 63.4754C89.2844 63.4754 87.8626 63.4754 86.7599 63.9895C85.5906 64.5348 84.6508 65.4746 84.1055 66.6439C83.5914 67.7466 83.5914 69.1684 83.5914 72.012V74.1463C83.5914 77.2198 83.5914 78.7565 82.9932 79.9304C82.4671 80.963 81.6276 81.8026 80.595 82.3287C79.4211 82.9268 77.8844 82.9268 74.8109 82.9268H72.8597Z"/>'
-    '<path d="M50.6645 58.5366C48.1085 58.5366 46.8305 58.5366 45.8149 58.1403C44.3062 57.5516 43.1129 56.3583 42.5242 54.8496C42.1279 53.834 42.1279 52.556 42.1279 50C42.1279 47.444 42.1279 46.166 42.5242 45.1504C43.1129 43.6417 44.3062 42.4484 45.8149 41.8597C46.8305 41.4634 48.1085 41.4634 50.6645 41.4634C53.2205 41.4634 54.4985 41.4634 55.5141 41.8597C57.0228 42.4484 58.2161 43.6417 58.8048 45.1504C59.2011 46.166 59.2011 47.444 59.2011 50C59.2011 52.556 59.2011 53.834 58.8048 54.8496C58.2161 56.3583 57.0228 57.5516 55.5141 58.1403C54.4985 58.5366 53.2205 58.5366 50.6645 58.5366Z"/>'
-    "</g></svg>"
+# The evaluatorq report skin (report.css, embedded fonts and texture), so an
+# arena report and an evaluatorq export read as one family and restyle together
+# on upgrade. Two edits keep the page self-contained and in house style: the
+# Google Fonts @import goes (Kurrent is embedded, Inter is only a fallback) and
+# so do the comments. Every self-contained page here (report, annotate) uses it.
+_BASE_CSS = (
+    re.sub(r"@import url\([^)]*\);|/\*.*?\*/", "", load_css(), flags=re.S)
+    # A/B side colours follow the evaluatorq pairwise vote chips.
+    + ":root { --a: #3b6fd4; --b: #8257c5; --warn-ink: #8a6a00; --heat: 245 139 78; }"
 )
+# Inline SVG needs no namespace; dropping it keeps the pages free of URLs.
+_LOGO = load_logo_svg().replace(' xmlns="http://www.w3.org/2000/svg"', "")
 
-# Shared orq v2 design tokens (shadcn "Neutral" base, mirrors orquesta-web
-# _spartan.css + _orq.css): neutral white/gray surfaces, Inter, indigo brand
-# with Pulse Orange as a reserved accent, subtle elevation, full light+dark.
-# A/B side colors stay functional. Every self-contained HTML page in this
-# project (report, annotate) shares this block so they read as one system.
-_ROOT_CSS = """
-:root {
-  color-scheme: light dark;
-  --radius: 10px; --r-sm: 6px; --r-md: 8px; --r-lg: 10px; --r-xl: 12px;
-  --paper: oklch(0.985 0 0); --surface: oklch(0.97 0 0); --card: oklch(1 0 0);
-  --line: oklch(0.922 0 0); --ink: #141319; --muted: oklch(0.50 0 0);
-  --brand: #df5325; --indigo: #24059d; --teal: #141319; --teal-soft: #259e6e;
-  --a: #7e22ce; --b: #0092ab; --good: #259e6e; --warn: #a67800; --danger: #b72118;
-  --dot-mute: oklch(0.60 0.008 83); --heat: 223 83 37;
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / .06), 0 1px 3px 0 rgb(0 0 0 / .04);
-  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / .05);
-  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-  --sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
-          "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-}
-@media (prefers-color-scheme: dark) { :root {
-  --paper: oklch(0.145 0 0); --surface: oklch(0.24 0 0); --card: oklch(0.205 0 0);
-  --line: oklch(1 0 0 / 12%); --ink: oklch(0.985 0 0); --muted: oklch(0.70 0 0);
-  --brand: #ff8f34; --indigo: #8a8dff; --teal: oklch(0.985 0 0); --teal-soft: #4bbe8e;
-  --good: #4bbe8e; --warn: #e0b64a; --danger: #f28a8a;
-  --a: #c084fc; --b: #4dd0e1; --dot-mute: oklch(0.5 0 0); --heat: 255 143 52;
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / .5); --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / .4);
-}}
-"""
-
-_CSS = (
-    _ROOT_CSS
-    + """
-* { box-sizing: border-box; }
-body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--sans);
-       line-height: 1.55; -webkit-font-smoothing: antialiased; }
-.wrap { max-width: 960px; margin: 0 auto; padding: 0 24px 72px; }
-header { display: flex; align-items: center; gap: 10px; padding: 26px 0 14px;
-         border-bottom: 1px solid var(--line); color: var(--ink); }
-header .brand { font-weight: 600; font-size: 17px; letter-spacing: -0.3px; }
-header .kind { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--muted); text-align: right; }
-header .kind a { color: var(--indigo); text-decoration: none; }
-h1 { font-size: 30px; font-weight: 500; line-height: 1.15; margin: 26px 0 4px; letter-spacing: -0.5px; }
-h2 { font-size: 17px; font-weight: 500; margin: 40px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
-.sub { color: var(--muted); font-family: var(--mono); font-size: 12.5px; }
-.sub a { color: var(--indigo); text-decoration: none; }
-.sub a:hover { text-decoration: underline; }
-.badges { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 4px; }
-.badge { font-family: var(--mono); font-size: 12px; padding: 3px 10px; border-radius: var(--r-sm);
-         border: 1px solid var(--line); background: var(--surface); }
-.badge b { font-weight: 600; }
-.badge.good { border-color: color-mix(in srgb, var(--good) 30%, transparent);
-              background: color-mix(in srgb, var(--good) 12%, var(--card)); color: var(--good); }
-.badge.warn { border-color: color-mix(in srgb, var(--warn) 30%, transparent);
-              background: color-mix(in srgb, var(--warn) 14%, var(--card)); color: var(--warn); }
-.verdict { background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow-sm);
-  border-radius: var(--r-xl); padding: 26px 30px 22px; margin: 26px 0 12px;
-  --state: var(--good); }
-.verdict.tied { --state: var(--warn); }
-.verdict .eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: .12em;
-  text-transform: uppercase; color: var(--state); font-weight: 600; margin: 0 0 10px; }
-.verdict h1 { margin: 0 0 10px; font-size: 27px; font-weight: 500; line-height: 1.25; letter-spacing: -0.02em; }
-.verdict .expl { color: var(--muted); font-size: 13.5px; max-width: 64ch; margin: 0 0 18px; }
-.verdict .vnote { color: var(--muted); font-size: 12px; max-width: 64ch; margin: 16px 0 0; }
-.verdict .kpis { display: flex; gap: 14px; margin-top: 20px; align-items: stretch; }
-.verdict .kpi { flex: 1; min-width: 0; background: var(--surface); border: 1px solid var(--line);
-  border-radius: var(--r-lg); padding: 16px 18px; display: flex; justify-content: space-between;
-  align-items: flex-start; gap: 10px; }
-.verdict .kpi-body { min-width: 0; }
-.verdict .kpi .medal { font-size: 18px; line-height: 1; flex-shrink: 0; }
-.verdict .name-kpi { display: block; font-size: 17px; font-weight: 500; line-height: 1.2;
-  letter-spacing: -0.01em; margin-bottom: 12px; white-space: nowrap; overflow: hidden;
-  text-overflow: ellipsis; }
-.verdict .kpi .metrics { display: flex; gap: 22px; }
-.verdict .kpi .metric { display: flex; flex-direction: column; gap: 2px; }
-.verdict .kpi .metric span { font-size: 12px; color: var(--muted); font-weight: 500; white-space: nowrap; }
-.verdict .kpi .metric b { font-size: 18px; font-weight: 500; color: var(--ink); font-family: var(--mono);
-  font-variant-numeric: tabular-nums; letter-spacing: -0.02em; line-height: 1.15; white-space: nowrap; }
-.verdict .kpi.state .metric:first-child b { color: var(--state); }
-table { border-collapse: collapse; width: 100%; font-size: 13.5px;
-        font-variant-numeric: tabular-nums; }
-th { text-align: left; font-family: var(--mono); font-size: 12px; text-transform: uppercase;
-     letter-spacing: 0.02em; color: var(--muted); padding: 6px 10px;
-     border-bottom: 1.5px solid var(--line); }
-td { padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+# Arena-only rules, in evaluatorq tokens. The pw-* rules (vote chips, round
+# rows, position-bias bar) are copied from evaluatorq's pairwise export
+# (pairwise_reports/export_html.py, _PAIRWISE_CSS), which keeps them private.
+_ARENA_CSS = """
+.hero .status-badge { margin: 4px 0 10px; }
+.hero h1 { font-size: 28px; line-height: 1.25; margin: 0 0 10px; }
+.lede { color: var(--gray-700); max-width: 66ch; margin: 0 0 6px; }
+.note, .vnote { font-size: 13px; color: var(--gray-500); margin: 8px 2px 14px; }
+.kpi-value .medal { font-size: .6em; vertical-align: middle; margin-left: 6px; }
+.kpi-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tablewrap { overflow-x: auto; }
+.tablewrap table { margin: 12px 0 8px; }
+.tablewrap th, .tablewrap td { padding: 8px 10px; }
 td.n, th.n { text-align: right; font-family: var(--mono); white-space: nowrap; }
-.tablewrap { overflow-x: auto; background: var(--card); border: 1px solid var(--line);
-             border-radius: var(--r-lg); padding: 4px 8px 8px; box-shadow: var(--shadow-xs); }
-.ci-track { position: relative; height: 8px; border-radius: 4px; min-width: 160px;
-            background: color-mix(in srgb, var(--ink) 8%, transparent); }
-.ci-range { position: absolute; top: 0; height: 8px; border-radius: 4px;
-            background: color-mix(in srgb, var(--indigo) 28%, transparent); }
-.ci-dot { position: absolute; top: -2px; width: 4px; height: 12px; border-radius: 2px; background: var(--indigo); }
+.card svg { display: block; }
+.ci-track { position: relative; height: 8px; border-radius: 4px; min-width: 110px; background: var(--gray-100); }
+.ci-range { position: absolute; top: 0; height: 8px; border-radius: 4px; background: rgb(var(--heat) / .45); }
+.ci-dot { position: absolute; top: -2px; width: 4px; height: 12px; border-radius: 2px; background: var(--slate); }
 .name { font-weight: 600; white-space: nowrap; }
-.think { font-size: 11px; color: var(--muted); }
-.think.off { color: var(--warn); border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
-             border-radius: var(--r-sm); padding: 0 5px; }
-.grid td, .grid th { text-align: center; padding: 6px 6px; }
+.think { font-size: 11px; color: var(--gray-500); }
+.think.off { color: var(--warn-ink); border: 1px solid rgba(242, 182, 0, .45); border-radius: 5px; padding: 0 5px; }
+.grid td, .grid th { text-align: center; padding: 7px 6px; }
 .grid td.rowname { text-align: left; font-weight: 600; white-space: nowrap; }
-.foot { margin-top: 48px; padding-top: 14px; border-top: 1px solid var(--line);
-        font-family: var(--mono); font-size: 12px; color: var(--muted); }
-.foot code { background: var(--surface); padding: 1px 5px; border-radius: 4px; }
-.note { font-size: 12.5px; color: var(--muted); margin: 8px 2px; }
-.subhead { font-family: var(--mono); font-size: 12px; color: var(--muted);
-           margin: 22px 2px 8px; }
-details.method { margin: 40px 0 0; }
-details.method > summary { font-size: 17px; font-weight: 500; cursor: pointer;
-  padding-bottom: 6px; border-bottom: 1px solid var(--line); list-style: none; }
-details.method > summary::-webkit-details-marker { display: none; }
-details.method > summary::after { content: " ▸"; color: var(--muted); }
-details.method[open] > summary::after { content: " ▾"; }
-details.method h3 { font-family: var(--mono); font-size: 11px; letter-spacing: .04em;
-  text-transform: uppercase; color: var(--muted); margin: 18px 0 4px; }
-details.method p { font-size: 13px; color: var(--muted); margin: 4px 2px; max-width: 74ch; }
-.costcards { display: flex; gap: 14px; flex-wrap: wrap; margin: 4px 0; }
-.costcard { flex: 1; min-width: 175px; background: var(--card); border: 1px solid var(--line);
-            border-radius: var(--r-lg); padding: 15px 18px; box-shadow: var(--shadow-xs); }
-.costcard.total { border-color: color-mix(in srgb, var(--indigo) 45%, var(--line)); }
-.costcard .lbl { font-family: var(--mono); font-size: 12px; letter-spacing: .04em;
-                 text-transform: uppercase; color: var(--muted); }
-.costcard .big { font-size: 27px; font-weight: 700; letter-spacing: -0.02em;
-                 font-variant-numeric: tabular-nums; margin-top: 6px; }
-.costcard .cap { font-size: 12px; color: var(--muted); margin-top: 5px; }
 .sideA { color: var(--a); font-weight: 600; } .sideB { color: var(--b); font-weight: 600; }
-.sig.warn { color: var(--warn); } .sig.good { color: var(--good); }
-@media (max-width: 640px) { h1 { font-size: 24px; } .verdict .kpis { flex-direction: column; } }
+.sig.warn { color: var(--warn-ink); } .sig.good { color: var(--c-pass); }
+.subhead { font-family: var(--mono); font-size: 12px; color: var(--gray-500); margin: 22px 2px 8px; }
+.tally { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 4px 2px 10px; font-size: 14px; }
+details.method { margin: 48px 0 0; }
+details.method > summary { font-size: 22px; font-weight: 600; color: var(--slate); list-style: none;
+  padding-bottom: 6px; border-bottom: 1px solid var(--gray-300); }
+details.method > summary::-webkit-details-marker { display: none; }
+details.method > summary::after { content: " ▸"; color: var(--gray-500); }
+details.method[open] > summary::after { content: " ▾"; }
+details.method h3 { margin: 22px 0 4px; }
+details.method p { font-size: 14px; color: var(--gray-700); max-width: 74ch; }
+.footer code { font-size: 11px; }
+.pw-caption { opacity: .7; font-size: .9em; margin: 4px 0 12px; }
+.pw-muted { opacity: .6; }
+.pw-bias { display: inline-flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
+.pw-bias__track { width: 60px; height: 8px; background: rgba(127,127,127,.15); border-radius: 4px; overflow: hidden; }
+.pw-bias__fill { display: block; height: 100%; background: #7f8c9a; }
+.pw-bias__fill--warn { background: #d9534f; }
+.pw-tag { font-size: .75em; padding: 1px 6px; border-radius: 10px; background: rgba(127,127,127,.18); margin-left: 6px; }
+.pw-tag--flip { background: rgba(217,83,79,.18); }
+.pw-chip { display: inline-block; min-width: 34px; text-align: center; padding: 1px 8px; margin-right: 4px;
+  border-radius: 10px; font-size: .8em; background: rgba(127,127,127,.15); }
+.pw-chip--a { background: rgba(59,111,212,.22); }
+.pw-chip--b { background: rgba(130,87,197,.22); }
+.pw-chip--tie { background: rgba(127,127,127,.2); }
+.pw-chip--abstain { opacity: .5; }
+.pw-chip--flip { outline: 1px dashed rgba(217,83,79,.6); }
+.pw-split { margin-left: 8px; color: #d9534f; }
+.pw-cmp { border: 1px solid rgba(127,127,127,.25); border-radius: 6px; margin: 6px 0; padding: 6px 10px; background: var(--surface); }
+.pw-cmp summary { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; font-weight: 400; color: var(--slate); }
+.pw-cmp__idx { opacity: .6; width: 28px; font-variant-numeric: tabular-nums; }
+.pw-cmp__q { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.pw-cmp__pair { display: block; font-size: 12px; color: var(--gray-500); }
+.pw-cmp__chips { white-space: nowrap; }
+.pw-responses { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
+.pw-response h4 { margin: 0; }
+.pw-response pre { white-space: pre-wrap; word-break: break-word; background: rgba(127,127,127,.08);
+  padding: 8px; border-radius: 4px; margin: 4px 0 0; font-size: 12.5px; max-height: 28rem; overflow-y: auto; }
+.pw-votes { list-style: none; padding: 0; margin: 8px 0 4px; }
+.pw-vote { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; padding: 6px 0; border-top: 1px solid rgba(127,127,127,.15); }
+.pw-vote__model { width: 170px; font-weight: 600; flex: none; }
+.pw-vote__why { flex: 1; opacity: .85; font-size: 13.5px; }
+@media (max-width: 720px) { .pw-responses { grid-template-columns: 1fr; } .kpi-band { flex-wrap: wrap; } }
 """
-)
 
-
-def _e(s: Any) -> str:
-    return html.escape(str(s))
-
-
-def _pct(x: float | None) -> str:
-    return "n/a" if x is None else f"{x:.0%}"
+_CSS = _BASE_CSS + _ARENA_CSS
 
 
 def _ci_bar(lo: float, hi: float, point: float, floor: float, span: float) -> str:
@@ -180,13 +121,14 @@ def _ci_bar(lo: float, hi: float, point: float, floor: float, span: float) -> st
     )
 
 
-def _cost_lines(records, manifest, prices, alias=None):
-    """(models_usd, jury_usd_estimate, unpriced_names) or None without prices.
+def _cost_lines(records, manifest, prices, alias=None, jury_measured=None):
+    """(models_usd, jury_usd, unpriced_names) or None without prices.
 
-    Model spend is exact (per-record attribution); jury spend is an
-    estimate at the panel's mean catalog rate, because records store the
-    panel's token total, not per-judge splits. ``alias`` maps the short model
-    names stored in records to the display names the manifest is keyed by.
+    Model spend is exact (per-record attribution). Jury spend is
+    ``jury_measured`` when the log priced every judge call, else an estimate
+    at the panel's mean catalog rate from the panel's token total. ``alias``
+    maps the short model names stored in records to the display names the
+    manifest is keyed by.
     """
     if not prices:
         return None
@@ -208,6 +150,8 @@ def _cost_lines(records, manifest, prices, alias=None):
                 unpriced.add(name)
             else:
                 models_usd += tin * pr[0] / 1e6 + tout * pr[1] / 1e6
+    if jury_measured is not None:
+        return models_usd, jury_measured, sorted(unpriced)
     panel = [prices[j] for j in manifest.get("judges", []) if j in prices]
     unpriced.update(j for j in manifest.get("judges", []) if j not in prices)
     jury_usd = None
@@ -267,6 +211,19 @@ def _fmt_usd(v: float) -> str:
     return f"${v:.2f}" if v >= 0.1 else f"${v:.3f}"
 
 
+def _kpi(label: str, value: str, subtitle: str, status: str = "") -> str:
+    """One evaluatorq KPI card; no status means a plain grey edge.
+
+    evaluatorq's ``kpi_cards`` has no subtitle slot and escapes its value, so
+    the markup is written out here with the same classes.
+    """
+    edge = f" kpi-card--{status}" if status else ""
+    return (
+        f"<div class='kpi-card{edge}'><div class='kpi-value'>{value}</div>"
+        f"<div class='kpi-label'>{label}</div><div class='kpi-subtitle'>{subtitle}</div></div>"
+    )
+
+
 def _value_map_svg(points, champion: str, size_label: str = "average response length") -> str:
     """ELO vs cost (log x), dashed best-value frontier, size = avg out tokens.
 
@@ -312,16 +269,16 @@ def _value_map_svg(points, champion: str, size_label: str = "average response le
         rad = max(9.0, 5 + 9 * (t / tmax))
         on_frontier = round(x) in fx
         fill = (
-            "var(--brand)"
+            "var(--clay)"
             if name == champion
-            else ("var(--teal-soft)" if on_frontier else "var(--dot-mute)")
+            else ("var(--olive)" if on_frontier else "var(--gray-500)")
         )
         rk = rank_of[name]
         # Surface ring separates overlapping dots; dot fills are dark enough for
         # plain white digits (no outline) in both light and dark.
         dots.append(
             f"<circle cx='{x:.0f}' cy='{y:.0f}' r='{rad:.0f}' fill='{fill}' opacity='.9' "
-            f"stroke='var(--card)' stroke-width='1.5'>"
+            f"stroke='var(--surface)' stroke-width='1.5'>"
             f"<title>{_e(name)}: {_fmt_usd(c)}, ELO {e:.0f}, {r:.0%} win rate</title></circle>"
             f"<text x='{x:.0f}' y='{y + 3.5:.0f}' font-size='10' font-weight='700' fill='#fff' "
             f"text-anchor='middle' pointer-events='none'>{rk}</text>"
@@ -333,7 +290,7 @@ def _value_map_svg(points, champion: str, size_label: str = "average response le
             nx = min(max(x, L + 60), W - R - 60)
             dots.append(
                 f"<text x='{nx:.0f}' y='{y + rad + 12:.0f}' font-size='10' "
-                f"fill='var(--muted)' text-anchor='middle' pointer-events='none'>{_e(name)}</text>"
+                f"fill='var(--gray-500)' text-anchor='middle' pointer-events='none'>{_e(name)}</text>"
             )
         else:
             # Podium labels: centered over their own dot, staggered upward by
@@ -345,17 +302,17 @@ def _value_map_svg(points, champion: str, size_label: str = "average response le
             if abs(lx - x) > 4 or (y - rad - ly) > 20:
                 leader = (
                     f"<line x1='{lx:.0f}' y1='{ly + 3:.0f}' x2='{x:.0f}' y2='{y - rad - 1:.0f}' "
-                    f"stroke='var(--muted)' stroke-width='0.75' opacity='0.6'/>"
+                    f"stroke='var(--gray-500)' stroke-width='0.75' opacity='0.6'/>"
                 )
             dots.append(
                 leader + f"<text x='{lx:.0f}' y='{ly:.0f}' font-size='11' font-weight='700' "
-                f"fill='var(--ink)' text-anchor='middle'>{_e(name)} "
-                f"<tspan fill='var(--muted)' font-weight='400'>{_fmt_usd(c)} &middot; ELO {e:.0f}</tspan></text>"
+                f"fill='var(--slate)' text-anchor='middle'>{_e(name)} "
+                f"<tspan fill='var(--gray-500)' font-weight='400'>{_fmt_usd(c)} &middot; ELO {e:.0f}</tspan></text>"
             )
         star = " &#9733;" if on_frontier else ""
         key_rows.append(
             f"<span style='white-space:nowrap'><b>{rk}</b> {_e(name)} "
-            f"<span style='color:var(--muted)'>{_fmt_usd(c)} &middot; ELO {e:.0f} &middot; {r:.0%}{star}</span></span>"
+            f"<span style='color:var(--gray-500)'>{_fmt_usd(c)} &middot; ELO {e:.0f} &middot; {r:.0%}{star}</span></span>"
         )
     key = (
         "<p class='note' style='display:flex;flex-wrap:wrap;gap:4px 18px'>"
@@ -366,9 +323,9 @@ def _value_map_svg(points, champion: str, size_label: str = "average response le
     # Axis ticks: y at round ELO steps with faint gridlines; x at $ decades (log scale).
     y_ticks = "".join(
         f"<line x1='{L}' y1='{py(v):.0f}' x2='{W - R}' y2='{py(v):.0f}' "
-        f"stroke='var(--line)' stroke-width='{1 if v in (e_lo, e_hi) else 0.5}' "
+        f"stroke='var(--gray-300)' stroke-width='{1 if v in (e_lo, e_hi) else 0.5}' "
         f"{'stroke-dasharray=2 3' if v not in (e_lo, e_hi) else ''}/>"
-        f"<text x='{L - 8}' y='{py(v) + 4:.0f}' font-size='10' fill='var(--muted)' "
+        f"<text x='{L - 8}' y='{py(v) + 4:.0f}' font-size='10' fill='var(--gray-500)' "
         f"text-anchor='end'>{v:.0f}</text>"
         for v in range(e_lo, e_hi + 1, step)
     )
@@ -381,8 +338,8 @@ def _value_map_svg(points, champion: str, size_label: str = "average response le
         tx = L + (d - x0) / span * (W - L - R)
         val = 10**d
         x_ticks += (
-            f"<line x1='{tx:.0f}' y1='{H - B}' x2='{tx:.0f}' y2='{H - B + 5}' stroke='var(--muted)'/>"
-            f"<text x='{tx:.0f}' y='{H - B + 17}' font-size='10' fill='var(--muted)' "
+            f"<line x1='{tx:.0f}' y1='{H - B}' x2='{tx:.0f}' y2='{H - B + 5}' stroke='var(--gray-500)'/>"
+            f"<text x='{tx:.0f}' y='{H - B + 17}' font-size='10' fill='var(--gray-500)' "
             f"text-anchor='middle'>{_fmt_usd(val)}</text>"
         )
     # Label the far-right extreme (the priciest model) so the right end of the
@@ -391,22 +348,22 @@ def _value_map_svg(points, champion: str, size_label: str = "average response le
     # decade already lands on the edge.
     if abs(x1 - round(x1)) > 0.03:
         x_ticks += (
-            f"<line x1='{W - R}' y1='{H - B}' x2='{W - R}' y2='{H - B + 5}' stroke='var(--muted)'/>"
-            f"<text x='{W - R}' y='{H - B + 17}' font-size='10' fill='var(--muted)' "
+            f"<line x1='{W - R}' y1='{H - B}' x2='{W - R}' y2='{H - B + 5}' stroke='var(--gray-500)'/>"
+            f"<text x='{W - R}' y='{H - B + 17}' font-size='10' fill='var(--gray-500)' "
             f"text-anchor='end'>{_fmt_usd(10**x1)}</text>"
         )
 
     return f"""
 <h2>Value map</h2>
-<div class="tablewrap">
+<div class="card">
 <svg viewBox="0 0 {W} {H}" width="100%" role="img" aria-label="ELO vs cost">
-<line x1="{L}" y1="{H - B}" x2="{W - R}" y2="{H - B}" stroke="var(--line)"/>
-<line x1="{L}" y1="{T}" x2="{L}" y2="{H - B}" stroke="var(--line)"/>
-<text x="{L - 8}" y="{T - 10}" font-size="10" fill="var(--muted)" text-anchor="end">ELO</text>
+<line x1="{L}" y1="{H - B}" x2="{W - R}" y2="{H - B}" stroke="var(--gray-300)"/>
+<line x1="{L}" y1="{T}" x2="{L}" y2="{H - B}" stroke="var(--gray-300)"/>
+<text x="{L - 8}" y="{T - 10}" font-size="10" fill="var(--gray-500)" text-anchor="end">ELO</text>
 {y_ticks}
 {x_ticks}
-<text x="{(L + W - R) // 2}" y="{H - 14}" font-size="11" fill="var(--muted)" text-anchor="middle">cost per model over the whole run (log scale)</text>
-<polyline points="{poly}" fill="none" stroke="var(--brand)" stroke-width="1.5" stroke-dasharray="5 4"/>
+<text x="{(L + W - R) // 2}" y="{H - 14}" font-size="11" fill="var(--gray-500)" text-anchor="middle">cost per model over the whole run (log scale)</text>
+<polyline points="{poly}" fill="none" stroke="var(--clay)" stroke-width="1.5" stroke-dasharray="5 4"/>
 {"".join(dots)}
 </svg></div>
 {key}
@@ -482,18 +439,102 @@ def _speed_svg(stats) -> str:
         label = f"{tps:.0f} tok/s &middot; ttft {ttft:.1f}s"
         op = 0.85 - 0.5 * (i / max(len(rows) - 1, 1))
         parts.append(
-            f"<text x='{L - 8}' y='{y + 12}' font-size='10.5' fill='var(--muted)' text-anchor='end'>{_e(name)}</text>"
-            f"<rect x='{L}' y='{y}' width='{width:.0f}' height='14' rx='4' fill='var(--teal-soft)' opacity='{op:.2f}'/>"
-            f"<text x='{L + width + 8:.0f}' y='{y + 12}' font-size='10.5' fill='var(--muted)'>{label}</text>"
+            f"<text x='{L - 8}' y='{y + 12}' font-size='10.5' fill='var(--gray-500)' text-anchor='end'>{_e(name)}</text>"
+            f"<rect x='{L}' y='{y}' width='{width:.0f}' height='14' rx='4' fill='var(--olive)' opacity='{op:.2f}'/>"
+            f"<text x='{L + width + 8:.0f}' y='{y + 12}' font-size='10.5' fill='var(--gray-500)'>{label}</text>"
         )
     return f"""
 <h2>{title}</h2>
-<div class="tablewrap">
+<div class="card">
 <svg viewBox="0 0 {W} {H}" width="100%" role="img" aria-label="{title} per model">
 {"".join(parts)}
 </svg></div>
 <p class="note">{note}</p>
 """
+
+
+_ROUNDS_CAP = 200  # a 16-model run would otherwise be tens of MB
+
+
+def _clip(text: str, n: int) -> str:
+    return text if len(text) <= n else text[:n].rstrip() + "…"
+
+
+def _vote_chip(v: dict, label: str) -> str:
+    """The judge's pick as an evaluatorq vote chip; a dot when it abstained."""
+    flip = " pw-chip--flip" if v.get("flipped") else ""
+    choice = v.get("vote")
+    if choice is None:
+        return f"<span class='pw-chip pw-chip--abstain{flip}' title='{_e(label)} abstained'>&middot;</span>"
+    tone = {"A": "a", "B": "b"}.get(choice, "tie")
+    return f"<span class='pw-chip pw-chip--{tone}{flip}' title='{_e(label)}'>{_e(choice)}</span>"
+
+
+def _rounds_html(judged, alias, labels, floor) -> str:
+    """One expandable row per judged round: the panel's chips, then both answers and every vote."""
+    if not judged:
+        return ""
+    rows = []
+    for i, r in enumerate(judged[:_ROUNDS_CAP], 1):
+        name_a = alias.get(r.rating_key("a"), r.model_a)
+        name_b = alias.get(r.rating_key("b"), r.model_b)
+        verdict = r.majority_verdict
+        badge = {
+            "A": (f"{name_a} wins", "pass"),
+            "B": (f"{name_b} wins", "pass"),
+            "tie": ("tie", "neutral"),
+        }.get(verdict, ("inconclusive", "warn"))
+        picks = {v.get("vote") for v in r.judge_votes if v.get("vote")}
+        split = (
+            "<span class='pw-split' title='the panel split or could not decide'>⚠</span>"
+            if len(picks) > 1 or verdict == "inconclusive"
+            else ""
+        )
+        chips = "".join(
+            _vote_chip(v, labels.get(v.get("model"), v.get("model", ""))) for v in r.judge_votes
+        )
+        question = _clip(r.prompt_text, 300)
+        full_prompt = f"<pre>{_e(r.prompt_text)}</pre>" if question != r.prompt_text else ""
+        votes = []
+        for v in r.judge_votes:
+            label = labels.get(v.get("model"), v.get("model", ""))
+            tags = "<span class='pw-tag pw-tag--flip'>flipped</span>" if v.get("flipped") else ""
+            tags += "<span class='pw-tag'>under floor</span>" if floor_abstained(v, floor) else ""
+            tags += "<span class='pw-tag'>stand-in</span>" if v.get("replacement") else ""
+            probs = vote_probabilities(v)
+            why = (
+                " &middot; ".join(f"{k} {probs[k]:.0%}" for k in ("A", "B", "tie"))
+                if probs
+                else _e(_clip(v.get("explanation") or "", 400))
+            )
+            votes.append(
+                f"<li class='pw-vote'><span class='pw-vote__model'>{_e(label)}</span>"
+                f"{_vote_chip(v, label)}{tags}<span class='pw-vote__why'>{why}</span></li>"
+            )
+        rows.append(
+            f"<details class='pw-cmp'><summary><span class='pw-cmp__idx'>{i}</span>"
+            f"<span class='pw-cmp__q'>{_e(question)}<span class='pw-cmp__pair'>"
+            f"<span class='sideA'>A</span> {_e(name_a)} vs <span class='sideB'>B</span> "
+            f"{_e(name_b)}</span></span>{status_badge(*badge)}"
+            f"<span class='pw-cmp__chips'>{chips}</span>{split}</summary>{full_prompt}"
+            f"<div class='pw-responses'><div class='pw-response'><h4><span class='sideA'>A</span> "
+            f"{_e(name_a)}</h4><pre>{_e(r.response_a)}</pre></div><div class='pw-response'><h4>"
+            f"<span class='sideB'>B</span> {_e(name_b)}</h4><pre>{_e(r.response_b)}</pre></div></div>"
+            f"<ul class='pw-votes'>{''.join(votes)}</ul></details>"
+        )
+    cap = (
+        f"<p class='note'>Showing the first {_ROUNDS_CAP} of {len(judged)} judged rounds. To page "
+        f"through all of them, run with <code>orq-arena run --tui</code> and press <b>B</b> on the "
+        f"final leaderboard to open the battle browser.</p>"
+        if len(judged) > _ROUNDS_CAP
+        else ""
+    )
+    return (
+        "<h2>Rounds</h2><p class='note'>Every judged round with each judge&#39;s pick: A, B or tie; "
+        "a dot means the judge abstained, a dashed outline that it flipped when the sides were "
+        "swapped, and &#9888; that the panel split. Open a round to read both answers and every "
+        "vote.</p>" + "".join(rows) + cap
+    )
 
 
 def _empty_report_html(manifest: dict[str, Any], n_records: int) -> str:
@@ -503,12 +544,13 @@ def _empty_report_html(manifest: dict[str, Any], n_records: int) -> str:
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>orq-arena report &middot; {bench_id}</title>
-<style>{_CSS}</style></head><body><div class="wrap">
-<header>{_MARK}<span class="brand">orq.ai</span><span class="kind">{bench_id} &middot; ORQ-ARENA RUN</span></header>
-<div class="verdict tied"><p class="eyebrow">&#9888; NO RATED MODELS</p>
+<style>{_CSS}</style></head><body><div class="container">
+<header class="hero"><div class="report-brand-logo">{_LOGO}</div>
+<p class="meta">{bench_id} &middot; ORQ-ARENA RUN</p>
+{status_badge("⚠ NO RATED MODELS", "warn")}
 <h1>Nothing to rank.</h1>
-<p class="expl">This run produced no rated models: all {n_records} rounds errored, or no
-candidates were configured. Check the candidates in the YAML and the run log, then re-run.</p></div>
+<p class="lede">This run produced no rated models: all {n_records} rounds errored, or no
+candidates were configured. Check the candidates in the YAML and the run log, then re-run.</p></header>
 </div></body></html>
 """
 
@@ -629,14 +671,81 @@ def build_report_html(
                 cells.append(f"<td{style} title='{_e(a)} beat {_e(b)} {v:g}&times;'>{v:g}</td>")
         grid_rows.append(f"<tr><td class='rowname'>{i}. {_e(a)}</td>{''.join(cells)}</tr>")
 
-    # Jury room.
+    # Jury room, in the columns of evaluatorq's pairwise export. Labels come
+    # from the whole panel, so two judges sharing a short name never share a row.
+    decisions = cfg.judge_api == "decisions"
     jury = report.get("jury") or {}
+    per_judge = jury.get("per_judge", [])
+    panel_ids = list(manifest.get("judges", cfg.judges))
+    labels = judge_labels([*panel_ids, *(str(j.get("model", "")) for j in per_judge)])
+    all_votes = [v for r in judged for v in r.judge_votes]
+    stand_ins = {v.get("model") for v in all_votes if v.get("replacement")}
+    # A flip rate means something only for a judge that saw both seat orders.
+    swapped = {v.get("model") for v in all_votes if v.get("completed")}
+    # Mean confidence: how sure a decision judge was of its leading option.
+    # Prompted judges carry no probabilities, so LLM runs never grow the column.
+    conf: dict[str, list[float]] = {}
+    # Over every vote that carries probabilities, abstained and flipped ones too,
+    # so a judge that contradicts itself does not read as confident.
+    for v in all_votes:
+        probs = vote_probabilities(v)
+        if probs is not None:
+            conf.setdefault(str(v.get("model", "")), []).append(max(probs.values()))
+    jury_head = ["Judge", "A rate", "B rate", "Tie rate", "Flip rate"]
+    jury_head += ["Mean confidence"] if conf else []
     jury_rows = []
-    for j in jury.get("per_judge", []):
-        jury_rows.append(
-            f"<tr><td class='name'>{_e(str(j.get('model', '')).split('/')[-1])}</td>"
-            f"<td class='n'>{_pct(j.get('position_bias'))}</td>"
-            f"<td class='n'>{_pct(j.get('tie_rate'))}</td></tr>"
+    for j in per_judge:
+        model = str(j.get("model", ""))
+        bias = j.get("position_bias")
+        if not cfg.judge_swap:
+            flip = "n/a (swap off)"
+        elif model not in swapped or bias is None:
+            flip = "<span class='pw-muted' title='never saw both seat orders of a pair'>n/a</span>"
+        else:
+            warn = " pw-bias__fill--warn" if bias >= POSITION_BIAS_WARN else ""
+            flip = (
+                f"<span class='pw-bias'><span class='pw-bias__track'><span class='pw-bias__fill"
+                f"{warn}' style='width:{min(bias, 1.0) * 100:.0f}%'></span></span>"
+                f"{_pct(bias)}</span>"
+            )
+        tag = " <span class='pw-tag'>stand-in</span>" if model in stand_ins else ""
+        row = [
+            f"<span class='name'>{_e(labels.get(model, model))}</span>{tag}",
+            _pct(j.get("a_rate")),
+            _pct(j.get("b_rate")),
+            _pct(j.get("tie_rate")),
+            flip,
+        ]
+        if conf:
+            ps = conf.get(model)
+            row.append(f"{sum(ps) / len(ps):.2f}" if ps else "n/a")
+        jury_rows.append(row)
+    if not cfg.judge_swap:
+        seat_note = (
+            "This run used a single seat order, so position bias (the flip rate) was not measured."
+        )
+    elif per_judge and not swapped:
+        seat_note = (
+            "No pair completed both seat orders, so position bias (the flip rate) could not be "
+            "measured for this run despite swapping being enabled."
+        )
+    else:
+        seat_note = (
+            "Each judge sees every pair in both seat orders; a judge that contradicts itself "
+            "abstains (the flip rate) and abstentions never become verdicts; a high flip rate "
+            "flags a judge to distrust."
+        )
+    if conf:
+        seat_note += (
+            " Mean confidence is how sure a judge was of its leading option, averaged over "
+            "all its votes, including abstained ones (1.00 = certain)."
+        )
+    abstain_floor = cfg.judge_abstain_below
+    if abstain_floor is not None and all_votes:
+        n_floor = sum(floor_abstained(v, abstain_floor) for v in all_votes)
+        seat_note += (
+            f" {n_floor} vote{'' if n_floor == 1 else 's'} ({n_floor / len(all_votes):.0%}) "
+            f"abstained because the top option fell under the {abstain_floor:.2f} floor."
         )
     cohen = report.get("cohen") or {}
     _raw_ks = [v.get("kappa") if isinstance(v, dict) else v for v in cohen.values()]
@@ -756,12 +865,15 @@ def build_report_html(
         signal_rows.append(("Did length sway the jury", detail, ""))
     signal_rows.append(("Judges agreeing on decisive rounds", f"<b>{_pct(agreement)}</b>", ""))
     signal_rows.append(("Jury share of tokens used", f"<b>{jury_share}</b>", ""))
-    meth_rows = "".join(
-        f"<tr><td class='name'>{lbl}</td><td class='sig{c}'>{txt}</td></tr>"
-        for lbl, txt, c in signal_rows
+    signals_table = html_table(
+        ["Signal", "Reading"],
+        [
+            [f"<span class='name'>{lbl}</span>", f"<span class='sig{c}'>{txt}</span>"]
+            for lbl, txt, c in signal_rows
+        ],
     )
 
-    panel = ", ".join(str(j).split("/")[-1] for j in manifest.get("judges", cfg.judges))
+    panel = ", ".join(labels[j] for j in panel_ids) + (" (decision models)" if decisions else "")
 
     # Records store short model names; elo/manifest/report are keyed by display
     # name (name). Identical unless the config sets custom names.
@@ -809,60 +921,57 @@ def build_report_html(
 
     # Tokens & cost as three cards: models spend, jury spend, aggregated total.
     # Without catalog prices there's no cost story, so cards fall back to tokens.
-    cost = _cost_lines(records, manifest, prices, alias)
+    # Jury spend is exact when the log priced every judge call (v5 logs, either
+    # judge_api), else estimated; the cards branch on that, not on the mode.
+    jury_measured = report.get("judge_cost_usd")
+    rounds_judged = [r for r in judged if r.judge_votes]
+    if jury_measured is None and rounds_judged:
+        if all(r.judge_cost_usd is not None for r in rounds_judged):
+            jury_measured = sum(r.judge_cost_usd or 0.0 for r in rounds_judged)
+    cost = _cost_lines(records, manifest, prices, alias, jury_measured)
     cost_note = ""
-
-    def _card(lbl, big, cap, extra=""):
-        return (
-            f"<div class='costcard{extra}'><div class='lbl'>{lbl}</div>"
-            f"<div class='big'>{big}</div><div class='cap'>{cap}</div></div>"
-        )
-
     if cost:
         w_usd, j_usd, unpriced = cost
         total = w_usd + (j_usd or 0.0)
-        j_big = f"&asymp; ${j_usd:,.2f}" if j_usd is not None else "n/a"
-        cost_cards = (
-            "<div class='costcards'>"
-            + (
-                _card(
-                    "Models", f"${w_usd:,.2f}", f"{w_in:,} in &middot; {w_out:,} out &middot; exact"
-                )
-                + _card("Jury", j_big, f"{j_in:,} in &middot; {j_out:,} out &middot; estimated")
-                + _card(
-                    "Estimated total",
-                    f"&asymp; ${total:,.2f}",
-                    f"jury {jury_share} of tokens",
-                    extra=" total",
-                )
+        if jury_measured is not None:
+            j_card = _kpi(
+                "Jury", _fmt_usd(j_usd), f"{j_in:,} in &middot; {j_out:,} out &middot; measured"
             )
-            + "</div>"
-        )
-        cost_note = (
-            "<p class='note'>Model spend is exact (per-model catalog rates); jury spend is "
-            "estimated at the panel's mean rate because the log stores the panel's token total, "
-            "not per-judge splits."
-            + (
-                " Unpriced in the catalog and excluded: " + ", ".join(unpriced) + "."
-                if unpriced
-                else ""
+            t_card = _kpi("Total", f"${total:,.2f}", f"jury {jury_share} of tokens", "neutral")
+            spend = (
+                "Model and jury spend are exact: jury cost is what each judge call was priced at."
             )
-            + "</p>"
+        else:
+            j_big = f"&asymp; ${j_usd:,.2f}" if j_usd is not None else "n/a"
+            j_card = _kpi("Jury", j_big, f"{j_in:,} in &middot; {j_out:,} out &middot; estimated")
+            t_card = _kpi(
+                "Estimated total",
+                f"&asymp; ${total:,.2f}",
+                f"jury {jury_share} of tokens",
+                "neutral",
+            )
+            spend = (
+                "Model spend is exact (per-model catalog rates); jury spend is estimated at the "
+                "panel's mean rate because the log stores the panel's token total, not per-judge splits."
+            )
+        models_card = _kpi(
+            "Models", f"${w_usd:,.2f}", f"{w_in:,} in &middot; {w_out:,} out &middot; exact"
         )
+        cost_cards = f"<div class='kpi-band'>{models_card}{j_card}{t_card}</div>"
+        excluded = (
+            " Unpriced in the catalog and excluded: " + ", ".join(unpriced) + "."
+            if unpriced
+            else ""
+        )
+        cost_note = f"<p class='note'>{spend}{excluded}</p>"
     else:
         cost_cards = (
-            "<div class='costcards'>"
-            + (
-                _card(
-                    "Models",
-                    f"{w_in + w_out:,}",
-                    f"{w_in:,} in &middot; {w_out:,} out &middot; tokens",
-                )
-                + _card(
-                    "Jury",
-                    f"{j_in + j_out:,}",
-                    f"{j_in:,} in &middot; {j_out:,} out &middot; tokens",
-                )
+            "<div class='kpi-band'>"
+            + _kpi(
+                "Models", f"{w_in + w_out:,}", f"{w_in:,} in &middot; {w_out:,} out &middot; tokens"
+            )
+            + _kpi(
+                "Jury", f"{j_in + j_out:,}", f"{j_in:,} in &middot; {j_out:,} out &middot; tokens"
             )
             + "</div>"
         )
@@ -873,24 +982,21 @@ def build_report_html(
     runner_name = ranked[1][0] if len(ranked) > 1 else ""
     separated = top_separated is True
     if len(ranked) == 1:
-        vclass, headline = " tied", f"{_e(champion)} ran unopposed: nothing to rank."
+        headline = f"{_e(champion)} ran unopposed: nothing to rank."
         expl = (
             "A benchmark needs at least two candidates to produce a ranking. Add "
             "competitors to get a verdict."
         )
     elif rated == 0:
-        vclass, headline = " tied", "No decisive rounds: nothing to rank yet."
+        headline = "No decisive rounds: nothing to rank yet."
         expl = (
             f"All {len(records)} rounds were inconclusive or errored, so no model earned a "
             f"rated win. Re-run with more prompts or a decisive jury to separate the field."
         )
     elif separated:
-        vclass, headline = (
-            "",
-            (
-                f"Adopt {_e(champion)}: wins {champ_rate:.0%} of rated rounds, "
-                f"and the lead over {_e(runner_name)} holds across resamples."
-            ),
+        headline = (
+            f"Adopt {_e(champion)}: wins {champ_rate:.0%} of rated rounds, "
+            f"and the lead over {_e(runner_name)} holds across resamples."
         )
         expl = (
             f"{_e(champion)} beat every other model in this pool on your prompts and its lead "
@@ -901,12 +1007,9 @@ def build_report_html(
         # small to say. Report which way it leans and how often, and let the
         # reader decide whether to spend more rounds or pick on cost.
         lean = f"{top_diff['win_rate']:.0%}"
-        vclass, headline = (
-            " tied",
-            (
-                f"{_e(champion)} leads {_e(runner_name)}, but this run is too small to "
-                f"call it: decide on cost and speed, or run more rounds."
-            ),
+        headline = (
+            f"{_e(champion)} leads {_e(runner_name)}, but this run is too small to "
+            f"call it: decide on cost and speed, or run more rounds."
         )
         expl = (
             f"{_e(champion)} has the best rating and stays ahead of {_e(runner_name)} in "
@@ -918,40 +1021,26 @@ def build_report_html(
     else:
         # Nothing was measured (a run recorded before separation was computed),
         # so the page claims nothing either way rather than inventing a verdict.
-        vclass, headline = (
-            " tied",
-            f"{_e(champion)} has the best rating in this pool.",
-        )
+        headline = f"{_e(champion)} has the best rating in this pool."
         expl = (
             f"This run predates the separation check, so whether the gap to {_e(runner_name)} "
             f"is real was never measured. Regenerate the report from the battle log to find "
             f"out: <code>orq-arena report &lt;log&gt;</code>."
         )
     if separated:
-        status = "&#10003; TOP SPOT SEPARATED"
+        status = status_badge("✓ TOP SPOT SEPARATED", "pass")
     elif top_diff:
-        status = "&#9888; TOP SPOT NOT RESOLVED AT THIS SIZE"
+        status = status_badge("⚠ TOP SPOT NOT RESOLVED AT THIS SIZE", "warn")
     else:
-        status = "SEPARATION NOT MEASURED"
+        status = status_badge("SEPARATION NOT MEASURED", "neutral")
     top3 = []
     for i, (nm, e0) in enumerate(ranked[:3]):
-        cls = " state" if i == 0 else ""
-        # Metric row in orq's tower-metric-card idiom: muted label on top, value
-        # below in mono at medium weight. ELO first (the ranking axis).
-        metrics = (
-            f"<div class='metric'><span>ELO</span><b>{e0:.0f}</b></div>"
-            f"<div class='metric'><span>win share</span><b>{rates_all.get(nm, 0.0):.0%}</b></div>"
-        )
+        # ELO is the value (the ranking axis); win share and spend ride below.
+        sub = f"ELO &middot; {rates_all.get(nm, 0.0):.0%} win share"
         if nm in per_cost_all:
-            metrics += (
-                f"<div class='metric'><span>cost</span><b>{_fmt_usd(per_cost_all[nm])}</b></div>"
-            )
-        top3.append(
-            f"<div class='kpi{cls}'>"
-            f"<div class='kpi-body'><b class='name-kpi'>{_e(nm)}</b>"
-            f"<div class='metrics'>{metrics}</div></div>"
-            f"<span class='medal'>{medals[i]}</span></div>"
-        )
+            sub += f" &middot; {_fmt_usd(per_cost_all[nm])}"
+        edge = ("pass" if separated else "warn") if i == 0 else ""
+        top3.append(_kpi(_e(nm), f"{e0:.0f}<span class='medal'>{medals[i]}</span>", sub, edge))
     # Reconcile the common confusion when a lower-ranked card shows a higher
     # win share than the model above it (win share ignores opponent strength;
     # ELO doesn't). Only shown when that inversion is actually on the card.
@@ -968,12 +1057,6 @@ def build_report_html(
         if inversion
         else ""
     )
-    verdict_banner = (
-        f"<div class='verdict{vclass}'><p class='eyebrow'>{status}</p>"
-        f"<h1>{headline}</h1>"
-        f"<p class='expl'>{expl}</p><div class='kpis'>"
-        f"{''.join(top3)}</div>{winshare_note}</div>"
-    )
 
     bench_id = _e(manifest.get("tournament_id", ""))
 
@@ -987,15 +1070,51 @@ def build_report_html(
             else f"dataset {label} &middot; "
         )
 
+    judges_meta = f"{len(panel_ids)} JUDGES{' (DECISION MODELS)' if decisions else ''}"
+    swap_meta = "SEAT SWAP ON" if cfg.judge_swap else "SEAT SWAP OFF"
+    seat_meth = (
+        "Every judge scores each pair in both seat orders; a judge that contradicts itself between "
+        "orders abstains (the flip rate), and abstentions never become verdicts."
+        if cfg.judge_swap
+        else "Every judge scores each pair in one seat order, so self-contradiction (the flip rate) "
+        "is not measured."
+    )
+    decision_meth = (
+        " Each judge answers one choice question (A, B or tie) through the orq Decisions API and "
+        "returns a probability per option; the vote is the most probable option. Native decision "
+        "models report calibrated probabilities; emulated chat models report their own estimate."
+        if decisions
+        else ""
+    )
+    cost_meth = (
+        "Model and jury spend are exact: jury cost is what each judge call was priced at."
+        if jury_measured is not None
+        else "Model spend is exact (per-model catalog rates). Jury spend is estimated (&asymp;) at "
+        "the panel&#39;s mean rate, because the log stores the panel&#39;s token total, not "
+        "per-judge splits. Models unpriced in the catalog are excluded from the estimate."
+    )
+    via = (
+        "Every verdict via the orq.ai Decisions API"
+        if decisions
+        else "Every verdict via evaluatorq&#39;s pairwise jury"
+    )
+    rounds = _rounds_html(judged, alias, labels, abstain_floor)
+
     return f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>orq-arena report &middot; {bench_id}</title>
-<style>{_CSS}</style></head><body><div class="wrap">
+<style>{_CSS}</style></head><body><div class="container">
 
-<header>{_MARK}<span class="brand">orq.ai</span><span class="kind">{dataset_frag}{bench_id} &middot; {datestr} &middot; {len(ranked)} MODELS &middot; {len(records)} ROUNDS{" &middot; " + duration.upper() if duration else ""} &middot; ORQ-ARENA RUN</span></header>
-
-{verdict_banner}
+<header class="hero">
+<div class="report-brand-logo">{_LOGO}</div>
+<p class="meta">{dataset_frag}{bench_id} &middot; {datestr} &middot; {len(ranked)} MODELS &middot; {len(records)} ROUNDS{" &middot; " + duration.upper() if duration else ""} &middot; {judges_meta} &middot; {swap_meta} &middot; ORQ-ARENA RUN</p>
+{status}
+<h1>{headline}</h1>
+<p class="lede">{expl}</p>
+<div class="kpi-band">{"".join(top3)}</div>{winshare_note}
+<p class="pw-caption"><strong>Criteria:</strong> {_e(cfg.criteria)}</p>
+</header>
 
 <h2>Leaderboard</h2>
 <div class="tablewrap"><table>
@@ -1019,30 +1138,23 @@ whose bars overlap are not thereby tied: read each bar on its own, and see Confi
 {cost_note}
 
 <details class="method"><summary>The jury</summary>
-<div class="tablewrap"><table>
-<thead><tr><th>Judge</th><th class="n">flip rate</th><th class="n">tie rate</th></tr></thead>
-<tbody>{"".join(jury_rows) or "<tr><td colspan='3'>no per-judge stats recorded</td></tr>"}</tbody>
-</table></div>
-<p class="note">Each judge sees every pair in both seat orders; a judge that contradicts
-itself abstains (the flip rate) and abstentions never become verdicts; a high flip rate
-flags a judge to distrust. Judges also agree with one another (0 = chance, 1 = perfect): {cohen_range or "n/a"}.</p>
+<div class="tablewrap">{html_table(jury_head, jury_rows) if jury_rows else "<p class='note'>No per-judge stats recorded.</p>"}</div>
+<p class="note">{seat_note} Judges also agree with one another (0 = chance, 1 = perfect): {cohen_range or "n/a"}.</p>
 
 <p class="subhead">Panel verdicts across all {len(records)} rounds</p>
-<div class="badges">
-  <span class="badge"><span class="sideA">A</span> wins <b>{verdicts["A"]}</b></span>
-  <span class="badge"><span class="sideB">B</span> wins <b>{verdicts["B"]}</b></span>
-  <span class="badge">ties <b>{verdicts["tie"]}</b></span>
-  <span class="badge{inc_cls}">inconclusive <b>{verdicts["inconclusive"]}</b></span>
-  {f'<span class="badge warn">errored <b>{voids}</b></span>' if voids else ""}
+<div class="tally">
+  <span><span class="sideA">A</span> wins <b>{verdicts["A"]}</b></span>
+  <span><span class="sideB">B</span> wins <b>{verdicts["B"]}</b></span>
+  <span>ties <b>{verdicts["tie"]}</b></span>
+  <span class="sig{inc_cls}">inconclusive <b>{verdicts["inconclusive"]}</b></span>
+  {f'<span class="sig warn">errored <b>{voids}</b></span>' if voids else ""}
 </div>
 <p class="note">The A-vs-B split is panel seat lean; a large skew would flag position bias in the
 setup. Inconclusive rounds carry no signal and are dropped from the rating, never counted as ties.{" An errored round is a network or infrastructure failure, not a model failure; it is logged and excluded." if voids else ""}</p>
 </details>
 
 <details class="method"{conf_open}><summary>Confidence stats</summary>
-<div class="tablewrap"><table>
-<thead><tr><th>Signal</th><th>Reading</th></tr></thead>
-<tbody>{meth_rows}</tbody></table></div>
+<div class="tablewrap">{signals_table}</div>
 <p class="note">These are run-confidence signals, not model scores: whether the top spot
 clears the noise floor, how tightly the jury agreed, and whether length rather than quality
 did the separating.</p>
@@ -1064,8 +1176,7 @@ coefficient are shown only when that fit converges and the interval excludes 0. 
 where one side always wins have no finite coefficient; they are counted as separated and
 widen the interval rather than being dropped.</p>
 <h3>The jury</h3>
-<p>Every judge scores each pair in both seat orders; a judge that contradicts itself between
-orders abstains (the flip rate), and abstentions never become verdicts. Fleiss&#39; &kappa;
+<p>{seat_meth}{decision_meth} Fleiss&#39; &kappa;
 measures panel agreement across full-panel rounds; pairwise Cohen&#39;s &kappa; measures
 judge-vs-judge agreement. Decisive-vote agreement is the share of decisive rounds the panel
 agreed on. The A-vs-B split is panel-level seat lean.</p>
@@ -1074,20 +1185,20 @@ agreed on. The A-vs-B split is panel-level seat lean.</p>
 Inconclusive rounds carry no signal and are dropped, never counted as ties. An errored round is
 a network or infrastructure failure, not a model failure; it is logged and excluded.</p>
 <h3>Cost</h3>
-<p>Model spend is exact (per-model catalog rates). Jury spend is estimated (&asymp;) at the
-panel&#39;s mean rate, because the log stores the panel&#39;s token total, not per-judge splits.
-Models unpriced in the catalog are excluded from the estimate.</p>
+<p>{cost_meth}</p>
 </details>
 
-<div class="foot">
+{rounds}
+
+<footer class="footer"><span class="footer-logo">{_LOGO}</span>
 config <code>{_e(manifest.get("config_sha256", "?"))}</code> &middot;
 prompts <code>{_e(manifest.get("prompts_sha256", "?"))}</code> ({manifest.get("prompt_count", "?")}) &middot;
 seed <code>{_e(manifest.get("seed", "?"))}</code> &middot;
 panel: {_e(panel)} &middot; evaluatorq <code>{_e(manifest.get("evaluatorq_version", "?"))}</code><br>
 generated by <a href="https://github.com/orq-ai/orq-arena">orq-arena</a>; regenerate any time
-with <code>orq-arena report &lt;battles.jsonl&gt;</code>. Every verdict via evaluatorq&#39;s
-pairwise jury; every token via the orq.ai router gateway.
-</div>
+with <code>orq-arena report &lt;battles.jsonl&gt;</code>. {via}; every token via the orq.ai
+router gateway.
+</footer>
 
 </div></body></html>
 """

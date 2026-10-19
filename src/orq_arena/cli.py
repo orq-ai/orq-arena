@@ -93,11 +93,13 @@ def _check_credential(cfg) -> None:
     import os
 
     from .config import ORQ_API_KEY_ENV
-    from .providers.credentials import verify_credential
+    from .providers.credentials import verify_credential, verify_decisions
 
     if not os.environ.get(ORQ_API_KEY_ENV):
         return
     ok, detail = asyncio.run(verify_credential(cfg.gateway))
+    if ok is True and cfg.judge_api == "decisions":
+        ok, detail = asyncio.run(verify_decisions(cfg.gateway, cfg.judges[0]))
     if ok is False:
         raise click.ClickException(detail)
     if ok is None and detail:
@@ -230,6 +232,8 @@ def run(
         call_counts,
         config_warnings,
         cost_projection,
+        judge_api_errors,
+        judge_context_warnings,
         judge_family_overlaps,
         referenced_models,
         surprises,
@@ -321,7 +325,7 @@ def run(
                 "judges step in"
             )
         elif not tui:
-            _print_run_plan(cost)
+            _print_run_plan(cost, judges_header(cfg))
     if cost.unpriced:
         warn(
             f"  no catalog price (self-hosted or unpriced): "
@@ -331,7 +335,12 @@ def run(
     # What the catalog knows about the config, from the same cached fetch the
     # prices came from. All advisory: every one of these still runs.
     catalog, unchecked = asyncio.run(fetch_catalog_covering(cfg.gateway, referenced_models(cfg)))
-    cfg_warnings = config_warnings(cfg, catalog, unchecked)
+    blocking = judge_api_errors(cfg, catalog)
+    if blocking:
+        raise click.ClickException("\n".join(blocking))
+    cfg_warnings = config_warnings(cfg, catalog, unchecked) + judge_context_warnings(
+        cfg, prompts, catalog
+    )
     if cfg_warnings:
         preflight_data["config_warnings"] = cfg_warnings
         for line in cfg_warnings:
@@ -433,7 +442,14 @@ def run(
         )
 
 
-def _print_run_plan(cost) -> None:
+def judges_header(cfg) -> str:
+    """The run plan's judge heading, which names the mode before anything is spent."""
+    kind = "decision models, " if cfg.judge_api == "decisions" else ""
+    orders = "×2 seat orders" if cfg.judge_swap else "×1 seat order"
+    return f"Judges ({kind}{orders})"
+
+
+def _print_run_plan(cost, judges_heading: str = "Judges (×2 seat orders)") -> None:
     """Run-plan cost table on stderr; the approval decision reads off this.
 
     Every candidate and judge gets a row (unpriced ones show n/a and ?, they
@@ -473,7 +489,7 @@ def _print_run_plan(cost) -> None:
 
     for role, header in (
         ("candidate", "Candidates"),
-        ("judge", "Judges (×2 seat orders)"),
+        ("judge", judges_heading),
         ("probe", None),
     ):
         rows = [r for r in cost.rows if r.role == role]
@@ -556,6 +572,13 @@ def pool(config_path: str, as_json: bool) -> None:
 @click.option("--judge", "judges", multiple=True, help="Router model id; repeat for a panel.")
 @click.option("--criteria", default=None, help="Override judging criteria.")
 @click.option(
+    "--judge-api",
+    type=click.Choice(["llm", "decisions"]),
+    default=None,
+    help="Endpoint the new panel answers on; defaults to the config's judge_api. "
+    "Stand-in judges that cannot answer on it are dropped, and the command says which.",
+)
+@click.option(
     "--config",
     "config_path",
     default=DEFAULT_CONFIG,
@@ -582,6 +605,7 @@ def rejudge(
     log_path: str,
     judges: tuple[str, ...],
     criteria: str | None,
+    judge_api: str | None,
     config_path: str,
     output_path: str | None,
     report_json: str | None,
@@ -611,6 +635,8 @@ def rejudge(
     if not judges:
         raise click.ClickException("pass --judge <model> (repeatable), or --compare <report.json>")
 
+    from .preflight import answers_on, judge_api_errors
+    from .providers.models_list import fetch_catalog_covering
     from .rejudge import (
         load_records,
         rejudge_run,
@@ -621,6 +647,30 @@ def rejudge(
     )
 
     cfg = _load_config(config_path)
+    api = judge_api or cfg.judge_api
+    catalog, _ = asyncio.run(
+        fetch_catalog_covering(cfg.gateway, [*judges, *cfg.replacement_judges])
+    )
+    # The config's stand-ins were picked for its own panel; keep the ones that
+    # can answer on the new panel's endpoint.
+    keep = [j for j in cfg.replacement_judges if answers_on(api, catalog.get(j))]
+    dropped = [j for j in cfg.replacement_judges if j not in keep]
+    if dropped:
+        click.echo(
+            f"  stand-in judges dropped, they do not answer on {api}: {', '.join(dropped)}",
+            err=True,
+        )
+    cfg = cfg.model_copy(
+        update={
+            "judge_api": api,
+            "judges": list(judges),
+            "replacement_judges": keep,
+            "judge_abstain_below": cfg.judge_abstain_below if api == "decisions" else None,
+        }
+    )
+    blocking = judge_api_errors(cfg, catalog)
+    if blocking:
+        raise click.ClickException("\n".join(blocking))
     records = load_records(log_path)
     if not records:
         raise click.ClickException(f"no judgeable rounds in {log_path}")
@@ -650,7 +700,7 @@ def rejudge(
     )
     render_result(result)
     if output_path:
-        write_rejudged(output_path, records, result["comparisons"])
+        write_rejudged(output_path, records, result["comparisons"], result["judge_ms"])
         click.echo(f"re-judged rounds -> {output_path}")
     if report_json:
         save_report_json(report_json, result)
