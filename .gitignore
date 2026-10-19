@@ -35,4 +35,4 @@ examples/**/run.log
 /*.report.html
 
 # Sampled task prompts carry absolute local paths
-prompts/tb21-sample.jsonl
+prompts/tb21-sample*.jsonl

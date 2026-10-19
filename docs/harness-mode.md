@@ -319,3 +319,41 @@ whatever the harness, which tells nothing about the harness; an Apple-silicon Ma
 `max_parallel_trials: 2`; 32 trials, each run once and cached across runs; 48 rounds, of which
 the verifier gate decided 10 and the jury 38 (16 of those inconclusive); jury agreement 80%,
 jury cost $2.57 for the final run. A refusal counts as a loss, like any other failed task.
+
+### Budget pool: cheap models behind the agents
+
+`configs/harness-tb21-budget.yaml` runs six agents on 16 tasks (the 8 above plus 8 more: `fix-git`,
+`cobol-modernization`, `pypi-server`, `chess-best-move`, `count-dataset-tokens`, `raman-fitting`,
+`configure-git-webserver`, `polyglot-rust-c`), with models that cost about $0.1 to $0.4 per million
+input tokens, 10 to 40 times less than Opus. Measured on 2026-10-19 with an Apple-silicon Mac and
+`max_parallel_trials: 3`: 96 trials, 3.2 hours, $7.60 of agent spend (pi's cost is estimated from
+tokens) and $1.13 of jury.
+
+| Harness | Pass rate | ELO (95% CI) | $/task | min/task |
+|---|---|---|---|---|
+| claude-code (haiku-5-5) | 14/16 | 1204 (1121 to 1318) | 0.03 | 2.0 |
+| pi + skills (haiku-5-5) | 12/16 | 1112 (1042 to 1191) | 0.01 | 1.6 |
+| pi (haiku-5-5) | 13/16 | 1083 (1012 to 1165) | 0.01 | 1.6 |
+| codex (gpt-6-luna) | 11/16 | 1046 (959 to 1136) | 0.01 | 1.9 |
+| pi (glm-5.3-flash) | 8/16 | 780 (668 to 864) | 0.01 | 6.3 |
+| pi (deepseek-v4-pro) | 12/16 | 775 (665 to 853) | 0.40 | 5.6 |
+
+How to read it:
+
+- **The tests separate more here than with Opus.** Of the 16 tasks, 5 are passed by every agent and
+  `raman-fitting` is passed by none, so 10 carry signal, against 3 of 8 in the Opus run.
+- **ELO is not pass rate.** pi with deepseek-v4-pro passes 12 of 16, as many as pi + skills, yet rates
+  last. The criteria ask the jury to weigh efficiency, and on trials that passed, its median is 37
+  steps, 3.1 minutes and $0.13, against 10 to 13 steps, under a minute and under a cent for the
+  Haiku agents. It lost 50 of its 64 jury rounds. It also accounts for $6.44 of the $7.60 agent
+  spend. If you want correctness alone, rank by pass rate.
+- **Same model, different harness again.** claude-code leads the three Haiku agents on both pass
+  rate (14 of 16 against 12 and 13) and ELO (1204 against 1083 and 1112), but its interval still
+  overlaps the two pi entries, so it is a lead, not a separation. The two pi agents overlap fully.
+- **The intervals are tighter than the Opus run**: 150 to 200 points wide for the top four, against
+  290 to 410 there, because this run drew 240 rounds, 59 of them decided by the tests.
+- **Jury:** 94% mean agreement, and 38 rounds ended in a tie or no result. One round voided: a
+  codex trial hit `VerifierTimeoutError` after 22 minutes and is retried on the next run.
+
+One trial per task and agent, as above: a pass rate over 16 tasks moves 6 points per task.
+
