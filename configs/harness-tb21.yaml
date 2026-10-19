@@ -29,6 +29,9 @@ harness:
   diff: true
   diff_max_bytes: 200000
 
+gateway:
+  judge_max_tokens: 8192        # a reasoning judge reading a long dossier needs room to think
+
 verifier_gate: true             # a hidden-test pass beats a fail without a jury call
 judge_api: llm                  # decision models cannot read a trajectory dossier
 

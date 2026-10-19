@@ -533,10 +533,13 @@ def _dry_run(
             keep_awake=False,
         )
         try:
-            argv, _env = runner._plan(item, candidate, "dry-run")
+            argv, env = runner._plan(item, candidate, "dry-run")
         except HarnessError as exc:
             return False, str(exc)
         argv[0] = exe
+        # A custom agent (codex) is imported from PYTHONPATH; _run_cmd has no env of its own.
+        if env.get("PYTHONPATH") != os.environ.get("PYTHONPATH"):
+            argv = ["env", f"PYTHONPATH={env['PYTHONPATH']}", *argv]
         code, out = _run_cmd([*argv, "--dry-run"], timeout=60.0)
     tail = out.strip().splitlines()[-1] if out.strip() else ""
     if code == 0:
