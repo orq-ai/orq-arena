@@ -70,6 +70,26 @@
   #rrRing circle.b { stroke: var(--b); fill: var(--b); }
   #rrRing text { fill: var(--chrome); font: 15px ui-monospace, Menlo, monospace; }
   #rrRing text.a { fill: var(--a); } #rrRing text.b { fill: var(--b); }
+  .beat { display: none; flex-direction: column; gap: 1.4vmin; } .beat.show { display: flex; }
+  .card.pick { cursor: pointer; } .card.pick:hover { border-color: var(--chrome-dim); } .card.chosen { border-color: var(--a); }
+  .rec { display: flex; flex-wrap: wrap; gap: 0.4em; }
+  .rec span { padding: 0.1em 0.5em; border: 1px solid var(--line); font-size: 0.9em; }
+  .rec span.w { border-color: var(--green); color: var(--green); } .rec span.l { color: var(--chrome-dim); }
+  .grid { border-collapse: collapse; } .grid td, .grid th { border: 1px solid var(--line); padding: 0.25em 0.6em; text-align: center; }
+  .grid th { color: var(--chrome-dim); font-weight: normal; } .grid td.diag { color: var(--line); }
+  .bars { display: flex; flex-direction: column; gap: 0.5vmin; font-size: 0.75em; }
+  .bar { display: grid; grid-template-columns: 9em 1fr 7em; gap: 1vmin; align-items: center; }
+  .bar .track { position: relative; height: 1.1em; background: var(--ink-raised); overflow: hidden; }
+  .bar .ci { position: absolute; top: 35%; height: 30%; background: var(--chrome-dim); opacity: 0.5; }
+  .bar .fill { position: absolute; top: 0; left: 0; height: 100%; }
+  .bar .pt { position: absolute; top: 0; width: 3px; height: 100%; background: var(--chrome); transition: left 0.25s; }
+  .bar .ghost { position: absolute; top: 40%; width: 2px; height: 20%; background: var(--b); opacity: 0.35; }
+  .bar .val { text-align: right; }
+  #btBeat1 .card { font-size: 1em; } #btBeat1 .note, #btBeat3 .note { font-size: 1em; }
+  #btBeat3 .bars { font-size: 1em; gap: 2vmin; margin-top: 2vmin; } #btBeat3 .track { height: 2.4em; }
+  #btBeat3 .ghost { opacity: 0.6; }
+  .chess { border-top: 1px dashed var(--line); padding-top: 1vmin; }
+  .chess b { color: var(--chrome); }
   #keys {
     display: none; position: fixed; inset: 20vh 30vw; background: var(--ink-raised);
     border: 1px solid var(--a); padding: 3vmin; font-size: 0.8em; z-index: 9;
@@ -127,8 +147,48 @@ match:
 </section>
 
 <section class="slide" id="bt" data-chapter="5">
-  <h1>Bradley-Terry</h1>
-  <p class="say">say: placeholder</p>
+  <h1>Bradley-Terry: the number that best explains the wins <span class="toy-tag">toy</span></h1>
+  <div class="ctl" id="btBeats">
+    <button data-beat="1">1. win rate lies</button>
+    <button data-beat="2">2. find the strengths</button>
+    <button data-beat="3">3. how sure?</button>
+  </div>
+
+  <div class="beat" id="btBeat1">
+    <p class="say">say: round robin, everybody met everybody. But the jury threw out the inconclusive rounds, so what is left is uneven: two models, both 6 of 8 on the rounds that counted. Which is better? Hands up, then click one.</p>
+    <div class="two">
+      <div class="card pick" data-who="flash"><h4><span class="B">gemini-flash</span>: 6 wins, 2 losses</h4>
+        <div class="rec"><span class="w">beat qwen</span><span class="w">beat qwen</span><span class="w">beat llama</span><span class="w">beat llama</span><span class="w">beat mistral</span><span class="w">beat mistral</span><span class="l">lost to opus</span><span class="l">lost to gpt-5.4</span></div></div>
+      <div class="card pick" data-who="sonnet"><h4><span class="A">claude-sonnet</span>: 6 wins, 2 losses</h4>
+        <div class="rec"><span class="w">beat opus</span><span class="w">beat gpt-5.4</span><span class="w">beat gpt-5.4</span><span class="w">beat gemini</span><span class="w">beat mistral</span><span class="w">beat llama</span><span class="l">lost to opus</span><span class="l">lost to qwen</span></div></div>
+    </div>
+    <p class="note" id="btPickSay"></p>
+  </div>
+
+  <div class="beat" id="btBeat2">
+    <p class="say">say: give every model a strength. The chance A beats B is A's share of the two strengths. Start them all equal and nudge until the predicted wins match what we saw. That is the whole algorithm.</p>
+    <div class="ctl">
+      <button id="btNudge">nudge once</button><button id="btRun">run to convergence</button><button id="btFitReset">reset</button>
+      <span id="btFitInfo"></span>
+    </div>
+    <div class="two">
+      <div class="card"><h4>observed wins <span class="T">(row beat column)</span></h4><table class="grid" id="btObs"></table></div>
+      <div class="card"><h4>predicted from current strengths <span class="T">(mismatch lit)</span></h4><table class="grid" id="btPred"></table></div>
+    </div>
+    <div class="bars" id="btFitBars"></div>
+    <div class="ctl">rating gap <input type="range" id="btGap" min="-800" max="800" step="50" value="400"><span id="btGapTxt"></span></div>
+    <p class="note chess"><b>Chess?</b> Same curve, same scale. Chess Elo is Bradley-Terry fitted one game at a time with a step size K, because players change over years. Models do not change between round 3 and round 40, so we fit every round at once: no K, no order effects. LMArena calls it Elo; it has been Bradley-Terry since 2023, and so is ours.</p>
+  </div>
+
+  <div class="beat" id="btBeat3">
+    <p class="say">say: we saw 60 rounds, not 60 thousand. Reshuffle them with replacement, refit, repeat. The spread is how sure we are. While bands overlap it is a tier, not a rank. The report says this on every run.</p>
+    <div class="ctl">
+      <button id="btBoot1">resample once</button><button id="btBoot50">resample 50x</button><button id="btBootReset">reset</button>
+      <span id="btBootInfo"></span>
+    </div>
+    <div class="bars" id="btBootBars"></div>
+    <p class="note" id="btBootSay"></p>
+  </div>
 </section>
 
 <section class="slide" id="deciders" data-chapter="6">
@@ -229,6 +289,110 @@ function initRing() {
   rrSet(8);
 }
 TOY_INITS.push(initRing);
+
+// ---------- toy 2: Bradley-Terry in three beats
+TOY_CHECKS.bt = () => {
+  const W = [[0, 7, 8, 9], [5, 0, 7, 8], [3, 4, 0, 8], [2, 3, 4, 0]];
+  const e = btFit(W).map(toElo);
+  if (!(e[0] > e[1] && e[1] > e[2] && e[2] > e[3])) throw new Error('order');
+  if (Math.abs(winProb(400) - 0.909) > 0.001) throw new Error('400 is 10 to 1');
+  if (Math.abs(winProb(0) - 0.5) > 1e-9) throw new Error('even');
+  const b = bootstrap(W, 20); if (b.length !== 4 || b[0].length !== 20) throw new Error('bootstrap shape');
+};
+const BT_MODELS = ['opus', 'gpt-5.4', 'gemini', 'mistral'];
+const BT_W = [[0, 7, 8, 9], [5, 0, 7, 8], [3, 4, 0, 8], [2, 3, 4, 0]];  // row beat column, 60 rounds
+// One MM step; the light prior keeps an unbeaten model finite. Normalised to geometric mean 1.
+function btStep(W, s) {
+  const n = W.length;
+  const ns = s.map((_, i) => {
+    let wins = 0, den = 0;
+    for (let j = 0; j < n; j++) if (i !== j) { wins += W[i][j]; const g = W[i][j] + W[j][i]; if (g) den += g / (s[i] + s[j]); }
+    return (wins + 0.5) / (den + 1 / (s[i] + 1));
+  });
+  const gm = Math.exp(ns.reduce((a, v) => a + Math.log(v), 0) / n);
+  return ns.map(v => v / gm);
+}
+function btFit(W, iters = 60) { let s = W.map(() => 1); for (let k = 0; k < iters; k++) s = btStep(W, s); return s; }
+function toElo(s) { return 1000 + 400 * Math.log10(s); }
+function winProb(gap) { return 1 / (1 + Math.pow(10, -gap / 400)); }
+function bootstrap(W, draws) {
+  const rounds = [];
+  W.forEach((row, i) => row.forEach((w, j) => { for (let k = 0; k < w; k++) rounds.push([i, j]); }));
+  const out = W.map(() => []);
+  for (let d = 0; d < draws; d++) {
+    const Wb = W.map(r => r.map(() => 0));
+    for (let k = 0; k < rounds.length; k++) { const [i, j] = rounds[Math.floor(Math.random() * rounds.length)]; Wb[i][j]++; }
+    btFit(Wb, 40).forEach((v, i) => out[i].push(toElo(v)));
+  }
+  return out;
+}
+const bt = { s: [1, 1, 1, 1], iter: 0, timer: null, ghosts: [[], [], [], []] };
+const btPct = v => Math.max(0, Math.min(100, (v - 700) / 600 * 100));
+function btBeat(n) {
+  [1, 2, 3].forEach(k => document.getElementById('btBeat' + k).classList.toggle('show', k === n));
+  document.querySelectorAll('#btBeats button').forEach(b => b.classList.toggle('on', +b.dataset.beat === n));
+  if (n === 2) btFitRender();
+  if (n === 3) btBootRender();
+}
+function btFitRender() {
+  const head = '<tr><th></th>' + BT_MODELS.map(m => '<th>' + m + '</th>').join('') + '</tr>';
+  let o = head, p = head, worst = 0;
+  BT_MODELS.forEach((m, i) => {
+    o += '<tr><th>' + m + '</th>'; p += '<tr><th>' + m + '</th>';
+    BT_MODELS.forEach((_, j) => {
+      if (i === j) { o += '<td class="diag">x</td>'; p += '<td class="diag">x</td>'; return; }
+      const g = BT_W[i][j] + BT_W[j][i], pr = g * bt.s[i] / (bt.s[i] + bt.s[j]), d = Math.abs(pr - BT_W[i][j]);
+      worst = Math.max(worst, d);
+      o += '<td>' + BT_W[i][j] + '</td>';
+      p += `<td class="${d > 2 ? 'R' : d > 0.5 ? 'X' : 'G'}">${pr.toFixed(1)}</td>`;
+    });
+    o += '</tr>'; p += '</tr>';
+  });
+  document.getElementById('btObs').innerHTML = o;
+  document.getElementById('btPred').innerHTML = p;
+  document.getElementById('btFitInfo').innerHTML = `nudges <b>${bt.iter}</b> · worst cell off by <b class="${worst > 0.5 ? 'X' : 'G'}">${worst.toFixed(1)}</b> wins`;
+  const order = [0, 1, 2, 3].sort((a, b) => bt.s[b] - bt.s[a]);
+  document.getElementById('btFitBars').innerHTML = order.map(i => { const e = toElo(bt.s[i]);
+    return `<div class="bar"><span>${BT_MODELS[i]}</span><div class="track"><div class="pt" style="left:${btPct(e)}%"></div></div><span class="val">${Math.round(e)} ELO</span></div>`; }).join('');
+}
+function btGapRender() {
+  const v = +document.getElementById('btGap').value, p = winProb(Math.abs(v));
+  document.getElementById('btGapTxt').innerHTML = `${Math.abs(v)} ELO gap means the stronger wins <b class="Y">${Math.round(p * 100)}%</b>; 400 points is 10 to 1`;
+}
+function btBootRender() {
+  const base = btFit(BT_W).map(toElo), order = [0, 1, 2, 3].sort((a, b) => base[b] - base[a]);
+  const band = bt.ghosts.map(g => { const s = [...g].sort((a, b) => a - b); return s.length >= 5 ? [s[Math.floor(s.length * 0.05)], s[Math.floor(s.length * 0.95)]] : null; });
+  document.getElementById('btBootBars').innerHTML = order.map(i => `<div class="bar"><span>${BT_MODELS[i]}</span><div class="track">${
+    bt.ghosts[i].map(g => `<div class="ghost" style="left:${btPct(g)}%"></div>`).join('')}${
+    band[i] ? `<div class="ci" style="left:${btPct(band[i][0])}%;width:${btPct(band[i][1]) - btPct(band[i][0])}%"></div>` : ''}<div class="pt" style="left:${btPct(base[i])}%"></div></div><span class="val">${
+    band[i] ? Math.round(band[i][0]) + '..' + Math.round(band[i][1]) : Math.round(base[i])}</span></div>`).join('');
+  const draws = bt.ghosts[0].length, [top, second] = order;
+  document.getElementById('btBootInfo').innerHTML = `resamples <b>${draws}</b>, 60 rounds each`;
+  document.getElementById('btBootSay').innerHTML = !band[top] ? 'each tick is one refit on a reshuffled set of the same 60 rounds'
+    : band[second][1] > band[top][0] ? `<span class="X">${BT_MODELS[top]} and ${BT_MODELS[second]} bands overlap: same tier, not a strict ranking</span>`
+    : `<span class="G">${BT_MODELS[top]} is clear of ${BT_MODELS[second]}</span>`;
+}
+function initBT() {
+  document.querySelectorAll('#btBeats button').forEach(b => { b.onclick = () => btBeat(+b.dataset.beat); });
+  document.querySelectorAll('#bt .card.pick').forEach(c => { c.onclick = () => {
+    document.querySelectorAll('#bt .card.pick').forEach(x => x.classList.toggle('chosen', x === c));
+    const lead = c.dataset.who === 'sonnet' ? 'Right. Same win rate, but sonnet beat the top of the pool and gemini beat the bottom.'
+      : 'Most people pick gemini: the cleaner record. But gemini beat the bottom of the pool and lost to the top; sonnet beat the top.';
+    document.getElementById('btPickSay').innerHTML = lead + ' <b class="Y">Win rate ignores who you fought. Bradley-Terry asks how strong each model must be to make all these results likely.</b>';
+  }; });
+  const step = () => { bt.s = btStep(BT_W, bt.s); bt.iter++; btFitRender(); };
+  document.getElementById('btNudge').onclick = step;
+  document.getElementById('btRun').onclick = () => { clearInterval(bt.timer); let k = 0; bt.timer = setInterval(() => { step(); if (++k >= 25) clearInterval(bt.timer); }, 250); };
+  document.getElementById('btFitReset').onclick = () => { clearInterval(bt.timer); bt.s = [1, 1, 1, 1]; bt.iter = 0; btFitRender(); };
+  document.getElementById('btGap').oninput = btGapRender;
+  const boot = k => { bootstrap(BT_W, k).forEach((e, i) => bt.ghosts[i].push(...e)); btBootRender(); };
+  document.getElementById('btBoot1').onclick = () => boot(1);
+  document.getElementById('btBoot50').onclick = () => boot(50);
+  document.getElementById('btBootReset').onclick = () => { bt.ghosts = [[], [], [], []]; btBootRender(); };
+  btGapRender();
+  btBeat(1);
+}
+TOY_INITS.push(initBT);
 </script>
 
 <script>
@@ -255,7 +419,9 @@ document.addEventListener('keydown', e => {
   }
 });
 TOY_INITS.forEach(init => init());
-show(Math.max(0, slides.findIndex(s => '#' + s.id === location.hash)));
+const fromHash = () => show(Math.max(0, slides.findIndex(s => '#' + s.id === location.hash)));
+window.addEventListener('hashchange', fromHash);
+fromHash();
 </script>
 </body>
 </html>
