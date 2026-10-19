@@ -46,14 +46,16 @@ endpoint `judge_api` names, because the catalog marks some chat models as decisi
   (eight small models, 140 rounds each), one judged live by the LLM panel and one live by a
   decision panel. Each was then re-judged by the other kind of panel.
 - **Reference jury:** there is no human ground truth for these rounds, so each pool was also
-  re-judged by three strong chat models from families outside the pool (grok-4.6, kimi-k3,
-  glm-5.3, both seat orders, about $10 per pool). "Agreement" below means agreement with this
-  jury on the rounds both decided. It is a better yardstick than the cheap LLM panel, not a
-  truth.
+  re-judged by three strong chat models (grok-4.6, kimi-k3, glm-5.3, both seat orders, about
+  $10 per pool). "Agreement" below means agreement with this jury on the rounds both decided.
+  It is a better yardstick than the cheap LLM panel, not a truth. It is independent of pool 1
+  but not of pool 2: `budget_8` seats `xai/grok-4-1-fast`, so grok-4.6 judges its own family
+  there, and the pool 2 figures (κ 0.92, Spearman 0.93) may be flattered by it. Re-running
+  pool 2 with kimi-k3 and glm-5.3 alone would settle it.
 - **Decision models tried:** typesafe/jev-latest, orq/decider-4b, openai/gpt-6-luna,
   perplexity/pplx-decider-v1-27b, alibaba/decision-model-preview, berget/Cloudflare/clef-flash,
-  berget/convaiinnovations/laya, berget/Qwen/Qwen3.5-2B: every model the catalog lists with a
-  Decisions endpoint.
+  berget/convaiinnovations/laya, berget/Qwen/Qwen3.5-2B: every native decision model the catalog
+  lists (chat models that also have a Decisions endpoint are not included, see section 8).
 
 ### 2.1 Pool 1: quickstart, against the reference jury
 
@@ -76,7 +78,7 @@ What it says:
 
 - **The LLM trio decides barely half the rounds.** Its judges flip between seat orders 30% to
   50% of the time (gpt-5.4-nano half the time), and a flip throws the vote out. jev-latest and
-  pplx-decider flip 13% to 18%; gpt-6-luna about a third of the time.
+  pplx-decider flip 10% to 17% across the two pools; gpt-6-luna about a third of the time.
 - **On the rounds both decide, every decision panel agrees with the reference at least as well**
   (κ 0.87 to 0.90 against 0.79 to 0.83), while deciding a third more of them.
 - **The LLM trio favours the longer answer more than the reference does.** The longer answer won
@@ -145,8 +147,11 @@ Panel size, over every sub-panel of the eight (pool 1 / pool 2):
 | 5 | 56 | 78% / 79% | 0.84 / 0.82 |
 | 7 | 8 | 90% / 88% | 0.84 / 0.82 |
 
-More judges decide more rounds but do not agree better: three good judges are enough, and a
-weak judge on a big panel mostly adds abstentions. Among three-judge panels that decide at
+Three judges decide fewer rounds than one (the panel needs a plurality, and a flip or a split
+costs the round), but agree better with the reference (κ 0.87 / 0.82 against 0.71 / 0.67).
+Five and seven judges decide more rounds again with κ flat around 0.82 to 0.84, so a bigger
+panel buys coverage, not agreement. The median three-judge decision panel does not beat the
+LLM trio on pool 2 (κ 0.82 against 0.89); the shipped one does because it was picked for it. Among three-judge panels that decide at
 least 60% of rounds on both pools and seat no degenerate judge, jev-latest, pplx-decider and
 gpt-6-luna has the best combined agreement (κ 0.87 and 0.92) and the highest decided share. It
 ships, with decider-4b as the stand-in (fast, run by orq, only called when a primary fails).

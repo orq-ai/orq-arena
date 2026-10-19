@@ -1,4 +1,4 @@
-"""Battle record, schema v4, one JSONL row per judged (or voided) round.
+"""Battle record, schema v5, one JSONL row per judged (or voided) round.
 
 v2 replaced the hand-rolled judge schema with evaluatorq's reconciled
 ``PairwiseVote`` dumps. v3 drops the arena HP bookkeeping (damage/hp fields):

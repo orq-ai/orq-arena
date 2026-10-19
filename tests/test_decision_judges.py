@@ -79,6 +79,20 @@ def test_the_floor_turns_an_unsure_vote_into_an_abstention_and_recounts():
     assert apply_abstain_floor(c, 0.85, quorum=2).winner == "inconclusive"
 
 
+def test_the_floor_abstains_a_verdict_it_cannot_read_probabilities_for():
+    blind = PairwiseVote(
+        model="j1", vote="A", observations=[{"ordering": "ab", "repetition": 0, "raw_output": {}}]
+    )
+    sure = _vote("j2", "A", {"A": 0.9, "B": 0.05, "tie": 0.05}, {"A": 0.05, "B": 0.9, "tie": 0.05})
+    c = PairwiseComparison(winner="A", votes=[blind, sure])
+
+    floored = apply_abstain_floor(c, 0.5, quorum=1)
+    assert [v.vote for v in floored.votes] == [None, "A"]
+    assert floor_abstained(floored.votes[0].model_dump(), 0.5)
+    # A call that failed outright (no observations) is a failure, not a floor abstention.
+    assert not floor_abstained({"model": "j", "vote": None, "observations": []}, 0.5)
+
+
 def test_a_flip_is_not_counted_as_a_floor_abstention():
     flipped = {"model": "j", "vote": None, "flipped": True, "observations": [
         _obs("ab", {"A": 0.4, "B": 0.3, "tie": 0.3}),
@@ -114,6 +128,51 @@ def test_the_config_mode_decides_the_endpoint_not_the_catalogue(monkeypatch):
     unknown = _cfg(judge_api="decisions", judges=["typesafe/jev-latest", "acme/new-decider"])
     asyncio.run(pin_judge_endpoints(unknown, None))
     assert model_catalogue.is_known_classify_model("acme/new-decider") is True
+
+
+def _catalogue_marks_chat_judge_as_decision_capable(monkeypatch, model):
+    info = ModelInfo(0.001, 0.005, "anthropic", True, supports_classify=True)
+
+    async def _info(requested, _client=None):
+        return info if requested == model else None
+
+    monkeypatch.setattr(judging, "get_model_info", _info)
+    # What evaluatorq itself would route on, absent the pin.
+    model_catalogue.register_model(model, info)
+    assert model_catalogue.is_known_classify_model(model) is True
+
+
+async def test_run_tournament_pins_an_llm_panel_to_chat(monkeypatch, tmp_path):
+    """Delete the pin call in the driver and an llm panel quietly turns mixed again."""
+    from tests.test_driver import _patch, _run
+
+    _patch(monkeypatch)
+    _catalogue_marks_chat_judge_as_decision_capable(monkeypatch, "anthropic/claude-haiku-4-5")
+    cfg = _cfg(judge_api="llm", judges=["anthropic/claude-haiku-4-5"])
+    await _run(cfg, tmp_path)
+    assert model_catalogue.is_known_classify_model("anthropic/claude-haiku-4-5") is False
+
+
+async def test_rejudge_run_pins_an_llm_panel_to_chat(monkeypatch):
+    from types import SimpleNamespace
+
+    from orq_arena import rejudge
+
+    _catalogue_marks_chat_judge_as_decision_capable(monkeypatch, "anthropic/claude-haiku-4-5")
+    monkeypatch.setattr(rejudge, "OrqGateway", lambda cfg: SimpleNamespace(client=None))
+    cfg = _cfg(judge_api="llm")
+    await rejudge.rejudge_run(cfg=cfg, records=[], judges=["anthropic/claude-haiku-4-5"])
+    assert model_catalogue.is_known_classify_model("anthropic/claude-haiku-4-5") is False
+
+
+def test_the_catalogue_contract_the_pin_relies_on():
+    # `pin_judge_endpoints` reaches into evaluatorq.common.model_catalogue, which is
+    # not public API. If a release renames these, this fails before a judge is mis-seated.
+    info = ModelInfo(
+        input_cost_per_1k=None, output_cost_per_1k=None, provider="p", supports_responses=False
+    )
+    model_catalogue.register_model("p/m", info._replace(supports_classify=True))
+    assert model_catalogue.is_known_classify_model("p/m") is True
 
 
 def test_the_floor_needs_the_decisions_api():

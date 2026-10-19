@@ -377,8 +377,8 @@ def test_decisions_report_measures_jury_cost_and_shows_confidence():
     assert "$0.040" in html and "&middot; measured" in html and "Total" in html
     assert "&asymp;" not in html and "Estimated total" not in html
     assert "jury cost is what each judge call was priced at" in html
-    # Confidence column, mean of the winning option over decided votes.
-    assert "Mean confidence" in html and "0.71" in html
+    # Confidence column: mean of the leading option over every vote, abstained ones too.
+    assert "Mean confidence" in html and "0.71" in html and "0.45" in html
     assert "2 votes (50%) abstained because the top option fell under the 0.50 floor." in html
     # Same short name on two providers: both judges keep their own label.
     assert "openai/judge-x" in html and "groq/judge-x" in html

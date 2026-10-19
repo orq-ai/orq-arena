@@ -39,7 +39,12 @@ async def pin_judge_endpoints(cfg: ArenaConfig, client: Any) -> None:
         if info is None:
             if not decisions:
                 continue  # unknown to the catalogue means chat already
-            info = ModelInfo(None, None, model.split("/", 1)[0], False)
+            info = ModelInfo(
+                input_cost_per_1k=None,
+                output_cost_per_1k=None,
+                provider=model.split("/", 1)[0],
+                supports_responses=False,
+            )
         if info.supports_classify != decisions:
             register_model(model, info._replace(supports_classify=decisions))
 
@@ -134,7 +139,9 @@ def apply_abstain_floor(
     votes = []
     for v in comparison.votes:
         p = top_probability(v)
-        votes.append(v.model_copy(update={"vote": None}) if p is not None and p < floor else v)
+        # A verdict with no readable probabilities cannot show it cleared the floor.
+        unsure = v.vote is not None and (p is None or p < floor)
+        votes.append(v.model_copy(update={"vote": None}) if unsure else v)
     decisive = [v.vote for v in votes if v.vote is not None]
     winner = "inconclusive" if len(decisive) < max(1, quorum) else pairwise_consensus(decisive)
     return comparison.model_copy(update={"votes": votes, "winner": winner})
@@ -145,7 +152,10 @@ def floor_abstained(vote: dict, floor: float | None) -> bool:
     if floor is None or vote.get("vote") is not None or vote.get("flipped"):
         return False
     probs = vote_probabilities(vote)
-    return probs is not None and max(probs.values()) < floor
+    if probs is None:
+        # Answered but unreadable: the floor abstains it. No observations means a failed call.
+        return bool(vote.get("observations"))
+    return max(probs.values()) < floor
 
 
 def judge_labels(model_ids: Sequence[str]) -> dict[str, str]:

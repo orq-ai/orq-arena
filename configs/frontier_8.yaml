@@ -29,10 +29,10 @@ candidates:
   - model_id: deepseek/deepseek-flash            # AA 40.3 as deepseek-v4-flash; that id is deprecated, this is its current id
     max_tokens: 8000
 
-# Cheap trio for the panel; frontier candidates are judged, not judging, so no
-# self-judge overlap here. Swap in frontier judges (opus/gpt-5.4/gemini-pro) if
-# you want to defend the numbers, at ~10x judge cost.
 # Decision-model panel, see docs/research/llm-judges-vs-decision-models.md.
+# Frontier candidates are judged, not judging, so there is no self-judge overlap
+# here. A decision panel costs a fraction of a prompted one; frontier chat judges
+# (opus/gpt-5.4/gemini-pro, with judge_api: llm) cost about 10x the old cheap trio.
 judge_api: decisions
 judges:
   - typesafe/jev-latest

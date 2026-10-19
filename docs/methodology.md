@@ -22,7 +22,7 @@ For every round, one prompt, two candidates, in a round-robin tournament:
 
 ## Judging
 
-**Both seat orders, always.** LLM judges measurably favor whichever answer they see first
+**Both seat orders, by default.** LLM judges measurably favor whichever answer they see first
 (Zheng et al., 2023), so every judge scores each pair twice with the sides swapped:
 
 ```mermaid
@@ -39,7 +39,8 @@ flowchart TD
     plur -- no --> inc
 ```
 
-A judge that gives a different verdict in each order abstains for that round, and the flip is
+`judge_swap: false` sends one order only: half the judge calls, no flip rule, and position
+bias goes unmeasured. A judge that gives a different verdict in each order abstains for that round, and the flip is
 recorded. A round needs at least two decisive votes (configurable) to produce a verdict, and
 that quorum is necessary but not sufficient: the surviving votes still have to reach a strict
 plurality. Two decisive votes that disagree one-all produce no plurality, so the round is

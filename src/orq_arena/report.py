@@ -21,7 +21,7 @@ from evaluatorq.pairwise_reports.sections import POSITION_BIAS_WARN
 
 from .config import ArenaConfig
 from .data.schemas import BattleRecord
-from .judging import floor_abstained, judge_labels, top_probability, vote_probabilities
+from .judging import floor_abstained, judge_labels, vote_probabilities
 
 if TYPE_CHECKING:  # driver imports this module at render time; keep it type-only
     from .tournament.driver import IdentitySource
@@ -682,13 +682,15 @@ def build_report_html(
     stand_ins = {v.get("model") for v in all_votes if v.get("replacement")}
     # A flip rate means something only for a judge that saw both seat orders.
     swapped = {v.get("model") for v in all_votes if v.get("completed")}
-    # Mean confidence: how sure a decision judge was of the option it voted for.
+    # Mean confidence: how sure a decision judge was of its leading option.
     # Prompted judges carry no probabilities, so LLM runs never grow the column.
     conf: dict[str, list[float]] = {}
+    # Over every vote that carries probabilities, abstained and flipped ones too,
+    # so a judge that contradicts itself does not read as confident.
     for v in all_votes:
-        p = top_probability(v)
-        if p is not None:
-            conf.setdefault(v.get("model"), []).append(p)
+        probs = vote_probabilities(v)
+        if probs is not None:
+            conf.setdefault(str(v.get("model", "")), []).append(max(probs.values()))
     jury_head = ["Judge", "A rate", "B rate", "Tie rate", "Flip rate"]
     jury_head += ["Mean confidence"] if conf else []
     jury_rows = []
@@ -735,15 +737,15 @@ def build_report_html(
         )
     if conf:
         seat_note += (
-            " Mean confidence is how sure a judge was of the option it voted for, averaged over "
-            "its votes (1.00 = certain)."
+            " Mean confidence is how sure a judge was of its leading option, averaged over "
+            "all its votes, including abstained ones (1.00 = certain)."
         )
-    floor = cfg.judge_abstain_below
-    if floor is not None and all_votes:
-        n_floor = sum(floor_abstained(v, floor) for v in all_votes)
+    abstain_floor = cfg.judge_abstain_below
+    if abstain_floor is not None and all_votes:
+        n_floor = sum(floor_abstained(v, abstain_floor) for v in all_votes)
         seat_note += (
             f" {n_floor} vote{'' if n_floor == 1 else 's'} ({n_floor / len(all_votes):.0%}) "
-            f"abstained because the top option fell under the {floor:.2f} floor."
+            f"abstained because the top option fell under the {abstain_floor:.2f} floor."
         )
     cohen = report.get("cohen") or {}
     _raw_ks = [v.get("kappa") if isinstance(v, dict) else v for v in cohen.values()]
@@ -1096,7 +1098,7 @@ def build_report_html(
         if decisions
         else "Every verdict via evaluatorq&#39;s pairwise jury"
     )
-    rounds = _rounds_html(judged, alias, labels, floor)
+    rounds = _rounds_html(judged, alias, labels, abstain_floor)
 
     return f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
