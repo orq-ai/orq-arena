@@ -44,6 +44,8 @@ def problems() -> list[str]:
     html = DECK.read_text(encoding="utf-8")
     found = []
     for path in sorted(HERE.rglob("*")):
+        if "fallback" in path.relative_to(HERE).parts:
+            continue  # a recorded run: model output and the generated report, not our writing
         if path.is_file() and path.suffix in {".html", ".py", ".md", ".jsonl", ".yaml", ".svg"}:
             if chr(0x2014) in path.read_text(encoding="utf-8", errors="ignore"):
                 found.append(f"em-dash in {path.relative_to(HERE)}")

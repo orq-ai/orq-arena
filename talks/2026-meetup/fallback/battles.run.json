@@ -1,0 +1,363 @@
+{
+  "tournament_id": "bench-1792376693",
+  "started_at": 1792376693.875384,
+  "seed": 42,
+  "config_sha256": "80de6f6d0a70bd50",
+  "config": {
+    "match": {
+      "max_rounds": 5,
+      "starting_hp": 100,
+      "damage_unanimous": 30,
+      "damage_majority": 15
+    },
+    "preflight": {
+      "thinking_probe": true
+    },
+    "headless_concurrency": 4,
+    "gateway": {
+      "base_url": "https://my.orq.ai/v3/router",
+      "candidate_max_tokens": 2048,
+      "judge_max_tokens": 2048,
+      "stream_read_timeout_s": 1200,
+      "judge_timeout_ms": 90000
+    },
+    "candidates": [
+      {
+        "model_id": "openai/gpt-5.4-mini",
+        "name": "gpt-5.4-mini",
+        "emblem": "",
+        "reasoning": null,
+        "max_tokens": null
+      },
+      {
+        "model_id": "google/gemini-3.7-flash",
+        "name": "gemini-3.7-flash",
+        "emblem": "",
+        "reasoning": null,
+        "max_tokens": 4096
+      },
+      {
+        "model_id": "deepseek/deepseek-flash",
+        "name": "deepseek-flash",
+        "emblem": "",
+        "reasoning": null,
+        "max_tokens": 8000
+      },
+      {
+        "model_id": "mistral/mistral-small-2603",
+        "name": "mistral-small-2603",
+        "emblem": "",
+        "reasoning": null,
+        "max_tokens": null
+      },
+      {
+        "model_id": "xai/grok-4-1-fast",
+        "name": "grok-4-1-fast",
+        "emblem": "",
+        "reasoning": null,
+        "max_tokens": null
+      },
+      {
+        "model_id": "cohere/command-a-03-2025",
+        "name": "command-a-03-2025",
+        "emblem": "",
+        "reasoning": null,
+        "max_tokens": null
+      },
+      {
+        "model_id": "alibaba/qwen3.5-flash",
+        "name": "qwen3.5-flash",
+        "emblem": "",
+        "reasoning": null,
+        "max_tokens": null
+      },
+      {
+        "model_id": "anthropic/claude-haiku-4-5-20251001",
+        "name": "claude-haiku-4-5-20251001",
+        "emblem": "",
+        "reasoning": null,
+        "max_tokens": null
+      }
+    ],
+    "judges": [
+      "typesafe/jev-latest",
+      "perplexity/pplx-decider-v1-27b",
+      "openai/gpt-6-luna"
+    ],
+    "replacement_judges": [
+      "orq/decider-4b"
+    ],
+    "criteria": "Accuracy and correctness, helpfulness and completeness, clarity, and relevance to the prompt.",
+    "min_successful_judges": 2,
+    "judge_api": "decisions",
+    "judge_swap": true,
+    "judge_abstain_below": null
+  },
+  "prompts_sha256": "861333ec81e7409c",
+  "prompt_count": 10,
+  "prompts_path": "talks/2026-meetup/seed.jsonl",
+  "effective_host": "https://my.orq.ai",
+  "orq_cli_workspace": null,
+  "candidates": {
+    "gpt-5.4-mini": {
+      "model": "openai/gpt-5.4-mini",
+      "reasoning": "vendor-default"
+    },
+    "gemini-3.7-flash": {
+      "model": "google/gemini-3.7-flash",
+      "reasoning": "vendor-default"
+    },
+    "deepseek-flash": {
+      "model": "deepseek/deepseek-flash",
+      "reasoning": "vendor-default"
+    },
+    "mistral-small-2603": {
+      "model": "mistral/mistral-small-2603",
+      "reasoning": "vendor-default"
+    },
+    "grok-4-1-fast": {
+      "model": "xai/grok-4-1-fast",
+      "reasoning": "vendor-default"
+    },
+    "command-a-03-2025": {
+      "model": "cohere/command-a-03-2025",
+      "reasoning": "vendor-default"
+    },
+    "qwen3.5-flash": {
+      "model": "alibaba/qwen3.5-flash",
+      "reasoning": "vendor-default"
+    },
+    "claude-haiku-4-5-20251001": {
+      "model": "anthropic/claude-haiku-4-5-20251001",
+      "reasoning": "vendor-default"
+    }
+  },
+  "judges": [
+    "typesafe/jev-latest",
+    "perplexity/pplx-decider-v1-27b",
+    "openai/gpt-6-luna"
+  ],
+  "replacement_judges": [
+    "orq/decider-4b"
+  ],
+  "min_successful_judges": 2,
+  "judge_api": "decisions",
+  "judge_swap": true,
+  "judge_abstain_below": null,
+  "evaluatorq_version": "1.55.1",
+  "finished_at": 1792377403.367815,
+  "preflight": {
+    "counts": {
+      "matches": 28,
+      "rounds_per_match": 5,
+      "model_streams": 280,
+      "judge_calls": 840,
+      "probe_calls": 8
+    },
+    "family_overlaps": [
+      "openai/gpt-6-luna"
+    ],
+    "cost_projection": {
+      "projected_usd": 2.98636831,
+      "worst_case_usd": 5.59542021,
+      "models_usd": 2.1287147,
+      "judges_usd": 0.83258448,
+      "probe_usd": 0.025069130000000002,
+      "unpriced": [],
+      "rows": [
+        {
+          "role": "candidate",
+          "model_id": "openai/gpt-5.4-mini",
+          "calls": 35,
+          "price_in": 0.75,
+          "price_out": 4.5,
+          "usd": 0.3235575
+        },
+        {
+          "role": "candidate",
+          "model_id": "google/gemini-3.7-flash",
+          "calls": 35,
+          "price_in": 0.75,
+          "price_out": 3.75,
+          "usd": 0.5385975
+        },
+        {
+          "role": "candidate",
+          "model_id": "deepseek/deepseek-flash",
+          "calls": 35,
+          "price_in": 0.14,
+          "price_out": 0.28,
+          "usd": 0.07858620000000001
+        },
+        {
+          "role": "candidate",
+          "model_id": "mistral/mistral-small-2603",
+          "calls": 35,
+          "price_in": 0.15,
+          "price_out": 0.6,
+          "usd": 0.0432075
+        },
+        {
+          "role": "candidate",
+          "model_id": "xai/grok-4-1-fast",
+          "calls": 35,
+          "price_in": 0.2,
+          "price_out": 0.5,
+          "usd": 0.036106
+        },
+        {
+          "role": "candidate",
+          "model_id": "cohere/command-a-03-2025",
+          "calls": 35,
+          "price_in": 2.5,
+          "price_out": 10.0,
+          "usd": 0.720125
+        },
+        {
+          "role": "candidate",
+          "model_id": "alibaba/qwen3.5-flash",
+          "calls": 35,
+          "price_in": 0.1,
+          "price_out": 0.4,
+          "usd": 0.028805
+        },
+        {
+          "role": "candidate",
+          "model_id": "anthropic/claude-haiku-4-5-20251001",
+          "calls": 35,
+          "price_in": 1.0,
+          "price_out": 5.0,
+          "usd": 0.35973
+        },
+        {
+          "role": "judge",
+          "model_id": "typesafe/jev-latest",
+          "calls": 280,
+          "price_in": 0.042,
+          "price_out": 0.0,
+          "usd": 0.19213488
+        },
+        {
+          "role": "judge",
+          "model_id": "perplexity/pplx-decider-v1-27b",
+          "calls": 280,
+          "price_in": 0.04,
+          "price_out": 0.0,
+          "usd": 0.1829856
+        },
+        {
+          "role": "judge",
+          "model_id": "openai/gpt-6-luna",
+          "calls": 280,
+          "price_in": 0.1,
+          "price_out": 0.5,
+          "usd": 0.45746400000000004
+        },
+        {
+          "role": "probe",
+          "model_id": "thinking probe",
+          "calls": 8,
+          "price_in": null,
+          "price_out": null,
+          "usd": 0.025069130000000002
+        },
+        {
+          "role": "replacement",
+          "model_id": "orq/decider-4b",
+          "calls": 0,
+          "price_in": null,
+          "price_out": null,
+          "usd": 0.4803372
+        }
+      ]
+    },
+    "thinking_probe": {
+      "gpt-5.4-mini": {
+        "model": "openai/gpt-5.4-mini",
+        "reasoning_tokens": 0,
+        "cot_chunks": 0,
+        "thinks": false,
+        "configured": false,
+        "error": null
+      },
+      "gemini-3.7-flash": {
+        "model": "google/gemini-3.7-flash",
+        "reasoning_tokens": 65,
+        "cot_chunks": 0,
+        "thinks": true,
+        "configured": false,
+        "error": null
+      },
+      "deepseek-flash": {
+        "model": "deepseek/deepseek-flash",
+        "reasoning_tokens": 11,
+        "cot_chunks": 11,
+        "thinks": true,
+        "configured": false,
+        "error": null
+      },
+      "mistral-small-2603": {
+        "model": "mistral/mistral-small-2603",
+        "reasoning_tokens": 0,
+        "cot_chunks": 0,
+        "thinks": false,
+        "configured": false,
+        "error": null
+      },
+      "grok-4-1-fast": {
+        "model": "xai/grok-4-1-fast",
+        "reasoning_tokens": 77,
+        "cot_chunks": 2,
+        "thinks": true,
+        "configured": false,
+        "error": null
+      },
+      "command-a-03-2025": {
+        "model": "cohere/command-a-03-2025",
+        "reasoning_tokens": 0,
+        "cot_chunks": 0,
+        "thinks": false,
+        "configured": false,
+        "error": null
+      },
+      "qwen3.5-flash": {
+        "model": "alibaba/qwen3.5-flash",
+        "reasoning_tokens": 170,
+        "cot_chunks": 58,
+        "thinks": true,
+        "configured": false,
+        "error": null
+      },
+      "claude-haiku-4-5-20251001": {
+        "model": "anthropic/claude-haiku-4-5-20251001",
+        "reasoning_tokens": 0,
+        "cot_chunks": 0,
+        "thinks": false,
+        "configured": false,
+        "error": null
+      }
+    }
+  },
+  "mean_agreement": 0.8797814207650273,
+  "error_rounds": 0,
+  "rated_rounds": 117,
+  "category_counts": {
+    "general": 37,
+    "math": 24,
+    "code": 37,
+    "creative": 19
+  },
+  "fleiss": {
+    "kappa": 0.436,
+    "label": "moderate",
+    "rounds_used": 80,
+    "rounds_total": 140
+  },
+  "tokens": {
+    "models_in": 33080,
+    "models_out": 338652,
+    "judges_in": 1396748,
+    "judges_out": 11200
+  },
+  "length_coef": 3.896162253388138
+}

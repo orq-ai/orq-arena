@@ -270,14 +270,14 @@ judge_abstain_below: 0.6   # default off</pre>
     <li>Arena data is what trains one: every decided round is a preference pair, on your prompts.</li>
     <li>And an arena is how you judge one: its pick against the alternatives, same jury.</li>
   </ul>
-  <p class="T">one record from <code>battles.jsonl</code> (examples/quickstart), trimmed:</p>
+  <p class="T">one record from <code>fallback/battles.jsonl</code> (the rehearsal run), trimmed:</p>
 <pre>{
-  "prompt_text": "Compute 2^100 mod 1000 without a calculator. Explain the technique you use.",
-  "model_a": "claude-sonnet-4-6",
-  "model_b": "deepseek-chat",
+  "prompt_text": "Plan a 3-day trip to Lisbon focused on food and history, with a daily budget of 80 euros.",
+  "model_a": "qwen3.5-flash",
+  "model_b": "claude-haiku-4-5-20251001",
   "majority_verdict": "A",
   "judge_votes": [
-    {"model": "anthropic/claude-haiku-4-5-20251001", "vote": "A", "flipped": false},
+    {"model": "typesafe/jev-latest", "vote": "A", "flipped": false},
     "..."
   ]
 }</pre>

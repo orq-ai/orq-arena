@@ -12,7 +12,7 @@ offline before the talk.
 | `audience_prompts.py` | form export (CSV) plus `seed.jsonl` to one prompts JSONL |
 | `seed.jsonl` | 10 rows from `prompts/starter.jsonl`, so the run starts with or without submissions |
 | `demo.yaml` | the live run's config: `configs/budget_8.yaml` with its decision-model panel |
-| `fallback/` | not recorded yet: a rehearsal run's `battles.jsonl`, its report, and the TUI recording |
+| `fallback/` | the rehearsal run: `battles.jsonl`, `battles.run.json`, `battles.report.html`; the TUI recording still to add |
 | `qr.svg`, `qr-repo.svg` | form QR (placeholder) and repo QR |
 
 ## Still to fill in
@@ -23,8 +23,36 @@ offline before the talk.
 - **LMArena raise.** The hook slide carries `<!-- VERIFY raise figure before talk -->`.
 - **evaluatorq 1.74.** The agents slide says evaluatorq 1.74 renders tool calls for the judge
   (verified on 1.74.0, `common/messages.py`). Master pins `>=1.55.1`; check the bump has merged.
-- **Rehearsal and fallback.** Not run yet (it spends money). Record wall time, rated rounds
-  and cost here, and the pool if it had to be trimmed to finish in 15 minutes.
+- **TUI recording.** `fallback/demo.cast` is not recorded yet; see "Record the fallback" below.
+
+## Rehearsal, 2026-10-19
+
+Headless, `demo.yaml` as shipped (all 8 models), `seed.jsonl` (10 prompts):
+
+| Wall time | Rounds rated | Cost |
+|---|---|---|
+| 12 min 0 s | 117 of 140 (0 voided) | about $0.97: models $0.86, jury $0.08, thinking probe $0.03 |
+
+Under the 15 minute budget, so the pool stays at 8. The preflight projects $2.99 (worst case
+$5.60) because it assumes every answer hits its token cap; the real run cost a third of that.
+Each match samples 5 prompts (`max_rounds`), so the run is 28 pairs x 5 = 140 rounds however
+many prompts the audience adds; the live run should take about as long.
+
+## Record the fallback
+
+One more paid run (about $1), in a real terminal, so the cast and the saved report match:
+
+```bash
+export ORQ_API_KEY=$(sed 's/^ORQ_API_KEY=//' ~/.orq/api-key)
+uv tool install asciinema   # once
+asciinema rec talks/2026-meetup/fallback/demo.cast -c ".venv/bin/orq-arena run \
+  --config talks/2026-meetup/demo.yaml --prompts talks/2026-meetup/seed.jsonl \
+  --output talks/2026-meetup/fallback/battles.jsonl --overwrite --tui --yes"
+```
+
+The run rewrites `battles.jsonl`, `battles.run.json` and `battles.report.html` next to the
+cast. Commit the cast only if it is under 2 MB; otherwise keep it local and say where here.
+If you re-record, swap the `#ring` slide's record for one from the new `battles.jsonl`.
 
 ## Runbook
 
