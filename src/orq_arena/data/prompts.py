@@ -37,6 +37,17 @@ def prompt_hash(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
 
 
+def replicate_key(text: str, replicate: int = 0) -> str:
+    """What a prompt's trial is keyed on: replicate 0 is the text itself, so trials cached
+    before replicates existed stay valid; later replicates are separate draws of one task."""
+    return text if not replicate else f"{text}\n\x00replicate={int(replicate)}"
+
+
+def item_key(item: PromptItem) -> str:
+    """``replicate_key`` for a prompt row; a row without a ``replicate`` is replicate 0."""
+    return replicate_key(item.text, int(item.metadata.get("replicate") or 0))
+
+
 def load_prompts(path: str | Path) -> list[PromptItem]:
     """Return the prompts in file (or dataset) order."""
     if str(path).startswith("orq:"):

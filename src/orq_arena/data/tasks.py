@@ -106,10 +106,15 @@ def sample_tasks(
     return sorted(picked, key=lambda t: t.name)
 
 
-def write_prompts(tasks: list[TaskInfo], out: str | Path) -> None:
-    """One JSONL row per task: the instruction plus what the runner needs."""
+def write_prompts(tasks: list[TaskInfo], out: str | Path, replicates: int = 1) -> None:
+    """One JSONL row per task and replicate: the instruction plus what the runner needs.
+
+    With ``replicates`` above 1 every task appears that many times, tagged ``replicate``
+    0 to n-1; each is a separate trial per agent. Replicate 0 matches a file written
+    without replicates, so trials cached before still count.
+    """
     with Path(out).open("w", encoding="utf-8") as fh:
-        for t in tasks:
+        for t, rep in ((t, r) for r in range(max(1, replicates)) for t in tasks):
             row = {
                 "prompt": t.instruction,
                 "category": t.difficulty,
@@ -121,4 +126,6 @@ def write_prompts(tasks: list[TaskInfo], out: str | Path) -> None:
                 "image": t.image,
                 "tags": list(t.tags),
             }
+            if replicates > 1:
+                row["replicate"] = rep
             fh.write(json.dumps(row, ensure_ascii=False) + "\n")

@@ -218,6 +218,19 @@ async def test_a_subscription_login_in_the_shell_never_reaches_harbor(tmp_path, 
     assert env["ANTHROPIC_API_KEY"] == "sk-test-key"
 
 
+async def test_each_replicate_of_a_task_is_its_own_trial(tmp_path):
+    spawn = Spawner()
+    runner = _runner(tmp_path, spawn)
+    rep1 = PromptItem(ITEM.text, metadata={**ITEM.metadata, "replicate": 1})
+    for item in (ITEM, rep1, rep1):  # the second rep1 replays the first
+        await runner.run_side(
+            item=item, candidate=_cand(), events=asyncio.Queue(), match_id="M", side="a"
+        )
+    names = [c[c.index("--job-name") + 1] for c in spawn.calls]
+    assert len(names) == 2 and names[0] != names[1]
+    assert names[0] == job_name(ITEM.text, _cand().candidate_id)  # replicate 0 keeps the old name
+
+
 async def test_pi_and_codex_routes(tmp_path):
     spawn = Spawner()
     runner = _runner(tmp_path, spawn)

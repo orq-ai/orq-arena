@@ -38,6 +38,7 @@ class TurnPrompt(BaseModel):
     match_id: str
     round_number: int
     prompt: str
+    replicate: int = 0  # harness mode: which draw of the task this round plays
 
 
 class ResponseChunk(BaseModel):

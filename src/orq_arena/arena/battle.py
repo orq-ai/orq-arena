@@ -22,7 +22,7 @@ from typing import Any, Literal
 
 from ..candidates import AnyCandidate, CandidateSpec, HarnessCandidate
 from ..config import ArenaConfig
-from ..data.prompts import PromptItem, prompt_hash
+from ..data.prompts import PromptItem, item_key, prompt_hash
 from ..data.schemas import GATE_JUDGE, BattleRecord
 from ..events import (
     ArenaEvent,
@@ -255,7 +255,7 @@ class Battle:
             RoundVoided(match_id=self.match_id, round_number=round_number, reason=reason)
         )
         return BattleRecord(
-            prompt_hash=_prompt_hash(item.text),
+            prompt_hash=_prompt_hash(item_key(item)),
             prompt_text=item.text,
             prompt_category=item.category,
             prompt_metadata=item.metadata,
@@ -340,7 +340,12 @@ class Battle:
 
             round_number = rounds_counted + 1
             await self.events.put(
-                TurnPrompt(match_id=self.match_id, round_number=round_number, prompt=prompt)
+                TurnPrompt(
+                    match_id=self.match_id,
+                    round_number=round_number,
+                    prompt=prompt,
+                    replicate=int(item.metadata.get("replicate") or 0),
+                )
             )
 
             res_a, res_b = await asyncio.gather(

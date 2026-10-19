@@ -25,7 +25,7 @@ from typing import Any, Literal
 
 from ..candidates import HarnessCandidate
 from ..config import HarnessConfig
-from ..data.prompts import PromptItem, prompt_hash
+from ..data.prompts import PromptItem, item_key, prompt_hash
 from ..events import ArenaEvent, SolutionReady, TrajectoryStep
 from . import tail
 from .diff import RunCmd, run_cmd, workspace_diff
@@ -225,7 +225,7 @@ class HarborRunner:
         side: Literal["a", "b"],
     ) -> Trial:
         """Run (or replay) one side. Always returns a Trial; ``trial.error`` voids the round."""
-        key = (prompt_hash(item.text), candidate.candidate_id)
+        key = (prompt_hash(item_key(item)), candidate.candidate_id)
         existing = self._trials.get(key)
         if existing is not None:
             trial = await existing
@@ -235,7 +235,7 @@ class HarborRunner:
         fut: asyncio.Future[Trial] = asyncio.get_running_loop().create_future()
         self._trials[key] = fut
         try:
-            name = job_name(item.text, candidate.candidate_id)
+            name = job_name(item_key(item), candidate.candidate_id)
             done = cached_trial_dir(self.trials_dir, name)
             if done is not None:
                 trial = await self._load(done, item, candidate)
@@ -255,7 +255,7 @@ class HarborRunner:
         return trial
 
     def is_cached(self, item: PromptItem, candidate: HarnessCandidate) -> bool:
-        name = job_name(item.text, candidate.candidate_id)
+        name = job_name(item_key(item), candidate.candidate_id)
         return cached_trial_dir(self.trials_dir, name) is not None
 
     # ----- internals ----------------------------------------------------

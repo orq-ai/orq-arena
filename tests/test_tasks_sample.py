@@ -83,3 +83,32 @@ def test_cli_samples_and_reports(tmp_path):
     assert len(out.read_text().splitlines()) == 4
     bad = CliRunner().invoke(cli, ["tasks", "sample", "--dataset", str(tmp_path / "nope")])
     assert bad.exit_code != 0
+
+
+def test_replicates_repeat_each_task_and_replicate_zero_matches_an_unreplicated_file(tmp_path):
+    from orq_arena.data.prompts import item_key, load_prompts
+
+    picked = sample_tasks(scan_tasks(_tree(tmp_path / "tb")), n=3, seed=1)
+    plain, rep = tmp_path / "plain.jsonl", tmp_path / "rep.jsonl"
+    write_prompts(picked, plain)
+    write_prompts(picked, rep, replicates=3)
+    assert "replicate" not in json.loads(plain.read_text().splitlines()[0])
+    rows = [json.loads(line) for line in rep.read_text().splitlines()]
+    assert len(rows) == 9
+    assert sorted({r["replicate"] for r in rows}) == [0, 1, 2]
+    assert [r["task_name"] for r in rows[:3]] == [r["task_name"] for r in rows[3:6]]
+    base = load_prompts(plain)
+    keys = [item_key(i) for i in load_prompts(rep)]
+    assert keys[:3] == [item_key(i) for i in base]  # old cached trials stay valid
+    assert len(set(keys)) == 9  # every replicate is its own trial
+
+
+def test_the_cli_takes_replicates(tmp_path):
+    out = tmp_path / "s.jsonl"
+    res = CliRunner().invoke(
+        cli,
+        ["tasks", "sample", "--dataset", str(_tree(tmp_path / "tb")), "--n", "2",
+         "--replicates", "3", "-o", str(out)],
+    )  # fmt: skip
+    assert res.exit_code == 0 and "3 replicates each" in res.output
+    assert len(out.read_text().splitlines()) == 6

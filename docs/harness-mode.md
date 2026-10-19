@@ -67,6 +67,13 @@ the category, the usual per-category ELO slices come out per difficulty for free
 
 Eight tasks is a reference-run size, not a defensible benchmark. See [Costs](#costs).
 
+**Several trials per task.** Agents are not deterministic, so one trial is one draw. Pass
+`--replicates 3` and every task appears three times in the file, tagged `replicate` 0, 1, 2. Each
+replicate is its own trial per agent, cached and replayed like any other, and a round plays one
+replicate against another agent's same replicate. Replicate 0 is keyed exactly like a file written
+without `--replicates`, so trials you already have are reused as the first draw. Cost and wall time
+scale with the replicate count.
+
 ## Configure the pool
 
 The shipped [`configs/harness-tb21.yaml`](https://github.com/orq-ai/orq-arena/blob/master/configs/harness-tb21.yaml)
@@ -266,8 +273,9 @@ costs only that.
 - **Memory is seeded, not accumulating.** `overlay.memory` gives the agent the same starting
   files for each task. Memory that grows across tasks would make task order matter and break the
   cache, so it is out of scope for now.
-- **One trial per task and agent.** Agents are not deterministic and a trial is a single draw, so
-  a small task set gives wide intervals. A pass rate over eight tasks moves by 12.5 points per task.
+- **One trial per task and agent, unless you ask for more.** Agents are not deterministic and a
+  trial is a single draw, so a small task set gives wide intervals. A pass rate over eight tasks
+  moves by 12.5 points per task. `--replicates` repeats each task, at proportional cost.
 - **Dockerfile tasks have no pristine workspace.** For a task built from a Dockerfile rather than
   a prebuilt image, the diff is reported as unavailable; the jury still gets the test result and
   the trajectory.

@@ -489,6 +489,14 @@ def tasks() -> None:
 )
 @click.option("--include-gpu", is_flag=True, default=False, help="Keep tasks that need a GPU.")
 @click.option(
+    "--replicates",
+    type=click.IntRange(min=1),
+    default=1,
+    show_default=True,
+    help="Trials per task and agent. Each task repeats this many times in the file, "
+    "and each repeat is run (and cached) separately.",
+)
+@click.option(
     "--output",
     "-o",
     "output_path",
@@ -503,6 +511,7 @@ def tasks_sample(
     max_timeout: float,
     include_gpu: bool,
     output_path: str,
+    replicates: int,
 ) -> None:
     """Sample a difficulty-stratified task set and write it as a prompt file.
 
@@ -532,8 +541,9 @@ def tasks_sample(
     if not picked:
         raise click.ClickException("every task was filtered out; relax --max-timeout.")
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-    write_prompts(picked, output_path)
-    click.echo(f"{len(picked)} of {len(found)} tasks → {output_path}")
+    write_prompts(picked, output_path, replicates)
+    extra = f", {replicates} replicates each" if replicates > 1 else ""
+    click.echo(f"{len(picked)} of {len(found)} tasks{extra} → {output_path}")
     for t in picked:
         click.echo(f"  {t.name:<32} {t.difficulty:<8} {t.timeout_sec:.0f}s")
 

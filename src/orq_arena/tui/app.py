@@ -17,7 +17,7 @@ from textual.app import App
 
 from ..candidates import CandidateSpec, HarnessCandidate
 from ..config import ArenaConfig
-from ..data.prompts import PromptItem
+from ..data.prompts import PromptItem, replicate_key
 from ..events import (
     ArenaEvent,
     JudgeVerdictEvent,
@@ -85,6 +85,7 @@ class ArenaApp(App):
         # Harness mode: which candidate sits on each side, and the task on screen.
         self._side_cand: dict[str, object] = {}
         self._current_prompt = ""
+        self._current_replicate = 0
         self._prompt_pos = {p.text: (i, p) for i, p in enumerate(prompts, 1)}
         # HP is a TUI-side show, derived from the judged verdicts.
         self._hp = HPTracker(
@@ -202,7 +203,12 @@ class ArenaApp(App):
             return ""
         trials = Path(self.cfg.harness.trials_dir or f"{self._battle_log_path}.trials")
         try:
-            trial = cached_trial_dir(trials, job_name(self._current_prompt, cand.candidate_id))
+            trial = cached_trial_dir(
+                trials,
+                job_name(
+                    replicate_key(self._current_prompt, self._current_replicate), cand.candidate_id
+                ),
+            )
             patch = trial / PATCH_FILE if trial else None
             return patch.read_text(encoding="utf-8") if patch and patch.exists() else ""
         except OSError:
@@ -237,6 +243,7 @@ class ArenaApp(App):
         elif isinstance(ev, TurnPrompt):
             self._hp.clear_votes()  # defensive: fresh round, fresh vote buffer
             self._current_prompt = ev.prompt
+            self._current_replicate = ev.replicate
             fs.set_prompt(ev.round_number, ev.prompt, task=self._task_line(ev.prompt))
         elif isinstance(ev, TrajectoryStep):
             fs.add_step(ev)

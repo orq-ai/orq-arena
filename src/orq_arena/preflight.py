@@ -31,7 +31,7 @@ from typing import Any
 
 from .candidates import AnyCandidate, CandidateSpec, HarnessCandidate
 from .config import ArenaConfig
-from .data.prompts import PromptItem
+from .data.prompts import PromptItem, item_key
 from .harness.routing import WIRE
 from .providers.models_list import ModelEntry, catalog_host
 from .providers.orq_gateway import OrqGateway
@@ -698,7 +698,9 @@ def harness_plan(
     for c in harnesses:
         mult = c.timeout_multiplier or cfg.harness.timeout_multiplier
         for item in prompts:
-            if root is not None and cached_trial_dir(root, job_name(item.text, c.candidate_id)):
+            if root is not None and cached_trial_dir(
+                root, job_name(item_key(item), c.candidate_id)
+            ):
                 cached += 1
             else:
                 uncached_s += timeout_s(item) * mult
