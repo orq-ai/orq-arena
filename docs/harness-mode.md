@@ -247,6 +247,17 @@ costs only that.
   and its last steps appear when the trial ends. The result is unaffected.
 - **Keep the Mac awake.** On macOS the arena wraps Harbor in `caffeinate -i`. If the machine
   sleeps anyway, the trial clock and its timeout stop mid-run and the timings are wrong.
+- **A trial that could not run is voided, never lost.** If Harbor fails before the tests run
+  (the container did not start, the agent could not be installed, the router refused every model
+  call, a hard time limit), the round is voided and nothing is cached, so the next run tries
+  again. Only an agent that ran out of its own time, or whose tests ran and failed, loses a round.
+  Some task images cannot host some agents (a stale package index, for example); the voided
+  round names the reason.
+- **Disk.** Docker needs room for every task image (hundreds of MB each, a few GB for some) and
+  Harbor copies each finished workspace out of the container. The arena keeps only the diff and
+  deletes that copy. If the disk fills, Docker Desktop turns read-only and every later trial voids
+  with a `docker compose` error: free space, restart Docker Desktop and run again, finished trials
+  are reused.
 - **Interrupted trials.** Harbor leaves the container of a killed trial behind; the arena removes
   it on a clean cancel, but check `docker ps -a` after a hard kill.
 - **Memory is seeded, not accumulating.** `overlay.memory` gives the agent the same starting
