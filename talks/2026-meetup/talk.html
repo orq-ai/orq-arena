@@ -90,6 +90,12 @@
   #btBeat3 .ghost { opacity: 0.6; }
   .chess { border-top: 1px dashed var(--line); padding-top: 1vmin; }
   .chess b { color: var(--chrome); }
+  .judge .row { display: flex; justify-content: space-between; align-items: center; margin: 0.5em 0; gap: 0.5em; }
+  .judge .row button { padding: 0.15em 0.6em; }
+  .judge button.sel-A { border-color: var(--a); color: var(--a); } .judge button.sel-B { border-color: var(--b); color: var(--b); }
+  .judge button.sel-tie { border-color: var(--yellow); color: var(--yellow); }
+  .judge .out { margin-top: 0.6em; padding-top: 0.6em; border-top: 1px dashed var(--line); min-height: 2.8em; }
+  .verdict { text-align: center; padding: 1.2vmin; border: 1px solid var(--line); background: var(--ink-raised); }
   #keys {
     display: none; position: fixed; inset: 20vh 30vw; background: var(--ink-raised);
     border: 1px solid var(--a); padding: 3vmin; font-size: 0.8em; z-index: 9;
@@ -142,8 +148,15 @@ match:
 </section>
 
 <section class="slide" id="judges" data-chapter="4">
-  <h1>Who judges the judge</h1>
-  <p class="say">say: placeholder</p>
+  <h1>Three judges, two seat orders <span class="toy-tag">toy</span></h1>
+  <p class="note" style="font-size:0.85em">prompt: "My async scraper hits a 429 after a few seconds. How do I stay under the rate limit?"</p>
+  <div class="two" style="font-size:1.2em">
+    <div class="card" style="border-left:3px solid var(--a)"><b class="A">A</b> Use an asyncio.Semaphore(10) around the client call; it bounds requests in flight, not tasks.</div>
+    <div class="card" style="border-left:3px solid var(--b)"><b class="B">B</b> Add a time.sleep(0.1) between requests, that usually fixes rate limits.</div>
+  </div>
+  <div class="three" id="jCards"></div>
+  <div class="verdict" id="jVerdict"></div>
+  <p class="say">say: every judge reads the pair twice, A first, then B first. If it changes its answer when the seats swap, the vote was about the seat, not the answer, and it abstains. Two valid votes make a quorum; fewer and the round is inconclusive, which is thrown out, not counted as a tie. Fleiss kappa on the report is how often the judges agree beyond chance. Let three people in the room be the judges.</p>
 </section>
 
 <section class="slide" id="bt" data-chapter="5">
@@ -393,6 +406,61 @@ function initBT() {
   btBeat(1);
 }
 TOY_INITS.push(initBT);
+
+// ---------- toy 3: three judges, two seat orders
+TOY_CHECKS.judges = () => {
+  const v = (ab, ba) => ({ ab, ba });
+  if (panelVerdict([v('A', 'B'), v('A', 'B'), v('A', 'B')]).verdict !== 'A') throw new Error('unanimous');
+  if (panelVerdict([v('A', 'A'), v('A', 'A'), v('A', 'B')]).verdict !== 'inconclusive') throw new Error('two flips, no quorum');
+  const r = panelVerdict([v('A', 'A'), v('B', 'A'), v('B', 'A')]); if (r.verdict !== 'B' || r.abstained !== 1) throw new Error('one flip');
+  if (panelVerdict([v('A', 'B'), v('B', 'A'), v('tie', 'tie')]).verdict !== 'tie') throw new Error('no majority');
+};
+const J_NAMES = ['jev-latest', 'pplx-decider', 'gpt-6-luna'];
+const J_SWAP = { A: 'B', B: 'A', tie: 'tie' };
+// `ba` is answered with the seats swapped, so its 'A' means response B. A judge whose two
+// readings disagree abstains; two valid votes make a quorum.
+function judgeVote({ ab, ba }) {
+  if (!ab || !ba) return null;
+  return ab === J_SWAP[ba] ? ab : 'abstain';
+}
+function panelVerdict(votes) {
+  const cast = votes.map(judgeVote);
+  if (cast.includes(null)) return { verdict: 'waiting', abstained: 0, valid: 0 };
+  const valid = cast.filter(v => v !== 'abstain'), abstained = cast.length - valid.length;
+  if (valid.length < 2) return { verdict: 'inconclusive', abstained, valid: valid.length };
+  const n = k => valid.filter(v => v === k).length;
+  const verdict = n('A') > n('B') && n('A') > n('tie') ? 'A' : n('B') > n('A') && n('B') > n('tie') ? 'B' : 'tie';
+  return { verdict, abstained, valid: valid.length };
+}
+const jVotes = J_NAMES.map(() => ({ ab: null, ba: null }));
+function jRender() {
+  document.getElementById('jCards').innerHTML = J_NAMES.map((name, k) => {
+    const v = jVotes[k], cast = judgeVote(v);
+    // a swapped-seat pick is coloured by the response it means: 'first' is B
+    const btn = (seat, val, label) => `<button class="${v[seat] === val ? 'sel-' + (seat === 'ba' ? J_SWAP[val] : val) : ''}" data-k="${k}" data-seat="${seat}" data-val="${val}">${label}</button>`;
+    const out = cast === null ? '<span class="T">waiting</span>'
+      : cast === 'abstain' ? `<span class="X">abstains</span> (said ${v.ab}, then ${J_SWAP[v.ba]} after the swap)`
+      : `<span class="${cast === 'tie' ? 'Y' : cast}">votes ${cast}</span> (same answer both ways)`;
+    return `<div class="card judge"><h4>${name}</h4>
+      <div class="row"><span class="T">seats A,B</span><span>${btn('ab', 'A', 'A')}${btn('ab', 'B', 'B')}${btn('ab', 'tie', 'tie')}</span></div>
+      <div class="row"><span class="T">seats swapped</span><span>${btn('ba', 'A', 'first')}${btn('ba', 'B', 'second')}${btn('ba', 'tie', 'tie')}</span></div>
+      <div class="out">${out}</div></div>`;
+  }).join('');
+  const r = panelVerdict(jVotes), extra = r.abstained ? `, ${r.abstained} abstained` : '';
+  document.getElementById('jVerdict').innerHTML =
+    r.verdict === 'waiting' ? '<span class="T">jury room: waiting for all three judges</span>'
+    : r.verdict === 'inconclusive' ? `<span class="X">inconclusive</span>: ${r.abstained} of 3 flipped, no quorum. Round excluded, not a tie.`
+    : r.verdict === 'tie' ? `<span class="Y">tie</span>: no majority among ${r.valid} valid votes${extra}`
+    : `<span class="${r.verdict}">${r.verdict} wins</span> (${r.valid} valid votes${extra})`;
+}
+function initJudges() {
+  document.getElementById('jCards').onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    jVotes[+b.dataset.k][b.dataset.seat] = b.dataset.val; jRender();
+  };
+  jRender();
+}
+TOY_INITS.push(initJudges);
 </script>
 
 <script>
