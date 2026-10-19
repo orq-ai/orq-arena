@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import re
+import shlex
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -48,7 +49,19 @@ def tail_text(text: str, lines: int = _OBS_LINES, limit: int = _OBS_BYTES) -> st
     return out if len(out) <= limit else "…" + out[-limit:]
 
 
+def _unwrap_shell(command: str) -> str:
+    """codex runs everything as ``/bin/bash -lc '<cmd>'``; show the command itself."""
+    try:
+        parts = shlex.split(command)
+    except ValueError:
+        return command
+    if len(parts) == 3 and parts[0] in ("/bin/bash", "/bin/sh") and parts[1] == "-lc":
+        return parts[2]
+    return command
+
+
 def _command_step(command: str) -> Step:
+    command = _unwrap_shell(command)
     kind: StepKind = "test" if TEST_COMMAND.search(command) else "command"
     return Step(kind, "$ " + _first_line(command), command if "\n" in command.strip() else "")
 
@@ -100,7 +113,9 @@ def _claude_tool_use(block: dict[str, Any]) -> Step:
 def _parse_claude(obj: dict[str, Any]) -> list[Step]:
     kind = obj.get("type")
     if kind == "system":
-        return [Step("log", f"session started · model {obj.get('model', '?')}")]
+        if obj.get("subtype") == "init":
+            return [Step("log", f"session started · model {obj.get('model', '?')}")]
+        return []  # thinking_tokens, vcs_state_changed and friends are bookkeeping
     if kind in ("assistant", "user"):
         content = (obj.get("message") or {}).get("content")
         if isinstance(content, str):
@@ -113,7 +128,11 @@ def _parse_claude(obj: dict[str, Any]) -> list[Step]:
             if kind == "assistant" and btype == "text" and block.get("text", "").strip():
                 steps.append(Step("message", _first_line(block["text"]), block["text"]))
             elif kind == "assistant" and btype == "thinking":
-                steps.append(Step("thinking", _first_line(block.get("thinking", "")), ""))
+                # claude-code ships the signature and an empty text; nothing to show then.
+                if block.get("thinking", "").strip():
+                    steps.append(
+                        Step("thinking", _first_line(block["thinking"]), block["thinking"])
+                    )
             elif kind == "assistant" and btype == "tool_use":
                 steps.append(_claude_tool_use(block))
             elif kind == "user" and btype == "tool_result":
@@ -150,14 +169,16 @@ def _pi_tool(name: str, args: dict[str, Any]) -> Step:
         return _command_step(str(args.get("command", "")))
     path = str(args.get("path") or args.get("file_path") or "")
     if low in ("edit", "write"):
-        old, new = args.get("oldText"), args.get("newText")
-        if old is not None or new is not None:
-            body = "\n".join(
-                [f"-{ln}" for ln in str(old or "").splitlines()]
-                + [f"+{ln}" for ln in str(new or "").splitlines()]
-            )
-        else:
-            body = str(args.get("content", ""))
+        pairs = args.get("edits") or [
+            {"oldText": args.get("oldText"), "newText": args.get("newText")}
+        ]
+        body_lines: list[str] = []
+        for e in pairs:
+            if e.get("oldText") is None and e.get("newText") is None:
+                continue
+            body_lines += [f"-{ln}" for ln in str(e.get("oldText") or "").splitlines()]
+            body_lines += [f"+{ln}" for ln in str(e.get("newText") or "").splitlines()]
+        body = "\n".join(body_lines) if body_lines else str(args.get("content", ""))
         return Step("edit", path or name, body)
     if low in ("read", "grep", "find", "ls"):
         return Step("read", f"{low} {path or args.get('pattern', '')}".strip())
@@ -177,6 +198,8 @@ def _parse_pi(obj: dict[str, Any]) -> list[Step]:
         if msg.get("role") != "assistant":
             return []
         steps = []
+        if msg.get("stopReason") == "error":
+            steps.append(Step("log", "⚠ model call failed: " + str(msg.get("errorMessage", "?"))))
         for block in msg.get("content") or []:
             if not isinstance(block, dict):
                 continue
@@ -187,8 +210,14 @@ def _parse_pi(obj: dict[str, Any]) -> list[Step]:
         return steps
     if kind == "agent_end":
         return [Step("done", "done: finished", "", {"exit": "finished"})]
+    if kind == "auto_retry_start":
+        return [Step("log", f"retrying after: {obj.get('errorMessage', '?')}")]
     if kind in (
+        "session",
         "agent_start",
+        "agent_settled",
+        "auto_retry_end",
+        "entry_appended",
         "turn_start",
         "turn_end",
         "message_start",
@@ -234,7 +263,9 @@ def _parse_codex(obj: dict[str, Any]) -> list[Step]:
         return []
     if kind == "turn.completed":
         return [Step("done", "done: finished", "", {"exit": "finished", "usage": obj.get("usage")})]
-    if kind in ("turn.failed", "error"):
+    if kind == "error":
+        return [Step("log", "⚠ " + str(obj.get("message", "error")))]  # often a retry notice
+    if kind == "turn.failed":
         return [
             Step(
                 "done",

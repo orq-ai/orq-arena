@@ -30,7 +30,7 @@ def test_old_yaml_without_kind_still_loads_as_a_model():
 def test_harness_spec_round_trips_through_the_manifest_config():
     cfg = _cfg(
         _h(name="pi", agent_kwargs={"max_turns": 60}),
-        _h(name="cc", agent="claude-code", api_format="anthropic_messages"),
+        _h(name="cc", agent="claude-code", model_id="anthropic/c"),
         {"model_id": "a/one"},
     )
     again = ArenaConfig.model_validate(cfg.model_dump(mode="json"))
@@ -72,28 +72,53 @@ def test_the_same_agent_setup_twice_is_rejected():
 
 def test_overlay_an_agent_cannot_honor_names_the_agent():
     with pytest.raises(ValidationError, match="pi.*memory"):
-        _cfg(_h(overlay={"memory": "/tmp"}), _h(agent="codex"))
-    with pytest.raises(ValidationError, match="codex.*skills"):
-        _cfg(_h(agent="codex", overlay={"skills": "/tmp"}), _h())
+        _cfg(_h(overlay={"memory": "/tmp"}), _h(agent="codex", model_id="openai/c"))
+    with pytest.raises(ValidationError, match="codex.*memory"):
+        _cfg(_h(agent="codex", model_id="openai/c", overlay={"memory": "/tmp"}), _h())
 
 
-def test_overlay_translates_to_the_agent_kwargs(tmp_path):
+def test_overlay_translates_to_harbor_arguments(tmp_path):
     c = HarnessCandidate.model_validate(
-        _h(agent="claude-code", overlay={"skills": str(tmp_path), "system_prompt": "be brief"})
+        _h(
+            agent="claude-code",
+            model_id="anthropic/c",
+            overlay={
+                "skills": str(tmp_path),
+                "memory": str(tmp_path),
+                "system_prompt": "be brief",
+                "settings": {"a": 1},
+            },
+        )
     )
     args = c.overlay.to_kwargs("claude-code")
-    assert args.kwargs["skills_dir"] == str(tmp_path.resolve())
+    assert args.skills == [str(tmp_path.resolve())]
+    assert args.kwargs["memory_dir"] == str(tmp_path.resolve())
     assert args.kwargs["append_system_prompt"] == "be brief"
+    assert args.kwargs["config"] == '{"a": 1}'
     pi = HarnessCandidate.model_validate(_h(overlay={"system_prompt": "be brief"}))
-    assert pi.overlay.to_kwargs("pi").extra_instructions == "be brief"
+    assert pi.overlay.to_kwargs("pi").extra_instruction == "be brief"
 
 
 def test_overlay_clashing_with_agent_kwargs_is_rejected(tmp_path):
     with pytest.raises(ValidationError, match="duplicate"):
         _cfg(
-            _h(agent_kwargs={"skills": "x"}, overlay={"skills": str(tmp_path)}),
-            _h(agent="codex"),
+            _h(
+                agent="claude-code",
+                model_id="anthropic/c",
+                agent_kwargs={"memory_dir": "x"},
+                overlay={"memory": str(tmp_path)},
+            ),
+            _h(),
         )
+
+
+def test_the_model_must_suit_the_agent():
+    with pytest.raises(ValidationError, match="anthropic"):
+        HarnessCandidate.model_validate(_h(agent="claude-code", model_id="openai/m"))
+    with pytest.raises(ValidationError, match="openai"):
+        HarnessCandidate.model_validate(_h(agent="codex", model_id="anthropic/m"))
+    with pytest.raises(ValidationError, match="not supported"):
+        HarnessCandidate.model_validate(_h(agent="gemini-cli"))
 
 
 def test_record_names_separates_variants():
@@ -118,9 +143,9 @@ def test_harness_config_keys_are_known_to_the_suggester():
 
 def test_decision_judges_are_refused_with_a_harness():
     with pytest.raises(ValidationError, match="decisions"):
-        _cfg(_h(), _h(agent="codex"), judge_api="decisions")
+        _cfg(_h(), _h(agent="codex", model_id="openai/c"), judge_api="decisions")
 
 
 def test_a_unknown_harness_key_is_a_typo_not_a_silent_drop():
     with pytest.raises(ValidationError):
-        _cfg(_h(agnet_kwargs={}), _h(agent="codex"))
+        _cfg(_h(agnet_kwargs={}), _h(agent="codex", model_id="openai/c"))

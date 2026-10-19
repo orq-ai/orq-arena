@@ -15,6 +15,7 @@ from typing import Annotated, Any, Literal, Union
 from pydantic import BaseModel, ConfigDict, Discriminator, Field, PrivateAttr, Tag, model_validator
 
 from .harness.overlay import Overlay, OverlayError
+from .harness.routing import model_problem
 
 
 class CandidateSpec(BaseModel):
@@ -90,11 +91,9 @@ class HarnessCandidate(BaseModel):
     model_id: str = Field(description="Model the agent drives, 'provider/model'")
     name: str = ""
     emblem: str = ""
-    # Harbor --api-format; None lets Harbor pick the agent's native wire format.
-    api_format: str | None = None
     agent_kwargs: dict[str, Any] = Field(default_factory=dict)
-    # Env passed to the Harbor process, e.g. a native key when the router cannot
-    # serve this agent. Values may use ${VAR}; only the keys enter the identity.
+    # Extra env for the Harbor process (a native key, a proxy). Values may use
+    # ${VAR}; only the keys enter the identity.
     agent_env: dict[str, str] = Field(default_factory=dict)
     overlay: Overlay | None = None
     extra_instructions: str = ""
@@ -104,6 +103,9 @@ class HarnessCandidate(BaseModel):
 
     @model_validator(mode="after")
     def _finish(self) -> HarnessCandidate:
+        problem = model_problem(self.agent, self.model_id)
+        if problem:
+            raise ValueError(f"{self.name or self.agent}: {problem}")
         try:
             args = self.overlay.to_kwargs(self.agent) if self.overlay else None
         except OverlayError as exc:

@@ -29,6 +29,8 @@ class Trial:
     test_tail: str = ""
     steps: list[Step] = field(default_factory=list)
     cost_usd: float | None = None
+    # True when the agent reported no cost and it was priced from tokens (pi).
+    cost_estimated: bool = False
     tokens_in: int = 0
     tokens_out: int = 0
     duration_ms: int = 0
@@ -59,6 +61,7 @@ class Trial:
             "passed": self.passed,
             "reward": self.reward,
             "cost_usd": self.cost_usd,
+            "cost_estimated": self.cost_estimated,
             "tokens_in": self.tokens_in,
             "tokens_out": self.tokens_out,
             "duration_ms": self.duration_ms,
@@ -195,6 +198,9 @@ def load_trial(trial_dir: Path, agent: str) -> Trial:
             exit_reason = "error"
             if reward is None:
                 error = f"trial failed before the verifier ran: {text[:300]}"
+
+    if exit_reason == "timeout" and reward is None:
+        reward = 0.0  # out of time before the tests could pass is a fail, not "not run"
 
     tests = trial_dir / "verifier" / "test-stdout.txt"
     tail = ""

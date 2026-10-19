@@ -150,7 +150,7 @@ async def test_a_harness_pool_gets_a_runner_and_a_per_log_trials_dir(monkeypatch
         {
             "candidates": [
                 {"kind": "harness", "agent": "pi", "model_id": "x/m", "name": "pi"},
-                {"kind": "harness", "agent": "codex", "model_id": "x/m", "name": "codex"},
+                {"kind": "harness", "agent": "codex", "model_id": "openai/m", "name": "codex"},
             ],
             "judges": ["x/j1"],
         }

@@ -32,6 +32,7 @@ from typing import Any
 from .candidates import AnyCandidate, CandidateSpec, HarnessCandidate
 from .config import ArenaConfig
 from .data.prompts import PromptItem
+from .harness.routing import WIRE
 from .providers.models_list import ModelEntry, catalog_host
 from .providers.orq_gateway import OrqGateway
 
@@ -529,9 +530,10 @@ def _dry_run(
             cfg.harness,
             Path(tmp),
             router_host=cfg.harness.router_host or catalog_host(cfg.gateway),
+            keep_awake=False,
         )
         try:
-            argv = runner._argv(item, candidate, "dry-run")
+            argv, _env = runner._plan(item, candidate, "dry-run")
         except HarnessError as exc:
             return False, str(exc)
         argv[0] = exe
@@ -740,7 +742,7 @@ def harness_plan(
                     "agent": c.agent,
                     "model": c.model_id,
                     "overlay": overlay_label(c),
-                    "api_format": c.api_format or "",
+                    "api_format": WIRE[c.agent],
                 }
                 for c in harnesses
             ],

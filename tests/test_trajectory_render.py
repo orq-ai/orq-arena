@@ -43,7 +43,7 @@ def _cfg(*, harness: bool = True, gate: bool = True, judges: int = 3) -> ArenaCo
                 "kind": "harness",
                 "name": "claude-code",
                 "agent": "claude-code",
-                "model_id": "a/opus",
+                "model_id": "anthropic/opus",
             },
             {
                 "kind": "harness",
@@ -433,7 +433,7 @@ async def test_diff_is_read_from_the_trial_cache(tmp_path):
         trial = tmp_path / job_name(TASK, cfg.candidates[0].candidate_id) / "trial-1"
         trial.mkdir(parents=True)
         (trial / "config.json").write_text("{}")
-        (trial / "result.json").write_text("{}")
+        (trial / "result.json").write_text('{"verifier_result": {"rewards": {"reward": 1}}}')
         (trial / PATCH_FILE).write_text("--- a/f\n+++ b/f\n@@ -1 +1 @@\n-1\n+2\n")
         app._handle_event(_solution("a", False))
         await pilot.pause()
@@ -490,14 +490,13 @@ _HARNESS_PLAN = {
                 "agent": "claude-code",
                 "model": "anthropic/opus",
                 "overlay": "vanilla",
-                "api_format": "anthropic_messages",
             },
             {
                 "name": "pi + skills",
                 "agent": "pi",
                 "model": "anthropic/opus",
                 "overlay": "skills #a1b2",
-                "api_format": "openai_chat_completions",
+                "api_format": "openai chat completions",
             },
         ],
     },
@@ -514,7 +513,13 @@ async def test_run_plan_renders_the_harness_block():
         table = screen.query_one("#harnesses", DataTable)
         assert table.row_count == 2
         row = [str(table.get_cell_at((1, c))) for c in range(5)]
-        assert row == ["pi + skills", "pi", "anthropic/opus", "skills #a1b2", "openai chat"]
+        assert row == [
+            "pi + skills",
+            "pi",
+            "anthropic/opus",
+            "skills #a1b2",
+            "openai chat completions",
+        ]
         text = " ".join(_text(w) for w in screen.query(Static))
         assert "8 tasks · easy 3 · medium 4 · hard 1" in text
         assert "fix-git · build-cython-ext" in text

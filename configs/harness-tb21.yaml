@@ -3,7 +3,8 @@
 # Each candidate is an agent run through Harbor in a fresh container per task. The
 # hidden tests of the task decide a round when exactly one side passes; the jury
 # only sees pairs that both pass or both fail. Everything is billed through the
-# orq router: Harbor is pointed at it with --base-url and --api-key-name.
+# orq router: each agent gets the router as its endpoint through the environment
+# (ORQ_API_KEY is read from your shell and never written to a file or a command line).
 #
 # Setup, once:
 #   uv tool install --python 3.13 harbor
@@ -22,7 +23,7 @@ harness:
   # Left out, it defaults to "<battle log>.trials" next to the run's log.
   trials_dir: outputs/harness/trials
   max_parallel_trials: 2        # containers at once, across all matches
-  api_key_name: ORQ_API_KEY
+  api_key_name: ORQ_API_KEY     # the env var holding your orq key
   timeout_multiplier: 1.5       # the task images are linux/amd64; Macs emulate them
   artifacts: ["/app"]
   diff: true
@@ -42,24 +43,21 @@ candidates:
     name: claude-code
     agent: claude-code
     model_id: anthropic/claude-opus-5-5
-    api_format: anthropic_messages        # served at <router>/v3/anthropic
     agent_kwargs: { max_turns: 60, max_budget_usd: 2.0 }
 
   - kind: harness
     name: pi
     agent: pi
     model_id: anthropic/claude-opus-5-5
-    api_format: openai_chat_completions   # served at <router>/v3/router
     agent_kwargs: { max_turns: 60 }
 
   # Same agent and model as "pi", plus a skills folder and a system prompt:
-  # the pair isolates what the setup is worth. Create harness/skills first (the
-  # preflight names the path if it is missing).
+  # the pair isolates what the setup is worth. The skill in harness/skills is
+  # a small example; swap in your own.
   - kind: harness
     name: pi + skills
     agent: pi
     model_id: anthropic/claude-opus-5-5
-    api_format: openai_chat_completions
     agent_kwargs: { max_turns: 60, thinking: medium }
     overlay:
       skills: harness/skills
@@ -69,9 +67,6 @@ candidates:
     name: codex
     agent: codex
     model_id: openai/gpt-6-luna
-    api_format: openai_responses          # served at <router>/v3/router
-    # Native-key fallback, only if the router cannot serve codex:
-    # agent_env: { OPENAI_API_KEY: "${OPENAI_API_KEY}" }
 
 # A prompted panel: the dossier is long, so decision models (32k to 64k of
 # context) are not used here. google/gemini-3.1-pro-preview stands in for a

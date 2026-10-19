@@ -13,7 +13,7 @@ CFG = ArenaConfig.model_validate(
     {
         "candidates": [
             {"kind": "harness", "agent": "pi", "model_id": "x/m", "name": "pi"},
-            {"kind": "harness", "agent": "codex", "model_id": "x/m", "name": "codex"},
+            {"kind": "harness", "agent": "codex", "model_id": "openai/m", "name": "codex"},
         ],
         "judges": ["prov/j1"],
     }

@@ -660,15 +660,20 @@ async def run_tournament(
     gateway = OrqGateway(cfg.gateway)
     await pin_judge_endpoints(cfg, gateway.client)
     log = BattleLog(battle_log_path)
-    runner = (
-        HarborRunner(
+    runner = None
+    if cfg.has_harness:
+        from ..providers.models_list import fetch_price_map
+
+        try:
+            prices = await fetch_price_map(cfg.gateway)
+        except Exception:  # pricing is advisory; an agent that reports no cost shows n/a
+            prices = {}
+        runner = HarborRunner(
             cfg.harness,
             Path(cfg.harness.trials_dir or f"{battle_log_path}.trials"),
             router_host=cfg.harness.router_host or catalog_host(cfg.gateway),
+            prices=prices,
         )
-        if cfg.has_harness
-        else None
-    )
     manifest_path = manifest_path_for(battle_log_path)
 
     names = [w.name for w in cfg.candidates]

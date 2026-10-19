@@ -6,6 +6,8 @@ import asyncio
 import json
 from pathlib import Path
 
+import pytest
+
 from orq_arena.candidates import HarnessCandidate
 from orq_arena.config import HarnessConfig
 from orq_arena.data.prompts import PromptItem
@@ -58,10 +60,12 @@ class FakeProc:
 class Spawner:
     def __init__(self, **kw):
         self.calls: list[list[str]] = []
+        self.envs: list[dict[str, str]] = []
         self.kw = kw
 
-    async def __call__(self, *argv, **_):
+    async def __call__(self, *argv, env=None, **_):
         self.calls.append(list(argv))
+        self.envs.append(env or {})
         return FakeProc(list(argv), **self.kw)
 
 
@@ -69,18 +73,23 @@ async def _nodiff(*_a, **_k):
     return 0, b""
 
 
-def _runner(tmp_path, spawn):
+def _runner(tmp_path, spawn, prices=None):
     return HarborRunner(
         HarnessConfig(), tmp_path / "trials", router_host="https://my.orq.ai", spawn=spawn,
-        diff_run=_nodiff, poll_s=0.01,
+        diff_run=_nodiff, poll_s=0.01, keep_awake=False, prices=prices,
     )  # fmt: skip
 
 
 def _cand(**kw):
     return HarnessCandidate.model_validate(
         {"kind": "harness", "agent": "claude-code", "model_id": "anthropic/m",
-         "api_format": "anthropic_messages", **kw}
+         **kw}
     )  # fmt: skip
+
+
+@pytest.fixture(autouse=True)
+def _key(monkeypatch):
+    monkeypatch.setenv("ORQ_API_KEY", "sk-test-key")
 
 
 ITEM = PromptItem("fix it", metadata={"harbor_task_path": "/tasks/fix-git", "timeout_sec": 10})
@@ -108,8 +117,7 @@ async def test_live_run_streams_steps_then_solution_and_builds_argv(tmp_path):
 
     argv = spawn.calls[0]
     assert argv[:2] == ["harbor", "run"]
-    assert argv[argv.index("--base-url") + 1] == "https://my.orq.ai/v3/anthropic"
-    assert argv[argv.index("--api-format") + 1] == "anthropic_messages"
+    assert argv[argv.index("-a") + 1] == "claude-code"
     assert "max_turns=5" in argv and argv[argv.index("-m") + 1] == "anthropic/m"
     assert argv[argv.index("--job-name") + 1] == job_name("fix it", c.candidate_id)
 
@@ -183,3 +191,101 @@ async def test_failed_verifier_reward_is_a_fail_not_an_error(tmp_path):
 
 def test_diffresult_default_is_empty():
     assert DiffResult().text == ""
+
+
+async def test_the_key_and_the_endpoint_travel_in_the_environment_not_argv(tmp_path):
+    spawn = Spawner()
+    await _runner(tmp_path, spawn).run_side(
+        item=ITEM, candidate=_cand(), events=asyncio.Queue(), match_id="M", side="a"
+    )
+    assert not any("sk-test-key" in a for a in spawn.calls[0])
+    env = spawn.envs[0]
+    assert env["ANTHROPIC_API_KEY"] == "sk-test-key"
+    assert env["ANTHROPIC_BASE_URL"] == "https://my.orq.ai/v3/anthropic"
+
+
+async def test_pi_and_codex_routes(tmp_path):
+    spawn = Spawner()
+    runner = _runner(tmp_path, spawn)
+    pi = _cand(agent="pi", model_id="anthropic/m")
+    codex = _cand(agent="codex", model_id="openai/m")
+    for c in (pi, codex):
+        await runner.run_side(
+            item=ITEM, candidate=c, events=asyncio.Queue(), match_id="M", side="a"
+        )
+    pi_argv, codex_argv = spawn.calls
+    assert pi_argv[pi_argv.index("-m") + 1] == "openai/anthropic/m"
+    assert "model_api=openai-completions" in pi_argv
+    assert spawn.envs[0]["OPENAI_BASE_URL"] == "https://my.orq.ai/v3/router"
+    assert codex_argv[codex_argv.index("-a") + 1] == "orq_codex:OrqCodex"
+    assert "orq_codex" in "".join(p.name for p in Path(spawn.envs[1]["PYTHONPATH"]).iterdir())
+
+
+async def test_overlay_becomes_harbor_flags(tmp_path):
+    skills = tmp_path / "skills"
+    (skills / "s1").mkdir(parents=True)
+    (skills / "s1" / "SKILL.md").write_text("x")
+    spawn = Spawner()
+    c = _cand(
+        overlay={
+            "skills": str(skills),
+            "mcp_servers": {"git": {"command": "mcp-git"}},
+            "system_prompt": "be brief",
+        },
+        extra_instructions="also this",
+    )
+    await _runner(tmp_path, spawn).run_side(
+        item=ITEM, candidate=c, events=asyncio.Queue(), match_id="M", side="a"
+    )
+    argv = spawn.calls[0]
+    assert argv[argv.index("--skill") + 1] == str(skills.resolve())
+    assert "append_system_prompt=be brief" in argv  # claude-code has a native system prompt
+    assert argv[argv.index("--extra-instruction") + 1] == "also this"
+    mcp = json.loads(Path(argv[argv.index("--mcp-config") + 1]).read_text())
+    assert mcp == {"mcpServers": {"git": {"command": "mcp-git"}}}
+
+
+async def test_a_missing_key_is_an_error_trial(tmp_path, monkeypatch):
+    monkeypatch.delenv("ORQ_API_KEY")
+    trial = await _runner(tmp_path, Spawner()).run_side(
+        item=ITEM, candidate=_cand(), events=asyncio.Queue(), match_id="M", side="a"
+    )
+    assert trial.error and "ORQ_API_KEY" in trial.error
+
+
+async def test_a_cancelled_trials_result_is_not_a_cache_hit(tmp_path):
+    from orq_arena.harness.runner import cached_trial_dir
+
+    trial = tmp_path / "t" / "job" / "task__abc"
+    trial.mkdir(parents=True)
+    (trial / "config.json").write_text("{}")
+    (trial / "result.json").write_text(
+        json.dumps(
+            {"exception_info": {"exception_type": "CancelledError"}, "verifier_result": None}
+        )
+    )
+    assert cached_trial_dir(tmp_path / "t", "job") is None
+
+
+async def test_pi_cost_is_estimated_from_tokens_and_tagged(tmp_path):
+    runner = _runner(tmp_path, Spawner(), prices={"anthropic/m": (1.0, 2.0)})
+    c = _cand(agent="pi", model_id="anthropic/m")
+    # the fake result reports cost 0.5, so wipe it to look like pi
+    orig = FakeProc.wait
+
+    async def wait(self):
+        rc = await orig(self)
+        trial = next((Path(self._arg("-o")) / self._arg("--job-name")).iterdir())
+        res = json.loads((trial / "result.json").read_text())
+        res["agent_result"]["cost_usd"] = None
+        (trial / "result.json").write_text(json.dumps(res))
+        return rc
+
+    FakeProc.wait = wait  # type: ignore[method-assign]
+    try:
+        trial = await runner.run_side(
+            item=ITEM, candidate=c, events=asyncio.Queue(), match_id="M", side="a"
+        )
+    finally:
+        FakeProc.wait = orig  # type: ignore[method-assign]
+    assert trial.cost_estimated and trial.cost_usd == pytest.approx((10 * 1.0 + 5 * 2.0) / 1e6)

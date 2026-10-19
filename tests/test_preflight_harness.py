@@ -90,8 +90,8 @@ def _cfg(*extra, **over) -> ArenaConfig:
     return ArenaConfig.model_validate(
         {
             "candidates": [
-                {**h, "agent": "claude-code", "name": "cc", "api_format": "anthropic_messages"},
-                {**h, "agent": "pi", "name": "pi", "api_format": "openai_chat_completions"},
+                {**h, "agent": "claude-code", "name": "cc"},
+                {**h, "agent": "pi", "name": "pi"},
                 *extra,
             ],
             "judges": ["openai/j1"],
@@ -234,7 +234,7 @@ def test_plan_shape_and_numbers(tmp_path, env):
         "agent": "claude-code",
         "model": "anthropic/m",
         "overlay": "vanilla",
-        "api_format": "anthropic_messages",
+        "api_format": "anthropic messages",
     }
     assert any(ln.startswith("✓ harbor 0.24.0") for ln in out["checks"])
     assert "✓ docker" in out["checks"] and "✓ ORQ_API_KEY" in out["checks"]
@@ -247,7 +247,7 @@ def test_cached_trials_are_counted_and_skip_the_wall_estimate(tmp_path, env):
     done = trials / job_name(prompts[0].text, cfg.candidates[0].candidate_id) / "t__abc"
     done.mkdir(parents=True)
     (done / "config.json").write_text("{}")
-    (done / "result.json").write_text("{}")
+    (done / "result.json").write_text('{"verifier_result": {"rewards": {"reward": 1}}}')
     # a partial run: config but no result.json, so it is not a hit
     part = trials / job_name(prompts[1].text, cfg.candidates[0].candidate_id) / "t__def"
     part.mkdir(parents=True)

@@ -489,7 +489,7 @@ def _harness_setup(tmp_path):
         {
             "candidates": [
                 {"kind": "harness", "agent": "pi", "model_id": "p/m", "name": "pi"},
-                {"kind": "harness", "agent": "codex", "model_id": "p/m", "name": "codex"},
+                {"kind": "harness", "agent": "codex", "model_id": "openai/m", "name": "codex"},
             ],
             "judges": ["prov/judge-1"],
         }

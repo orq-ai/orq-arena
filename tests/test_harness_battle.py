@@ -23,7 +23,7 @@ def _cfg(**extra) -> ArenaConfig:
         {
             "candidates": [
                 {**h, "agent": "pi", "name": "pi"},
-                {**h, "agent": "codex", "name": "codex"},
+                {**h, "agent": "codex", "name": "codex", "model_id": "openai/m"},
             ],
             "judges": ["x/j1", "x/j2"],
             **extra,

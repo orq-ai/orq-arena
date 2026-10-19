@@ -569,7 +569,8 @@ def _solution_html(letter: str, name: str, sol: dict, dossier: str, show_dossier
     """One side of a harness round: verdict, counts, exit reason, diff, trajectory, test output."""
     cost = sol.get("cost_usd")
     cost_txt = (
-        f"{_fmt_usd(cost)} <span class='pw-tag'>observed</span>"
+        f"{_fmt_usd(cost)} <span class='pw-tag'>"
+        f"{'estimated' if sol.get('cost_estimated') else 'observed'}</span>"
         if isinstance(cost, (int, float))
         else "cost unknown"
     )
@@ -1157,7 +1158,7 @@ def build_report_html(
         else ""
     )
     trial_note = (
-        " Agent spend is what each trial reported (observed), counted once even when a cached "
+        " Agent spend is what each trial reported (observed), or its tokens at the catalog rate for an agent that reports none (estimated), counted once even when a cached "
         "trial is replayed into later matches."
         if is_harness
         else ""

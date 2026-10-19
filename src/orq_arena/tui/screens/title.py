@@ -39,13 +39,6 @@ def _span(seconds: int | float) -> str:
     return f"{hours}h{mins:02d}" if hours else f"{mins}m"
 
 
-_API_LABELS = {
-    "anthropic_messages": "anthropic",
-    "openai_chat_completions": "openai chat",
-    "openai_responses": "openai resp.",
-}
-
-
 class RunPlanScreen(Screen):
     """Scrollable plan body; the consent bar stays pinned at the bottom."""
 
@@ -227,7 +220,7 @@ class RunPlanScreen(Screen):
                 str(h.get("agent", "")),
                 str(h.get("model", "")),
                 str(h.get("overlay") or "vanilla"),
-                _API_LABELS.get(str(h.get("api_format")), str(h.get("api_format") or "native")),
+                str(h.get("api_format") or ""),
             )
 
     def on_mount(self) -> None:

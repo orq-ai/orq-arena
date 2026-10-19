@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from orq_arena.harness.parsers import parse_line
 
@@ -80,3 +81,44 @@ def test_unknown_and_non_json_lines_become_log_steps_not_nothing():
     (c,) = parse_line("gemini-cli", _line({"hello": 1}))
     assert c.kind == "log"
     assert parse_line("pi", "   ") == []
+
+
+FIXTURES = Path(__file__).parent / "fixtures" / "harbor"
+
+
+def _kinds(agent: str, name: str) -> list[str]:
+    out: list[str] = []
+    for line in (FIXTURES / name).read_text().splitlines():
+        out.extend(s.kind for s in parse_line(agent, line))
+    return out
+
+
+def test_real_claude_code_log():
+    kinds = _kinds("claude-code", "claude-code.txt")
+    assert {"edit", "command", "observation", "message", "done"} <= set(kinds)
+    assert kinds[-1] == "done"
+
+
+def test_real_pi_logs_including_a_retried_router_error():
+    kinds = _kinds("pi", "pi.txt")
+    assert {"command", "observation", "message", "done"} <= set(kinds)
+    assert "log" in kinds  # the "Connection error." assistant message and its retry
+    assert "edit" in _kinds("pi", "pi-edit.txt")
+
+
+def test_real_codex_logs_strip_the_bash_wrapper():
+    kinds = _kinds("codex", "codex-bash.txt")
+    assert kinds.count("command") == kinds.count("observation") == 10
+    titles = [
+        s.title
+        for line in (FIXTURES / "codex-bash.txt").read_text().splitlines()
+        for s in parse_line("codex", line)
+        if s.kind == "command"
+    ]
+    assert not any("bash -lc" in t for t in titles)
+    assert "edit" in _kinds("codex", "codex.txt")
+
+
+def test_the_stalled_codex_log_never_looks_finished():
+    kinds = _kinds("codex", "codex-failure-bare-model.txt")
+    assert "done" not in kinds and "command" not in kinds

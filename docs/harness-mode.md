@@ -3,7 +3,7 @@
 Rate coding agents, not just models. In harness mode a candidate is a **coding agent** (Claude
 Code, pi, codex, ...) with a model behind it and an optional setup around it: skills, MCP
 servers, memory, a system prompt. Each agent works on real tasks from
-terminal-bench 2.1 (an open set of 89 terminal tasks, each with hidden tests) inside a container, and the
+terminal-bench 2.1 (an open set of terminal tasks, each with hidden tests) inside a container, and the
 arena rates them head to head exactly like models: round-robin matches, a jury, Bradley-Terry
 ELO with confidence intervals.
 
@@ -39,8 +39,9 @@ side's verdict, diff and trajectory.
   ```
 
   The docs were written against Harbor 0.24; the run manifest records the version that ran.
-- **`ORQ_API_KEY`** in the environment, as for any run. Harbor passes it to every agent as the
-  router key, so one key covers the agents and the judges.
+- **`ORQ_API_KEY`** in the environment, as for any run. It reaches every agent as the router key
+  through the Harbor process's environment (never a command-line argument or a file), so one key
+  covers the agents and the judges.
 
 `orq-arena run` checks all of this before it spends anything and stops with a list of what is
 missing (see [Preflight](#preflight-and-the-run-plan)).
@@ -49,8 +50,8 @@ missing (see [Preflight](#preflight-and-the-run-plan)).
 
 A prompts file for harness mode has one row per task, with the task folder in its metadata.
 `orq-arena tasks sample` builds it from a local copy of the terminal-bench 2.1 dataset
-(`terminal-bench/terminal-bench-2-1`, cloned or downloaded to a folder; Harbor's own task cache
-also works):
+(`harbor-framework/terminal-bench-2-1` on GitHub, cloned to a folder, then pass its `tasks/` folder;
+Harbor's own task cache also works):
 
 ```bash
 orq-arena tasks sample --dataset <path to the dataset> --n 8 --seed 7 -o prompts/tb21-sample.jsonl
@@ -82,21 +83,18 @@ candidates:
     name: claude-code
     agent: claude-code
     model_id: anthropic/claude-opus-5-5
-    api_format: anthropic_messages
     agent_kwargs: { max_turns: 60, max_budget_usd: 2.0 }
 
   - kind: harness
     name: pi
     agent: pi
     model_id: anthropic/claude-opus-5-5
-    api_format: openai_chat_completions
     agent_kwargs: { max_turns: 60 }
 
   - kind: harness
     name: pi + skills
     agent: pi
     model_id: anthropic/claude-opus-5-5
-    api_format: openai_chat_completions
     agent_kwargs: { max_turns: 60, thinking: medium }
     overlay:
       skills: harness/skills
@@ -119,24 +117,25 @@ Every key is in the [configuration reference](configuration.md#harness-candidate
 
 ### Models and the router
 
-All agents are pointed at the orq router through Harbor's own flags (`--base-url`,
-`--api-key-name`, `--api-format`), with no custom code:
+Harbor has no endpoint flag, so each agent is pointed at the orq router through the environment of
+the Harbor process, the way Harbor itself reads provider settings. What each agent speaks was
+measured against the router:
 
-| Agent | `api_format` | Router path |
-|---|---|---|
-| `claude-code` | `anthropic_messages` | `/v3/anthropic` |
-| `pi` | `openai_chat_completions` | `/v3/router` |
-| `codex` | `openai_responses` | `/v3/router` |
+| Agent | Model | Wire format | Router path |
+|---|---|---|---|
+| `claude-code` | must be `anthropic/...` | Anthropic messages | `/v3/anthropic` |
+| `pi` | any `provider/model` | OpenAI chat completions | `/v3/router` |
+| `codex` | must be `openai/...` | OpenAI responses | `/v3/router` |
 
-Whether the router can serve a given agent depends on that agent. If one cannot be served, give it
-a native provider key for that candidate only:
+Stock Harbor cannot run codex against the router: it strips the provider from the model name and
+the router's responses endpoint then rejects the request, so codex retries silently forever. The
+arena ships a ten-line Harbor agent, `OrqCodex` (in `src/orq_arena/harness/harbor_agents/`), that
+puts the prefix back, and puts that folder on the Harbor process's `PYTHONPATH`. Nothing for you to
+install.
 
-```yaml
-agent_env: { OPENAI_API_KEY: "${OPENAI_API_KEY}" }
-```
-
-The run then no longer routes that agent through orq, and you should say so when you publish the
-results. The judges always go through the router.
+Other agents are not supported yet: each needs its own routing and parser. An `agent_env` map on a
+candidate adds extra environment for the Harbor process (a proxy, say), and its *names* count
+toward the candidate's identity. The judges always go through the router.
 
 ## Overlay: what each agent honors
 
@@ -147,22 +146,17 @@ nothing.
 
 | Overlay key | `claude-code` | `pi` | `codex` | Other agents |
 |---|---|---|---|---|
-| `skills` (folder copied in) | yes | yes | no | no |
-| `mcp_servers` | yes | yes | no | no |
-| `memory` (seeded folder) | yes | no, use `files` | no | no |
-| `system_prompt` | yes, appended to the system prompt | yes, but as extra instructions (weaker) | yes, as extra instructions | yes, as extra instructions |
-| `settings` | yes | no, use `files` | yes | no |
-| `files` (`{container path: local path}`) | no | yes, needs the helper below | no | no |
+| `skills` (folder, `--skill`) | yes | yes | yes | no |
+| `mcp_servers` (`--mcp-config`) | yes | yes | yes | no |
+| `memory` (seeded folder) | yes | no | no | no |
+| `system_prompt` | yes, appended to the system prompt | yes, as an instruction added to the task (weaker) | yes, as an instruction added to the task | yes, same |
+| `settings` (native agent config) | yes | yes | yes | no |
 
-`files` is the escape hatch for anything an agent reads from disk, for example a pi extension. It
-runs pi through a small helper agent (`orq_arena_harbor.pi_files:PiWithFiles`, in `harbor_agents/`)
-that uploads the files first. The helper has to be installed into Harbor's own environment:
+A `skills` folder is either one skill (a folder holding `SKILL.md`) or a folder whose children are
+skills. `mcp_servers` takes the usual `{name: {command, args}}` or `{name: {url}}` map. Skills and
+MCP are Harbor features, so how well an agent uses them is up to the agent.
 
-```bash
-uv tool install --python 3.13 harbor --with-editable ./harbor_agents
-```
-
-Skills, memory and `files` paths are resolved on your machine, and preflight stops the run if one
+Skills and memory paths are resolved on your machine, and preflight stops the run if one
 does not exist.
 
 ## Identity and variants
@@ -170,7 +164,7 @@ does not exist.
 Two candidates with the same agent and model but different setups are different contestants. Each
 gets a **variant**: the first six characters of a hash of its `agent_kwargs`, the *names* of its
 `agent_env` keys (never the values, so a secret cannot leak into a log), its instructions, and the
-**contents** of its overlay files. A vanilla agent with nothing set has an empty variant.
+**contents** of its skills and memory folders. A vanilla agent with nothing set has an empty variant.
 
 The candidate's identity is `agent:model_id#variant`, for example
 `pi:anthropic/claude-opus-5-5#e95601`. The default display name is
@@ -232,7 +226,8 @@ count toward a match's round cap, so a small `--rounds` can draw an extra task.
 
 Agent spend is **not projected**. The preflight says so and the cap per trial is whatever you set
 in `agent_kwargs` (`max_budget_usd`, `max_turns`). What it does cost is reported afterwards, as
-measured by each trial and tagged `observed` in the report.
+measured by each trial and tagged `observed` in the report. pi reports no cost of its own, so
+its cost is its token counts priced at the catalog rate and tagged `estimated`.
 
 Rough planning numbers, computed from public terminal-bench figures and not measured on this
 tool: about six minutes and between $0.5 and $1 per trial for a frontier model. The reference
@@ -245,7 +240,15 @@ costs only that.
 - **Emulation on a Mac.** The task images are linux/amd64. Apple-silicon Macs run them under
   emulation: slower, and a few tasks are flaky. That is why `timeout_multiplier` defaults to 1.5.
   The first run also pulls every task image, 10 to 20 minutes for eight tasks.
-- **A fresh container for every trial.** Nothing carries over between tasks.
+- **A fresh container for every trial.** Nothing carries over between tasks. The agent is also
+  installed fresh each time, which takes one to four minutes and dominates the wall time of easy
+  tasks.
+- **pi's live pane lags.** Harbor buffers pi's log in 4 KB blocks, so a pi pane updates in bursts
+  and its last steps appear when the trial ends. The result is unaffected.
+- **Keep the Mac awake.** On macOS the arena wraps Harbor in `caffeinate -i`. If the machine
+  sleeps anyway, the trial clock and its timeout stop mid-run and the timings are wrong.
+- **Interrupted trials.** Harbor leaves the container of a killed trial behind; the arena removes
+  it on a clean cancel, but check `docker ps -a` after a hard kill.
 - **Memory is seeded, not accumulating.** `overlay.memory` gives the agent the same starting
   files for each task. Memory that grows across tasks would make task order matter and break the
   cache, so it is out of scope for now.

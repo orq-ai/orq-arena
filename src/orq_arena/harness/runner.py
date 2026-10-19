@@ -16,6 +16,7 @@ import os
 import shutil
 import signal
 import subprocess
+import sys
 import time
 from collections.abc import Callable
 from functools import lru_cache
@@ -29,6 +30,7 @@ from ..events import ArenaEvent, SolutionReady, TrajectoryStep
 from . import tail
 from .diff import RunCmd, run_cmd, workspace_diff
 from .parsers import parse_line
+from .routing import route
 from .trial import Trial, find_trial_dir, load_trial
 
 EXTRAS_FILE = "orq_arena.json"  # diff stat and notes, next to Harbor's own files
@@ -65,20 +67,31 @@ def job_name(prompt_text: str, candidate_id: str) -> str:
     return f"{prompt_hash(prompt_text)}-{hashlib.sha256(candidate_id.encode()).hexdigest()[:10]}"
 
 
-def api_endpoint(router_host: str, api_format: str | None) -> str:
-    """Anthropic-native agents use /v3/anthropic, everything else /v3/router."""
-    path = "/v3/anthropic" if api_format == "anthropic_messages" else "/v3/router"
-    return router_host.rstrip("/") + path
-
-
 def _ak_value(value: Any) -> str:
     return value if isinstance(value, str) else json.dumps(value)
 
 
-def cached_trial_dir(trials_dir: Path, name: str) -> Path | None:
-    """The finished trial for ``name``, or None (absent, or a run that never finished)."""
+def finished_trial_dir(trials_dir: Path, name: str) -> Path | None:
+    """The trial directory once Harbor wrote its ``result.json`` (success or not)."""
     trial = find_trial_dir(trials_dir / name)
     return trial if trial is not None and (trial / "result.json").exists() else None
+
+
+def cached_trial_dir(trials_dir: Path, name: str) -> Path | None:
+    """A trial worth replaying: finished, with the verifier's verdict.
+
+    A cancelled or crashed trial also writes ``result.json`` (with an
+    ``exception_info`` and no verifier result), so the file's presence alone says
+    nothing about whether the agent got a fair run.
+    """
+    trial = finished_trial_dir(trials_dir, name)
+    if trial is None:
+        return None
+    try:
+        result = json.loads((trial / "result.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return trial if isinstance(result, dict) and result.get("verifier_result") else None
 
 
 class HarborRunner:
@@ -91,6 +104,8 @@ class HarborRunner:
         spawn: Spawn = asyncio.create_subprocess_exec,
         diff_run: RunCmd = run_cmd,
         poll_s: float = 0.5,
+        prices: dict[str, tuple[float, float]] | None = None,
+        keep_awake: bool | None = None,
     ) -> None:
         self.cfg = cfg
         self.trials_dir = Path(trials_dir)
@@ -98,46 +113,78 @@ class HarborRunner:
         self._spawn = spawn
         self._diff_run = diff_run
         self._poll_s = poll_s
+        self._prices = prices or {}
+        # A sleeping Mac freezes the trial and its timeout clock mid-run.
+        self._caffeinate = (
+            shutil.which("caffeinate")
+            if (sys.platform == "darwin" if keep_awake is None else keep_awake)
+            else None
+        )
         self._sem = asyncio.Semaphore(max(1, cfg.max_parallel_trials))
         self._trials: dict[tuple[str, str], asyncio.Future[Trial]] = {}
 
     # ----- command line -------------------------------------------------
 
-    def _argv(self, item: PromptItem, c: HarnessCandidate, name: str) -> list[str]:
+    def _api_key(self) -> str:
+        key = os.environ.get(self.cfg.api_key_name, "")
+        if not key:
+            raise HarnessError(
+                f"{self.cfg.api_key_name} is not set; agents reach the router with it"
+            )
+        return key
+
+    def _plan(
+        self, item: PromptItem, c: HarnessCandidate, name: str
+    ) -> tuple[list[str], dict[str, str]]:
+        """The Harbor command line and the process environment for one trial."""
         task = item.metadata.get("harbor_task_path")
         if not task:
             raise HarnessError(
                 "this prompt row has no harbor_task_path; build the prompt file with "
                 "`orq-arena tasks sample`"
             )
+        r = route(c.agent, c.model_id, self.router_host, self._api_key())
         overlay = c.overlay.to_kwargs(c.agent) if c.overlay else None
-        kwargs = {**c.agent_kwargs, **(overlay.kwargs if overlay else {})}
-        instructions = "\n\n".join(
-            p for p in (c.extra_instructions, overlay.extra_instructions if overlay else "") if p
-        )
-        if instructions:
-            kwargs["extra_instructions"] = instructions
+        kwargs: dict[str, Any] = {
+            **c.agent_kwargs,
+            **r.kwargs,
+            **(overlay.kwargs if overlay else {}),
+        }
         argv = [
-            self.cfg.harbor_bin, "run",
+            self.cfg.harbor_bin, "run", "-y",
             "-p", str(task),
-            "-a", (overlay.custom_agent if overlay and overlay.custom_agent else c.agent),
-            "-m", c.model_id,
+            "-a", r.harbor_agent,
+            "-m", r.model,
             "-n", "1",
             "-o", str(self.trials_dir),
             "--job-name", name,
             "--timeout-multiplier", str(c.timeout_multiplier or self.cfg.timeout_multiplier),
-            "--base-url", api_endpoint(self.router_host, c.api_format),
-            "--api-key-name", self.cfg.api_key_name,
         ]  # fmt: skip
-        if c.api_format:
-            argv += ["--api-format", c.api_format]
         for art in self.cfg.artifacts:
             argv += ["--artifact", art]
         for key, value in kwargs.items():
             argv += ["--ak", f"{key}={_ak_value(value)}"]
-        for key, value in self._agent_env(c).items():
-            argv += ["--ae", f"{key}={value}"]
-        return argv
+        if overlay:
+            for skill in overlay.skills:
+                argv += ["--skill", skill]
+            if overlay.mcp_servers:
+                mcp = self.trials_dir / f"{name}.mcp.json"
+                mcp.parent.mkdir(parents=True, exist_ok=True)
+                mcp.write_text(json.dumps({"mcpServers": overlay.mcp_servers}), encoding="utf-8")
+                argv += ["--mcp-config", str(mcp)]
+        instructions = "\n\n".join(
+            p for p in (c.extra_instructions, overlay.extra_instruction if overlay else "") if p
+        )
+        if instructions:
+            argv += ["--extra-instruction", instructions]
+        env = {**os.environ, **r.env, **self._agent_env(c)}
+        if r.pythonpath:
+            env["PYTHONPATH"] = os.pathsep.join(
+                p for p in (r.pythonpath, env.get("PYTHONPATH")) if p
+            )
+        if self._caffeinate:
+            argv = [self._caffeinate, "-i", *argv]
+        return argv, env
 
     @staticmethod
     def _agent_env(c: HarnessCandidate) -> dict[str, str]:
@@ -197,7 +244,7 @@ class HarborRunner:
     # ----- internals ----------------------------------------------------
 
     async def _load(self, trial_dir: Path, item: PromptItem, c: HarnessCandidate) -> Trial:
-        trial = load_trial(trial_dir, c.agent)
+        trial = self._priced(load_trial(trial_dir, c.agent), c)
         extras_path = trial_dir / EXTRAS_FILE
         if extras_path.exists():
             extras = json.loads(extras_path.read_text(encoding="utf-8"))
@@ -208,6 +255,14 @@ class HarborRunner:
             trial.tests_edited = bool(extras.get("tests_edited"))
         elif trial.error is None:
             await self._attach_diff(trial, trial_dir, item)
+        return trial
+
+    def _priced(self, trial: Trial, c: HarnessCandidate) -> Trial:
+        """pi reports no cost; price its tokens at the catalog rate and say so."""
+        price = self._prices.get(c.model_id)
+        if trial.cost_usd is None and price and (trial.tokens_in or trial.tokens_out):
+            trial.cost_usd = (price[0] * trial.tokens_in + price[1] * trial.tokens_out) / 1e6
+            trial.cost_estimated = True
         return trial
 
     async def _attach_diff(self, trial: Trial, trial_dir: Path, item: PromptItem) -> None:
@@ -275,16 +330,14 @@ class HarborRunner:
         match_id: str,
         side: Literal["a", "b"],
     ) -> Trial:
-        try:
-            argv = self._argv(item, c, name)
-        except HarnessError as exc:
-            return await self._fail(str(exc), c, events, match_id, side)
-
         job_dir = self.trials_dir / name
         shutil.rmtree(job_dir, ignore_errors=True)  # a partial run from a killed attempt
         self.trials_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            argv, env = self._plan(item, c, name)
+        except HarnessError as exc:
+            return await self._fail(str(exc), c, events, match_id, side)
         log_path = self.trials_dir / f"{name}.harbor.log"
-        env = {**os.environ, **self._agent_env(c)}
         t0 = time.monotonic()
 
         def on_line(line: str) -> None:
@@ -327,10 +380,11 @@ class HarborRunner:
             finally:
                 if proc is not None and proc.returncode is None:
                     await _stop(proc)
+                    await _remove_containers(find_trial_dir(job_dir))
                 finished.set()
                 await follower
 
-        trial_dir = cached_trial_dir(self.trials_dir, name)
+        trial_dir = finished_trial_dir(self.trials_dir, name)
         if trial_dir is None:
             tail_log = _log_tail(log_path)
             return await self._fail(
@@ -340,7 +394,7 @@ class HarborRunner:
                 match_id,
                 side,
             )
-        trial = load_trial(trial_dir, c.agent)
+        trial = self._priced(load_trial(trial_dir, c.agent), c)
         if trial.error is None:
             await self._attach_diff(trial, trial_dir, item)
         await events.put(self._ready(trial, match_id, side, replay=False))
@@ -374,3 +428,24 @@ async def _stop(proc: Any) -> None:
     except (asyncio.TimeoutError, ProcessLookupError):
         proc.kill()
         await proc.wait()
+
+
+async def _remove_containers(trial_dir: Path | None) -> None:
+    """Harbor leaves the container behind when interrupted; the trial name is its handle."""
+    if trial_dir is None:
+        return
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "docker", "ps", "-aq", "--filter", f"name={trial_dir.name.lower()}",
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+        )  # fmt: skip
+        out, _ = await asyncio.wait_for(proc.communicate(), 20)
+        ids = out.decode().split()
+        if ids:
+            rm = await asyncio.create_subprocess_exec(
+                "docker", "rm", "-f", *ids,
+                stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL,
+            )  # fmt: skip
+            await asyncio.wait_for(rm.wait(), 30)
+    except (OSError, asyncio.TimeoutError):
+        pass  # best effort: the user can `docker rm` it

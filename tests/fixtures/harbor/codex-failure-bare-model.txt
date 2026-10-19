@@ -1,0 +1,5 @@
+WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir "/tmp" (codex_home: AbsolutePathBuf("/tmp/codex-home"))
+Reading additional input from stdin...
+{"type":"thread.started","thread_id":"01a1527d-e9d8-73f0-916e-38740e90514f"}
+{"type":"turn.started"}
+{"type":"error","message":"Reconnecting... 2/5 (stream disconnected before completion: idle timeout waiting for websocket)"}

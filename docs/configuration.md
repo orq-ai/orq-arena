@@ -226,14 +226,13 @@ a worked config, is [Harness mode](harness-mode.md). The keys:
 |---|---|---|---|
 | `kind` | `"model"` or `"harness"` | `"model"` | Which kind of candidate this entry is. Omit it for a model. |
 | `agent` | `str` | (required) | The Harbor agent name, for example `claude-code`, `pi` or `codex`. |
-| `model_id` | `str` | (required) | The model the agent drives, as `provider/model`. Passed to Harbor as `-m`. |
+| `model_id` | `str` | (required) | The model the agent drives, as `provider/model`. `claude-code` needs an `anthropic/` model and `codex` an `openai/` one. |
 | `name` | `str` | `agent/short_model`, plus `-<variant>` when the setup differs from vanilla | Display name on the leaderboard and cards. |
 | `emblem` | `str` | `""` | Optional glyph shown before the name. |
-| `api_format` | `str` or `null` | `null` | Harbor's `--api-format`: `anthropic_messages`, `openai_chat_completions` or `openai_responses`. Also picks the router path: `anthropic_messages` goes to `/v3/anthropic`, everything else to `/v3/router`. `null` leaves Harbor to pick the agent's own format. |
 | `agent_kwargs` | `dict` | `{}` | Passed to Harbor as repeated `--ak key=value`. Typical keys are `max_turns`, `max_budget_usd`, `reasoning_effort` and `thinking`, which cap the spend per trial. |
-| `agent_env` | `dict[str, str]` | `{}` | Environment passed to the Harbor process (`--ae`). Values may use `${VAR}`. Use it to give one agent a native provider key when the router cannot serve it. Only the keys (never the values) enter the candidate's identity. |
-| `overlay` | object or `null` | `null` | The setup around the agent: `skills`, `mcp_servers`, `memory`, `system_prompt`, `settings`, `files`. An agent that cannot honor a key fails config loading with its name in the message. The table of who honors what is in [Harness mode](harness-mode.md#overlay-what-each-agent-honors). |
-| `extra_instructions` | `str` | `""` | Text appended to the agent's instructions, for every agent. |
+| `agent_env` | `dict[str, str]` | `{}` | Extra environment for the Harbor process (a proxy, a native key). Values may use `${VAR}`. The router endpoint and key are set for you per agent. Only the keys (never the values) enter the candidate's identity. |
+| `overlay` | object or `null` | `null` | The setup around the agent: `skills`, `mcp_servers`, `memory`, `system_prompt`, `settings`. An agent that cannot honor a key fails config loading with its name in the message. The table of who honors what is in [Harness mode](harness-mode.md#overlay-what-each-agent-honors). |
+| `extra_instructions` | `str` | `""` | Text appended to the task instruction (Harbor's `--extra-instruction`). |
 | `timeout_multiplier` | `float` or `null` | `null` | Per-candidate override of `harness.timeout_multiplier`. |
 
 Two candidates with the same agent and model but a different setup are two contestants, told apart
@@ -255,7 +254,7 @@ Only read when at least one candidate has `kind: harness`.
 | `harbor_bin` | `str` | `"harbor"` | The Harbor executable. Preflight stops the run if it is not on the `PATH`. |
 | `trials_dir` | `str` or `null` | `null` (→ `<battle log>.trials`) | Where trials and their cache live, one folder per task and candidate. |
 | `max_parallel_trials` | `int` | `2` | Harbor trials running at once across all matches. Each is a Docker container, so keep it low on a laptop. |
-| `router_host` | `str` or `null` | `null` (→ the gateway host) | Host agents are pointed at. Agents get `<host>/v3/anthropic` or `<host>/v3/router`, depending on `api_format`. |
+| `router_host` | `str` or `null` | `null` (→ the gateway host) | Host agents are pointed at. Agents get `<host>/v3/anthropic` (claude-code) or `<host>/v3/router` (pi, codex). |
 | `api_key_name` | `str` | `"ORQ_API_KEY"` | Name of the environment variable Harbor hands to the agents as the router key. Preflight stops the run if it is unset. |
 | `timeout_multiplier` | `float` | `1.5` | Scales every task's agent time limit. The task images are linux/amd64, so an Apple-silicon Mac runs them under emulation and needs the slack. |
 | `artifacts` | `list[str]` | `["/app"]` | Container paths Harbor copies out after the trial. The final workspace diff is built from `/app`. |
