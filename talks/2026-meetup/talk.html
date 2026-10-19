@@ -62,6 +62,14 @@
   .foot {
     position: fixed; right: 2vmin; bottom: 1.4vmin; font-size: 0.55em; color: var(--chrome-dim);
   }
+  #rrRing line { stroke: var(--chrome-dim); stroke-opacity: 0.18; stroke-width: 1.5; }
+  #rrRing line.done { stroke: var(--chrome-dim); stroke-opacity: 0.6; }
+  #rrRing line.live { stroke: var(--yellow); stroke-opacity: 1; stroke-width: 3; }
+  #rrRing circle { fill: var(--ink-raised); stroke: var(--line); stroke-width: 2; }
+  #rrRing circle.a { stroke: var(--a); fill: var(--a); }
+  #rrRing circle.b { stroke: var(--b); fill: var(--b); }
+  #rrRing text { fill: var(--chrome); font: 15px ui-monospace, Menlo, monospace; }
+  #rrRing text.a { fill: var(--a); } #rrRing text.b { fill: var(--b); }
   #keys {
     display: none; position: fixed; inset: 20vh 30vw; background: var(--ink-raised);
     border: 1px solid var(--a); padding: 3vmin; font-size: 0.8em; z-index: 9;
@@ -83,8 +91,29 @@
 </section>
 
 <section class="slide" id="build" data-chapter="2">
-  <h1>Build one</h1>
-  <p class="say">say: placeholder</p>
+  <h1>Build one: everybody fights everybody <span class="toy-tag">toy</span></h1>
+  <div class="two grow">
+    <div style="display:flex;flex-direction:column;gap:1.6vmin">
+<pre>candidates:
+  - model_id: openai/gpt-5.4-mini
+  - model_id: google/gemini-3.7-flash
+  - model_id: anthropic/claude-haiku-4-5-20251001
+  # ... 8 in this pool, one per provider
+
+match:
+  max_rounds: 5        # prompts sampled per match</pre>
+<pre>orq-arena run --config demo.yaml \
+  --prompts meetup.jsonl --tui</pre>
+      <div class="ctl" id="rrCtl">
+        pool <span id="rrSizes"><button>4</button><button>6</button><button>8</button><button>12</button></span>
+        <button id="rrNext">next match</button><button id="rrPlay">play</button><button id="rrReset">reset</button>
+      </div>
+      <div class="note">pairs <b class="Y" id="rrPairCount">28</b> · played <b id="rrDone">0</b> ·
+        <span id="rrCost">28 pairs x 5 rounds = 140 rounds</span></div>
+    </div>
+    <svg id="rrRing" viewBox="0 0 700 440" overflow="visible" style="width:100%;height:100%;max-height:70vh"></svg>
+  </div>
+  <p class="say">say: no bracket, no seeding, no luck of the draw; every pair meets on every sampled prompt; cost grows with the square. Click 12: 66 pairs, 330 rounds, each judged by three judges in both seat orders.</p>
 </section>
 
 <section class="slide" id="byok" data-chapter="3">
@@ -142,6 +171,64 @@
 <script id="toys">
 const TOY_CHECKS = {};
 const TOY_INITS = [];
+
+// ---------- toy 1: round robin
+TOY_CHECKS.rr = () => {
+  if (rrPairs(8).length !== 28 || rrPairs(12).length !== 66) throw new Error('rrPairs');
+};
+const RR_NAMES = ['gpt-5.4-mini', 'gemini-3.7-flash', 'deepseek-flash', 'mistral-small',
+  'grok-4-1-fast', 'command-a', 'qwen3.5-flash', 'claude-haiku-4-5'];  // configs/budget_8.yaml
+const RR_ROUNDS = 5;  // match.max_rounds default
+const rr = { n: 8, pairs: [], idx: 0, timer: null };
+function rrPairs(n) {
+  const out = [];
+  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) out.push([i, j]);
+  return out;
+}
+function rrSet(n) {
+  clearInterval(rr.timer);
+  Object.assign(rr, { n, pairs: rrPairs(n), idx: 0 });
+  document.querySelectorAll('#rrSizes button').forEach(b => b.classList.toggle('on', +b.textContent === n));
+  const NS = 'http://www.w3.org/2000/svg', svg = document.getElementById('rrRing');
+  const el = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+  svg.innerHTML = '';
+  const pos = [...Array(n).keys()].map(i => {
+    const a = (i / n) * 2 * Math.PI - Math.PI / 2;
+    return [350 + 150 * Math.cos(a), 220 + 150 * Math.sin(a), Math.cos(a)];
+  });
+  for (const [i, j] of rr.pairs) svg.appendChild(el('line', { id: `rrL${i}_${j}`, x1: pos[i][0], y1: pos[i][1], x2: pos[j][0], y2: pos[j][1] }));
+  pos.forEach(([x, y, c], i) => {
+    svg.appendChild(el('circle', { id: 'rrN' + i, cx: x, cy: y, r: 9 }));
+    const t = el('text', { id: 'rrT' + i, x: x + 18 * c, y: y + 5, 'text-anchor': c > 0.2 ? 'start' : c < -0.2 ? 'end' : 'middle' });
+    if (Math.abs(c) <= 0.2) t.setAttribute('y', y + (y < 220 ? -16 : 26));
+    t.textContent = RR_NAMES[i] || 'model-' + (i + 1);
+    svg.appendChild(t);
+  });
+  rrCount();
+}
+function rrCount() {
+  const p = rr.pairs.length;
+  document.getElementById('rrPairCount').textContent = p;
+  document.getElementById('rrDone').textContent = rr.idx;
+  document.getElementById('rrCost').textContent = `${p} pairs x ${RR_ROUNDS} rounds = ${p * RR_ROUNDS} rounds`;
+}
+function rrStep() {
+  document.querySelectorAll('#rrRing .a, #rrRing .b').forEach(e => e.classList.remove('a', 'b'));
+  document.querySelectorAll('#rrRing line.live').forEach(e => e.classList.replace('live', 'done'));
+  if (rr.idx >= rr.pairs.length) { clearInterval(rr.timer); return; }
+  const [i, j] = rr.pairs[rr.idx++];
+  ['rrN', 'rrT'].forEach(p => { document.getElementById(p + i).classList.add('a'); document.getElementById(p + j).classList.add('b'); });
+  document.getElementById(`rrL${i}_${j}`).classList.add('live');
+  rrCount();
+}
+function initRing() {
+  document.querySelectorAll('#rrSizes button').forEach(b => { b.onclick = () => rrSet(+b.textContent); });
+  document.getElementById('rrNext').onclick = rrStep;
+  document.getElementById('rrPlay').onclick = () => { clearInterval(rr.timer); rr.timer = setInterval(rrStep, 180); };
+  document.getElementById('rrReset').onclick = () => rrSet(rr.n);
+  rrSet(8);
+}
+TOY_INITS.push(initRing);
 </script>
 
 <script>
