@@ -290,11 +290,14 @@ The shipped `configs/harness-tb21.yaml` on eight terminal-bench 2.1 tasks, measu
 
 How to read it:
 
-- **The top two are not separated.** pi + skills is ahead of claude-code in 69% of resamples, and
-  the order is not stable: an earlier run that reused the same trials on seven of the eight tasks
-  and only re-ran the jury put claude-code first. Between agents that pass the same tests, the
-  ranking is the jury's preference, and it moves between runs.
-- **The tests separate little at the top.** Four of the eight tasks are passed by every agent.
+- **The top two are not separated.** pi + skills is ahead of claude-code in 69% of resamples.
+  The jury is not what makes the order wobble: re-judging the same 48 rounds three more times
+  with the same panel changed the verdict on 16 of the 38 jury-judged rounds at least once, but
+  never switched a winner (the changes are between a pick, a tie and no result), and the ranking
+  came out identical every time. What moves the order is which rounds are drawn: the first run,
+  with a different draw and `password-recovery` in the sample, put claude-code first. With 32
+  rated rounds, the order of two agents that pass the same tests follows the draw.
+- **The tests separate little at the top.** Five of the eight tasks are passed by every agent.
   The one task that separates pi from pi + skills is `headless-terminal`, a single trial each:
   suggestive for the skill, not a measurement.
 - **codex is clearly behind** on these tasks, failing three of them, and also by far the
