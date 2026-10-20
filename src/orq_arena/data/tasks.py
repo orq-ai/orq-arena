@@ -65,6 +65,21 @@ def scan_tasks(root: str | Path) -> list[TaskInfo]:
     return [found[k] for k in sorted(found)]
 
 
+def read_names(path: str | Path) -> list[str]:
+    """Task names from a text file, one per line; blank lines and ``#`` comments are skipped."""
+    lines = Path(path).read_text(encoding="utf-8").splitlines()
+    return [ln.strip() for ln in lines if ln.strip() and not ln.strip().startswith("#")]
+
+
+def select_named(tasks: list[TaskInfo], names: list[str]) -> list[TaskInfo]:
+    """The named tasks, in the order the names are given. A name with no task is an error."""
+    by_name = {t.name: t for t in tasks}
+    missing = [n for n in names if n not in by_name]
+    if missing:
+        raise ValueError(f"no such task in the dataset: {', '.join(missing)}")
+    return [by_name[n] for n in names]
+
+
 def sample_tasks(
     tasks: list[TaskInfo],
     *,

@@ -112,3 +112,45 @@ def test_the_cli_takes_replicates(tmp_path):
     )  # fmt: skip
     assert res.exit_code == 0 and "3 replicates each" in res.output
     assert len(out.read_text().splitlines()) == 6
+
+
+def test_a_names_file_rebuilds_a_published_sample_exactly(tmp_path):
+    from orq_arena.data.tasks import read_names, select_named
+
+    root = _tree(tmp_path / "tb")
+    names = tmp_path / "names.txt"
+    names.write_text("# a comment\n\nmed3\neasy1\nhard0\n")
+    assert read_names(names) == ["med3", "easy1", "hard0"]
+    assert [t.name for t in select_named(scan_tasks(root), read_names(names))] == [
+        "med3",
+        "easy1",
+        "hard0",
+    ]
+    out = tmp_path / "s.jsonl"
+    res = CliRunner().invoke(
+        cli, ["tasks", "sample", "--dataset", str(root), "--names-file", str(names), "-o", str(out)]
+    )  # fmt: skip
+    assert res.exit_code == 0
+    assert [json.loads(line)["task_name"] for line in out.read_text().splitlines()] == [
+        "med3", "easy1", "hard0",
+    ]  # fmt: skip
+
+
+def test_a_names_file_with_an_unknown_task_is_refused(tmp_path):
+    root = _tree(tmp_path / "tb")
+    names = tmp_path / "names.txt"
+    names.write_text("easy1\nno-such-task\n")
+    res = CliRunner().invoke(
+        cli, ["tasks", "sample", "--dataset", str(root), "--names-file", str(names), "-o", str(tmp_path / "s.jsonl")]
+    )  # fmt: skip
+    assert res.exit_code != 0 and "no-such-task" in res.output
+
+
+def test_the_shipped_names_file_lists_16_distinct_tasks():
+    from pathlib import Path
+
+    from orq_arena.data.tasks import read_names
+
+    names = read_names(Path(__file__).parent.parent / "configs" / "tb21-sample16.txt")
+    assert len(names) == 16 and len(set(names)) == 16
+    assert "cancel-async-tasks" in names and "password-recovery" not in names

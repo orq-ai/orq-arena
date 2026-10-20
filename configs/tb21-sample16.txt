@@ -1,0 +1,20 @@
+# The 16 terminal-bench 2.1 tasks of the harness reference runs, in the order the prompt file had.
+# The first 8 are the 8-task reference sample (cancel-async-tasks stands in for password-recovery,
+# which Opus 5.5 refuses whatever the harness). Build the prompt file with
+#   orq-arena tasks sample --dataset <clone>/tasks --names-file configs/tb21-sample16.txt -o tasks.jsonl
+db-wal-recovery
+gpt2-codegolf
+headless-terminal
+log-summary-date-ranges
+merge-diff-arc-agi-task
+cancel-async-tasks
+prove-plus-comm
+adaptive-rejection-sampler
+fix-git
+cobol-modernization
+pypi-server
+chess-best-move
+count-dataset-tokens
+raman-fitting
+configure-git-webserver
+polyglot-rust-c

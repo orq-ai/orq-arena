@@ -67,6 +67,16 @@ ordinary prompt (the task instructions as `prompt`, the difficulty as `category`
 `harbor_task_path`, `task_name`, `difficulty`, `timeout_sec` and `image`. Because the difficulty is
 the category, the usual per-category ELO slices come out per difficulty for free.
 
+To rebuild a published sample exactly, name its tasks instead of sampling: the 16 tasks of the
+reference runs are in `configs/tb21-sample16.txt` (its first 8 are the 8-task reference sample).
+
+```bash
+orq-arena tasks sample --dataset <path to the dataset> --names-file configs/tb21-sample16.txt -o tasks.jsonl
+```
+
+The rows it writes are identical to the ones the reference runs used, so every trial cached for
+them still matches.
+
 Eight tasks is a reference-run size, not a defensible benchmark. See [Costs](#costs).
 
 **Several trials per task.** Agents are not deterministic, so one trial is one draw. Pass
@@ -235,16 +245,23 @@ count toward a match's round cap, so a small `--rounds` can draw an extra task.
 
 ## Costs
 
-Agent spend is **not projected**. The preflight says so and the cap per trial is whatever you set
-in `agent_kwargs` (`max_budget_usd`, `max_turns`). What it does cost is reported afterwards, as
-measured by each trial and tagged `observed` in the report. pi reports no cost of its own, so
-its cost is its token counts priced at the catalog rate and tagged `estimated`.
+Agent spend is **not projected**. The preflight says so, and the caps per trial are whatever you
+set in `agent_kwargs`: `max_turns` (claude-code and pi) and `max_budget_usd` (claude-code only).
+codex has neither, so a codex trial is bounded by the task's time limit alone. What a run cost is
+reported afterwards, as each trial measured it and tagged `observed`. pi reports no cost of its
+own, so its cost is its token counts priced at the catalog rate and tagged `estimated`; the
+report, the headless table and the TUI mark it with a `~`.
 
-Rough planning numbers, computed from public terminal-bench figures and not measured on this
-tool: about six minutes and between $0.5 and $1 per trial for a frontier model. The reference
-pool of four agents on eight tasks is 32 trials, so budget in the tens of dollars and a few hours
-of wall time at two parallel trials. The jury adds a few dollars; a re-judge with a new panel
-costs only that.
+Measured, on an Apple-silicon Mac:
+
+| Run | Trials | Wall time | Agent spend | Per trial | Jury |
+|---|---|---|---|---|---|
+| Opus 5.5 behind three agents plus codex, 8 tasks | 32 | not recorded | not summed | $0.00 to $0.63, 0.2 to 4.6 min | $2.57 (final run) |
+| Budget pool (Haiku 5.5 and cheaper), 16 tasks, 3 in parallel | 96 | 3.2 hours | $7.60 | $0.01 mean, but $0.40 for deepseek-v4-pro | $1.13 |
+
+Budget a few dollars for the jury and a re-judge with a new panel costs only that. Wall time is
+dominated by pulling task images on the first run and installing the agent in each fresh
+container; a replay from the trial cache costs only the jury calls.
 
 ## Caveats
 
@@ -310,14 +327,16 @@ How to read it:
   with a different draw and `password-recovery` in the sample, put claude-code first. With 32
   rated rounds, the order of two agents that pass the same tests follows the draw.
 - **The tests separate little at the top.** Five of the eight tasks are passed by every agent.
-  The one task that separates pi from pi + skills is `headless-terminal`, a single trial each:
-  suggestive for the skill, not a measurement.
+  The one task that separates pi from pi + skills is `headless-terminal`, a single trial each.
+  `pi + skills` differs from `pi` in three ways (the skills folder, one line of system prompt and
+  `thinking: medium`), so that gap is not attributable to skills alone; the budget config adds a
+  control, `pi + thinking`, that changes only the thinking level.
 - **codex is clearly behind** on these tasks, failing three of them, and also by far the
   cheapest.
 
-Run conditions: Harbor 0.24.0; `orq-arena tasks sample --n 8 --seed 7` (1 easy, 5 medium,
-2 hard), with `password-recovery` swapped for `cancel-async-tasks` because Opus 5.5 refuses it
-whatever the harness, which tells nothing about the harness; an Apple-silicon Mac with
+Run conditions: Harbor 0.24.0; the first 8 tasks of `configs/tb21-sample16.txt` (1 easy, 5 medium,
+2 hard: `tasks sample --n 8 --seed 7` with `password-recovery` replaced by `cancel-async-tasks`,
+because Opus 5.5 refuses it whatever the harness, which tells nothing about the harness); an Apple-silicon Mac with
 `max_parallel_trials: 2`; 32 trials, each run once and cached across runs; 48 rounds, of which
 the verifier gate decided 10 and the jury 38 (16 of those inconclusive); jury agreement 80%,
 jury cost $2.57 for the final run. A refusal counts as a loss, like any other failed task.

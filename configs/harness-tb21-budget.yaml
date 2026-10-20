@@ -16,9 +16,10 @@
 # Run:
 #   orq-arena run --config configs/harness-tb21.yaml --prompts prompts/tb21-sample.jsonl
 #
-# Cost: agent spend is not projected. It is capped per trial by max_budget_usd
-# and max_turns below; expect roughly $0.5 to $1 per trial on a frontier model.
-# See docs/harness-mode.md.
+# Cost: agent spend is not projected. Per-trial caps: max_turns (claude-code and pi) and
+# max_budget_usd (claude-code only). codex has neither, so a codex trial is bounded by the
+# task's time limit alone. Measured on the budget run: 96 trials for $7.60, and
+# deepseek-v4-pro alone was $6.44 of it. See docs/harness-mode.md.
 
 harness:
   harbor_bin: harbor
@@ -57,7 +58,9 @@ candidates:
     model_id: anthropic/claude-haiku-5-5
     agent_kwargs: { max_turns: 60 }
 
-  # Same agent and model as "pi (haiku)", plus a skills folder and a system prompt.
+  # Same agent and model as "pi (haiku)", but three things differ: a skills folder, a system
+  # prompt line and thinking: medium. "pi + thinking (haiku)" below is the control that
+  # separates thinking from the skills and the prompt line.
   - kind: harness
     name: pi + skills (haiku)
     agent: pi
@@ -66,6 +69,15 @@ candidates:
     overlay:
       skills: harness/skills
       system_prompt: "Prefer small diffs; run the tests before you stop."
+
+  # Control for "pi + skills (haiku)": thinking: medium and nothing else. Read the skills and
+  # prompt effect as "pi + skills" against this one, the thinking effect as this one against
+  # "pi (haiku)".
+  - kind: harness
+    name: pi + thinking (haiku)
+    agent: pi
+    model_id: anthropic/claude-haiku-5-5
+    agent_kwargs: { max_turns: 60, thinking: medium }
 
   - kind: harness
     name: codex (gpt-6-luna)

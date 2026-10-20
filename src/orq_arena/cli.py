@@ -496,6 +496,12 @@ def tasks() -> None:
 )
 @click.option("--include-gpu", is_flag=True, default=False, help="Keep tasks that need a GPU.")
 @click.option(
+    "--names-file",
+    default=None,
+    help="Build the file from the tasks named in this text file (one per line, in this order) "
+    "instead of sampling, so a published sample can be rebuilt exactly. Ignores --n and --seed.",
+)
+@click.option(
     "--replicates",
     type=click.IntRange(min=1),
     default=1,
@@ -518,6 +524,7 @@ def tasks_sample(
     max_timeout: float,
     include_gpu: bool,
     output_path: str,
+    names_file: str | None,
     replicates: int,
 ) -> None:
     """Sample a difficulty-stratified task set and write it as a prompt file.
@@ -538,13 +545,21 @@ def tasks_sample(
         raise click.ClickException(
             f"no tasks under {root} (a task is a directory with task.toml and instruction.md)."
         )
-    picked = sample_tasks(
-        found,
-        n=n,
-        seed=seed,
-        max_timeout_s=max_timeout or None,
-        exclude_gpu=not include_gpu,
-    )
+    if names_file:
+        from .data.tasks import read_names, select_named
+
+        try:
+            picked = select_named(found, read_names(names_file))
+        except (OSError, ValueError) as exc:
+            raise click.ClickException(str(exc)) from exc
+    else:
+        picked = sample_tasks(
+            found,
+            n=n,
+            seed=seed,
+            max_timeout_s=max_timeout or None,
+            exclude_gpu=not include_gpu,
+        )
     if not picked:
         raise click.ClickException("every task was filtered out; relax --max-timeout.")
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)

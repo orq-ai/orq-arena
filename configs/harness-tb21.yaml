@@ -13,8 +13,9 @@
 # Run:
 #   orq-arena run --config configs/harness-tb21.yaml --prompts prompts/tb21-sample.jsonl
 #
-# Cost: agent spend is not projected. It is capped per trial by max_budget_usd
-# and max_turns below; expect roughly $0.5 to $1 per trial on a frontier model.
+# Cost: agent spend is not projected. Per-trial caps: max_turns (claude-code and pi) and
+# max_budget_usd (claude-code only). codex has neither, so a codex trial is bounded by the
+# task's time limit alone. Measured on the reference run: $0.01 to $0.63 per trial.
 # See docs/harness-mode.md.
 
 harness:
@@ -54,9 +55,10 @@ candidates:
     model_id: anthropic/claude-opus-5-5
     agent_kwargs: { max_turns: 60 }
 
-  # Same agent and model as "pi", plus a skills folder and a system prompt:
-  # the pair isolates what the setup is worth. The skill in harness/skills is
-  # a small example; swap in your own.
+  # Same agent and model as "pi", but three things differ: a skills folder, a system prompt
+  # line and thinking: medium. So the pair measures the setup as a whole, not skills alone;
+  # to isolate skills, add a control that sets thinking: medium and nothing else (see
+  # harness-tb21-budget.yaml). The skill in harness/skills is a small example; swap in your own.
   - kind: harness
     name: pi + skills
     agent: pi
