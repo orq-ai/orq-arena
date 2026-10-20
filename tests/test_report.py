@@ -675,3 +675,23 @@ def test_harness_cost_counts_a_replayed_trial_once(tmp_path):
     usd, trials, unknown = _harness_costs([*records, again], {"pi:p/m": "pi", "codex:p/m": "codex"})
     assert (trials, unknown) == (2, 0)
     assert usd == {"pi": 0.42, "codex": 0.18}
+
+
+def test_the_ladder_and_the_spend_card_say_when_a_cost_is_estimated(tmp_path):
+    from orq_arena.report import _cost_provenance
+
+    cfg, records, report, manifest = _harness_setup(tmp_path)
+    for rec in records:
+        rec.solution_a["cost_estimated"] = True  # pi: tokens priced at the catalog rate
+    report["harness"]["pi"] |= {"estimated": 1, "unverified": 0}
+    report["harness"]["codex"] |= {"estimated": 0, "unverified": 3}
+    html = build_report_html(
+        cfg=cfg, records=records, elo={"pi": 950.0, "codex": 1050.0}, report=report, manifest=manifest
+    )  # fmt: skip
+    assert "~$0.42" in html and "1 of 1 trials priced from tokens" in html
+    assert "(3 void)" in html  # a void is shown beside the pass rate
+    assert (
+        "1 observed, 1 estimated from tokens" in html and "2 trials &middot; observed" not in html
+    )
+    assert _cost_provenance(4, 0) == "observed"
+    assert _cost_provenance(4, 4) == "estimated from tokens"

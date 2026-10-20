@@ -194,6 +194,12 @@ def harness_summary(records: list[BattleRecord], alias: dict[str, str]) -> dict[
             "trials": len(sols),
             "passed": sum(1 for s in verified if s["passed"]),
             "verified": len(verified),
+            # trials whose verifier never ran (voided): out of the pass rate, but never hidden
+            "unverified": len(sols) - len(verified),
+            # trials whose cost is tokens priced at the catalog rate, not a reported figure
+            "estimated": sum(
+                1 for s in sols if s.get("cost_usd") is not None and s.get("cost_estimated")
+            ),
             "pass_rate": (sum(1 for s in verified if s["passed"]) / len(verified))
             if verified
             else None,

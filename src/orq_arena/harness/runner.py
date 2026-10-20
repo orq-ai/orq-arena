@@ -319,6 +319,7 @@ class HarborRunner:
             passed=trial.passed,
             reward=trial.reward,
             cost_usd=trial.cost_usd,
+            cost_estimated=trial.cost_estimated,
             duration_ms=trial.duration_ms,
             steps=trial.n_steps,
             commands=trial.commands,

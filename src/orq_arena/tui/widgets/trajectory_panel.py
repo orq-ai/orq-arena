@@ -19,16 +19,11 @@ from textual.markup import escape
 from textual.widgets import RichLog, Static
 
 from ...events import SolutionReady, TrajectoryStep
+from ...fmt import fmt_cost, fmt_duration
 
 OBSERVATION_LINES = 6
 MAX_LINES = 2000
 _TESTS_PATH = re.compile(r"(^|/)tests?/")
-
-
-def _fmt_duration(ms: int) -> str:
-    secs = max(0, ms) // 1000
-    mins, s = divmod(secs, 60)
-    return f"{mins}m{s:02d}s" if mins else f"{s}s"
 
 
 def _plural(n: int, one: str, many: str | None = None) -> str:
@@ -247,10 +242,10 @@ class TrajectoryPanel(Vertical):
             _plural(self._steps, "step"),
             _plural(self._cmds, "cmd"),
             _plural(self._edits, "edit"),
-            _fmt_duration(self._t_ms),
+            fmt_duration(self._t_ms),
         ]
         if sol is not None and sol.cost_usd is not None:
-            parts.append(f"${sol.cost_usd:.2f}")
+            parts.append(fmt_cost(sol.cost_usd, sol.cost_estimated))
         if self._replay:
             parts.append("⟲ CACHED")
         elif sol is None:
@@ -283,7 +278,7 @@ class TrajectoryPanel(Vertical):
         }.get(sol.exit_reason, sol.exit_reason or "agent stopped")
         done = f"◼ done: {exit_text}"
         if sol.cost_usd is not None:
-            done += f" · ${sol.cost_usd:.2f}"
+            done += f" · {fmt_cost(sol.cost_usd, sol.cost_estimated)}"
         lines = [done]
         reward = f"  (reward {sol.reward:g})" if sol.reward is not None else ""
         if sol.passed is True:

@@ -96,6 +96,7 @@ class SolutionReady(BaseModel):
     passed: bool | None = None  # None: the verifier did not run
     reward: float | None = None
     cost_usd: float | None = None
+    cost_estimated: bool = False  # priced from tokens at the catalog rate, not reported
     duration_ms: int = 0
     steps: int = 0
     commands: int = 0

@@ -9,6 +9,7 @@ harness log unchanged.
 
 from __future__ import annotations
 
+from ..fmt import fmt_cost, fmt_duration
 from ..redact import redact
 from .trial import Trial
 
@@ -18,11 +19,6 @@ STEPS_CAP = 6 * 1024
 
 def _clip(text: str, cap: int) -> str:
     return text if len(text) <= cap else text[:cap] + "\n[truncated]"
-
-
-def _fmt_duration(ms: int) -> str:
-    s = ms // 1000
-    return f"{s // 60}m {s % 60:02d}s" if s >= 60 else f"{s}s"
 
 
 def verdict_line(passed: bool | None, reward: float | None) -> str:
@@ -51,7 +47,11 @@ def key_steps(trial: Trial) -> list[str]:
 
 
 def render(trial: Trial) -> str:
-    cost = f"${trial.cost_usd:.2f}" if trial.cost_usd is not None else "cost unknown"
+    cost = (
+        fmt_cost(trial.cost_usd, trial.cost_estimated)
+        if trial.cost_usd is not None
+        else "cost unknown"
+    )
     parts = [f"## Hidden tests: {verdict_line(trial.passed, trial.reward)}"]
 
     head = "## Workspace diff"
@@ -62,7 +62,7 @@ def render(trial: Trial) -> str:
 
     parts.append(
         f"## Trajectory: {trial.n_steps} steps, {trial.commands} commands, {trial.edits} edits, "
-        f"{_fmt_duration(trial.duration_ms)}, {cost}, exit: {trial.exit_reason}"
+        f"{fmt_duration(trial.duration_ms)}, {cost}, exit: {trial.exit_reason}"
     )
     steps = "\n".join(key_steps(trial))
     if steps:

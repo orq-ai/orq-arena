@@ -39,6 +39,7 @@ from .events import (
     TournamentEnded,
     TurnResolved,
 )
+from .fmt import fmt_cost
 from .tournament.driver import run_tournament
 
 
@@ -83,7 +84,15 @@ def _harness_cells(h: dict[str, Any] | None) -> list[str]:
     if not h:
         return ["", "", ""]
     rate = f"{h['passed']}/{h['verified']}" if h.get("verified") else "n/a"
-    cost = f"{h['mean_cost_usd']:.2f}" if h.get("mean_cost_usd") is not None else "n/a"
+    if h.get("unverified"):
+        rate += (
+            f" ({h['unverified']} void)"  # a harness that voids 8 of 10 trials must not read 2/2
+        )
+    cost = (
+        f"{'~' if h.get('estimated') else ''}{h['mean_cost_usd']:.2f}"  # "~": tokens at catalog rate
+        if h.get("mean_cost_usd") is not None
+        else "n/a"
+    )
     return [rate, cost, f"{h.get('mean_duration_s', 0) / 60:.1f}"]
 
 
@@ -94,7 +103,7 @@ def _solution_line(ev: SolutionReady) -> str:
         return f"[yellow]{ev.match_id} {side} trial failed, {ev.error}[/yellow]"
     verdict = {True: "PASSED", False: "FAILED", None: "tests not run"}[ev.passed]
     cached = " (cached)" if ev.replay else ""
-    cost = f" · ${ev.cost_usd:.2f}" if ev.cost_usd is not None else ""
+    cost = f" · {fmt_cost(ev.cost_usd, ev.cost_estimated)}" if ev.cost_usd is not None else ""
     return (
         f"[dim]{ev.match_id} {side} hidden tests {verdict}{cached} · {ev.steps} steps · "
         f"{ev.duration_ms / 60000:.1f} min{cost} · {ev.exit_reason}[/dim]"

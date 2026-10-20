@@ -399,3 +399,31 @@ async def test_an_unexpected_exception_voids_one_round_instead_of_raising(tmp_pa
     assert trial.error and "bug" in trial.error
     # and the key was forgotten, so a later match may try again
     assert not runner._trials
+
+
+def test_harness_summary_counts_voided_and_estimated_trials_beside_the_pass_rate():
+    from orq_arena.data.schemas import BattleRecord
+    from orq_arena.tournament.driver import harness_summary
+
+    def rec(h, a_sol, b_sol):
+        return BattleRecord(
+            prompt_hash=h, prompt_text="t", model_a="pi", model_b="cc", model_a_id="pi:m", model_b_id="cc:m",
+            solution_a=a_sol, solution_b=b_sol,
+        )  # fmt: skip
+
+    ok = {"passed": True, "cost_usd": 0.2, "cost_estimated": True, "duration_ms": 1000}
+    void = {"passed": None, "cost_usd": None, "duration_ms": 1000}
+    rep = harness_summary(
+        [rec("h1", ok, ok), rec("h2", void, ok), rec("h3", void, ok)], {"pi:m": "pi", "cc:m": "cc"}
+    )
+    assert rep["pi"]["trials"] == 3 and rep["pi"]["verified"] == 1 and rep["pi"]["unverified"] == 2
+    assert rep["pi"]["estimated"] == 1 and rep["cc"]["estimated"] == 3
+
+
+def test_one_duration_format_everywhere():
+    from orq_arena import fmt
+    from orq_arena.harness import dossier
+    from orq_arena.tui.widgets import trajectory_panel
+
+    assert dossier.fmt_duration is fmt.fmt_duration is trajectory_panel.fmt_duration
+    assert fmt.fmt_duration(125_000) == "2m 05s" and fmt.fmt_duration(45_000) == "45s"

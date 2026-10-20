@@ -22,6 +22,7 @@ from evaluatorq.pairwise_reports.sections import POSITION_BIAS_WARN
 from .candidates import HarnessCandidate
 from .config import ArenaConfig
 from .data.schemas import BattleRecord
+from .fmt import fmt_cost
 from .judging import floor_abstained, judge_labels, vote_probabilities
 from .redact import redact
 from .rounds_page import rounds_path_for, write_rounds
@@ -222,6 +223,18 @@ def _fmt_usd(v: float) -> str:
     return f"${v:.2f}" if v >= 0.1 else f"${v:.3f}"
 
 
+def _harness_estimated(records) -> int:
+    """Distinct trials whose cost is tokens priced at the catalog rate, not a reported figure."""
+    seen: dict[tuple[str, str], dict] = {}
+    for r in records:
+        for side, sol in (("a", r.solution_a), ("b", r.solution_b)):
+            if sol:
+                seen.setdefault((r.prompt_hash, r.rating_key(side)), sol)
+    return sum(
+        1 for s in seen.values() if s.get("cost_usd") is not None and s.get("cost_estimated")
+    )
+
+
 def _harness_costs(records, alias) -> tuple[dict[str, float], int, int]:
     """(observed usd per harness name, trials, trials that reported no cost).
 
@@ -244,6 +257,15 @@ def _harness_costs(records, alias) -> tuple[dict[str, float], int, int]:
         name = alias.get(key, key)
         usd[name] = usd.get(name, 0.0) + float(cost)
     return usd, len(seen), unknown
+
+
+def _cost_provenance(priced: int, estimated: int) -> str:
+    """How an agent-spend figure was obtained: reported by the trials, or priced from tokens."""
+    if estimated == 0:
+        return "observed"
+    if estimated >= priced:
+        return "estimated from tokens"
+    return f"{priced - estimated} observed, {estimated} estimated from tokens"
 
 
 def _kpi(label: str, value: str, subtitle: str, status: str = "") -> str:
@@ -627,16 +649,25 @@ def build_report_html(
                     f"tests/'>⚠ tests edited &times;{edited}</span>"
                 )
             verified = hs.get("verified") or 0
+            unverified = hs.get("unverified") or 0
+            void_txt = f" <span class='sig warn'>({unverified} void)</span>" if unverified else ""
             pass_cell = (
                 f"<td class='n' title='{hs.get('pass_rate', 0):.0%} of verified trials'>"
-                f"{hs.get('passed', 0)}/{verified}</td>"
+                f"{hs.get('passed', 0)}/{verified}{void_txt}</td>"
                 if verified
-                else "<td class='n'>n/a</td>"
+                else f"<td class='n'>n/a{void_txt}</td>"
             )
             cost_v, dur_v = hs.get("mean_cost_usd"), hs.get("mean_duration_s")
+            est_n = hs.get("estimated") or 0
+            cost_txt = "n/a" if cost_v is None else fmt_cost(cost_v, bool(est_n), 2)
+            cost_title = (
+                f" title='{est_n} of {hs.get('trials', 0)} trials priced from tokens at the catalog rate'"
+                if est_n
+                else ""
+            )
             tail_cells = (
                 pass_cell
-                + f"<td class='n'>{'n/a' if cost_v is None else _fmt_usd(cost_v)}</td>"
+                + f"<td class='n'{cost_title}>{cost_txt}</td>"
                 + f"<td class='n'>{'n/a' if dur_v is None else f'{dur_v / 60:.1f}'}</td>"
             )
         else:
@@ -948,7 +979,8 @@ def build_report_html(
         _kpi(
             "Agent trials",
             _fmt_usd(trial_usd),
-            f"{n_trials} trials &middot; observed"
+            f"{n_trials} trials &middot; "
+            + _cost_provenance(n_trials - n_trials_unknown, _harness_estimated(records))
             + (f" &middot; {n_trials_unknown} reported no cost" if n_trials_unknown else ""),
         )
         if is_harness

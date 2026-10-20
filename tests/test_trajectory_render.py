@@ -150,7 +150,7 @@ async def test_steps_append_and_header_counts_update():
         assert "4 steps" in header  # observations are not steps
         assert "2 cmds" in header
         assert "1 edit" in header and "1 edits" not in header
-        assert "1m05s" in header
+        assert "1m 05s" in header
         assert "LIVE" in header and "CACHED" not in header
         assert len(panel._log.lines) > 5
         # the other pane is untouched
@@ -197,7 +197,7 @@ async def test_replay_badge_and_cost_in_header():
         await pilot.pause()
         header = _text(screen._resp_b._header)
         assert "⟲ CACHED" in header and "LIVE" not in header
-        assert "$0.18" in header and "4m05s" in header
+        assert "$0.18" in header and "4m 05s" in header
 
 
 async def test_diff_toggle_swaps_the_pane_and_back():
