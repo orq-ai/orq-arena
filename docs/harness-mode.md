@@ -378,6 +378,37 @@ How to read it:
 
 One trial per task and agent, as above: a pass rate over 16 tasks moves 6 points per task.
 
+#### Skills control: thinking, not skills, moved the rating
+
+`pi + skills` differs from `pi` in three ways (the skills folder, a system prompt line and
+`thinking: medium`), so the budget config adds `pi + thinking (haiku)`: thinking medium and
+nothing else. Measured on 2026-10-20, 16 tasks, 7 agents, 16 new trials (the rest replayed from
+cache), 282 rated rounds, 0 voided:
+
+| Harness | Pass rate | ELO (95% CI) | $/task | min/task |
+|---|---|---|---|---|
+| pi + thinking (haiku-5-5) | 13/16 | 1240 (1161 to 1350) | ~0.01 | 1.4 |
+| claude-code (haiku-5-5) | 14/16 | 1188 (1107 to 1292) | 0.03 | 2.0 |
+| pi + skills (haiku-5-5) | 12/16 | 1073 (1003 to 1149) | ~0.01 | 1.6 |
+| pi (haiku-5-5) | 13/16 | 1035 (964 to 1111) | ~0.01 | 1.6 |
+| codex (gpt-6-luna) | 11/16 | 1009 (921 to 1091) | 0.01 | 1.9 |
+| pi (deepseek-v4-pro) | 12/16 | 737 (617 to 817) | ~0.40 | 5.6 |
+| pi (glm-5.3-flash) | 8/16 | 717 (599 to 804) | ~0.01 | 6.3 |
+
+- **Thinking medium, not the skills, is what the jury preferred.** The three Haiku pi variants pass
+  nearly the same number of tasks (13, 13 and 12 of 16), and the only task that separates them is
+  `headless-terminal`, which `pi + skills` fails. But on jury rounds `pi + thinking` beat
+  `pi + skills` 10 times to 1 and `pi` 7 times to 1 (the rest ties or no result). It takes fewer
+  steps (median 10, against 13 and 11) and less time (1.4 minutes, against 1.6 and 1.6).
+- **The skills folder and the prompt line did nothing here.** `pi + skills` against plain `pi` was
+  6 wins to 4, with 6 ties or no result, and it passed one task fewer. That reverses the reading
+  of the first budget run, where `pi + skills` looked better than `pi`: that gap was the thinking
+  setting.
+- **The sample is small.** 16 tasks, one trial each, and the top intervals overlap (`pi + thinking`
+  and claude-code). The example skill in `harness/skills` is two lines, so this says nothing about
+  skills that carry real task knowledge.
+- ELO is only comparable inside one pool: adding the control moved every rating.
+
 ### Mid-price pool: stronger, still cheap models behind pi
 
 `configs/harness-tb21-mid.yaml` puts five more models behind pi on the same 16 tasks, with the two
