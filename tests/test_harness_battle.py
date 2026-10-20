@@ -15,6 +15,7 @@ from orq_arena.data.prompts import PromptItem
 from orq_arena.events import JudgeVerdictEvent, SolutionReady
 from orq_arena.harness.parsers import Step
 from orq_arena.harness.trial import Trial
+from orq_arena.tournament.driver import harness_summary
 
 
 def _cfg(**extra) -> ArenaConfig:
@@ -62,7 +63,7 @@ def _trial(passed, **kw) -> Trial:
     )  # fmt: skip
 
 
-async def _run(monkeypatch, trials, **cfg_extra):
+async def _run(monkeypatch, trials, prompts=None, **cfg_extra):
     jury = FakeJury()
     monkeypatch.setattr(judging_mod, "llm_jury_pairwise", lambda **kw: jury)
     cfg = _cfg(**cfg_extra)
@@ -70,7 +71,7 @@ async def _run(monkeypatch, trials, **cfg_extra):
     b = Battle(
         cfg=cfg, gateway=type("G", (), {"client": object()})(),
         candidate_a=cfg.candidates[0], candidate_b=cfg.candidates[1],
-        prompts=[PromptItem("fix it", metadata={"harbor_task_path": "/t"})],
+        prompts=prompts or [PromptItem("fix it", metadata={"harbor_task_path": "/t"})],
         match_id="M1", round_name="r", tournament_id="t", events=events,
         runner=FakeRunner(trials),
     )  # fmt: skip
@@ -118,3 +119,14 @@ async def test_errored_trial_voids_the_round(monkeypatch):
     result, jury, _ = await _run(monkeypatch, {"pi": bad, "codex": _trial(True)})
     rec = result.battles[0]
     assert jury.calls == [] and rec.winner == "void" and "trial failed" in (rec.error or "")
+
+
+async def test_each_replicate_of_a_task_is_its_own_judged_record(monkeypatch):
+    reps = [
+        PromptItem("fix it", metadata={"harbor_task_path": "/t", "replicate": r}) for r in (0, 1)
+    ]
+    result, _, _ = await _run(
+        monkeypatch, {"pi": _trial(False), "codex": _trial(True)}, prompts=reps
+    )
+    assert len({r.prompt_hash for r in result.battles}) == 2
+    assert [s["trials"] for s in harness_summary(result.battles, {}).values()] == [2, 2]

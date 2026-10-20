@@ -449,7 +449,7 @@ class Battle:
             self._record(
                 battles,
                 BattleRecord(
-                    prompt_hash=_prompt_hash(prompt),
+                    prompt_hash=_prompt_hash(item_key(item)),
                     prompt_text=prompt,
                     prompt_category=item.category,
                     prompt_metadata=item.metadata,

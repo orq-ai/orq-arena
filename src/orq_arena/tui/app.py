@@ -17,7 +17,7 @@ from textual.app import App
 
 from ..candidates import CandidateSpec, HarnessCandidate
 from ..config import ArenaConfig
-from ..data.prompts import PromptItem, replicate_key
+from ..data.prompts import PromptItem, item_key, replicate_key
 from ..events import (
     ArenaEvent,
     JudgeVerdictEvent,
@@ -86,7 +86,7 @@ class ArenaApp(App):
         self._side_cand: dict[str, object] = {}
         self._current_prompt = ""
         self._current_replicate = 0
-        self._prompt_pos = {p.text: (i, p) for i, p in enumerate(prompts, 1)}
+        self._prompt_pos = {item_key(p): (i, p) for i, p in enumerate(prompts, 1)}
         # HP is a TUI-side show, derived from the judged verdicts.
         self._hp = HPTracker(
             starting_hp=cfg.match.starting_hp,
@@ -180,7 +180,7 @@ class ArenaApp(App):
         """'TASK 2/8 · fix-git · easy · 15m' from the prompt row's metadata."""
         if not self.cfg.has_harness:
             return ""
-        pos = self._prompt_pos.get(prompt)
+        pos = self._prompt_pos.get(replicate_key(prompt, self._current_replicate))
         if pos is None:
             return ""
         k, item = pos
