@@ -483,7 +483,8 @@ def judge_family_overlaps(judges: list[str], candidates: Sequence[AnyCandidate])
 # ----- harness mode ----------------------------------------------------------
 
 _COST_NOTE = (
-    "agent spend is not projected; capped per trial by agent_kwargs (max_budget_usd, max_turns)"
+    "agent spend is not projected; per-trial caps are agent_kwargs max_turns (claude-code, pi) and "
+    "max_budget_usd (claude-code); codex has neither, and costs differ by model: check the first trials"
 )
 _DEFAULT_AGENT_TIMEOUT_S = 900
 _UNRESOLVED_VAR = re.compile(r"\$(\w+|\{[^}]*\})")

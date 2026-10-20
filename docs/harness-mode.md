@@ -378,3 +378,44 @@ How to read it:
 
 One trial per task and agent, as above: a pass rate over 16 tasks moves 6 points per task.
 
+### Mid-price pool: stronger, still cheap models behind pi
+
+`configs/harness-tb21-mid.yaml` puts five more models behind pi on the same 16 tasks, with the two
+Haiku 5.5 agents of the budget pool as a bridge. All five were smoke-tested through pi and the
+router on one easy task first. Measured on 2026-10-20: 7 agents, 336 rounds, 80 new trials
+(the Haiku ones replayed from the budget run's cache), 5.3 hours, and $1.53 of jury. The agent
+spend of the five new models was $27.26, and all of it is **estimated** (pi reports no cost, so
+it is tokens priced at the catalog rate), not a billed figure.
+
+| Harness | Pass rate | ELO (95% CI) | $/task | min/task | Agent timeouts |
+|---|---|---|---|---|---|
+| claude-code (haiku-5-5) | 14/16 | 1327 (1236 to 1459) | 0.03 | 2.0 | 0 |
+| pi (haiku-5-5) | 13/16 | 1180 (1111 to 1268) | ~0.01 | 1.6 | 0 |
+| pi (deepseek-v4.1-flash) | 9/16 | 980 (906 to 1050) | ~0.21 | 10.0 | 4 |
+| pi (grok-4.3) | 6/16 | 951 (880 to 1026) | ~0.12 | 4.0 | 2 |
+| pi (muse-spark-1.3) | 8/16 | 891 (817 to 961) | ~0.57 | 7.5 | 1 |
+| pi (glm-5.3) | 7/16 | 863 (773 to 938) | ~0.26 | 7.9 | 3 |
+| pi (qwen3.8-max) | 9/16 | 808 (710 to 879) | ~0.54 | 15.1 | 8 |
+
+ELO is only comparable inside one pool: the two Haiku agents rate higher here than in the budget
+pool because they face weaker opponents.
+
+How to read it:
+
+- **The more expensive models did worse, not better.** None of the five passes more than 9 of 16
+  tasks, against 13 for pi on Haiku, and each costs 12 to 57 times more per task for the pi agent
+  (about $0.12 to $0.57 against about $0.01) and takes 2.5 to 9 times as long. Together they used
+  $27.26 of the run's $27.97 agent spend.
+- **Timeouts explain part of it.** 18 of the 112 trials hit the agent time limit, 8 of them
+  qwen3.8-max (the task limit is 15 minutes, times the 1.5 multiplier). The Haiku agents had none.
+  A timeout is a loss, like any failed task.
+- **This measures the models behind pi, as pi drives them, one trial each.** pi was not tuned
+  per model, a different harness might suit these models better, and a task passed or failed by
+  one trial moves a pass rate 6 points. Treat it as "these five, under pi, on these tasks", not
+  as a ranking of the models.
+- **The tests still separate**: `fix-git` and `merge-diff-arc-agi-task` are passed by all seven,
+  `raman-fitting` by none (as in the budget run), and 125 of the 336 rounds were decided by the
+  tests alone.
+- **Jury:** 92% mean agreement. One round voided: a pi (muse-spark-1.3) trial made no model call
+  ("the router may have refused it"), so it is retried on the next run.
+
