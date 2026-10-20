@@ -247,7 +247,18 @@ count toward a match's round cap, so a small `--rounds` can draw an extra task.
 
 Agent spend is **not projected**. The preflight says so, and the caps per trial are whatever you
 set in `agent_kwargs`: `max_turns` (claude-code and pi) and `max_budget_usd` (claude-code only).
-codex has neither, so a codex trial is bounded by the task's time limit alone. What a run cost is
+codex has neither, so a codex trial is bounded by the task's time limit alone.
+
+Those caps are not equal across agents, so they are not a fair limit. codex accepts no turn cap,
+and a "turn" means different things per agent: pi on deepseek-v4-pro logged 119 steps under
+`max_turns: 60`. The one limit Harbor applies to every agent alike is the task's own time limit
+(times `timeout_multiplier`), and that is the rule: **the task time limit is the only per-trial
+cap, and spend is capped at the orq gateway** (a spend limit on the run's key), as a ceiling for
+the whole run. In the measured runs the dollar cap never bound (the most a claude-code trial cost
+was $0.37 against its $1.00 cap), while the time limit stopped 18 trials in the mid-price pool. The shipped configs still carry the old caps; they go when the trials are
+next re-run, because changing a contestant's config starts its cache over.
+
+What a run cost is
 reported afterwards, as each trial measured it and tagged `observed`. pi reports no cost of its
 own, so its cost is its token counts priced at the catalog rate and tagged `estimated`; the
 report, the headless table and the TUI mark it with a `~`.
@@ -355,9 +366,13 @@ tokens) and $1.13 of jury.
 | claude-code (haiku-5-5) | 14/16 | 1204 (1121 to 1318) | 0.03 | 2.0 |
 | pi + skills (haiku-5-5) | 12/16 | 1112 (1042 to 1191) | 0.01 | 1.6 |
 | pi (haiku-5-5) | 13/16 | 1083 (1012 to 1165) | 0.01 | 1.6 |
-| codex (gpt-6-luna) | 11/16 | 1046 (959 to 1136) | 0.01 | 1.9 |
+| codex (gpt-6-luna)&dagger; | 11/16 | 1046 (959 to 1136) | 0.01 | 1.9 |
 | pi (glm-5.3-flash) | 8/16 | 780 (668 to 864) | 0.01 | 6.3 |
 | pi (deepseek-v4-pro) | 12/16 | 775 (665 to 853) | 0.40 | 5.6 |
+
+&dagger; `openai/gpt-6-luna` is also one of the three judges, so one judge shares codex's model.
+The preflight warns about it. codex's pass rate comes from the tests and does not depend on the
+jury; its ELO may. A later jury is picked with no contestant's model family on it.
 
 How to read it:
 
@@ -378,7 +393,7 @@ How to read it:
 
 One trial per task and agent, as above: a pass rate over 16 tasks moves 6 points per task.
 
-#### Skills control: thinking, not skills, moved the rating
+#### Skills control: thinking helped, the skills overlay did not
 
 `pi + skills` differs from `pi` in three ways (the skills folder, a system prompt line and
 `thinking: medium`), so the budget config adds `pi + thinking (haiku)`: thinking medium and
@@ -391,19 +406,22 @@ cache), 282 rated rounds, 0 voided:
 | claude-code (haiku-5-5) | 14/16 | 1188 (1107 to 1292) | 0.03 | 2.0 |
 | pi + skills (haiku-5-5) | 12/16 | 1073 (1003 to 1149) | ~0.01 | 1.6 |
 | pi (haiku-5-5) | 13/16 | 1035 (964 to 1111) | ~0.01 | 1.6 |
-| codex (gpt-6-luna) | 11/16 | 1009 (921 to 1091) | 0.01 | 1.9 |
+| codex (gpt-6-luna)&dagger; | 11/16 | 1009 (921 to 1091) | 0.01 | 1.9 |
 | pi (deepseek-v4-pro) | 12/16 | 737 (617 to 817) | ~0.40 | 5.6 |
 | pi (glm-5.3-flash) | 8/16 | 717 (599 to 804) | ~0.01 | 6.3 |
 
-- **Thinking medium, not the skills, is what the jury preferred.** The three Haiku pi variants pass
-  nearly the same number of tasks (13, 13 and 12 of 16), and the only task that separates them is
-  `headless-terminal`, which `pi + skills` fails. But on jury rounds `pi + thinking` beat
-  `pi + skills` 10 times to 1 and `pi` 7 times to 1 (the rest ties or no result). It takes fewer
-  steps (median 10, against 13 and 11) and less time (1.4 minutes, against 1.6 and 1.6).
-- **The skills folder and the prompt line did nothing here.** `pi + skills` against plain `pi` was
-  6 wins to 4, with 6 ties or no result, and it passed one task fewer. That reverses the reading
-  of the first budget run, where `pi + skills` looked better than `pi`: that gap was the thinking
-  setting.
+&dagger; See the note under the budget table: codex runs the model of one of its judges.
+
+- **On correctness the three pi setups are one tier.** They pass 13, 12 and 13 of 16, and the only
+  task that separates them is `headless-terminal`, which `pi + skills` fails. One task is too
+  close to call.
+- **On quality they separate, in two steps.** Thinking medium alone adds 205 points over `pi`
+  (1240 against 1035). Adding the skills folder and the prompt line on top of it removes 167 of
+  them (`pi + skills`, 1073). On jury rounds `pi + thinking` beat `pi + skills` 10 times to 1 and
+  `pi` 7 times to 1 (the rest ties or no result). It takes fewer steps (median 10, against 13
+  and 11) and less time (1.4 minutes, against 1.6 and 1.6).
+- **So the overlay looks harmful here, not inert.** `pi + skills` still rates 38 points above
+  `pi`, but that is thinking's gain minus the overlay's cost.
 - **The sample is small.** 16 tasks, one trial each, and the top intervals overlap (`pi + thinking`
   and claude-code). The example skill in `harness/skills` is two lines, so this says nothing about
   skills that carry real task knowledge.
@@ -450,3 +468,18 @@ How to read it:
 - **Jury:** 92% mean agreement. One round voided: a pi (muse-spark-1.3) trial made no model call
   ("the router may have refused it"), so it is retried on the next run.
 
+## What comes next
+
+The harness headline is moving to correctness first. With hidden tests, the answer is the pass
+rate; the jury's ELO becomes a quality view inside it. Planned, in order:
+
+- **Correctness tier, then one criterion.** The report names the agents the leader cannot be
+  told apart from on the tests (paired on the same tasks), then picks the best of them by cost,
+  latency, turns or quality. Runs without a jury become possible, the cap rule above is applied,
+  and the trials are re-run with replicates.
+- **A jury only where it changes the answer:** rounds both agents passed, among the top tier and
+  between a baseline and a variant, judged for quality by a panel with no contestant's model on it.
+- **A/B through evaluatorq.** A baseline against a variant exports as an evaluatorq pairwise run,
+  so the verdict and its interval match the rest of the orq tools.
+- **Your own tasks.** Tasks without hidden tests go to the jury instead of being voided, and a guide
+  shows how to package your repo's past changes as Harbor tasks.
