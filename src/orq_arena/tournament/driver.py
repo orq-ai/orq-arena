@@ -31,6 +31,7 @@ from ..judging import pin_judge_endpoints
 from ..providers.credentials import active_workspace
 from ..providers.models_list import catalog_host
 from ..providers.orq_gateway import OrqGateway
+from ..redact import redact
 from .elo import (
     bootstrap_ci,
     bootstrap_draws,
@@ -632,7 +633,7 @@ def _write_manifest(
         manifest["fleiss"] = report.get("fleiss")
         manifest["tokens"] = report.get("tokens")
         manifest["length_coef"] = report.get("length_coef")
-    path.write_text(json.dumps(manifest, indent=2, default=str), encoding="utf-8")
+    path.write_text(redact(json.dumps(manifest, indent=2, default=str)), encoding="utf-8")
 
 
 async def run_tournament(

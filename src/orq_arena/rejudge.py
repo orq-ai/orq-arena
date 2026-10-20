@@ -22,6 +22,7 @@ from .data.schemas import BattleRecord
 from .harness.routing import harness_model_id
 from .judging import judge_labels, judged_cost_usd, make_jury, pin_judge_endpoints
 from .providers.orq_gateway import OrqGateway
+from .redact import redact
 from .tournament.driver import manifest_path_for, record_names
 from .tournament.elo import bradley_terry_mle, build_wins_matrix
 
@@ -252,7 +253,7 @@ def write_rejudged(
                     ),
                 }
             )
-            fh.write(row.model_dump_json() + "\n")
+            fh.write(redact(row.model_dump_json()) + "\n")
 
 
 # The verdict word needs a field the statistic can express itself on. Spearman
@@ -375,7 +376,7 @@ def save_report_json(path: str | Path, result: dict) -> None:
         "new_ranking": result["new_ranking"] if decisive else None,
         "jury": result["report"].model_dump(),
     }
-    Path(path).write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
+    Path(path).write_text(redact(json.dumps(payload, indent=2, default=str)), encoding="utf-8")
 
 
 def compare_reports(paths: list[str | Path]) -> list[dict]:

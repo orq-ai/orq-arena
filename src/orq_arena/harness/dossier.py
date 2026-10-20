@@ -9,6 +9,7 @@ harness log unchanged.
 
 from __future__ import annotations
 
+from ..redact import redact
 from .trial import Trial
 
 DIFF_CAP = 8 * 1024
@@ -68,4 +69,4 @@ def render(trial: Trial) -> str:
         parts.append("## Key steps\n" + _clip(steps, STEPS_CAP))
     if trial.test_tail:
         parts.append("## Test output (tail)\n" + trial.test_tail)
-    return "\n\n".join(parts)
+    return redact("\n\n".join(parts))

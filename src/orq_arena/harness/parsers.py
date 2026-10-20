@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ..events import StepKind
+from ..redact import redact
 
 TEST_COMMAND = re.compile(
     r"\b(pytest|py\.test|npm (run )?test|yarn test|go test|cargo test|make (test|check)|"
@@ -33,6 +34,13 @@ class Step:
     body: str = ""
     # Machine-readable extras: {"exit": "max_turns"}, {"cost_usd": 0.4, "turns": 9}.
     meta: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        # Every step passes through here, so a key an agent printed never reaches the
+        # pane, steps.json, the dossier or the report.
+        self.title = redact(self.title)
+        self.body = redact(self.body)
+        self.meta = {k: redact(v) if isinstance(v, str) else v for k, v in self.meta.items()}
 
     def as_dict(self) -> dict[str, Any]:
         return {"kind": self.kind, "title": self.title, "body": self.body, "meta": self.meta}

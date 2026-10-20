@@ -231,6 +231,42 @@ async def test_each_replicate_of_a_task_is_its_own_trial(tmp_path):
     assert names[0] == job_name(ITEM.text, _cand().candidate_id)  # replicate 0 keeps the old name
 
 
+async def test_a_key_an_agent_prints_is_scrubbed_from_every_file_and_event(tmp_path):
+    from orq_arena import redact
+
+    redact.clear()
+    key = "sk-test-key-0123456789abcdef"
+    spawn = Spawner(reward=1.0)
+    runner = _runner(tmp_path, spawn)
+    runner._api_key = lambda: key  # type: ignore[method-assign]
+    orig = FakeProc.wait
+
+    async def leaky_wait(self):
+        await orig(self)
+        trial = Path(self._arg("-o")) / self._arg("--job-name") / "task__abc"
+        (trial / "agent" / "claude-code.txt").write_text(
+            json.dumps({"type": "assistant", "message": {"content": [
+                {"type": "tool_use", "name": "Bash", "input": {"command": f"env | grep {key}"}}]}}) + "\n"
+        )  # fmt: skip
+        (trial / "agent" / "raw.log").write_text(f"OPENAI_API_KEY={key}")
+        return self.returncode
+
+    FakeProc.wait = leaky_wait  # type: ignore[method-assign]
+    try:
+        q: asyncio.Queue = asyncio.Queue()
+        await runner.run_side(item=ITEM, candidate=_cand(), events=q, match_id="M", side="a")
+    finally:
+        FakeProc.wait = orig  # type: ignore[method-assign]
+        redact.clear()
+    leaked = [
+        p
+        for p in (tmp_path / "trials").rglob("*")
+        if p.is_file() and key in p.read_text(errors="ignore")
+    ]
+    assert not leaked, leaked
+    assert not any(key in json.dumps(e.model_dump()) for e in _drain(q))
+
+
 async def test_pi_and_codex_routes(tmp_path):
     spawn = Spawner()
     runner = _runner(tmp_path, spawn)

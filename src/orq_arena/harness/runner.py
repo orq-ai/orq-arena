@@ -27,6 +27,7 @@ from ..candidates import HarnessCandidate
 from ..config import HarnessConfig
 from ..data.prompts import PromptItem, item_key, prompt_hash
 from ..events import ArenaEvent, SolutionReady, TrajectoryStep
+from ..redact import redact, register, scrub_tree
 from . import tail
 from .diff import RunCmd, run_cmd, workspace_diff
 from .parsers import parse_line
@@ -159,7 +160,9 @@ class HarborRunner:
                 "this prompt row has no harbor_task_path; build the prompt file with "
                 "`orq-arena tasks sample`"
             )
-        r = route(c.agent, c.model_id, self.router_host, self._api_key())
+        key = self._api_key()
+        register(key, *self._agent_env(c).values())  # before anything of the trial is read back
+        r = route(c.agent, c.model_id, self.router_host, key)
         overlay = c.overlay.to_kwargs(c.agent) if c.overlay else None
         kwargs: dict[str, Any] = {
             **c.agent_kwargs,
@@ -261,6 +264,8 @@ class HarborRunner:
     # ----- internals ----------------------------------------------------
 
     async def _load(self, trial_dir: Path, item: PromptItem, c: HarnessCandidate) -> Trial:
+        register(*self._agent_env(c).values(), os.environ.get(self.cfg.api_key_name))
+        scrub_tree(trial_dir)  # a trial cached before masking existed heals when it is read
         trial = self._priced(load_trial(trial_dir, c.agent), c)
         extras_path = trial_dir / EXTRAS_FILE
         extras: dict[str, Any] | None = None
@@ -295,9 +300,9 @@ class HarborRunner:
             max_bytes=self.cfg.diff_max_bytes,
             run=self._diff_run,
         )
-        trial.diff, trial.diff_stat = d.text, d.stat
+        trial.diff, trial.diff_stat = redact(d.text), d.stat
         trial.diff_note, trial.tests_edited = d.note, d.tests_edited
-        (trial_dir / PATCH_FILE).write_text(d.text, encoding="utf-8")
+        (trial_dir / PATCH_FILE).write_text(trial.diff, encoding="utf-8")
         (trial_dir / EXTRAS_FILE).write_text(
             json.dumps({"diff_stat": d.stat, "diff_note": d.note, "tests_edited": d.tests_edited}),
             encoding="utf-8",
@@ -409,6 +414,9 @@ class HarborRunner:
                 finished.set()
                 await follower
 
+        # Agents print their environment; mask the key in every raw file Harbor and the agent left.
+        scrub_tree(job_dir)
+        scrub_tree(log_path)
         trial_dir = finished_trial_dir(self.trials_dir, name)
         if trial_dir is None:
             tail_log = _log_tail(log_path)
@@ -437,14 +445,14 @@ class HarborRunner:
         match_id: str,
         side: Literal["a", "b"],
     ) -> Trial:
-        trial = Trial(agent=c.agent, error=error, exit_reason="error")
+        trial = Trial(agent=c.agent, error=redact(error), exit_reason="error")
         await events.put(self._ready(trial, match_id, side, replay=False))
         return trial
 
 
 def _log_tail(path: Path, chars: int = 300) -> str:
     try:
-        return path.read_text(encoding="utf-8", errors="replace").strip()[-chars:]
+        return redact(path.read_text(encoding="utf-8", errors="replace")).strip()[-chars:]
     except OSError:
         return ""
 

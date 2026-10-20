@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import sys
 from typing import Literal
 
 import click
 from loguru import logger
 from pydantic import ValidationError
 
-from .config import load_config
+from . import redact
+from .config import ORQ_API_KEY_ENV, load_config
 from .data.prompts import load_prompts
 
 DEFAULT_CONFIG = "orq_arena.yaml"
@@ -137,6 +139,11 @@ def _load_dotenv() -> None:
 def cli() -> None:
     """orq-arena, LLM arena benchmark: orq.ai router + evaluatorq jury."""
     _load_dotenv()
+    # Mask credentials in everything printed or written. The full-screen TUI draws on the
+    # terminal itself, and its text already passes through the same masks at the source.
+    redact.register_env(ORQ_API_KEY_ENV)
+    if "--tui" not in sys.argv:
+        redact.install_stream_redaction()
 
 
 @cli.command()

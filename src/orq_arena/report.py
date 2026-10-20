@@ -24,6 +24,7 @@ from .candidates import HarnessCandidate
 from .config import ArenaConfig
 from .data.schemas import BattleRecord
 from .judging import floor_abstained, judge_labels, vote_probabilities
+from .redact import redact
 
 if TYPE_CHECKING:  # driver imports this module at render time; keep it type-only
     from .tournament.driver import IdentitySource
@@ -1494,13 +1495,15 @@ def write_report(
 ) -> Path:
     out = report_path_for(log_path)
     out.write_text(
-        build_report_html(
-            cfg=cfg,
-            records=records,
-            elo=elo,
-            report=report,
-            manifest=manifest,
-            prices=prices,
+        redact(
+            build_report_html(
+                cfg=cfg,
+                records=records,
+                elo=elo,
+                report=report,
+                manifest=manifest,
+                prices=prices,
+            )
         ),
         encoding="utf-8",
     )
