@@ -432,19 +432,20 @@ def test_write_report_writes_both_pages_and_the_report_only_links(tmp_path):
     assert "battles.rounds.html" in out.read_text()
     html = page.read_text()
     for needle in (
+        "f-q",
         "f-who",
         "f-vs",
-        "f-win",
-        "f-res",
-        "f-by",
         "f-task",
+        "f-win",
         "f-tests",
-        "f-panel",
         "f-match",
+        "f-panel",
+        "f-sort",
     ):
         assert f'id="{needle}"' in html  # the filters
     assert "battles.report.html" in html  # the way back
     assert '<option value="">log order</option>' in html  # the default order is selectable
+    assert html.count("<select") <= 9 and 'id="pills"' in html  # a few controls, outcome as pills
 
 
 def test_the_rounds_page_holds_every_round_with_no_cap_at_200():

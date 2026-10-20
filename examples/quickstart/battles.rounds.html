@@ -651,52 +651,76 @@ details.method p { font-size: 14px; color: var(--gray-700); max-width: 74ch; }
 .hx pre { max-height: 22rem; }
 @media (max-width: 720px) { .pw-responses { grid-template-columns: 1fr; } .kpi-band { flex-wrap: wrap; } }
 
-.rf { position: sticky; top: 0; z-index: 5; background: var(--bg, #fff); padding: 10px 0 8px; border-bottom: 1px solid rgba(127,127,127,.3); }
-.rf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px 12px; }
-.rf label { display: flex; flex-direction: column; gap: 2px; font-size: 11px; text-transform: uppercase;
-  letter-spacing: .04em; color: var(--gray-500); }
-.rf select, .rf input[type=search] { font: inherit; font-size: 13px; text-transform: none; letter-spacing: 0;
-  padding: 5px 6px; border: 1px solid rgba(127,127,127,.4); border-radius: 5px; background: var(--surface, #fff); color: inherit; }
-.rf-bar { display: flex; align-items: center; gap: 12px; margin-top: 8px; font-size: 13px; }
-.rf-bar button { font: inherit; font-size: 12px; padding: 3px 10px; border-radius: 5px; cursor: pointer;
+.rf { border: 1px solid rgba(127,127,127,.3); border-radius: 8px; padding: 12px 14px; margin: 8px 0 14px; background: var(--surface, #fff); }
+.rf-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.rf-row + .rf-row { margin-top: 10px; }
+.rf input[type=search], .rf select { font: inherit; font-size: 13.5px; padding: 6px 8px; min-width: 0;
+  border: 1px solid rgba(127,127,127,.4); border-radius: 6px; background: var(--surface, #fff); color: inherit; }
+.rf input[type=search] { flex: 1 1 260px; }
+.rf select { flex: 0 1 200px; }
+.rf [hidden] { display: none; }
+.rf-vs { color: var(--gray-500); font-size: 13px; }
+.rf-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.rf-pill { font: inherit; font-size: 13px; padding: 4px 12px; border-radius: 999px; cursor: pointer;
   border: 1px solid rgba(127,127,127,.4); background: transparent; color: inherit; }
-.rf-count { font-variant-numeric: tabular-nums; font-weight: 600; }
+.rf-pill[aria-pressed=true] { background: var(--slate, #1d2129); border-color: var(--slate, #1d2129); color: #fff; }
+.rf-more { font-size: 13px; }
+.rf-more > summary { cursor: pointer; color: var(--gray-500); list-style: none; }
+.rf-more > summary::before { content: "+ "; } .rf-more[open] > summary::before { content: "- "; }
+.rf-more-grid { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 8px; }
+.rf-more-grid label { display: flex; flex-direction: column; gap: 2px; font-size: 11px; text-transform: uppercase;
+  letter-spacing: .04em; color: var(--gray-500); }
+.rf-more-grid select { text-transform: none; letter-spacing: 0; }
+.rf-status { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--gray-500); }
+.rf-count { font-weight: 600; color: inherit; font-variant-numeric: tabular-nums; }
+.rf-clear { font: inherit; font-size: 12.5px; background: none; border: 0; cursor: pointer; color: var(--link, #3b6fd4); padding: 0; }
 .rd[hidden] { display: none; }
 .rd-empty { padding: 28px 0; color: var(--gray-500); }
 .rd-prompt { white-space: pre-wrap; word-break: break-word; }
 .rd-note { font-size: 13px; color: var(--gray-700); margin: 6px 0; }
-.pw-cmp summary .status-badge { margin-left: 6px; }
+.pw-cmp.rd { padding: 0; }
+.pw-cmp.rd > summary { display: grid; grid-template-columns: 38px 1fr auto; align-items: center; gap: 4px 12px; padding: 10px 14px; }
+.pw-cmp.rd[open] > summary { border-bottom: 1px solid rgba(127,127,127,.2); }
+.pw-cmp.rd > *:not(summary) { margin-left: 14px; margin-right: 14px; }
+.pw-cmp.rd > :last-child { margin-bottom: 12px; }
+.rd-title { font-weight: 600; overflow-wrap: anywhere; }
+.rd-pair { font-size: 13px; color: var(--gray-500); }
+.rd-meta { font-size: 12px; color: var(--gray-500); }
+.rd-end { display: flex; align-items: center; gap: 8px; justify-content: flex-end; text-align: right; }
+.rd-warn { color: #d9534f; font-size: 13px; }
 </style></head>
 <body><div class="container">
 <header class="hero"><p class="meta">bench-1784289186 &middot; ROUNDS</p>
 <h1>Rounds</h1>
-<p class="lede"><a href="battles.report.html">&larr; back to the run report</a>. Filter the rounds below; open one to read
-both sides and every vote. The filters are kept in the address, so a filtered view can be shared.</p></header>
+<p class="lede"><a href="battles.report.html">&larr; back to the run report</a></p></header>
 <div class="rf" id="rf">
- <div class="rf-grid">
-  <label>search<input type="search" id="f-q" placeholder="prompt, task or contestant"></label>
-  <label>contestant<select id="f-who"></select></label>
-  <label>versus<select id="f-vs"></select></label>
-  <label>winner<select id="f-win"></select></label>
-  <label>result<select id="f-res">
-   <option value="">any</option><option value="decided">decided (a winner)</option>
-   <option value="tie">tie</option><option value="inconclusive">inconclusive</option><option value="void">voided</option></select></label>
-  <label>decided by<select id="f-by"><option value="">any</option><option value="gate">verifier gate (tests)</option>
-   <option value="jury">jury</option></select></label>
-  <label id="l-task">task<select id="f-task"></select></label>
-  <label id="l-cat">category<select id="f-cat"></select></label>
-  <label id="l-tests">hidden tests<select id="f-tests"><option value="">any</option>
-   <option value="both-pass">both passed</option><option value="both-fail">both failed</option>
-   <option value="one">exactly one passed</option><option value="edited">a side edited tests/</option></select></label>
-  <label>match<select id="f-match"></select></label>
-  <label>judges<select id="f-panel"><option value="">any</option><option value="split">panel split</option>
-   <option value="flipped">a vote flipped with the seats</option><option value="abstained">a judge abstained</option>
-   <option value="standin">a stand-in judge voted</option></select></label>
-  <label>order<select id="f-sort"><option value="">log order</option><option value="split">panel splits first</option>
-   <option value="task">task, then log order</option></select></label>
+ <div class="rf-row">
+  <input type="search" id="f-q" placeholder="Search a task, prompt or agent" aria-label="search">
+  <select id="f-who" aria-label="agent"></select>
+  <span class="rf-vs" id="vs-wrap" hidden>vs <select id="f-vs" aria-label="versus"></select></span>
+  <select id="f-task" aria-label="task"></select>
  </div>
- <div class="rf-bar"><span class="rf-count" id="count"></span><button id="reset" type="button">reset filters</button>
-  <span id="capnote" class="note"></span></div>
+ <div class="rf-row">
+  <div class="rf-pills" id="pills" role="group" aria-label="outcome"></div>
+ </div>
+ <div class="rf-row">
+  <details class="rf-more" id="more"><summary>More filters</summary>
+   <div class="rf-more-grid">
+    <label>winner<select id="f-win"></select></label>
+    <label id="l-tests">hidden tests<select id="f-tests"><option value="">any</option>
+     <option value="both-pass">both passed</option><option value="both-fail">both failed</option>
+     <option value="one">exactly one passed</option><option value="edited">edited tests/</option></select></label>
+    <label>match<select id="f-match"></select></label>
+    <label id="l-cat">category<select id="f-cat"></select></label>
+    <label>judges<select id="f-panel"><option value="">any</option><option value="flipped">a vote flipped</option>
+     <option value="abstained">a judge abstained</option><option value="standin">a stand-in voted</option></select></label>
+    <label>order<select id="f-sort"><option value="">log order</option><option value="split">panel splits first</option>
+     <option value="task">by task</option></select></label>
+   </div>
+  </details>
+  <span class="rf-status"><span class="rf-count" id="count"></span><button class="rf-clear" id="reset" type="button">clear filters</button>
+   <span id="capnote"></span></span>
+ </div>
 </div>
 <div id="list"></div>
 <p class="rd-empty" id="empty" hidden>No round matches these filters.</p>
@@ -714,40 +738,49 @@ const fmtUsd = v => v == null ? 'cost unknown' : '$' + (v < 0.1 ? v.toFixed(3) :
 const winnerOf = r => r.v === 'A' ? r.a : r.v === 'B' ? r.b : '';
 const harness = R.some(r => r.ta || r.tb);
 
-const FIELDS = ['q', 'who', 'vs', 'win', 'res', 'by', 'task', 'cat', 'tests', 'match', 'panel', 'sort'];
+const FIELDS = ['q', 'who', 'vs', 'task', 'show', 'win', 'tests', 'match', 'cat', 'panel', 'sort'];
+const PILLS = [['', 'All'], ['tests', 'Decided by tests'], ['jury', 'Decided by jury'], ['tie', 'Tie or no result'], ['split', 'Panel split'], ['void', 'Voided']];
 const names = uniq(R.flatMap(r => [r.a, r.b])).sort();
 function fill(id, first, values) {
   const s = $(id); s.textContent = '';
   for (const [v, t] of [['', first], ...values.map(x => [x, x])]) { const o = el('option', null, t); o.value = v; s.appendChild(o); }
 }
-fill('f-who', 'any', names); fill('f-vs', 'any', names);
+fill('f-who', 'Any agent', names); fill('f-vs', 'any opponent', names);
 fill('f-win', 'any', [...names, '(tie)']);
-fill('f-task', 'any', uniq(R.map(r => r.task)).sort());
+fill('f-task', harness ? 'Any task' : 'Any prompt category', harness ? uniq(R.map(r => r.task)).sort() : uniq(R.map(r => r.cat)).sort());
 fill('f-cat', 'any', uniq(R.map(r => r.cat)).sort());
 fill('f-match', 'any', uniq(R.map(r => r.match)));
-$('l-task').hidden = !harness;
 $('l-tests').hidden = !harness;
-$('l-cat').hidden = uniq(R.map(r => r.cat)).length < 2;
-if (D.capped) $('capnote').textContent = 'The page holds the first ' + R.length + ' of ' + D.total + ' rounds.';
+$('l-cat').hidden = !harness || uniq(R.map(r => r.cat)).length < 2;
+if (D.capped) $('capnote').textContent = 'Showing the first ' + R.length + ' of ' + D.total + ' rounds.';
+let show = '';
+const pills = $('pills');
+for (const [v, t] of PILLS) {
+  const b = el('button', 'rf-pill', t); b.type = 'button'; b.dataset.v = v; b.setAttribute('aria-pressed', v === '' ? 'true' : 'false');
+  b.addEventListener('click', () => { show = v; apply(); }); pills.appendChild(b);
+}
 
-function state() { const s = {}; for (const f of FIELDS) { const v = $('f-' + f).value; if (v) s[f] = v; } return s; }
+const field = f => f === 'show' ? { get value() { return show; }, set value(v) { show = v; } } : $('f-' + f);
+function state() { const s = {}; for (const f of FIELDS) { const v = field(f).value; if (v) s[f] = v; } return s; }
 function writeHash() { const p = new URLSearchParams(state()).toString(); history.replaceState(null, '', p ? '#' + p : location.pathname + location.search); }
 function readHash() {
   const p = new URLSearchParams(location.hash.slice(1));
-  for (const f of FIELDS) { const e = $('f-' + f); const v = p.get(f) || ''; e.value = v; if (e.value !== v) e.value = ''; }
+  for (const f of FIELDS) { const f_ = field(f); const v = p.get(f) || ''; f_.value = v; if (f !== 'show' && f_.value !== v) f_.value = ''; }
 }
 
-function bothPassed(r) { return r.ta && r.tb && T[r.ta].passed === true && T[r.tb].passed === true; }
 function matches(r, s) {
   if (s.q) { const hay = (r.q + ' ' + r.task + ' ' + r.a + ' ' + r.b).toLowerCase(); if (!hay.includes(s.q.toLowerCase())) return false; }
   if (s.who && r.a !== s.who && r.b !== s.who) return false;
   if (s.vs) { if (s.who ? !((r.a === s.who && r.b === s.vs) || (r.b === s.who && r.a === s.vs)) : (r.a !== s.vs && r.b !== s.vs)) return false; }
-  if (s.win) { if (s.win === '(tie)' ? r.v !== 'tie' : winnerOf(r) !== s.win) return false; }
-  if (s.res) { if (s.res === 'decided' ? !(r.v === 'A' || r.v === 'B') : r.v !== s.res) return false; }
-  if (s.by) { const gate = r.gate; if (s.by === 'gate' ? !gate : (gate || r.v === 'void')) return false; }
-  if (s.task && r.task !== s.task) return false;
+  if (s.task && (harness ? r.task : r.cat) !== s.task) return false;
   if (s.cat && r.cat !== s.cat) return false;
   if (s.match && r.match !== s.match) return false;
+  if (s.win) { if (s.win === '(tie)' ? r.v !== 'tie' : winnerOf(r) !== s.win) return false; }
+  if (s.show === 'tests' && !r.gate) return false;
+  if (s.show === 'jury' && (r.gate || !(r.v === 'A' || r.v === 'B'))) return false;
+  if (s.show === 'tie' && !(r.v === 'tie' || r.v === 'inconclusive')) return false;
+  if (s.show === 'split' && !r.split) return false;
+  if (s.show === 'void' && r.v !== 'void') return false;
   if (s.tests) {
     if (!r.ta || !r.tb) return false;
     const pa = T[r.ta].passed, pb = T[r.tb].passed;
@@ -756,7 +789,6 @@ function matches(r, s) {
     if (s.tests === 'one' && !((pa === true) !== (pb === true))) return false;
     if (s.tests === 'edited' && !(T[r.ta].tests_edited || T[r.tb].tests_edited)) return false;
   }
-  if (s.panel === 'split' && !r.split) return false;
   if (s.panel === 'flipped' && !r.votes.some(v => v.flipped)) return false;
   if (s.panel === 'abstained' && !r.votes.some(v => v.vote == null)) return false;
   if (s.panel === 'standin' && !r.votes.some(v => v.stand_in)) return false;
@@ -769,7 +801,7 @@ function verdictBadge(r) {
   if (r.v === 'B') return badge(r.b + ' wins', 'pass');
   if (r.v === 'tie') return badge('tie', 'neutral');
   if (r.v === 'void') return badge('voided', 'fail');
-  return badge('inconclusive', 'warn');
+  return badge('no result', 'warn');
 }
 function chip(v) {
   const tone = v.vote === 'A' ? 'a' : v.vote === 'B' ? 'b' : 'tie';
@@ -777,11 +809,6 @@ function chip(v) {
   if (v.flipped) c.classList.add('pw-chip--flip');
   c.title = v.judge + (v.vote == null ? ' abstained' : '');
   return c;
-}
-function pair(r) {
-  const s = el('span', 'pw-cmp__pair');
-  s.append(el('span', 'sideA', 'A'), ' ' + r.a + ' vs ', el('span', 'sideB', 'B'), ' ' + r.b);
-  return s;
 }
 function pre(text) { const p = el('pre'); p.textContent = text; return p; }
 function details(summary, text) { const d = el('details'); d.append(el('summary', null, summary), pre(text)); return d; }
@@ -808,7 +835,8 @@ function trialPane(letter, name, key, gated) {
 
 function build(r, body) {
   if (r.err) body.appendChild(el('p', 'rd-note', 'voided: ' + r.err));
-  if (r.q.length > 300) { body.appendChild(el('h4', null, 'Prompt')); const p = el('div', 'rd-prompt'); p.textContent = r.q; body.appendChild(p); }
+  if (r.task) { const d = details('Task instructions', r.q); body.appendChild(d); }
+  else if (r.q.length > 140) { body.appendChild(el('h4', null, 'Prompt')); const p = el('div', 'rd-prompt'); p.textContent = r.q; body.appendChild(p); }
   const panes = el('div', 'pw-responses');
   if (r.ta || r.tb) {
     if (r.ta) panes.appendChild(trialPane('A', r.a, r.ta, r.gate));
@@ -820,7 +848,8 @@ function build(r, body) {
     }
   }
   body.appendChild(panes);
-  if (r.gate) body.appendChild(el('p', 'rd-note', 'jury: skipped, the hidden tests decided this round (verifier gate)'));
+  if (r.gate) body.appendChild(el('p', 'rd-note', 'The jury was skipped: exactly one side passed the hidden tests, so the tests decided this round.'));
+  if (r.votes.length) body.appendChild(el('h4', null, 'Judges'));
   const ul = el('ul', 'pw-votes');
   for (const v of r.votes) {
     const li = el('li', 'pw-vote');
@@ -836,14 +865,16 @@ function build(r, body) {
 
 const rows = R.map(r => {
   const d = el('details', 'pw-cmp rd'), sum = el('summary');
-  const q = el('span', 'pw-cmp__q');
-  q.append(r.task ? r.task + (r.level ? ' (' + r.level + ')' : '') : (r.q.length > 300 ? r.q.slice(0, 300) + '…' : r.q), pair(r));
-  const chips = el('span', 'pw-cmp__chips'); r.votes.forEach(v => chips.appendChild(chip(v)));
-  sum.append(el('span', 'pw-cmp__idx', String(r.i)), q, verdictBadge(r));
-  if (r.gate) sum.appendChild(el('span', 'pw-tag', 'decided by verifier gate'));
-  if (r.match) sum.appendChild(el('span', 'pw-tag', r.match + ' · round ' + r.n));
-  sum.append(chips);
-  if (r.split) sum.appendChild(el('span', 'pw-split', '⚠'));
+  const main = el('div');
+  const title = r.task ? r.task + (r.level ? ' · ' + r.level : '') : (r.q.length > 140 ? r.q.slice(0, 140) + '…' : r.q);
+  const pair = el('div', 'rd-pair');
+  pair.append(el('span', 'sideA', 'A'), ' ' + r.a + '  vs  ', el('span', 'sideB', 'B'), ' ' + r.b);
+  const how = r.v === 'void' ? 'voided' : r.gate ? 'decided by tests' : 'decided by jury';
+  main.append(el('div', 'rd-title', title), pair, el('div', 'rd-meta', [r.match ? r.match + ' · round ' + r.n : '', how].filter(Boolean).join(' · ')));
+  const end = el('div', 'rd-end');
+  if (r.split) { const w = el('span', 'rd-warn', '⚠ split'); w.title = 'the panel split or could not decide'; end.appendChild(w); }
+  end.appendChild(verdictBadge(r));
+  sum.append(el('span', 'pw-cmp__idx', String(r.i)), main, end);
   d.appendChild(sum);
   let built = false;
   d.addEventListener('toggle', () => { if (d.open && !built) { built = true; build(r, d); } });
@@ -860,10 +891,15 @@ function apply() {
   for (const k of order) { const ok = matches(R[k], s); rows[k].hidden = !ok; if (ok) shown++; list.appendChild(rows[k]); }
   $('count').textContent = shown + ' of ' + R.length + ' rounds';
   $('empty').hidden = shown > 0;
+  $('vs-wrap').hidden = !s.who;
+  if (!s.who && $('f-vs').value) { $('f-vs').value = ''; }
+  pills.querySelectorAll('.rf-pill').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === show)));
+  $('reset').hidden = Object.keys(s).length === 0;
+  if (s.win || s.tests || s.match || s.cat || s.panel || s.sort) $('more').open = true;
   writeHash();
 }
-for (const f of FIELDS) $('f-' + f).addEventListener(f === 'q' ? 'input' : 'change', apply);
-$('reset').addEventListener('click', () => { for (const f of FIELDS) $('f-' + f).value = ''; apply(); });
+for (const f of FIELDS) if (f !== 'show') $('f-' + f).addEventListener(f === 'q' ? 'input' : 'change', apply);
+$('reset').addEventListener('click', () => { for (const f of FIELDS) field(f).value = ''; apply(); });
 window.addEventListener('hashchange', () => { readHash(); apply(); });
 readHash(); apply();
 })();
