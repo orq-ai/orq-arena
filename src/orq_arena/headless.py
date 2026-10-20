@@ -176,6 +176,10 @@ def _print_summary(console: Console, ev: TournamentEnded) -> None:
     rp = report_path_for(ev.battle_log_path)
     if rp.exists():
         console.print(f"report page → {rp}")
+        from .rounds_page import rounds_path_for
+
+        if rounds_path_for(rp).exists():
+            console.print(f"rounds page → {rounds_path_for(rp)}")
 
 
 def _match_line(ev: MatchResolved) -> str:

@@ -47,7 +47,7 @@ full `orq_arena.yaml` key reference, see [configuration.md](configuration.md).
 | [`run`](#run) | Round-robin benchmark via the orq.ai router: headless by default, HTML report written next to the log (`--open` to view), `--tui` for the live show. |
 | [`pool`](#pool) | Print the configured candidate pool (seed, name, model id). |
 | [`rejudge`](#rejudge) | Re-score a recorded `battles.jsonl` with a different judge panel, zero regeneration; or, with [`--compare`](#rejudge-compare), tabulate saved rejudge reports side by side. |
-| [`report`](#report) | Render the single-file HTML report page from a recorded run; no model calls, one optional catalog read for prices. |
+| [`report`](#report) | Render the single-file HTML report page, and the rounds page it links to, from a recorded run; no model calls, one optional catalog read for prices. |
 | [`annotate`](#annotate) | Render a blinded human-annotation page from a recorded run; no API calls. |
 | [`anchor`](#anchor) | Merge human vote files back against a run: panel↔human κ + rank correlation; no API calls. |
 | [`refresh-catalog`](#refresh-catalog) | Force re-fetch of the 24h model-catalog cache. |
@@ -587,7 +587,12 @@ nothing warns or fails):
 ```text
 $ orq-arena report examples/quickstart/battles.jsonl
 report page -> examples/quickstart/battles.report.html
+rounds page -> examples/quickstart/battles.rounds.html
 ```
+
+The report is a summary and only links to the rounds page, which holds every round with
+filters. `--output` moves the report; the rounds page is written beside it (`x.report.html`
+becomes `x.rounds.html`).
 
 ## `annotate`
 

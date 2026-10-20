@@ -24,8 +24,10 @@ skills are worth on your tasks.
 5. The verdict feeds the ELO, as in any other run.
 
 Headless runs print one line per finished trial. The TUI (`--tui`) streams each agent's steps
-live next to each other instead of a model's thinking and answer. The HTML report shows each
-side's verdict, diff and trajectory.
+live next to each other instead of a model's thinking and answer. The rounds page
+(`battles.rounds.html`, linked from the report) shows each side's verdict, diff and trajectory,
+with filters to find a round: by agent, task, winner, result, whether the tests or the jury decided
+it, and whether both sides passed.
 
 ## What you need
 

@@ -90,14 +90,24 @@ def test_the_streams_the_process_prints_to_are_masked():
     assert stream.getvalue() == inner.getvalue()  # everything else is the wrapped stream
 
 
-def test_a_written_report_is_masked(tmp_path, monkeypatch):
+def test_the_report_and_the_rounds_page_are_masked(tmp_path, monkeypatch):
     from orq_arena import report
+    from orq_arena.config import ArenaConfig
 
+    cfg = ArenaConfig.model_validate(
+        {"candidates": [{"model_id": "p/a"}, {"model_id": "p/b"}], "judges": ["p/j"]}
+    )
     monkeypatch.setattr(report, "build_report_html", lambda **_: f"<pre>{KEY}</pre>")
+    rec = BattleRecord(
+        prompt_hash="h", prompt_text=f"q {KEY}", model_a="a", model_b="b",
+        response_a=f"leak {KEY}", response_b="ok", error=f"harbor: {KEY}",
+    )  # fmt: skip
     out = report.write_report(
-        cfg=None, records=[], elo={}, report={}, manifest={}, log_path=tmp_path / "b.jsonl"
+        cfg=cfg, records=[rec], elo={}, report={}, manifest={}, log_path=tmp_path / "b.jsonl"
     )  # fmt: skip
     assert KEY not in out.read_text()
+    rounds = (tmp_path / "b.rounds.html").read_text()
+    assert KEY not in rounds and redact.MASK in rounds
 
 
 def test_the_runner_masks_a_failure_tail_and_registers_the_key_it_hands_agents(

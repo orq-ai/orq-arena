@@ -9,7 +9,6 @@ attached to a PR or linked from a post. Regenerable at any time with
 
 from __future__ import annotations
 
-import json
 import re
 import time
 from pathlib import Path
@@ -25,6 +24,7 @@ from .config import ArenaConfig
 from .data.schemas import BattleRecord
 from .judging import floor_abstained, judge_labels, vote_probabilities
 from .redact import redact
+from .rounds_page import rounds_path_for, write_rounds
 
 if TYPE_CHECKING:  # driver imports this module at render time; keep it type-only
     from .tournament.driver import IdentitySource
@@ -488,228 +488,6 @@ def _speed_svg(stats) -> str:
 """
 
 
-_ROUNDS_CAP = 200  # a 16-model run would otherwise be tens of MB
-
-
-def _clip(text: str, n: int) -> str:
-    return text if len(text) <= n else text[:n].rstrip() + "…"
-
-
-# Embedded caps for the harness round block. A trial can be megabytes of diff and
-# trajectory, and the same cached trial appears in every match that drew it.
-_DIFF_EMBED_CAP = 16_000
-_STEPS_EMBED_CAP = 16_000
-_TESTS_EMBED_CAP = 4_000
-_STEP_BODY_CAP = 400
-_TRUNC = "\n[truncated, the full file is in the trial directory]"
-
-
-def _trial_file(sol: dict, *parts: str) -> Path | None:
-    trial_dir = sol.get("trial_dir") or ""
-    if not trial_dir:
-        return None
-    path = Path(trial_dir).joinpath(*parts)
-    return path if path.is_file() else None
-
-
-def _read_capped(path: Path | None, cap: int, *, tail: bool = False) -> str:
-    """The file's text, cut to ``cap`` characters (the end for logs, else the start)."""
-    if path is None:
-        return ""
-    try:
-        text = path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return ""
-    if len(text) <= cap:
-        return text
-    return ("[truncated]\n" + text[-cap:]) if tail else (text[:cap] + _TRUNC)
-
-
-def _steps_text(path: Path | None) -> tuple[str, int]:
-    """The trajectory as plain text, and how many steps it holds."""
-    if path is None:
-        return "", 0
-    try:
-        rows = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return "", 0
-    if not isinstance(rows, list):
-        return "", 0
-    lines: list[str] = []
-    n = 0
-    for row in rows:
-        if not isinstance(row, dict):
-            continue
-        n += 1
-        lines.append(f"[{row.get('kind', '')}] {row.get('title', '')}")
-        body = str(row.get("body") or "").strip()
-        if body:
-            lines.extend("    " + ln for ln in _clip(body, _STEP_BODY_CAP).splitlines()[:12])
-    text = "\n".join(lines)
-    return (text[:_STEPS_EMBED_CAP] + _TRUNC if len(text) > _STEPS_EMBED_CAP else text), n
-
-
-def _fmt_duration(ms: int) -> str:
-    s = int(ms) // 1000
-    return f"{s // 60}m {s % 60:02d}s" if s >= 60 else f"{s}s"
-
-
-def _verifier_badge(sol: dict) -> str:
-    passed, reward = sol.get("passed"), sol.get("reward")
-    word, tone = {
-        True: ("✓ hidden tests PASSED", "pass"),
-        False: ("✗ hidden tests FAILED", "fail"),
-        None: ("hidden tests not run", "neutral"),
-    }[passed if passed in (True, False) else None]
-    return status_badge(
-        word + (f" (reward {reward:g})" if isinstance(reward, (int, float)) else ""), tone
-    )
-
-
-def _solution_html(letter: str, name: str, sol: dict, dossier: str, show_dossier: bool) -> str:
-    """One side of a harness round: verdict, counts, exit reason, diff, trajectory, test output."""
-    cost = sol.get("cost_usd")
-    cost_txt = (
-        f"{_fmt_usd(cost)} <span class='pw-tag'>"
-        f"{'estimated' if sol.get('cost_estimated') else 'observed'}</span>"
-        if isinstance(cost, (int, float))
-        else "cost unknown"
-    )
-    counts = (
-        f"{int(sol.get('steps') or 0)} steps &middot; {int(sol.get('commands') or 0)} cmds "
-        f"&middot; {int(sol.get('edits') or 0)} edits &middot; "
-        f"{_fmt_duration(int(sol.get('duration_ms') or 0))} &middot; {cost_txt}"
-    )
-    parts = [
-        f"<h4><span class='side{letter}'>{letter}</span> {_e(name)}</h4>",
-        f"<p>{_verifier_badge(sol)}</p>",
-        f"<p class='hx-counts'>{counts}</p>",
-        f"<p class='hx-exit'>exit: {_e(sol.get('exit_reason') or 'unknown')}</p>",
-    ]
-
-    stat = sol.get("diff_stat") or ""
-    warn = " <span class='sig warn'>⚠ tests/ edited</span>" if sol.get("tests_edited") else ""
-    patch = _read_capped(_trial_file(sol, "diff.patch"), _DIFF_EMBED_CAP)
-    if patch.strip():
-        parts.append(
-            f"<details><summary>diff {_e(stat)}{warn}</summary><pre>{_e(patch)}</pre></details>"
-        )
-    elif stat or warn:
-        parts.append(f"<p class='hx-exit'>diff {_e(stat)}{warn}</p>")
-    elif sol.get("diff_note"):
-        parts.append(f"<p class='hx-exit'>{_e(sol['diff_note'])}</p>")
-
-    steps, n_steps = _steps_text(_trial_file(sol, "steps.json"))
-    if steps:
-        parts.append(
-            f"<details><summary>trajectory, {n_steps} steps</summary><pre>{_e(steps)}</pre></details>"
-        )
-    tests = _read_capped(
-        _trial_file(sol, "verifier", "test-stdout.txt"), _TESTS_EMBED_CAP, tail=True
-    )
-    if tests.strip():
-        parts.append(f"<details><summary>test output</summary><pre>{_e(tests)}</pre></details>")
-    if show_dossier:
-        parts.append(
-            f"<details><summary>dossier the jury read</summary><pre>{_e(dossier)}</pre></details>"
-        )
-    return f"<div class='pw-response hx'>{''.join(parts)}</div>"
-
-
-def _vote_chip(v: dict, label: str) -> str:
-    """The judge's pick as an evaluatorq vote chip; a dot when it abstained."""
-    flip = " pw-chip--flip" if v.get("flipped") else ""
-    choice = v.get("vote")
-    if choice is None:
-        return f"<span class='pw-chip pw-chip--abstain{flip}' title='{_e(label)} abstained'>&middot;</span>"
-    tone = {"A": "a", "B": "b"}.get(choice, "tie")
-    return f"<span class='pw-chip pw-chip--{tone}{flip}' title='{_e(label)}'>{_e(choice)}</span>"
-
-
-def _rounds_html(judged, alias, labels, floor) -> str:
-    """One expandable row per judged round: the panel's chips, then both answers and every vote."""
-    if not judged:
-        return ""
-    rows = []
-    for i, r in enumerate(judged[:_ROUNDS_CAP], 1):
-        name_a = alias.get(r.rating_key("a"), r.model_a)
-        name_b = alias.get(r.rating_key("b"), r.model_b)
-        verdict = r.majority_verdict
-        badge = {
-            "A": (f"{name_a} wins", "pass"),
-            "B": (f"{name_b} wins", "pass"),
-            "tie": ("tie", "neutral"),
-        }.get(verdict, ("inconclusive", "warn"))
-        picks = {v.get("vote") for v in r.judge_votes if v.get("vote")}
-        split = (
-            "<span class='pw-split' title='the panel split or could not decide'>⚠</span>"
-            if len(picks) > 1 or verdict == "inconclusive"
-            else ""
-        )
-        chips = "".join(
-            _vote_chip(v, labels.get(v.get("model"), v.get("model", ""))) for v in r.judge_votes
-        )
-        question = _clip(r.prompt_text, 300)
-        full_prompt = f"<pre>{_e(r.prompt_text)}</pre>" if question != r.prompt_text else ""
-        votes = []
-        for v in r.judge_votes:
-            label = labels.get(v.get("model"), v.get("model", ""))
-            tags = "<span class='pw-tag pw-tag--flip'>flipped</span>" if v.get("flipped") else ""
-            tags += "<span class='pw-tag'>under floor</span>" if floor_abstained(v, floor) else ""
-            tags += "<span class='pw-tag'>stand-in</span>" if v.get("replacement") else ""
-            probs = vote_probabilities(v)
-            why = (
-                " &middot; ".join(f"{k} {probs[k]:.0%}" for k in ("A", "B", "tie"))
-                if probs
-                else _e(_clip(v.get("explanation") or "", 400))
-            )
-            votes.append(
-                f"<li class='pw-vote'><span class='pw-vote__model'>{_e(label)}</span>"
-                f"{_vote_chip(v, label)}{tags}<span class='pw-vote__why'>{why}</span></li>"
-            )
-        gated = r.decided_by_gate
-        harness_round = r.solution_a is not None or r.solution_b is not None
-        gate_tag = "<span class='pw-tag'>decided by verifier gate</span>" if gated else ""
-        if harness_round:
-            panes = "".join(
-                _solution_html(letter, nm, sol or {}, text, not gated)
-                for letter, nm, sol, text in (
-                    ("A", name_a, r.solution_a, r.response_a),
-                    ("B", name_b, r.solution_b, r.response_b),
-                )
-            )
-            skipped = "<p class='note'>jury: skipped (gate)</p>" if gated else ""
-        else:
-            panes = (
-                f"<div class='pw-response'><h4><span class='sideA'>A</span> "
-                f"{_e(name_a)}</h4><pre>{_e(r.response_a)}</pre></div><div class='pw-response'><h4>"
-                f"<span class='sideB'>B</span> {_e(name_b)}</h4><pre>{_e(r.response_b)}</pre></div>"
-            )
-            skipped = ""
-        rows.append(
-            f"<details class='pw-cmp'><summary><span class='pw-cmp__idx'>{i}</span>"
-            f"<span class='pw-cmp__q'>{_e(question)}<span class='pw-cmp__pair'>"
-            f"<span class='sideA'>A</span> {_e(name_a)} vs <span class='sideB'>B</span> "
-            f"{_e(name_b)}</span></span>{status_badge(*badge)}{gate_tag}"
-            f"<span class='pw-cmp__chips'>{chips}</span>{split}</summary>{full_prompt}"
-            f"<div class='pw-responses'>{panes}</div>{skipped}"
-            f"<ul class='pw-votes'>{''.join(votes)}</ul></details>"
-        )
-    cap = (
-        f"<p class='note'>Showing the first {_ROUNDS_CAP} of {len(judged)} judged rounds. To page "
-        f"through all of them, run with <code>orq-arena run --tui</code> and press <b>B</b> on the "
-        f"final leaderboard to open the battle browser.</p>"
-        if len(judged) > _ROUNDS_CAP
-        else ""
-    )
-    return (
-        "<h2>Rounds</h2><p class='note'>Every judged round with each judge&#39;s pick: A, B or tie; "
-        "a dot means the judge abstained, a dashed outline that it flipped when the sides were "
-        "swapped, and &#9888; that the panel split. Open a round to read both answers (a harness run: both solutions, with diff and "
-        "trajectory) and every vote.</p>" + "".join(rows) + cap
-    )
-
-
 def _empty_report_html(manifest: dict[str, Any], n_records: int) -> str:
     """Minimal valid page when no models were rated (empty pool / all voided)."""
     bench_id = _e(manifest.get("tournament_id", ""))
@@ -728,6 +506,24 @@ candidates were configured. Check the candidates in the YAML and the run log, th
 """
 
 
+def _alias_map(cfg: ArenaConfig, report: dict[str, Any]) -> dict[str, str]:
+    """Display name per rating key. Records store short names or ids; the rating is keyed by name."""
+    return report.get("by_model_names") or {
+        **{w.short_model: w.name for w in cfg.candidates},
+        # Two setups of one agent and model share a short name; the id tells them apart.
+        **{w.candidate_id: w.name for w in cfg.candidates if isinstance(w, HarnessCandidate)},
+    }
+
+
+def _judge_label_map(
+    cfg: ArenaConfig, report: dict[str, Any], manifest: dict[str, Any]
+) -> dict[str, str]:
+    """A label per judge from the whole panel, so two judges sharing a short name never share a row."""
+    per_judge = (report.get("jury") or {}).get("per_judge", [])
+    panel_ids = list(manifest.get("judges", cfg.judges))
+    return judge_labels([*panel_ids, *(str(j.get("model", "")) for j in per_judge)])
+
+
 def build_report_html(
     *,
     cfg: ArenaConfig,
@@ -737,8 +533,12 @@ def build_report_html(
     manifest: dict[str, Any],
     prices: dict[str, tuple[float, float]] | None = None,
     identity_source: IdentitySource = "manifest",
+    rounds_href: str | None = None,
 ) -> str:
     """Render the run report page as a self-contained HTML string.
+
+    Rounds are never embedded: ``rounds_href`` is the link to the rounds page
+    (``rounds_page.py``), left out when there is none.
 
     ``identity_source`` says where the model names, judge panel and reasoning
     flags came from: the run's manifest, or a YAML that may have drifted since
@@ -878,7 +678,7 @@ def build_report_html(
     jury = report.get("jury") or {}
     per_judge = jury.get("per_judge", [])
     panel_ids = list(manifest.get("judges", cfg.judges))
-    labels = judge_labels([*panel_ids, *(str(j.get("model", "")) for j in per_judge)])
+    labels = _judge_label_map(cfg, report, manifest)
     all_votes = [v for r in judged for v in r.judge_votes]
     stand_ins = {v.get("model") for v in all_votes if v.get("replacement")}
     # A flip rate means something only for a judge that saw both seat orders.
@@ -1080,11 +880,7 @@ def build_report_html(
 
     # Records store short model names; elo/manifest/report are keyed by display
     # name (name). Identical unless the config sets custom names.
-    alias = report.get("by_model_names") or {
-        **{w.short_model: w.name for w in cfg.candidates},
-        # Two setups of one agent and model share a short name; the id tells them apart.
-        **{w.candidate_id: w.name for w in cfg.candidates if isinstance(w, HarnessCandidate)},
-    }
+    alias = _alias_map(cfg, report)
     stats_all = _speed_stats(records, alias)
     speed = _speed_svg(stats_all)
     dur_by = {n: d for n, _t, _f, _o, d in stats_all}
@@ -1343,7 +1139,13 @@ def build_report_html(
         if decisions
         else "Every verdict via evaluatorq&#39;s pairwise jury"
     )
-    rounds = _rounds_html(judged, alias, labels, abstain_floor)
+    rounds = (
+        f"<h2>Rounds</h2><p class='note'>All {len(records)} rounds, each with the judges' picks "
+        f"and, for a harness run, both solutions with diff and trajectory, are on their own page "
+        f"with filters: <a href='{_e(rounds_href)}'>open the rounds browser</a>.</p>"
+        if rounds_href
+        else ""
+    )
     harness_meth = (
         "<h3>The verifier gate</h3><p>Each coding agent works in its own fresh container and the "
         "task&#39;s hidden tests then run against what it left behind. When exactly one of the two "
@@ -1492,8 +1294,12 @@ def write_report(
     manifest: dict[str, Any],
     log_path: str | Path,
     prices: dict[str, tuple[float, float]] | None = None,
+    out_path: str | Path | None = None,
+    identity_source: IdentitySource = "manifest",
 ) -> Path:
-    out = report_path_for(log_path)
+    """Write the run report and, beside it, the rounds page it links to. Returns the report path."""
+    out = Path(out_path) if out_path else report_path_for(log_path)
+    rounds_out = rounds_path_for(out)
     out.write_text(
         redact(
             build_report_html(
@@ -1503,8 +1309,19 @@ def write_report(
                 report=report,
                 manifest=manifest,
                 prices=prices,
+                identity_source=identity_source,
+                rounds_href=rounds_out.name,
             )
         ),
         encoding="utf-8",
+    )
+    write_rounds(
+        rounds_out,
+        records=records,
+        alias=_alias_map(cfg, report),
+        labels=_judge_label_map(cfg, report, manifest),
+        floor=cfg.judge_abstain_below,
+        title=str(manifest.get("tournament_id") or out.stem),
+        report_href=out.name,
     )
     return out

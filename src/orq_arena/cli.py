@@ -648,6 +648,10 @@ def _open_report(battle_log_path: str, open_browser: bool, announce: bool = Fals
         return
     if announce:
         click.echo(f"report page → {page}")
+        from .rounds_page import rounds_path_for
+
+        if rounds_path_for(page).exists():
+            click.echo(f"rounds page → {rounds_path_for(page)}")
     if open_browser and sys.stdout.isatty() and not os.environ.get("CI"):
         webbrowser.open(page.resolve().as_uri())
 
@@ -863,7 +867,8 @@ def report_cmd(log_path: str, config_path: str, output_path: str | None) -> None
     from click.core import ParameterSource
 
     from .data.schemas import BattleRecord
-    from .report import build_report_html, report_path_for
+    from .report import write_report
+    from .rounds_page import rounds_path_for
     from .tournament.driver import (
         IdentitySource,
         config_from_manifest,
@@ -936,20 +941,19 @@ def report_cmd(log_path: str, config_path: str, output_path: str | None) -> None
     except Exception:
         prices = {}
 
-    out = Path(output_path) if output_path else report_path_for(log)
-    out.write_text(
-        build_report_html(
-            cfg=cfg,
-            records=records,
-            elo=elo,
-            report=rep,
-            manifest=manifest,
-            prices=prices or None,
-            identity_source=identity,
-        ),
-        encoding="utf-8",
+    out = write_report(
+        cfg=cfg,
+        records=records,
+        elo=elo,
+        report=rep,
+        manifest=manifest,
+        log_path=log,
+        prices=prices or None,
+        out_path=output_path,
+        identity_source=identity,
     )
     click.echo(f"report page -> {out}")
+    click.echo(f"rounds page -> {rounds_path_for(out)}")
 
 
 @cli.command("refresh-catalog")
