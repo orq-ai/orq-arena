@@ -13,6 +13,7 @@ that catches an unknown key format also eats code in a diff.
 
 from __future__ import annotations
 
+import logging
 import os
 import sys
 from collections.abc import Iterable
@@ -24,6 +25,7 @@ MIN_LEN = 12  # shorter values are not worth the false positives
 _ENV_WORDS = ("KEY", "TOKEN", "SECRET", "PASSWORD", "CREDENTIAL")
 _SECRETS: dict[str, None] = {}  # insertion-ordered set
 _MAX_SCRUB_BYTES = 64 * 1024 * 1024
+log = logging.getLogger(__name__)
 
 
 def register(*values: str | None) -> None:
@@ -36,12 +38,26 @@ def register(*values: str | None) -> None:
         _SECRETS[quote(v, safe="")] = None
 
 
+def looks_secret(value: str | None) -> bool:
+    """A value shaped like a credential: one long token, not a path, a URL or a sentence.
+
+    ``GOOGLE_APPLICATION_CREDENTIALS=/home/me/adc.json`` has a credential-ish name and a
+    path for a value; masking the path would turn it to ``[redacted]`` in every diff.
+    """
+    v = (value or "").strip()
+    if len(v) < MIN_LEN or any(c.isspace() for c in v):
+        return False
+    if v.startswith(("/", "~", ".")) or "://" in v:
+        return False
+    return not os.path.exists(v)
+
+
 def register_env(*names: str) -> None:
-    """Register the named env vars, plus every env var that looks like a credential."""
+    """Register the named env vars, plus every credential-named env var whose value looks like one."""
     for name in names:
         register(os.environ.get(name))
     for name, value in os.environ.items():
-        if any(w in name.upper() for w in _ENV_WORDS):
+        if any(w in name.upper() for w in _ENV_WORDS) and looks_secret(value):
             register(value)
 
 
@@ -89,11 +105,14 @@ def scrub_file(path: Path) -> bool:
     """Mask secrets in a text file in place. True when it changed. Binary and huge files are left."""
     try:
         if path.stat().st_size > _MAX_SCRUB_BYTES:
+            log.warning("not scrubbed, over %d MB: %s", _MAX_SCRUB_BYTES >> 20, path)
             return False
         raw = path.read_bytes()
-    except OSError:
+    except OSError as exc:
+        log.warning("not scrubbed, unreadable (%s): %s", exc, path)
         return False
     if b"\x00" in raw[:4096]:
+        log.warning("not scrubbed, binary: %s", path)
         return False
     text = raw.decode("utf-8", errors="surrogateescape")
     clean = redact(text)

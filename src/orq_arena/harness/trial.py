@@ -14,6 +14,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from ..redact import redact
 from .parsers import Step, parse_line
 
 STEPS_FILE = "steps.json"
@@ -257,12 +258,13 @@ def load_trial(trial_dir: Path, agent: str) -> Trial:
         dir=trial_dir,
         passed=None if reward is None else reward >= 1.0,
         reward=reward,
-        test_tail=tail,
+        # masked in memory too: scrub_tree leaves a file it cannot rewrite as it was
+        test_tail=redact(tail),
         steps=steps,
         cost_usd=float(cost) if isinstance(cost, (int, float)) else None,
         tokens_in=int(agent_result.get("n_input_tokens") or 0),
         tokens_out=int(agent_result.get("n_output_tokens") or 0),
         duration_ms=_duration_ms(result),
         exit_reason=exit_reason,
-        error=error,
+        error=redact(error) if error else error,
     )

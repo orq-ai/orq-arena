@@ -118,3 +118,65 @@ def test_the_runner_masks_a_failure_tail_and_registers_the_key_it_hands_agents(
     log = tmp_path / "x.harbor.log"
     log.write_text(f"Traceback ... env: ORQ_API_KEY={KEY}")
     assert KEY not in _log_tail(log)
+
+
+def test_a_trial_error_and_test_tail_are_masked_in_memory_when_the_files_are_not(tmp_path):
+    # scrub_tree skips a file with a NUL byte up front, so load_trial must mask on its own
+    d = tmp_path / "t__abc"
+    (d / "verifier").mkdir(parents=True)
+    exc = {"exception_type": "RuntimeError", "exception_message": f"env ORQ_API_KEY={KEY}"}
+    (d / "result.json").write_text(json.dumps({"exception_info": exc}))
+    (d / "verifier" / "test-stdout.txt").write_bytes(b"\x00" + f"\nFAILED {KEY}".encode())
+    assert redact.scrub_tree(d) == 1  # result.json only; the test output is left
+    (d / "result.json").write_text(json.dumps({"exception_info": exc}))  # as an unscrubbable file
+    t = load_trial(d, "pi")
+    assert t.error and KEY not in t.error and redact.MASK in t.error
+    assert KEY not in t.test_tail and redact.MASK in t.test_tail
+
+
+def test_a_skipped_scrub_is_logged(tmp_path, caplog):
+    f = tmp_path / "blob.bin"
+    f.write_bytes(b"\x00" + KEY.encode())
+    with caplog.at_level("WARNING", logger="orq_arena.redact"):
+        assert redact.scrub_file(f) is False
+    assert "not scrubbed, binary" in caplog.text
+
+
+def test_a_credential_named_path_is_not_registered(monkeypatch):
+    redact.clear()
+    monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", "/home/user/.config/gcloud/adc.json")
+    monkeypatch.setenv("SOME_BASE_URL_TOKEN", "https://router.example.com/v2/proxy")
+    monkeypatch.setenv("MY_SERVICE_TOKEN", "tok_9f8e7d6c5b4a3f2e1d0c")
+    redact.register_env()
+    out = redact.redact("/home/user/.config/gcloud/adc.json https://router.example.com/v2/proxy")
+    assert redact.MASK not in out
+    assert redact.redact("tok_9f8e7d6c5b4a3f2e1d0c") == redact.MASK
+
+
+def test_the_rejudged_log_never_writes_the_key(tmp_path):
+    from evaluatorq import PairwiseComparison
+
+    from orq_arena.rejudge import write_rejudged
+
+    rec = BattleRecord(
+        prompt_hash="h", prompt_text="t", model_a="a", model_b="b",
+        response_a=f"env | grep {KEY}", response_b="ok",
+    )  # fmt: skip
+    out = tmp_path / "r.jsonl"
+    write_rejudged(out, [rec], [PairwiseComparison.model_validate({"winner": "A", "votes": []})])
+    assert KEY not in out.read_text() and redact.MASK in out.read_text()
+
+
+def test_the_run_manifest_never_writes_the_key(tmp_path):
+    from orq_arena.config import ArenaConfig
+    from orq_arena.tournament.driver import _write_manifest
+
+    cfg = ArenaConfig.model_validate(
+        {"candidates": [{"model_id": "p/a"}, {"model_id": "p/b"}], "judges": ["p/j"]}
+    )
+    out = tmp_path / "b.run.json"
+    _write_manifest(
+        out, cfg=cfg, prompts=[], seed=1, tournament_id="t", started_at=0.0,
+        preflight={"note": f"harbor printed {KEY}"},
+    )  # fmt: skip
+    assert KEY not in out.read_text() and redact.MASK in out.read_text()

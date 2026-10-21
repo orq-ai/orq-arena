@@ -27,7 +27,7 @@ from ..candidates import HarnessCandidate
 from ..config import HarnessConfig
 from ..data.prompts import PromptItem, item_key, prompt_hash
 from ..events import ArenaEvent, SolutionReady, TrajectoryStep
-from ..redact import redact, register, scrub_tree
+from ..redact import looks_secret, redact, register, scrub_tree
 from . import tail
 from .diff import RunCmd, run_cmd, workspace_diff
 from .parsers import parse_line
@@ -161,7 +161,7 @@ class HarborRunner:
                 "`orq-arena tasks sample`"
             )
         key = self._api_key()
-        register(key, *self._agent_env(c).values())  # before anything of the trial is read back
+        register(key, *self._secret_env(c))  # before anything of the trial is read back
         r = route(c.agent, c.model_id, self.router_host, key)
         overlay = c.overlay.to_kwargs(c.agent) if c.overlay else None
         kwargs: dict[str, Any] = {
@@ -209,6 +209,11 @@ class HarborRunner:
     @staticmethod
     def _agent_env(c: HarnessCandidate) -> dict[str, str]:
         return {k: os.path.expandvars(v) for k, v in c.agent_env.items()}
+
+    @classmethod
+    def _secret_env(cls, c: HarnessCandidate) -> list[str]:
+        """The agent_env values to mask: credential-shaped ones, not base URLs or paths."""
+        return [v for v in cls._agent_env(c).values() if looks_secret(v)]
 
     def _hard_timeout_s(self, item: PromptItem, c: HarnessCandidate) -> float:
         agent_s = float(item.metadata.get("timeout_sec") or 900)
@@ -264,7 +269,7 @@ class HarborRunner:
     # ----- internals ----------------------------------------------------
 
     async def _load(self, trial_dir: Path, item: PromptItem, c: HarnessCandidate) -> Trial:
-        register(*self._agent_env(c).values(), os.environ.get(self.cfg.api_key_name))
+        register(*self._secret_env(c), os.environ.get(self.cfg.api_key_name))
         scrub_tree(trial_dir)  # a trial cached before masking existed heals when it is read
         trial = self._priced(load_trial(trial_dir, c.agent), c)
         extras_path = trial_dir / EXTRAS_FILE
