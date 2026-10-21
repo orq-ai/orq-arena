@@ -9,10 +9,10 @@ coherent, no makeweights padding a "frontier" field, no giants lurking in a
 | Config | Models | Providers | AA band | For |
 |--------|--------|-----------|---------|-----|
 | [`../orq_arena.yaml`](../orq_arena.yaml) | 8 | 5 | mixed, uniform thinking-OFF | The default: a fair apples-to-apples ELO |
-| [`reasoning_arena.yaml`](reasoning_arena.yaml) | 8 | 5 | mixed, uniform thinking-ON | Does thinking help on your prompts? |
-| [`frontier_8.yaml`](frontier_8.yaml) | 8 | 5 | ~40-56 | The strongest models, each at its best |
+| [`reasoning_arena.yaml`](reasoning_arena.yaml) | 8 | 6 | mixed, uniform thinking-ON | Does thinking help on your prompts? |
+| [`frontier_8.yaml`](frontier_8.yaml) | 8 | 6 | ~40-56 | The strongest models, each at its best |
 | [`budget_8.yaml`](budget_8.yaml) | 8 | 8 | ~12-25 | Which cheap/fast model wins on your prompts |
-| [`frontier_16.yaml`](frontier_16.yaml) | 16 | 8 | ~29-56 | Big-field stress test + preference-data generation |
+| [`frontier_16.yaml`](frontier_16.yaml) | 16 | 9 | ~29-56 | Big-field stress test + preference-data generation |
 
 Pool size drives cost: an N-model pool runs C(N,2) matches (28 for 8, 120 for
 16), each `match.max_rounds` rounds. Every run prints a spend projection and
@@ -24,6 +24,14 @@ Notes:
   key at all, so every model runs at its vendor default (best) effort and
   compares at full strength rather than under a cap; the preflight thinking
   probe reports what each one actually did.
-- **Judge/candidate family overlap.** In wide pools the cheap judge trio shares
-  provider families with several candidates. That's expected; the report flags
-  it. Swap in out-of-family judges when you intend to defend the numbers.
+- **Always-thinking models get their own `max_tokens`.** Models that spend
+  output tokens on reasoning before they answer (deepseek-flash, the kimi models,
+  deepseek-v4-pro) ran out mid-thought at the default 2048 cap and returned empty
+  answers, and gemini-3.7-flash came close, so in `frontier_*` and `budget_8` each carries a
+  per-candidate `max_tokens` of 4096 or 8000; `reasoning_arena` raises
+  `gateway.candidate_max_tokens` to 16000 instead. A cap is a ceiling, not a target.
+- **Judge/candidate family overlap.** Every config seats the same decision-model
+  panel (jev-latest, pplx-decider-v1-27b, gpt-6-luna, with decider-4b as the
+  stand-in), see [the research note](../docs/research/llm-judges-vs-decision-models.md).
+  Only gpt-6-luna shares a family (OpenAI) with the pools; the preflight and the
+  report flag it. Swap in out-of-family judges when you intend to defend the numbers.

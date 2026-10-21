@@ -230,8 +230,10 @@ class Battle:
             )
         )
 
-        # The round cap counts decisive rounds; ties/inconclusive keep drawing
-        # more prompts so the rating gets ``max_rounds`` real comparisons.
+        # The loop stops at ``max_rounds`` decisive rounds or when the prompts
+        # run out, whichever comes first. The driver hands each match only
+        # ``max_rounds`` prompts, so a tie or inconclusive round uses its prompt
+        # and is not replaced.
         prompt_iter = iter(self.prompts)
         while rounds_counted < rules.max_rounds:
             try:

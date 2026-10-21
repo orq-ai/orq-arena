@@ -731,7 +731,7 @@ def report_cmd(log_path: str, config_path: str, output_path: str | None) -> None
     """Render the single-file HTML report page from a recorded run.
 
     Reads battles.jsonl and its *.run.json manifest; makes no model calls
-    (one catalog read prices the cost section when a key is present).
+    (one read of the public model catalog, no key needed, prices the cost section).
     The same page is written automatically at the end of every run.
 
     Model names, the judge panel and the reasoning flags come from the run's

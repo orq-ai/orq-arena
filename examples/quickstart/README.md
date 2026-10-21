@@ -4,13 +4,17 @@ A real, committed orq-arena run so you can inspect the output before spending a
 cent of your own: 8 models across five providers, the 30-prompt starter bank,
 and the cheap judge trio that was the default when it was recorded.
 
-This directory is a record, so `config.yaml` still names the panel the run used. One
-of its judges, `google/gemini-2.5-flash-lite`, is deprecated in the model catalog as of
-2026-10-20, and the shipped configs now use `google/gemini-3.5-flash-lite` in its place.
-One of its candidates, `deepseek/deepseek-chat`, is no longer served at all (the router
-answers 404), so the run cannot be reproduced as recorded. To run something close to
-it, copy the config, swap that candidate and the judge for the ones the shipped
-`orq_arena.yaml` uses, and treat the result as a new run with a different pool and jury.
+This directory is a record, so `config.yaml` still names the pool, the prompted LLM
+panel and the `api.orq.ai` host the run used. The shipped configs have since moved to a
+panel of decision models (see
+[LLM judges vs decision models](../../docs/research/llm-judges-vs-decision-models.md)).
+One of this run's judges, `google/gemini-2.5-flash-lite`, is deprecated in the model
+catalog as of 2026-10-20, and one of its candidates, `deepseek/deepseek-chat`, is no
+longer served at all (the router answers 404), so the run cannot be reproduced as
+recorded. To run something close to it, copy the config, swap that candidate for
+`nebius/deepseek-ai/DeepSeek-V4-Pro` (with `name: deepseek-v4-pro` and thinking disabled,
+as the shipped `orq_arena.yaml` has it) and that judge for `google/gemini-3.5-flash-lite`,
+keep the LLM panel, and treat the result as a new run with a different pool and jury.
 
 Open **[`battles.report.html`](battles.report.html)** in a browser for the full
 page. Regenerate it from the recorded log at any time (no model calls), writing
@@ -21,9 +25,11 @@ orq-arena report examples/quickstart/battles.jsonl \
   --output /tmp/orq-arena-quickstart.report.html
 ```
 
-Reproduce the whole run (needs `ORQ_API_KEY`, several minutes). The preflight projects
-≈ $11.87 and puts the worst case at ≈ $36.70, the gap being a stand-in judge covering every
-judge call, which this config's `replacement_judges` allows:
+The command that made this run is below (it needs `ORQ_API_KEY` and several minutes, and
+no longer completes as recorded because `deepseek/deepseek-chat` answers 404). Priced at
+the rates the run recorded, its preflight projects ≈ $11.87 and puts the worst case at
+≈ $36.70, the gap being a stand-in judge covering every judge call, which this config's
+`replacement_judges` allows:
 
 ```bash
 orq-arena run --config examples/quickstart/config.yaml \
@@ -70,6 +76,6 @@ would rather keep the committed log untouched.
 | File | What it is |
 |------|-----------|
 | `config.yaml` | The 8-model pool + judge panel this run used |
-| `battles.jsonl` | One JSONL row per judged round (schema v3; runs recorded now are v4 and also carry each model's full router id): both responses, per-judge votes, token usage, timing |
+| `battles.jsonl` | One JSONL row per judged round (schema v3; runs recorded now are v5, which also carry each model's full router id and what the jury cost per round): both responses, per-judge votes, token usage, timing |
 | `battles.run.json` | Seeded manifest: config/prompt hashes, panel, evaluatorq version, preflight (incl. `family_overlaps`) |
 | `battles.report.html` | The self-contained HTML report |

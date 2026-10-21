@@ -126,7 +126,7 @@ Set expectations for the out-of-the-box run: the shipped 30-prompt bank and defa
 
 **Share the result**: the report (`<log>.report.html`) is one self-contained file. It opens with a verdict banner naming the top three models (win share, ELO, total cost), then the full ladder with error bars, a quality-vs-cost chart, speed, the win grid, and how the jury behaved. Regenerate it any time with `orq-arena report battles.jsonl`, no model calls needed.
 
-**Re-judge with a different jury**: the responses are already in `battles.jsonl`, so swapping the panel costs judge tokens only: `orq-arena rejudge battles.jsonl --judge mistral/mistral-small-2603`. It reports how the new jury behaved and how much the ranking moved. Multi-judge example: **[docs/cli.md](docs/cli.md)**.
+**Re-judge with a different jury**: the responses are already in `battles.jsonl`, so swapping the panel costs judge tokens only: `orq-arena rejudge battles.jsonl --judge-api llm --judge mistral/mistral-small-2603` (`--judge-api llm` because the shipped config seats decision models and mistral is a chat model). It reports how the new jury behaved and how much the ranking moved. Multi-judge example: **[docs/cli.md](docs/cli.md)**.
 
 ## Documentation
 
@@ -138,6 +138,7 @@ Full guides live at **[orq-ai.github.io/orq-arena](https://orq-ai.github.io/orq-
 | [CLI Reference](docs/cli.md) | Every command and flag: `run`, `pool`, `report`, and the rest |
 | [Configuration](docs/configuration.md) | Every `orq_arena.yaml` key, reasoning recipes, defaults |
 | [Methodology](docs/methodology.md) | How the ranking is made, bias controls, confidence intervals, reproducibility |
+| [LLM judges vs decision models](docs/research/llm-judges-vs-decision-models.md) | Research: the two kinds of jury measured on real arena rounds, and where each belongs |
 
 ## Contributing
 
