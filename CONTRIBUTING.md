@@ -24,9 +24,15 @@ uv sync
 
 # 3. Verify
 uv run pytest            # full suite, no network
+uv run ruff check src/ tests/  # lint, as CI runs it
+uv run mypy              # type check (src/orq_arena, per pyproject.toml)
 uv run orq-arena report examples/quickstart/battles.jsonl \
   --output /tmp/orq-arena-quickstart.report.html  # render the committed example, no API key
 ```
+
+Optional: `uv run pre-commit install` runs `ruff check --fix` and `ruff format` on staged
+Python files at each commit. For docs changes, `uv sync --group docs`, then
+`uv run mkdocs build --strict`: the same strict build the Docs workflow runs on pull requests.
 
 Live runs need an orq.ai API key: `cp .env.example .env` and fill in `ORQ_API_KEY`
 (`.env` is gitignored and loaded automatically).
@@ -41,7 +47,7 @@ template. If you add a new credential, wire it through an environment variable a
 
 - `src/orq_arena/`: the benchmark core. `tournament/` (scheduling, Bradley-Terry + CIs),
   `arena/` (one battle: stream → judge → record), `providers/` (orq router client,
-  model catalog), `analysis/` (κ), `data/` (schema-v4 records), `rejudge.py`,
+  model catalog), `analysis/` (κ), `data/` (schema-v5 records), `rejudge.py`,
   `anchor.py` (human annotation), `report.py` (the HTML report).
 - `src/orq_arena/tui/`: the Textual show, behind the optional `[tui]` extra. Strictly a
   consumer of the event stream; nothing in here may affect a verdict (HP/damage is computed
@@ -57,7 +63,8 @@ template. If you add a new credential, wire it through an environment variable a
    changes to judging, rating, or void policy need a plan-level discussion first.
 3. Add or update a test when behaviour changes. Textual widgets get a headless render test
    (that pattern has caught real bugs twice).
-4. Run `uv run pytest` before pushing.
+4. Run what CI runs before pushing: `uv run ruff check src/ tests/`, `uv run mypy`, and
+   `uv run pytest -q`; add `uv run mkdocs build --strict` when you touch `docs/` or `mkdocs.yml`.
 5. Open a PR using the template. Note: the repo requires **signed commits**
    ([GitHub docs](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits)).
 

@@ -1,9 +1,10 @@
 # orq-arena default configuration.
 # All candidate + judge calls route through the orq.ai router gateway.
 
-# Match rules. max_rounds caps the decisive rounds per match; starting_hp and
-# the damage_* tiers drive the live TUI health bars only (the rating never
-# sees them, it's fed per-round verdicts).
+# Match rules. max_rounds is the number of prompts each match draws; a tied or
+# inconclusive round uses its prompt and is not replaced. starting_hp and the
+# damage_* tiers drive the live TUI health bars only (the rating never sees
+# them, it's fed per-round verdicts).
 match:
   max_rounds: 5
   starting_hp: 100
@@ -87,5 +88,5 @@ criteria: >-
   relevance to the prompt.
 
 # Fewer decisive reconciled votes than this -> round is inconclusive
-# (no damage, no round-cap tick). Guards against jury-of-one verdicts.
+# (no damage, never rated; its prompt is spent). Guards against jury-of-one verdicts.
 min_successful_judges: 2

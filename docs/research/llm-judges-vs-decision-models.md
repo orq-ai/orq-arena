@@ -30,8 +30,9 @@ on the other (section 2.2).
 | Failure modes | Off-contract JSON, refusals, a reasoning model running out of tokens | Refusal (counts as abstain), 4xx/5xx; no parse failures, the answer is typed |
 | What the reader sees | The judge's reason on every card | Three probability bars per card, no reason |
 
-Both run through evaluatorq's pairwise jury, so self-judge exclusion, stand-in judges, the
-quorum and the plurality rule are the same in both modes. The arena pins every judge to the
+Both run through evaluatorq's pairwise jury, so stand-in judges, the quorum and the plurality
+rule are the same in both modes. Self-judge exclusion is the arena's own step, taken before the
+jury is built, so it too is the same in both. The arena pins every judge to the
 endpoint `judge_api` names, because the catalog marks some chat models as decision-capable too
 (section 3.1).
 
@@ -42,9 +43,11 @@ endpoint `judge_api` names, because the catalog marks some chat models as decisi
 - **Pool 1, quickstart:** the committed `examples/quickstart/battles.jsonl`, eight frontier and
   mid-tier models, 140 rounds, recorded in July with the then-default LLM panel
   (claude-haiku-4-5, gemini-2.5-flash-lite, gpt-5.4-nano).
-- **Pool 2, budget:** two fresh runs of `configs/budget_8.yaml` on `prompts/starter.jsonl`
-  (eight small models, 140 rounds each), one judged live by the LLM panel and one live by a
-  decision panel. Each was then re-judged by the other kind of panel.
+- **Pool 2, budget:** two fresh runs of the `configs/budget_8.yaml` pool on
+  `prompts/starter.jsonl` (eight small models, 140 rounds each), one judged live by the LLM panel
+  that file shipped with then (claude-haiku-4-5, gemini-3.5-flash-lite, gpt-5.4-nano) and one live
+  by a decision panel. Each was then re-judged by the other kind of panel. Both configs are kept
+  in `docs/research/configs/`, since `configs/budget_8.yaml` now ships the decision panel.
 - **Reference jury:** there is no human ground truth for these rounds, so each pool was also
   re-judged by three strong chat models (grok-4.6, kimi-k3, glm-5.3, both seat orders, about
   $10 per pool). "Agreement" below means agreement with this jury on the rounds both decided.
@@ -312,11 +315,18 @@ uv run python scripts/judge_study.py --ref qs.reference.jsonl \
   "recorded LLM panel=examples/quickstart/battles.jsonl" "decisions=qs.decisions.jsonl"
 
 # Pool 2: two live runs, then the same re-judges over b8_llm.jsonl
-orq-arena run --config configs/budget_8.yaml --prompts prompts/starter.jsonl -y --output b8_llm.jsonl
+orq-arena run --config docs/research/configs/budget_8_live_llm.yaml \
+  --prompts prompts/starter.jsonl -y --output b8_llm.jsonl
 orq-arena run --config docs/research/configs/budget_8_live_decisions.yaml \
   --prompts prompts/starter.jsonl -y --output b8_dec.jsonl
 
 # Panel sweep: all eight decision models in one panel, then every sub-panel offline
+orq-arena rejudge examples/quickstart/battles.jsonl \
+  --config docs/research/configs/quickstart_decisions.yaml --judge-api decisions \
+  --judge typesafe/jev-latest --judge orq/decider-4b --judge openai/gpt-6-luna \
+  --judge perplexity/pplx-decider-v1-27b --judge alibaba/decision-model-preview \
+  --judge berget/Cloudflare/clef-flash --judge berget/convaiinnovations/laya \
+  --judge berget/Qwen/Qwen3.5-2B --output qs.all8.jsonl
 uv run python scripts/judge_study.py --ref qs.reference.jsonl "all 8=qs.all8.jsonl" --sweep "all 8"
 
 # Data filtering pilot

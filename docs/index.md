@@ -10,8 +10,9 @@ So run your own leaderboard. orq-arena ranks your model pool head-to-head on you
 and answers the question directly: **"which of these models actually wins on my data, and can
 I trust the ranking?"**
 
-One command runs a round-robin tournament over your models. A panel of LLM judges compares every
-pair of answers blind, in both orders so no judge can favor "whichever answer came first". Out the
+One command runs a round-robin tournament over your models. A panel of judges compares every
+pair of answers blind, in both orders by default (`judge_swap: false` halves judge calls and
+leaves position bias unmeasured), so no judge can favor "whichever answer came first". Out the
 other end: a chess-style **ELO leaderboard** with confidence intervals.
 
 Every run opens on the **Run Plan**: the full pool, every judge, and the estimated cost to run
@@ -29,7 +30,7 @@ jury's length preference is identified), per-judge behaviour, and the win grid:
 Eval suites score models one at a time and stop discriminating once several models pass:
 everything reads 9/10 and the ranking goes flat. Head-to-head comparison keeps discriminating:
 show a judge two answers to the same prompt and ask which is better, the same technique the big
-human-preference leaderboards use, with an LLM jury instead of a crowd. The verdicts are
+human-preference leaderboards use, with a model jury instead of a crowd. The verdicts are
 guarded: every pair is judged twice with the answers swapped, a judge that changes its vote
 when only the order changed is discarded for that round, and if too few trustworthy votes
 remain the round counts as `inconclusive` rather than a coin flip.
@@ -56,10 +57,17 @@ library for exactly this kind of jury.
   Judge-agreement stats ship with the standings.
 - **A report you can share.** One HTML per run. Verdict first, then the ELO ladder with
   error bars, a quality-vs-cost chart, latency, and the dollar spend: exact per model at
-  catalog rates, marked `≈` for the jury, whose spend is estimated at the panel's mean rate.
+  catalog rates, and exact for the jury too, priced per judge call (logs recorded before that
+  show the jury marked `≈`, estimated at the panel's mean rate).
 - **Raw data out the back.** Every judged round lands in `battles.jsonl`: both responses, each
   judge's vote, exact token counts, per-response timing. Real pairwise preference data for
   whatever you want to do next.
+- **Two kinds of jury.** Decision models (the default in the shipped configs; the code default
+  is `judge_api: llm`) answer one A/B/tie question through the orq.ai Decisions API with a
+  probability per option, for input tokens only; prompted LLM judges (`judge_api: llm`) write
+  their reasons. On two 140-round pools the decision panel agreed better with a strong
+  reference jury, decided about a third more rounds and cost about an eleventh as much:
+  [LLM judges vs decision models](research/llm-judges-vs-decision-models.md).
 - **Jury swaps.** The responses are already recorded, so re-judging with a different panel
   costs judge tokens only, and tells you how much the ranking depends on who judged it.
 - **Human spot-checks.** `annotate` renders a run into a blind page (no model names, no jury
@@ -109,9 +117,19 @@ The report is the artifact you can share, one self-contained HTML file:
 
     [:octicons-arrow-right-24: Methodology](methodology.md)
 
+-   :material-flask:{ .lg .middle } **LLM judges vs decision models**
+
+    ---
+
+    The two kinds of jury measured on real arena rounds: agreement, cost,
+    and where each belongs.
+
+    [:octicons-arrow-right-24: Research](research/llm-judges-vs-decision-models.md)
+
 </div>
 
 ## Suggested reading order
 
 - **Running benchmarks?** [Getting Started](getting-started.md) → [Configuration](configuration.md) → [CLI Reference](cli.md)
+- **Choosing a jury?** [Methodology](methodology.md) → [LLM judges vs decision models](research/llm-judges-vs-decision-models.md)
 - **New to Orq.ai?** [orq.ai](https://orq.ai) is the platform behind the router and the jury; [docs.orq.ai](https://docs.orq.ai) covers the gateway, datasets, and API keys

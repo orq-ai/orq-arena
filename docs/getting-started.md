@@ -311,7 +311,7 @@ further model calls:
 |---|---|
 | `battles.jsonl` | One JSON line per judged round: both responses, reconciled per-judge votes, token/TTFT accounting. |
 | `battles.run.json` | The run manifest: the config it ran, config/prompt hashes, candidate pool, judge panel, seed, and (once finished) agreement stats. No credential ever lands in it. |
-| `battles.report.html` | A single-file HTML report, no server, no external assets. Verdict banner with the top 3 models up top, then the ELO ladder with error bars, a quality-vs-cost value map, speed, and the dollar spend (exact per model, `≈` for the jury, which is estimated at the panel's mean rate). Share it with anyone. |
+| `battles.report.html` | A single-file HTML report, no server, no external assets. Verdict banner with the top 3 models up top, then the ELO ladder with error bars, a quality-vs-cost value map, speed, and the dollar spend (exact per model at catalog rates, and exact for the jury too, priced per judge call; logs recorded before that show the jury marked `≈`, estimated at the panel's mean rate). Share it with anyone. |
 
 ![HTML report page: verdict banner with the top three models, badges, ELO leaderboard with CI bars, and the ELO-vs-cost value map](assets/report-page.png)
 
@@ -338,7 +338,19 @@ next to the log. `orq-arena report <log>` regenerates the report page on demand,
     one workspace, so a key minted elsewhere fails exactly this way. The preflight probe catches
     it with one listing call before the run spends anything, which matters because otherwise
     every judge call returns 401 and the run still produces a leaderboard-shaped result. Mint a
-    key for the right workspace with `orq api-keys create --name orq-arena`.
+    key for the right workspace with `orq api-keys create --name orq-arena`. If the panel is
+    decision models (`judge_api: decisions`), a second probe follows; see the next entry.
+
+??? failure "`Error: the Decisions API rejected ORQ_API_KEY (403), so no decision judge could vote.`"
+
+    The router accepts the key, but the key may not use the Decisions API, which decision judges
+    answer on. The shipped configs seat decision models (`judge_api: decisions`), so after the
+    listing call `run` and `rejudge` make one tiny decision call to the first judge (a few dozen
+    input tokens) before any spend (in `run`, before the confirmation prompt). Without that check every judge call would
+    answer 403 while the candidates keep streaming, and the run would pay for every response and
+    decide nothing. The message ends: "The key needs the classify.execute permission; mint one
+    that has it, or set judge_api: llm." Either mint a key with the `classify.execute`
+    permission, or set `judge_api: llm` in your YAML and list chat models as `judges`.
 
 ??? warning "A response shows `✂ truncated` in the live `--tui` show"
 

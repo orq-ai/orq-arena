@@ -28,6 +28,8 @@ cp .env.example .env
 |---|---|---|---|
 | `ORQ_API_KEY` | Required for live runs | (none) | The only secret orq-arena needs. Every candidate, judge, and preflight-probe call goes through the orq.ai router gateway with this one key; the run fails up front with `ORQ_API_KEY is not set.` followed by `orq api-keys create --name orq-arena`, preceded by `orq auth login` when the CLI is not already logged in. A key that is set but rejected by the router is caught by the preflight credential probe, before the run spends anything. Create one in your workspace settings, as [`.env.example`](https://github.com/orq-ai/orq-arena/blob/master/.env.example) points to, or per the [API keys guide](https://docs.orq.ai/docs/ai-studio/organization/api-keys). |
 | `ORQ_BASE_URL` | No | `https://my.orq.ai` | Points completions, the credential probe **and** the model/price catalog at a different orq.ai host (staging, a proxy). Honoured only while `gateway.base_url` names the orq router (the default, or its older spelling `https://api.orq.ai/v3/router`): setting any other URL in the YAML is a bring-your-own-endpoint opt-out that wins outright, so the run can never be split between two hosts. Not read from `.env.example`; export it yourself when you need it. |
+| `ORQ_ARENA_THEME` | No | `orq-arena` | Colour theme of the live TUI (`--tui`). The other built-in theme is `crt-neon`; it is also reachable from the TUI's command palette. |
+| `CI` | No | (unset) | When set to any non-empty value, `run --open` and `annotate` never open a browser tab (`annotate --serve` still opens its local URL). They already skip it when stdout is not a terminal. |
 
 Notes:
 
@@ -52,9 +54,11 @@ what the shell hasn't set. A missing `.env` is silently fine.
 
 | File | Purpose |
 |---|---|
-| `orq_arena.yaml` | The default model pool + rules, shipped at the project root. Loaded whenever `--config` is omitted or points here, `DEFAULT_CONFIG = "orq_arena.yaml"` in `src/orq_arena/cli.py`. Ships 8 candidates, uniform thinking-**OFF**, so the ELO compares models rather than vendor default reasoning settings. |
+| `orq_arena.yaml` | The default model pool + rules, shipped at the project root. It is the `--config` default (`DEFAULT_CONFIG = "orq_arena.yaml"` in `src/orq_arena/cli.py`) only for `rejudge`, `report` and `refresh-catalog`; `run` and `pool` need `--config` spelled out. Ships 8 candidates, uniform thinking-**OFF**, so the ELO compares models rather than vendor default reasoning settings. |
 | `configs/reasoning_arena.yaml` | Uniform thinking-**ON** counterpart of the default file, the "does thinking help?" benchmark. Not loaded automatically; run it explicitly with `--config configs/reasoning_arena.yaml`. |
 | `configs/frontier_8.yaml`, `configs/budget_8.yaml`, `configs/frontier_16.yaml` | Ready-made pools tiered by the Artificial Analysis intelligence index (frontier ~40-56, budget ~12-25, 16-model stress test). See [`configs/README.md`](https://github.com/orq-ai/orq-arena/blob/master/configs/README.md). |
+| `examples/quickstart/config.yaml` | The pool and LLM panel behind the committed quickstart log. See [`examples/quickstart/README.md`](https://github.com/orq-ai/orq-arena/blob/master/examples/quickstart/README.md). |
+| `docs/research/configs/*.yaml` | The configs the [LLM judges vs decision models](research/llm-judges-vs-decision-models.md) study ran, kept so its commands can be repeated. |
 
 Any YAML path can be passed to `--config`; `load_config()` (`src/orq_arena/config.py`) reads it
 with `yaml.safe_load` and validates it into an `ArenaConfig` via
@@ -69,9 +73,9 @@ configuring nothing.
 |---|---|
 | `orq-arena run` | Required, no default. The YAML candidates are used as-is; the run is headless by default (`--tui` opts into the live show). |
 | `orq-arena pool` | Required, no default. Prints the configured candidate pool. |
-| `orq-arena rejudge` | Defaults to `orq_arena.yaml`. Supplies `gateway` and (unless `--criteria` overrides it) `criteria`. |
+| `orq-arena rejudge` | Defaults to `orq_arena.yaml`. Supplies `gateway`, `criteria` (unless `--criteria` overrides it), `judge_api` (unless `--judge-api` overrides it), `judge_swap`, `min_successful_judges`, `judge_abstain_below` (kept only when the new panel answers on `decisions`), and `replacement_judges` (only the stand-ins that answer on the new panel's endpoint; the command names any it drops). Its `candidates` supply the display names in the printed rankings, and resolve the contestants for self-judge exclusion only when the log has no run manifest beside it. The panel itself always comes from `--judge`. |
 | `orq-arena report` | Reads run identity from the log's `*.run.json` manifest. `orq_arena.yaml` is only a fallback for a log with no manifest; passing `--config` explicitly overrides the manifest and is disclosed on the page. |
-| `orq-arena refresh-catalog` | Defaults to `orq_arena.yaml`. Only `gateway` is used, to re-fetch the workspace model catalog. |
+| `orq-arena refresh-catalog` | Defaults to `orq_arena.yaml`. Only `gateway` is used, to re-fetch the model catalog (public; a key narrows it to what the workspace has enabled). The rest of the file is still validated. |
 
 ---
 
@@ -150,9 +154,9 @@ on-screen health bar happens to sit.
 |---|---|---|---|
 | `base_url` | `str` | `"https://my.orq.ai/v3/router"` | Base URL for the `AsyncOpenAI` client (`OrqGateway.__init__`, `src/orq_arena/providers/orq_gateway.py`). One OpenAI-compatible endpoint fronts every provider, models, judges, and the preflight probe all share it. Left at the default, host resolution is delegated to evaluatorq and honours `ORQ_BASE_URL`. `https://api.orq.ai/v3/router`, the default before `my.orq.ai`, is the same service and is treated the same way, so a config written then keeps working unchanged. Any other URL here opts out of that entirely (see [Alternate configs and overrides](#alternate-configs-and-overrides)). |
 | `candidate_max_tokens` | `int` | `2048` | Default per-response output cap for candidate completions (`stream_completion`'s `max_tokens=max_tokens or self._cfg.candidate_max_tokens`). Too low truncates long or creative answers, a cut response is flagged `✂ truncated` in the TUI response panel (`src/orq_arena/tui/widgets/response_panel.py`) and judges tend to penalize it. Overridden per-candidate by `candidates[].max_tokens`. |
-| `judge_max_tokens` | `int` | `2048` | Output cap for judge calls, passed to evaluatorq's `llm_jury_pairwise(max_tokens=...)`. A **cap, not a target**: it costs nothing extra on frugal judges. Thinking-by-default judges (e.g. `gemini-2.5-flash`) burn reasoning tokens before writing a verdict; a low cap starves the verdict entirely and fails the vote (the codebase's own regression case: `512` produced a `LengthFinishReasonError` on every one of that judge's votes). `2048` leaves headroom without materially raising cost on the cheap default panel. |
+| `judge_max_tokens` | `int` | `2048` | Output cap for prompted judge calls, passed to evaluatorq's `llm_jury_pairwise(max_tokens=...)` (`make_jury`, `src/orq_arena/judging.py`). Read only with `judge_api: llm`; a decision judge returns probabilities, not text, and never sees it. A **cap, not a target**: it costs nothing extra on frugal judges. Thinking-by-default judges (e.g. `gemini-2.5-flash`) burn reasoning tokens before writing a verdict; a low cap starves the verdict entirely and fails the vote (the codebase's own regression case: `512` produced a `LengthFinishReasonError` on every one of that judge's votes). `2048` leaves headroom without materially raising cost on the cheap default panel. |
 | `stream_read_timeout_s` | `int` | `1200` | Max **silence** between stream chunks, in seconds, before the client treats the connection as dead (`httpx.Timeout(read=float(stream_read_timeout_s), ...)` in `OrqGateway.__init__`). This is a read-gap timeout, not a total-duration cap, a thinking model that pauses for minutes before its first token is fine as long as chunks keep arriving within this gap. A stream that goes silent longer than this is retried once, then the round is voided (logged, shown, excluded from scoring). `1200s` = 20 minutes, deliberately generous. |
-| `judge_timeout_ms` | `int` | `90000` | Per-judge-call timeout in milliseconds, passed to evaluatorq's `llm_jury_pairwise(timeout_ms=...)` (`Battle.__init__`, `src/orq_arena/arena/battle.py`). `90000` (90s) is also evaluatorq's own library default for this parameter. |
+| `judge_timeout_ms` | `int` | `90000` | Per-judge-call timeout in milliseconds, passed to evaluatorq's `llm_jury_pairwise(timeout_ms=...)` (`make_jury`, `src/orq_arena/judging.py`). `90000` (90s) is also evaluatorq's own library default for this parameter. |
 
 Not configurable via YAML: `connect=10.0`, `write=60.0`, and `pool=60.0` second timeouts are
 hardcoded in `OrqGateway.__init__` alongside `stream_read_timeout_s`, only the read-gap timeout
@@ -179,7 +183,7 @@ least 2 entries (`ArenaConfig._validate`: `"Need at least 2 candidates, got {n}"
 | Key | Type | Default | Effect |
 |---|---|---|---|
 | `model_id` | `str` | (required) | orq.ai router gateway model slug, e.g. `anthropic/claude-opus-4-8`. The only required field per candidate entry. |
-| `name` | `str` | `""` → falls back to `short_model` | Display name used on the leaderboard, TUI cards, and arena events (`MatchStarted`/`MatchResolved`). Defaults to `model_id` with the provider prefix stripped (`"anthropic/claude-opus-4-8"` → `"claude-opus-4-8"`) and is **generated only to break a collision: when two candidates would answer to the same name, both fall back to their full model ids and the preflight says so**. A custom name is honoured as written. Note: `battles.jsonl` records store both `short_model` (`model_a`/`model_b`) and the full router id (`model_a_id`/`model_b_id`); the id is what every per-model view keys on, because short names collide across providers. `name` is presentation-only. |
+| `name` | `str` | `""` → falls back to `short_model` | Display name used on the leaderboard, TUI cards, and arena events (`MatchStarted`/`MatchResolved`). Defaults to `model_id` with the provider prefix stripped (`"anthropic/claude-opus-4-8"` → `"claude-opus-4-8"`) and is **generated only to break a collision: when two candidates would answer to the same name, both fall back to their full model ids and the preflight says so**. A custom name is honoured as written unless it collides too; it then falls back the same way. Two cases still fail the load: the same `model_id` listed twice under one name (`Duplicate candidate ...: the same model_id is listed twice`), and a name that still clashes after the fallback, such as a custom name equal to another candidate's full id (`Duplicate candidate name ...; names must be unique`). Note: `battles.jsonl` records store both `short_model` (`model_a`/`model_b`) and the full router id (`model_a_id`/`model_b_id`); the id is what every per-model view keys on, because short names collide across providers. `name` is presentation-only. |
 | `emblem` | `str` | `""` | Optional glyph/emoji shown before the orc name on the TUI candidate card (`src/orq_arena/tui/widgets/model_card.py`). Purely cosmetic. |
 | `reasoning` | `dict \| null` | `None` | Raw router reasoning-control object, forwarded verbatim as `extra_body` on the completion request (`stream_completion`, `src/orq_arena/providers/orq_gateway.py`). Not interpreted beyond the `budget_tokens` cross-check below, the router normalizes it per provider. |
 | `max_tokens` | `int \| null` | `None` → falls back to `gateway.candidate_max_tokens` | Per-candidate override of the response output cap. |
@@ -214,20 +218,25 @@ in that file), those belong in `configs/reasoning_arena.yaml` instead.
 
 | Key | Type | Default | Effect |
 |---|---|---|---|
-| `judges` | `list[str]` | (required, non-empty) | Router model ids forming the base judge panel handed to evaluatorq's `llm_jury_pairwise(judges=...)`. Must be non-empty, `ArenaConfig._validate` raises `ValueError("Judge panel is empty")` otherwise. Each judge votes on both seat orderings of every round. |
+| `judges` | `list[str]` | (required, non-empty) | Router model ids forming the base judge panel handed to evaluatorq's `llm_jury_pairwise(judges=...)` (`make_jury`, `src/orq_arena/judging.py`). Must be non-empty, `ArenaConfig._validate` raises `ValueError("Judge panel is empty")` otherwise. Each judge votes on both seat orderings of every round, or on one when `judge_swap` is off. |
 | `replacement_judges` | `list[str]` | `[]` | Neutral stand-ins promoted when a primary judge errors mid-run (`llm_jury_pairwise(replacement_judges=...)`). |
 | `criteria` | `str` | `"Accuracy and correctness, helpfulness and completeness, clarity, and relevance to the prompt."` | Free-text criteria string every judge is given, what the jury is asked to judge on. Can be overridden for a single re-judge without editing the YAML via `orq-arena rejudge ... --criteria "..."`. |
-| `min_successful_judges` | `int` | `2` | Minimum number of decisive reconciled votes required for a round to produce a real verdict. Fewer than this, and the round is `inconclusive` (dropped from the rating, doesn't count toward `max_rounds`), a guard against a "jury of one" deciding a round. |
+| `min_successful_judges` | `int` | `2` | Minimum number of decisive reconciled votes required for a round to produce a real verdict. Fewer than this, and the round is `inconclusive`: dropped from the rating, and its prompt is used up, not replaced (a match draws `max_rounds` prompts and no more). A guard against a "jury of one" deciding a round. |
 | `judge_api` | `"llm"` or `"decisions"` | `"llm"` | Which router endpoint the judges answer on. `llm` prompts chat models for a JSON verdict with a written reason. `decisions` asks decision models one A/B/tie question through the orq.ai [Decisions API](https://docs.orq.ai/ai-gateway/features/decisions) and gets a probability per option back, billed on input tokens only. One mode per panel: the catalog marks some chat models (claude-haiku-4-5, gpt-oss) as decision-capable too, so the mode, not the model id, decides the endpoint. A judge that cannot answer on the chosen endpoint stops the run in preflight, before any spend; in decisions mode the preflight also checks that the key may call the Decisions API. See [the research note](research/llm-judges-vs-decision-models.md) for how the two compare. |
 | `judge_swap` | `bool` | `true` | Show each judge both seat orders (A then B, B then A) and throw out a vote that flips. Off halves the judge calls, and the report then says position bias was not measured. |
-| `judge_abstain_below` | `float` or `null` | `null` | Decisions mode only (the config refuses it otherwise). A vote whose winning option has a lower probability than this becomes an abstention, the same as a flipped vote. Off by default: a floor raises agreement on the rounds that stay decided but leaves fewer of them. |
+| `judge_abstain_below` | `float` or `null` | `null` | Decisions mode only (the config refuses it otherwise), and strictly between 0 and 1. A vote whose winning option has a lower probability than this becomes an abstention, the same as a flipped vote. Off by default: a floor raises agreement on the rounds that stay decided but leaves fewer of them. |
 
 **Self-judge exclusion:** per match, any judge whose `model_id` matches either contestant's
 `model_id` is filtered out of that match's panel (`panel = [m for m in cfg.judges if m not in
-contestants]`, `Battle.__init__`). If that empties the panel entirely, `Battle.__init__` raises
+contestants]`, `Battle.__init__`), and the same filter applies to `replacement_judges`. If that empties the panel entirely, `Battle.__init__` raises
 `ValueError("Every judge is a contestant in ..., add a neutral judge to the config.")`: a
 small `judges` list can strand a specific pairing if both models in that match are also
 configured as judges elsewhere in the config.
+
+**Family overlap warning:** the preflight also warns when a judge shares a provider prefix with
+any candidate (`judge_family_overlaps`, `src/orq_arena/preflight.py`), and the run manifest
+records it. Only the primary `judges` are checked; a stand-in from a candidate's family is not
+flagged.
 
 ---
 
@@ -289,8 +298,8 @@ Settings that cause a hard failure (config load or first live call) if absent or
   effective `max_tokens` (own override or `gateway.candidate_max_tokens`), or config loading fails.
 - `ORQ_API_KEY` must be set in the real environment,
   not required to *load* the YAML, but the gateway raises `RuntimeError` the moment any live
-  call is attempted (`orq-arena run`, `rejudge`, `refresh-catalog`). Not needed for
-  `orq-arena pool`, `report`, `annotate`, or `anchor`.
+  call is attempted (`orq-arena run`, `rejudge`). Not needed for `orq-arena pool`, `report`,
+  `annotate`, `anchor`, or `refresh-catalog`.
 - At least one configured judge must not be a contestant in a given match, or that match raises
   `ValueError` at battle start.
 
@@ -315,7 +324,7 @@ Everything else is a Pydantic default and safe to omit from the YAML entirely:
 | `judge_api` | `"llm"` |
 | `judge_swap` | `true` |
 | `judge_abstain_below` | `null` |
-| `candidates[].name` | short model id, or the full id when two candidates would share one |
+| `candidates[].name` | short model id, or the full id when two candidates (custom names included) would share one |
 | `candidates[].emblem` | `""` |
 | `candidates[].reasoning` | `null` |
 | `candidates[].max_tokens` | `null` (→ `gateway.candidate_max_tokens`) |

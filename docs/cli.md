@@ -61,7 +61,8 @@ A few things apply across every subcommand and are only documented once, here:
 - **`.env` loading**: every invocation reads `./.env` from the current directory before
   doing anything else. **A variable already set in your shell always wins over `.env`.**
   `ORQ_API_KEY` is the only variable you have to set; `ORQ_BASE_URL` is read too, to point
-  a run at a non-production orq.ai host. Details (quoting, comments,
+  a run at a non-production orq.ai host. It only applies while `gateway.base_url` is the orq.ai
+  router; any other `base_url` is used as written. Details (quoting, comments,
   missing-file handling): [configuration.md](configuration.md#environment-variables).
 - **Config validation is all-or-nothing**: the *entire* `--config` file
   is validated (≥2 `candidates`, non-empty `judges`, thinking-budget
@@ -69,7 +70,9 @@ A few things apply across every subcommand and are only documented once, here:
   invalid config file fails the same way for `pool` or `refresh-catalog` as it does for
   `run`, see [Required vs Optional Settings](configuration.md#required-vs-optional-settings).
   Unknown keys are part of that validation: a misspelled setting is rejected with a
-  did-you-mean suggestion rather than silently ignored.
+  did-you-mean suggestion rather than silently ignored. Two exceptions: `report` without an
+  explicit `--config` ignores a missing or invalid default file when the log has its own
+  manifest, and `rejudge --compare` reads no config at all.
 - **Default paths**: every default path in the tables below is one of these four, all
   relative to the current working directory:
 
@@ -88,7 +91,7 @@ A few things apply across every subcommand and are only documented once, here:
 
   | Command | Needs a live API key? |
   |---|---|
-  | `run` | Yes, model streams, judge calls, and (if enabled) the thinking probe all call the gateway. A key that is set but rejected is caught by the preflight probe before any spend. |
+  | `run` | Yes, model streams, judge calls, and (if enabled) the thinking probe all call the gateway. A key that is set but rejected is caught by the preflight probe before any spend. With `judge_api: decisions` the probe also makes one tiny decision call, so a key without the `classify.execute` permission stops the run there. |
   | `pool` | No, prints the parsed config only. |
   | `rejudge` | Yes, re-scores recorded responses with a live judge panel. |
   | `report` | No. The catalog read that prices the cost section is public, so the cost section renders with or without a key. |
@@ -127,8 +130,9 @@ orq-arena run --config PATH [--prompts PATH] [--output PATH] [--rounds N]
 
 ### How a run behaves
 
-**The model pool is the YAML's `candidates` list, verbatim.** Preflight and the confirmation
-prompt happen up front in the terminal, before the TUI (or headless run) even starts. To
+**The model pool is the YAML's `candidates` list, verbatim.** In a headless run, preflight and
+the confirmation prompt happen up front in the terminal, before any match starts. With `--tui`
+the same preflight runs silently and the RUN PLAN screen shows it and asks instead. To
 discover which model ids your workspace can fight, see
 [`refresh-catalog`](#refresh-catalog) (`--show` lists them grouped by provider).
 
@@ -140,7 +144,7 @@ preflight: {matches} matches × {rounds_per_match} rounds → {model_streams} mo
 
 Every pair of candidates plays one match, each match runs `min(--rounds, number of prompts)`
 rounds, every round streams both contestants once and is scored by each judge twice (once
-per seat order).
+per seat order), or once when `judge_swap` is off.
 
 **Preflight: the RUN PLAN table** (see the expected output below). One row per candidate and
 judge (call count, catalog price in $/M in / $/M out, cost), closing with a bold
@@ -151,11 +155,13 @@ judge (call count, catalog price in $/M in / $/M out, cost), closing with a bold
   case adds the failure paths that spend money without appearing in any call count: the one
   retry each stream takes, and a replacement panel for every judge call when
   `replacement_judges` is set.
-- **Neither is a hard guarantee.** Prices are real (the router's Model Garden catalog) and
-  call counts are exact, but prompt tokens are estimated from character count, which
-  under-counts CJK, code and dense punctuation. Treat the projection as a good estimate, not
-  a cap your invoice cannot exceed.
-- **Unpriced models** (normal for self-hosted) keep their row with `n/a` prices and a `?`
+- **Neither is a hard guarantee.** Prices are real (orq.ai's public model catalog, no key
+  needed) and call counts are exact, but prompt tokens are estimated from character count,
+  which under-counts CJK, code and dense punctuation. Treat the projection as a good
+  estimate, not a cap your invoice cannot exceed. Decision judges are priced on input tokens
+  only, since they write no output.
+- **Unpriced models** (normal for self-hosted, and any model the catalog prices in a currency
+  other than USD) keep their row with `n/a` prices and a `?`
   cost; the total renders `≈ $X + ?` with a `no catalog price (self-hosted or unpriced): …`
   note below. If pricing is entirely unreachable the table is skipped. Pricing never blocks
   the run.
@@ -174,15 +180,31 @@ judge (call count, catalog price in $/M in / $/M out, cost), closing with a bold
 **Confirmation.** Unless `--yes`/`-y` is given, the CLI prompts
 `Proceed (≈ $X, up to $Y with retries)?`, so both dollar figures sit in the approval question
 itself (plain `Proceed?` when nothing could be priced). Declining aborts before any battle or judge calls (the thinking probe, when
-enabled, has already made its one probe stream per model). When stdin is not an interactive
+enabled, has already made its one probe stream per model, and with `judge_api: decisions` the
+key check has made one tiny decision call to the first judge). When stdin is not an interactive
 terminal the run errors out with a "pass `--yes`" hint instead of prompting.
 
 **Streams.** Preflight narration, warnings, per-match lines, and the progress bar print to
 stderr; the Final Results, token totals, battle-log path, and report-page path print to
 stdout. `1>results.txt` captures only the results; `2>/dev/null` silences the chatter.
 
-**Output.** Every judged round is appended to `--output` (`battles.jsonl`, schema v5) as the
-run proceeds, live-run or headless alike.
+**Output.** Every judged round, and every voided one, is appended to `--output`
+(`battles.jsonl`, schema v5) as the run proceeds, live-run or headless alike.
+
+**Preflight warnings and stops.** Besides the lines above, preflight can print:
+
+- `--rounds must be >= 1`, which stops the run.
+- `⚠ renamed to keep two models apart: …` when two candidates share a short name and fall
+  back to their full model ids.
+- Catalog warnings: a model the catalog does not list or marks deprecated, a prompted judge
+  with no responses endpoint, a judge whose context window a round may overflow, or a
+  catalog that could not be read at all. These are advisory; the run still goes ahead.
+- A stop when a judge cannot answer on the configured `judge_api` (a chat model on a
+  `decisions` panel, or the reverse), before any spend.
+
+`--tui` needs no `--yes` on a non-interactive stdin, since it confirms on its own screen. A
+run that finishes with no round rated exits `1` with
+`no round was rated, so there is no ranking: …`, so CI never reads a dead jury as success.
 
 **Examples:**
 
@@ -204,7 +226,7 @@ orq-arena run --config configs/reasoning_arena.yaml --prompts prompts/starter.js
 `Final Results` is stderr). The preflight and the closing summary are regenerated by running
 the tool against the committed
 [`examples/quickstart`](https://github.com/orq-ai/orq-arena/tree/master/examples/quickstart) run,
-its 8-model pool against the default judge trio; only the per-round chatter in the middle is
+its 8-model pool against a prompted (`judge_api: llm`) judge trio; only the per-round chatter in the middle is
 elided, since replaying it would mean re-running the matches:
 
 ```text
@@ -319,9 +341,9 @@ model, the per-category slices, per-judge behaviour (A/B lean, flip rate, tie ra
 
 ![Final Results: ELO ladder with CIs and len-ctrl, per-judge behaviour, win grid](assets/leaderboard.svg)
 
-**From the final leaderboard**: `B` opens the battle browser, paging through every judged
+**From the final leaderboard**: `b` opens the battle browser, paging through every judged
 round with the prompt, both responses, and per-judge votes with flip badges; `s` saves an
-SVG screenshot; `q` quits.
+SVG screenshot; `q`, Enter or space quits.
 
 ![Battle browser: prompt, both responses, per-judge votes with flip badges](assets/battle-browser.svg)
 
@@ -378,6 +400,10 @@ battle log are already on disk, so swapping the jury costs judge tokens only. `r
 mutually exclusive modes: the default `--judge` mode re-scores a log with a new panel, and
 [`--compare`](#rejudge-compare) tabulates saved rejudge reports side by side (no API calls).
 
+The shipped `orq_arena.yaml` sets `judge_api: decisions`, so a panel of chat models needs
+`--judge-api llm` (or a config with `judge_api: llm`); without it the command stops before any
+spend and names the judges that cannot answer.
+
 ```text
 orq-arena rejudge [LOG_PATH] --judge MODEL_ID [--judge MODEL_ID ...] [--criteria TEXT]
                   [--judge-api llm|decisions] [--config PATH] [--output PATH]
@@ -387,12 +413,12 @@ orq-arena rejudge --compare REPORT_JSON [--compare REPORT_JSON ...]
 
 | Argument / Flag | Default | Effect |
 |---|---|---|
-| `log_path` (positional) | `battles.jsonl` | Recorded battle log to re-judge (schema v5 JSONL; v3 and v4 still load). Optional, omit it to re-judge the default log in the current directory. Ignored in `--compare` mode. |
+| `log_path` (positional) | `battles.jsonl` | Recorded battle log to re-judge (schema v5 JSONL; v2 to v4 still load). Optional, omit it to re-judge the default log in the current directory. Ignored in `--compare` mode. |
 | `--judge MODEL_ID` | none, **required unless `--compare`, repeatable** | Router model id for the new panel; pass `--judge` multiple times for a multi-judge panel. Mutually exclusive with `--compare`. |
-| `--compare REPORT_JSON` | none, **repeatable** | Switches to compare mode: tabulate the given saved rejudge report JSONs side by side (see [`rejudge --compare`](#rejudge-compare)). Mutually exclusive with `--judge`; makes no API calls. |
+| `--compare REPORT_JSON` | none, **repeatable** | Switches to compare mode: tabulate the given saved rejudge report JSONs side by side (see [`rejudge --compare`](#rejudge-compare)). Mutually exclusive with `--judge` (passing both stops with `--compare tabulates saved reports; drop --judge`); makes no API calls. |
 | `--criteria TEXT` | `criteria` from `--config` | Override the judging criteria for this rejudge only, doesn't touch the YAML file. |
-| `--judge-api llm\|decisions` | `judge_api` from `--config` | The endpoint the new panel answers on (see [`judge_api`](configuration.md#judges-replacement_judges-criteria-min_successful_judges)). Stand-in judges from the config that cannot answer on it are dropped, and the command prints which. A `--judge` that cannot answer on it stops the command before any spend. |
-| `--config PATH` | `orq_arena.yaml` | Supplies `gateway`, and (unless overridden) `criteria`, `judge_api`, `judge_swap`, `judge_abstain_below`, `replacement_judges`, and `min_successful_judges`. |
+| `--judge-api llm\|decisions` | `judge_api` from `--config` | The endpoint the new panel answers on (see [`judge_api`](configuration.md#judges-replacement_judges-criteria-min_successful_judges-judge_api-judge_swap-judge_abstain_below)). Stand-in judges from the config that cannot answer on it are dropped, and the command prints which. A `--judge` that cannot answer on it stops the command before any spend. |
+| `--config PATH` | `orq_arena.yaml` | Supplies `gateway`, and (unless overridden) `criteria`, `judge_api`, `judge_swap`, `judge_abstain_below` (kept only when the panel answers on `decisions`), `replacement_judges`, and `min_successful_judges`. |
 | `--output PATH` | none, result only printed | Write the re-judged rounds to this JSONL path. |
 | `--report-json PATH` | none, result only printed | Write the run summary as JSON. |
 | `--concurrency N` | `4` | Max concurrent judge calls. |
@@ -403,35 +429,48 @@ orq-arena rejudge --compare REPORT_JSON [--compare REPORT_JSON ...]
   and no recorded error. Voided or errored rounds are silently skipped. If nothing
   qualifies, the command exits with `no judgeable rounds in {log_path}`.
 - **Self-judge exclusion.** For each contestant pair, any `--judge` that *is* one of the
-  contestants is dropped from that pair's panel, the same rule live matches apply.
-  Contestants are matched against the pool recorded in the `<log>.run.json` manifest, the
+  contestants is dropped from that pair's panel, the same rule live matches apply. Stand-in
+  judges get the same filter. v4 and v5 logs record each contestant's full model id, so they
+  are matched by id directly. Older logs carry only short names, which are resolved against
+  the pool recorded in the run manifest (`battles.run.json` for `battles.jsonl`), the
   pool the run actually used, never the current YAML, which may have drifted since.
   Without a manifest the CLI warns and falls back to `--config`. If exclusion leaves a
-  pair with no judges at all, the command errors with
-  `every judge is a contestant in {pair}`; add a neutral model to `--judge` to fix it.
+  pair with no judges at all, the command stops with
+  `every judge is a contestant in {pair}` (a raw traceback, not an `Error:` line); add a
+  neutral model to `--judge` to fix it.
 - **Small panels are fine.** The YAML's `min_successful_judges` quorum (sized for the
   original run's, typically larger, panel) is clamped down to the rejudge panel's size, so
   a legitimate 1- or 2-judge rejudge is never rejected by a quorum meant for a bigger jury.
 - **Report contents:**
   - `re-judged {N} rounds, {M} verdicts changed` (vs. the recorded `majority_verdict`)
   - Spearman rank correlation between the old and new Bradley-Terry rankings, printed with
-    the model and round counts behind it (`0.80 over 8 models, 140 rounds, ...`). The verdict
+    the model and round counts behind it (`0.80 over 8 models, 140 rounds, ...`). When the
+    new panel left some rounds inconclusive, the count reads `N of M rounds decided`, since
+    the correlation is fit on the decided ones only. The verdict
     word needs a pool of at least 5 models to be earned: at 4 the only reachable values at or
     above the 0.8 bar are 0.8 and 1.0, so smaller pools print
-    `too few models (N) for a robustness verdict` instead. At 5+ models, `>= 0.8` reads
-    `judge-robust ranking`, below it `ranking is panel-sensitive; treat with care`.
+    `too few models (N) for a robustness verdict` instead. It also needs at least half the
+    rounds decided, or it reads `too few rounds decided for a robustness verdict`. Otherwise
+    `>= 0.8` reads `judge-robust ranking`, below it `ranking is panel-sensitive; treat with care`.
+  - If the new panel decided no round at all, the command prints
+    `the jury produced no usable verdict in any of N rounds` instead of a ranking, still
+    writes `--output` and `--report-json`, and exits `1`.
   - `old ranking: A > B > C ...` and `new ranking: ...` strings
   - a **"new jury behaviour"** table, one row per judge: `A-lean`, `B-lean`, `flip rate`
     (position bias, how often a judge's verdict flips depending on seat order), `tie rate`
   - `mean inter-judge agreement`, when the panel has more than one judge
-- **`--output`** writes one JSONL row per input record with `judge_votes`, `majority_verdict`,
-  and `winner` replaced by the new panel's verdict; every other field (prompt, both
-  responses, tokens, timings) is copied through unchanged.
-- **`--report-json`** writes:
+- **`--output`** writes one JSONL row per judgeable round (skipped rounds are left out) with
+  `judge_votes`, `majority_verdict`, `winner`, the judge token counts, `judge_cost_usd` and
+  `judge_ms` replaced by the new panel's; every other field (prompt, both responses,
+  candidate tokens and timings) is copied through unchanged.
+- **`--report-json`** writes the fields below. `decisive` counts the rounds the new panel
+  decided (ties included). When it is `0`, `spearman` and `new_ranking` are `null`, so
+  `--compare` never scores a dead panel.
 
   ```json
   {
     "total": 0,
+    "decisive": 0,
     "changed_verdicts": 0,
     "spearman": 0.0,
     "old_ranking": ["..."],
@@ -444,13 +483,13 @@ orq-arena rejudge --compare REPORT_JSON [--compare REPORT_JSON ...]
 
 ```bash
 # Single-judge rejudge of the default log against the default config
-orq-arena rejudge battles.jsonl --judge mistral/mistral-small-2603
+orq-arena rejudge battles.jsonl --judge-api llm --judge mistral/mistral-small-2603
 
 # Multi-judge panel
-orq-arena rejudge battles.jsonl --judge mistral/mistral-small-2603 --judge anthropic/claude-haiku-4-5-20251001
+orq-arena rejudge battles.jsonl --judge-api llm --judge mistral/mistral-small-2603 --judge anthropic/claude-haiku-4-5-20251001
 
 # Override criteria, write both the rejudged log and a JSON summary
-orq-arena rejudge battles.jsonl \
+orq-arena rejudge battles.jsonl --judge-api llm \
   --judge mistral/mistral-small-2603 \
   --criteria "Correctness only; ignore style." \
   --output battles.rejudged.jsonl \
@@ -461,16 +500,18 @@ orq-arena rejudge battles.jsonl --judge-api decisions \
   --judge typesafe/jev-latest --judge perplexity/pplx-decider-v1-27b --judge openai/gpt-6-luna
 
 # Higher concurrency against a non-default log
-orq-arena rejudge my_battles.jsonl --judge openai/gpt-5.4-nano --concurrency 8
+orq-arena rejudge my_battles.jsonl --judge-api llm --judge openai/gpt-5.4-nano --concurrency 8
 ```
 
-**Expected output.** The command line, the `re-judging …` line and the round count are real
-(the committed example log has 140 judgeable rounds). **Everything after that is illustrative:**
+**Expected output.** The command line, the two lines after it and the round count are real
+(the committed example log has 140 judgeable rounds; the `stand-in judges dropped` line is the
+shipped config's decision-model stand-in, which cannot answer on `llm`). **Everything after that is illustrative:**
 running it for real costs judge tokens, so the verdict counts, the Spearman value and the
 per-judge percentages below are stand-ins showing the shape, not a recorded result.
 
 ```text
-$ orq-arena rejudge examples/quickstart/battles.jsonl --judge openai/gpt-5.1
+$ orq-arena rejudge examples/quickstart/battles.jsonl --judge-api llm --judge openai/gpt-5.1
+  stand-in judges dropped, they do not answer on llm: orq/decider-4b
 re-judging 140 rounds with panel: openai/gpt-5.1
 
 re-judged 140 rounds, 23 verdicts changed
@@ -518,8 +559,8 @@ jury?), inconclusive rate (decisiveness), mean agreement, worst per-judge flip r
 which jury is *right* needs gold pairs or a human anchor (see [`annotate`](#annotate) and [`anchor`](#anchor)).
 
 ```bash
-orq-arena rejudge battles.jsonl --judge openai/gpt-5.1 --report-json solo.json
-orq-arena rejudge battles.jsonl --judge anthropic/claude-haiku-4-5-20251001 \
+orq-arena rejudge battles.jsonl --judge-api llm --judge openai/gpt-5.1 --report-json solo.json
+orq-arena rejudge battles.jsonl --judge-api llm --judge anthropic/claude-haiku-4-5-20251001 \
   --judge openai/gpt-5.1 --report-json panel.json
 orq-arena rejudge --compare solo.json --compare panel.json
 ```
@@ -545,9 +586,9 @@ self-consistent. These measure reliability, not accuracy; accuracy needs gold pa
 ## `report`
 
 Render the single-file HTML report page from a recorded run. Reads `battles.jsonl` and its
-`*.run.json` manifest; makes no model calls (one catalog read prices the cost section when a
-key is present). The same page is written automatically at the end
-of every run (`<log>.report.html` next to the log).
+`*.run.json` manifest; makes no model calls (one read of the public model catalog, no key
+needed, prices the cost section). The same page is written automatically at the end
+of every run (`battles.report.html` next to `battles.jsonl`).
 
 **The manifest is the source of truth for run identity.** Model names, the judge panel and the
 reasoning flags come from the manifest the run wrote, not from whatever the YAML says today, so a
@@ -567,27 +608,33 @@ orq-arena report [LOG_PATH] [--config PATH] [--output PATH]
 |---|---|---|
 | `LOG_PATH` (positional) | `battles.jsonl` | The recorded run to render. |
 | `--config PATH` | `orq_arena.yaml`, only as a fallback | Overrides the run's recorded identity (judge panel, model-name mapping, reasoning flags) when passed explicitly, and the page discloses that it was overridden. Left alone, it is used only when the log has no usable manifest; match rules are never consulted. |
-| `--output PATH` | `<log>.report.html` | Destination HTML file. |
+| `--output PATH` | `<log>.report.html` (`battles.report.html` for `battles.jsonl`) | Destination HTML file. |
 
 The page is self-contained (inline CSS, no external assets, works from `file://`): verdict
 headline stating whether the top two separate, the ELO ladder with confidence-interval bars and the
-`length-adj.` column, the win grid, per-judge behaviour, token and cost accounting (catalog
-rates when a key is present: candidate spend exact, jury spend estimated at the panel mean;
-one catalog read, never completion spend), and the
-manifest hashes for reproducibility.
+`length-adj.` column, the win grid, per-judge behaviour, token and cost accounting at catalog
+rates (one catalog read, never completion spend), a
+Rounds section with every judged round and each judge's pick (the first 200 on bigger runs),
+and the manifest hashes for reproducibility. Candidate spend is exact. Jury spend is
+measured on v5 logs, which price every judge call, and estimated at the panel mean on older ones.
 
 ```bash
 orq-arena report outputs/g1/battles.jsonl
 orq-arena report battles.jsonl --output /tmp/run.html
 ```
 
-**Expected output** (one line; without a key the page's cost section is simply omitted,
-nothing warns or fails):
+**Expected output** (one line, with or without a key; the cost section is left out only when
+the catalog cannot be read and no cached copy stands in, and nothing warns or fails then):
 
 ```text
 $ orq-arena report examples/quickstart/battles.jsonl
 report page -> examples/quickstart/battles.report.html
 ```
+
+It stops with an `Error:` line when the log does not exist (`{log} not found`), holds no rows
+(`no rounds in {log}`), or has no usable manifest while the config is missing or invalid
+(`… pass --config <your.yaml> …`). A log line that is not a valid record stops it with a raw
+traceback instead.
 
 ## `annotate`
 
@@ -648,6 +695,10 @@ $ orq-arena annotate examples/quickstart/battles.jsonl --output annotate.html --
 10 rounds -> annotate.html (blind; votes export as votes.json)
 ```
 
+It stops with `no judgeable rounds in {log}` when the log has no complete round, and with
+`every round is already voted in the --exclude files` when nothing is left to show. A log or
+`--exclude` path that does not exist is a usage error (exit `2`).
+
 ## `anchor`
 
 Merge one or more human vote files back against the recorded run and print the human-anchor
@@ -664,7 +715,7 @@ orq-arena anchor BATTLE_LOG VOTES_JSON [VOTES_JSON ...] [--json]
 | `--json` | off | Print the same stats as one JSON object (`per_annotator`, `inter_annotator`, `panel_ranking`, `unknown_keys`) instead of the table; undefined Spearman values become `null`. |
 
 Output, per annotator: rounds voted, rounds usable for κ (the panel must have been decisive;
-inconclusive rounds are excluded from κ but still feed the human Bradley-Terry fit), Cohen's
+inconclusive rounds are excluded from κ and from both rankings below), Cohen's
 κ vs the panel majority with its Landis-Koch label, and the Spearman correlation between the
 human-vote Bradley-Terry ranking and the panel's, **both fit on the rounds that rater
 actually voted**: the panel side is refit on the same subset, a model with fewer than 3
@@ -706,7 +757,7 @@ orq-arena refresh-catalog [--config PATH] [--show/--no-show]
 
 | Flag | Default | Effect |
 |---|---|---|
-| `--config PATH` | `orq_arena.yaml` | Only `gateway` is used (base URL, API key env var name). |
+| `--config PATH` | `orq_arena.yaml` | Only `gateway.base_url` is used (while it is the orq.ai router, `ORQ_BASE_URL` picks the host). The whole file is still validated. |
 | `--show` / `--no-show` | `--no-show` (off) | Print every fetched model id, grouped by provider. |
 
 **Behavior notes:**
@@ -802,10 +853,12 @@ output on pipes.
 ### Compare two juries on the same recorded run
 
 ```bash
-orq-arena rejudge battles.jsonl --judge mistral/mistral-small-2603 --judge anthropic/claude-haiku-4-5-20251001
+orq-arena rejudge battles.jsonl --judge-api llm \
+  --judge mistral/mistral-small-2603 --judge anthropic/claude-haiku-4-5-20251001
 ```
 
-Costs judge tokens only, the responses already in `battles.jsonl` are reused as-is. Prints
+`--judge-api llm` because these are chat models and the shipped config's panel answers on
+`decisions`. Costs judge tokens only, the responses already in `battles.jsonl` are reused as-is. Prints
 the changed-verdict count and the Spearman rank correlation against the original ranking.
 
 ### Discover model ids for your model pool
@@ -837,8 +890,17 @@ Everything you need to run `orq-arena` unattended or pipe its output:
   `rejudge --report-json <file>` writes its summary as JSON.
 - **Color**: output honors the standard `NO_COLOR` and `FORCE_COLOR` environment
   variables and disables color on non-TTY streams automatically.
-- **Exit codes**: `0` success, `1` any runtime error (printed as `Error: …` on stderr),
-  `2` usage error (unknown flag, bad value).
+- **Exit codes**: `0` success, `1` any runtime error, `2` usage error (unknown flag, bad
+  value, a path argument of `annotate`, `anchor` or `--compare` that does not exist). Most runtime errors print as `Error: …` on
+  stderr. These also exit `1` but print something else, so match on the exit code, not on
+  the `Error:` prefix:
+    - a raw Python traceback: a `--config` file that is not valid YAML, a missing or
+      malformed `--prompts` file, `--prompts orq:…` without `ORQ_API_KEY`, `run` without `ORQ_API_KEY`, `rejudge` on a log
+      that does not exist, `rejudge` without `ORQ_API_KEY` (after the `re-judging …` line),
+      `every judge is a contestant in …`, a log line that is not a valid record, and a votes
+      file or `--compare` report that is not valid JSON;
+    - `rejudge` when the new panel decided no round (the red `no usable verdict` message);
+    - `Aborted!`: declining the `run` confirmation, or Ctrl-C.
 
 ---
 

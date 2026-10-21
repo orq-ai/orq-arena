@@ -29,9 +29,11 @@ For every round, one prompt, two candidates, in a round-robin tournament:
 flowchart TD
     o1["verdict in seat order 1 (A,B)"] --> rec{"same verdict<br/>both orders?"}
     o2["verdict in seat order 2 (B,A)"] --> rec
-    rec -- yes --> vote["reconciled vote"]
+    rec -- yes --> floor{"judge_abstain_below set and<br/>top probability under it?"}
     rec -- no --> flip["abstain, flipped=True"]
     rec -- "a call failed" --> fail["abstain, not a flip"]
+    floor -- yes --> low["abstain, not a flip"]
+    floor -- no --> vote["reconciled vote"]
     vote --> quorum{"≥ 2 decisive votes?"}
     quorum -- no --> inc["inconclusive,<br/>never reaches the rating"]
     quorum -- yes --> plur{"strict plurality<br/>among them?"}
@@ -45,6 +47,10 @@ recorded. A round needs at least two decisive votes (configurable) to produce a 
 that quorum is necessary but not sufficient: the surviving votes still have to reach a strict
 plurality. Two decisive votes that disagree one-all produce no plurality, so the round is
 dropped from the rating rather than decided by a jury that could not agree with itself.
+
+`judge_abstain_below` (decision panels only, off by default) adds one more way to abstain: a
+reconciled vote whose winning option has a lower probability than the floor is set aside, the
+same as a flip, and the quorum and plurality are then counted without it.
 
 **Self-preference.** LLM judges recognize and favor their own family's prose (Panickssery et
 al., 2024). A judge that is also a contestant is excluded from its own matches, and the
@@ -101,12 +107,20 @@ controlled today; markdown formatting is not.
 with enough comparisons to mean anything; thin slices are dropped instead of shown with
 misleading precision.
 
+**Fixed settings.** These are constants, not config keys: 1000 bootstrap resamples for the
+rating intervals and 400 for the length coefficient, a category slice needs 20 judged
+comparisons, a model enters a rater's human-anchor ranking with at least 3 qualifying rounds,
+and the run's schedule, prompt draws and resamples use seed 42.
+
 ## Auditing the jury
 
 Every run reports the numbers needed to challenge its own ranking:
 
 - **Agreement**: mean modal-vote share per round, plus chance-corrected Fleiss' and Cohen's
-  kappa with the standard Landis-Koch labels (slight to almost-perfect).
+  kappa with the standard Landis-Koch labels (poor to almost perfect). Fleiss' kappa counts only
+  the rounds where every primary judge cast a decisive vote, and the report says how many that
+  was; Cohen's kappa uses each pair's rounds where both were decisive. Votes from stand-in
+  judges are left out of both.
 - **Per-judge flip rates**: how often each judge contradicted itself between seat orders,
   published per judge rather than hidden in an average.
 - **Jury swap**: `rejudge` re-scores the recorded responses under a different panel (judge
