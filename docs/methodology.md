@@ -178,6 +178,28 @@ the rounds the rater actually voted: models below a minimum comparison count are
 rather than seated at the default rating, and the model count prints beside every
 correlation. Usage: [cli.md](cli.md#annotate).
 
+## Lessons from The Leaderboard Illusion
+
+In 2025 a study of Chatbot Arena, the best-known public LLM leaderboard, found that its rules
+let a few big labs look better than they were (Singh et al., 2025). Arena disputed parts of
+the account. The study closes with five fixes. orq-arena is a private arena you run yourself,
+not a public leaderboard, but the same traps apply, so here is where each one stands:
+
+| What the study found | What orq-arena does |
+| --- | --- |
+| Labs tested many versions in secret and hid the scores they did not like. | Every round is written to the battle log the moment it ends, including failed and inconclusive ones. The report covers the whole pool; there is no option to drop a model from it. |
+| Some labs got far more secret tests than others. | Nobody submits models to your arena. You choose the pool. |
+| Models were quietly removed, mostly open ones, which skews the ratings of the rest. | The pool is fixed for the whole run and every pair of models meets, so no comparison is missing. |
+| Some models were shown to voters far more often. | Every pair is judged on the same number of prompts, in a seeded random order. |
+| Outsiders could not see what was tested, removed, or how often. | The battle log, the run manifest and the report hold every answer, every judge vote and how much the judges agreed. |
+| Labs trained on Arena data to climb the board. | You rank on your own prompts, which no lab has trained on. |
+
+One trap no tool can close for you: running again (a new seed, or `rejudge` with another
+panel) until you like the result, then sharing only that run. If you publish a ranking, publish
+every run behind it. Two smaller notes: each pair is judged on its own random draw of prompts
+when `max_rounds` is below the size of your prompt set (the preflight says so), and pairs are
+not sampled adaptively, since a full round-robin already compares every pair equally.
+
 ## Current limitations
 
 - **The shipped 30-prompt bank is a smoke test**, sized to exercise every mechanism, not to
@@ -196,3 +218,5 @@ correlation. Usage: [cli.md](cli.md#annotate).
   Evaluators. [arXiv:2404.04475](https://arxiv.org/abs/2404.04475)
 - Panickssery et al. (2024). LLM Evaluators Recognize and Favor Their Own Generations.
   [arXiv:2404.13076](https://arxiv.org/abs/2404.13076)
+- Singh et al. (2025). The Leaderboard Illusion.
+  [arXiv:2504.20879](https://arxiv.org/abs/2504.20879)

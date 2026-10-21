@@ -106,6 +106,24 @@ async def test_round_robin_runs_every_pair_and_ends(monkeypatch, tmp_path):
     assert len(lines) == 3
 
 
+async def test_every_pair_gets_the_same_number_of_prompts(monkeypatch, tmp_path):
+    # Equal sampling per pair (Leaderboard Illusion, arXiv 2504.20879, sec. 6):
+    # no match may see more or fewer prompts than another.
+    _patch(monkeypatch)
+    seen: list[int] = []
+
+    class CountingBattle(FakeBattle):
+        def __init__(self, *, prompts, **kw):
+            super().__init__(prompts=prompts, **kw)
+            seen.append(len(prompts))
+
+    monkeypatch.setattr(driver_mod, "Battle", CountingBattle)
+    cfg = _cfg(4)
+    cfg.match.max_rounds = 1
+    await _run(cfg, tmp_path)  # 2 prompts in the bank, cap 1
+    assert seen == [1] * 6
+
+
 async def test_manifest_round_trips_preflight(monkeypatch, tmp_path):
     _patch(monkeypatch)
     preflight = {"counts": {}, "family_overlaps": ["x/j1"]}
