@@ -699,6 +699,18 @@ def test_the_ladder_and_the_spend_card_say_when_a_cost_is_estimated(tmp_path):
     assert _cost_provenance(4, 4) == "estimated from tokens"
 
 
+def test_the_total_card_says_estimated_when_a_trial_cost_is(tmp_path):
+    cfg, records, report, manifest = _harness_setup(tmp_path)
+    report["harness"]["pi"]["estimated"] = 0
+    kw = dict(cfg=cfg, records=records, elo={"pi": 950.0, "codex": 1050.0}, report=report,
+              manifest=manifest, prices={"prov/judge-1": (1.0, 2.0)})  # fmt: skip
+    measured = build_report_html(**kw)  # judge_cost_usd is set: the jury is measured
+    assert ">Total<" in measured and "partly estimated" not in measured
+    report["harness"]["pi"]["estimated"] = 1  # pi: tokens priced at the catalog rate
+    html = build_report_html(**kw)
+    assert ">Estimated total<" in html and "Agent spend is partly estimated" in html
+
+
 def test_a_round_says_how_it_ended_with_the_split_the_pills_use():
     from orq_arena.data.schemas import GATE_JUDGE
 

@@ -253,9 +253,11 @@ Those caps are not equal across agents, so they are not a fair limit. codex acce
 and a "turn" means different things per agent: pi on deepseek-v4-pro logged 119 steps under
 `max_turns: 60`. The one limit Harbor applies to every agent alike is the task's own time limit
 (times `timeout_multiplier`), and that is the rule: **the task time limit is the only per-trial
-cap, and spend is capped at the orq gateway** (a spend limit on the run's key), as a ceiling for
-the whole run. In the measured runs the dollar cap never bound (the most a claude-code trial cost
-was $0.37 against its $1.00 cap), while the time limit stopped 18 trials in the mid-price pool. The shipped configs still carry the old caps; they go when the trials are
+cap, and spend is capped at the orq gateway** (a [Budget](https://docs.orq.ai/ai-gateway/budgets)
+scoped to the run's API key), as a ceiling for the whole run. In the measured runs the dollar cap
+never bound (the most a claude-code trial cost was $0.63 against its $2.00 cap with Opus, and
+$0.37 against $1.00 in the budget and mid-price pools), while the time limit stopped 18 trials in
+the mid-price pool. The shipped configs still carry the old caps; they go when the trials are
 next re-run, because changing a contestant's config starts its cache over.
 
 What a run cost is
@@ -332,7 +334,7 @@ How to read the tables in this section:
 - **ELO** comes from the jury and the tests together. All the runs below were re-judged on
   2026-10-21 by panels with no contestant's model family on them (see each config), from the
   stored write-ups, without running an agent again.
-- **The caps are not equal.** claude-code stops at its `max_budget_usd`, pi at `max_turns`, and
+- **The caps are not equal.** claude-code stops at its `max_budget_usd`, pi at `max_turns` (turns, not steps), and
   codex only at the task's time limit (see [Costs](#costs)). In these runs the dollar cap never
   bound, but the pass rates compare agents under different limits.
 - **The samples are small.** One trial per task over 8 or 16 tasks, and the ELO intervals are
