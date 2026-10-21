@@ -215,9 +215,18 @@ The Decisions API is in beta and carries no evaluators or guardrails yet.
   probabilities, not a prompted verdict. `judge_api` now decides the endpoint and the arena pins
   every judge to it.
 - **Decision judges can hit the workspace rate limit.** A re-judge at concurrency 8 with three
-  decision judges and both seat orders sends more than 1,500 requests a minute, the router's
-  per-workspace cap, and evaluatorq does not retry a 429: the vote is lost. Live runs stay under
-  it (generation is the bottleneck); keep `rejudge --concurrency` at 3 or below for a three-judge decision panel.
+  decision judges and both seat orders wants 48 requests in flight, and a provider behind the
+  router can answer 429. evaluatorq does not retry a 429: the vote is lost. Since evaluatorq 1.74
+  it also caps in-flight judge requests at 10 per process. We measured that cap on 2026-10-21
+  (evaluatorq 1.74.0, arena `3f5a894`): the 140-round quickstart log re-judged by this panel
+  (jev-latest, pplx-decider-v1-27b, gpt-6-luna) at `--concurrency 8`, twice at the default cap
+  and twice with it raised to 48 through `scripts/rejudge_cap.py`. Wall time was the same within
+  noise (35 and 48 s at 10, 41 and 44 s at 48). Lost votes were not: at 10, pplx-decider lost 6
+  and 4 of its 140 votes to 429s; at 48 it lost 57 and 62, and the panel decided 93 and 95
+  rounds instead of 109 and 113. So the cap costs no time and protects the votes; we keep it.
+  The commands and raw numbers are in [`rejudge-cap-timing.json`](rejudge-cap-timing.json).
+  Live runs stay under the cap (generation is the bottleneck), and a re-judge that loses votes
+  can be repeated at a lower `--concurrency`.
 - **jev-latest's catalog window (64k) is not its limit:** state plus question must fit 32k.
   Prompt plus two capped responses stays well under that on every shipped config.
 
@@ -310,7 +319,7 @@ orq-arena rejudge examples/quickstart/battles.jsonl \
 orq-arena rejudge examples/quickstart/battles.jsonl \
   --config docs/research/configs/quickstart_decisions.yaml --judge-api decisions \
   --judge typesafe/jev-latest --judge perplexity/pplx-decider-v1-27b --judge openai/gpt-6-luna \
-  --concurrency 3 --output qs.decisions.jsonl
+  --concurrency 3 --output qs.decisions.jsonl  # the study ran at 3; see 3.1 on concurrency
 uv run python scripts/judge_study.py --ref qs.reference.jsonl \
   "recorded LLM panel=examples/quickstart/battles.jsonl" "decisions=qs.decisions.jsonl"
 

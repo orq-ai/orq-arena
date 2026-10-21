@@ -246,3 +246,50 @@ def test_new_judge_keys_leave_an_old_runs_config_hash_alone():
     recorded = json.loads((root / "battles.run.json").read_text())["config_sha256"]
     assert config_sha256(cfg) == recorded
     assert config_sha256(cfg.model_copy(update={"judge_swap": False})) != recorded
+
+
+async def test_rejudge_bounds_rounds_and_evaluatorq_bounds_judge_calls(monkeypatch):
+    """`rejudge --concurrency 8` with 3 judges x 2 seat orders wants 48 calls at once.
+
+    The arena's semaphore holds rounds in flight to 8. evaluatorq 1.74 then holds
+    judge calls to 10 per process unless the caller sets a higher limit.
+    """
+    from types import SimpleNamespace
+
+    from evaluatorq import llm_concurrency_limit, llm_slot
+
+    from orq_arena import rejudge
+    from tests.test_rejudge_ranking_identity import _rec
+
+    rounds = round_peak = calls = call_peak = 0
+
+    class _SlotComparator:
+        async def compare(self, **_kw):
+            nonlocal rounds, round_peak
+
+            async def call():
+                nonlocal calls, call_peak
+                async with llm_slot():
+                    calls += 1
+                    call_peak = max(call_peak, calls)
+                    await asyncio.sleep(0.01)
+                    calls -= 1
+
+            rounds += 1
+            round_peak = max(round_peak, rounds)
+            await asyncio.gather(*(call() for _ in range(6)))  # 3 judges x 2 seat orders
+            rounds -= 1
+            return PairwiseComparison.model_validate({"winner": "A", "votes": []})
+
+    monkeypatch.setattr(judging, "llm_jury_pairwise", lambda **_kw: _SlotComparator())
+    monkeypatch.setattr(rejudge, "OrqGateway", lambda cfg: SimpleNamespace(client=object()))
+    cfg = _cfg()
+    records = [_rec(i, "A") for i in range(20)]
+
+    await rejudge.rejudge_run(cfg=cfg, records=records, judges=["prov/j1"], concurrency=8)
+    assert (round_peak, call_peak) == (8, 10)
+
+    round_peak = call_peak = 0
+    async with llm_concurrency_limit(200):  # well above the fan-out: only the rounds bound it
+        await rejudge.rejudge_run(cfg=cfg, records=records, judges=["prov/j1"], concurrency=8)
+    assert (round_peak, call_peak) == (8, 48)
