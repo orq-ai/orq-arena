@@ -29,13 +29,21 @@ def build_wins_matrix(
     return wins
 
 
+# Virtual ties per model against a fixed 1000-rated anchor. A model that loses
+# (or wins) every round has no finite MLE: its strength ran to the 1e-10 floor
+# and printed as exactly -3000 on a 5-model, 2-round run. One tie is a weak
+# prior: it caps a sweep without visibly moving models that have a real record.
+PRIOR_TIES = 1.0
+
+
 def bradley_terry_mle(
     wins: dict[str, dict[str, float]],
     models: list[str],
-    iterations: int = 100,
+    iterations: int = 1000,
     tol: float = 1e-6,
 ) -> dict[str, float]:
-    """Iterative MLE. Returns {model: elo} anchored so geometric mean = 1000."""
+    """Iterative MAP fit (MLE plus ``PRIOR_TIES`` virtual ties against a fixed
+    anchor). Returns {model: elo} anchored so geometric mean = 1000."""
     if not models:
         return {}
     ratings: dict[str, float] = {m: 1.0 for m in models}
@@ -50,24 +58,24 @@ def bradley_terry_mle(
     for _ in range(iterations):
         old = dict(ratings)
         for i in models:
-            numerator = sum(wins.get(i, {}).get(j, 0) for j in models if j != i)
-            denominator = 0.0
+            # The anchor sits at strength 1, so its ties add 0.5 * PRIOR_TIES
+            # wins and PRIOR_TIES games at 1 / (r_i + 1).
+            numerator = 0.5 * PRIOR_TIES + sum(wins.get(i, {}).get(j, 0) for j in models if j != i)
+            denominator = PRIOR_TIES / (ratings[i] + 1.0)
             for j in models:
                 if j == i:
                     continue
                 if n_matrix[i][j] > 0:
                     denominator += n_matrix[i][j] / (ratings[i] + ratings[j])
-            ratings[i] = numerator / denominator if denominator > 0 else 1.0
+            ratings[i] = numerator / denominator
 
-        log_mean = sum(math.log(max(r, 1e-10)) for r in ratings.values()) / len(ratings)
-        factor = math.exp(-log_mean)
-        for m in ratings:
-            ratings[m] *= factor
-
+        # No per-iteration rescale: the anchor pins the scale, and rescaling
+        # would move the models relative to it. Anchor once, after the fit.
         if all(abs(ratings[m] - old[m]) < tol for m in models):
             break
 
-    return {m: 400 * math.log10(max(r, 1e-10)) + 1000 for m, r in ratings.items()}
+    log_mean = sum(math.log(r) for r in ratings.values()) / len(ratings)
+    return {m: 400 * (math.log(r) - log_mean) / math.log(10) + 1000 for m, r in ratings.items()}
 
 
 @dataclass(frozen=True)
@@ -374,7 +382,7 @@ def bootstrap_draws(
     out: list[dict[str, float]] = []
     for _ in range(iterations):
         resampled = [matches[rng.randrange(len(matches))] for _ in matches]
-        ratings = bradley_terry_mle(build_wins_matrix(resampled), models, iterations=50)
+        ratings = bradley_terry_mle(build_wins_matrix(resampled), models, iterations=300)
         out.append({m: ratings.get(m, 1000.0) for m in models})
     return out
 

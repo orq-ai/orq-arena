@@ -184,3 +184,31 @@ def test_elo_is_anchored_at_1000_mean():
     rows = [("a", "b", 1.0, 100, 100), ("b", "c", 1.0, 100, 100), ("c", "a", 1.0, 100, 100)]
     fit = style_controlled_elo(rows, ["a", "b", "c"])
     assert abs(sum(fit.elo.values()) / len(fit.elo) - 1000.0) < 1e-6
+
+
+def test_winless_and_unbeaten_models_get_finite_ratings():
+    # The demo6 shape: 5 models, 2 rounds per pair, "e" loses all 8 and "a"
+    # wins all 8. A plain MLE sends both to the 1e-10 strength floor
+    # (exactly -3000 and its mirror); the virtual-tie prior keeps them finite.
+    models = ["a", "b", "c", "d", "e"]
+    matches = [
+        (w, loser, "winner")
+        for i, w in enumerate(models)
+        for loser in models[i + 1 :]
+        for _ in range(2)
+    ]
+    elo = bradley_terry_mle(build_wins_matrix(matches), models)
+    assert elo["a"] > elo["b"] > elo["c"] > elo["d"] > elo["e"]
+    assert 0 < elo["e"] and elo["a"] < 2000
+    assert abs(sum(elo.values()) / len(elo) - 1000.0) < 1e-6
+    # Converged, not wherever the iteration budget stopped.
+    longer = bradley_terry_mle(build_wins_matrix(matches), models, iterations=5000)
+    assert all(abs(elo[m] - longer[m]) < 0.5 for m in models)
+
+
+def test_sweep_bootstrap_ci_stays_off_the_floor():
+    from orq_arena.tournament.elo import bootstrap_ci
+
+    matches = [("a", "b", "winner")] * 4
+    ci = bootstrap_ci(matches, ["a", "b"], iterations=50)
+    assert ci["b"][0] > 0 and ci["a"][1] < 2000

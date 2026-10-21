@@ -640,12 +640,9 @@ def build_report_html(
         tok = verbosity.get(name)
         sc_cell = f"<td class='n'>{elo_sc[name]:.0f}</td>" if name in elo_sc else ""
         rank = medals[i - 1] if i <= 3 else str(i)
-        # BT strength -> 0 floors the rating at 400*log10(1e-10)+1000 = -3000; that
-        # bound is really -inf (model won ~nothing), so show it as such, not the artifact.
-        lo_txt = "&minus;&infin;" if lo <= -2900 else f"{lo:.0f}"
         ladder_rows.append(
             f"<tr><td class='n'>{rank}</td><td class='name'>{_e(name)}{think}</td>"
-            f"<td class='n'>{e0:.0f}</td><td class='n'>{lo_txt}&ndash;{hi:.0f}</td>"
+            f"<td class='n'>{e0:.0f}</td><td class='n'>{lo:.0f}&ndash;{hi:.0f}</td>"
             f"<td title='{lo:.0f} to {hi:.0f}'>{_ci_bar(dlo, dhi, e0, floor, span)}</td>"
             f"{sc_cell}"
             f"<td class='n'>{'' if tok is None else f'{tok:.0f}'}</td></tr>"
@@ -1124,7 +1121,7 @@ def build_report_html(
 <p class="note">ELO is a skill rating anchored at 1000: a model climbs by winning rounds, and more
 for beating a strong opponent, so a higher score means better on your prompts. The 95% CI is the
 range its true rating most likely sits in; the bar plots each on one shared scale, so models
-whose bars overlap are not thereby tied: read each bar on its own, and see Confidence stats for whether the top two actually separate.{" The length-adj. column refits the rating with the jury&#39;s length preference (measured in characters) priced out; a large gap between a model&#39;s ELO and its length-adjusted score means verbosity, not quality, was separating them. It appears only when that preference is identified: the joint fit converged and its bootstrap interval excludes 0." if elo_sc else ""} Full method (Bradley-Terry, bootstrap intervals, the &minus;&infin; bound) is in Methodology in detail below.{off_note}</p>
+whose bars overlap are not thereby tied: read each bar on its own, and see Confidence stats for whether the top two actually separate.{" The length-adj. column refits the rating with the jury&#39;s length preference (measured in characters) priced out; a large gap between a model&#39;s ELO and its length-adjusted score means verbosity, not quality, was separating them. It appears only when that preference is identified: the joint fit converged and its bootstrap interval excludes 0." if elo_sc else ""} Full method (Bradley-Terry, bootstrap intervals) is in Methodology in detail below.{off_note}</p>
 
 {value_map}
 {speed}
@@ -1162,13 +1159,14 @@ did the separating.</p>
 
 <details class="method"><summary>Methodology in detail</summary>
 <h3>Ratings</h3>
-<p>Bradley-Terry MLE over every rated round (wins and ties), anchored at a 1000-point mean.
+<p>Bradley-Terry fit over every rated round (wins and ties), anchored at a 1000-point mean. Each
+model also gets one virtual tie against a fixed 1000-rated anchor, so a model that wins or loses
+every round still gets a finite rating instead of running off the scale.
 95% intervals are 1000-iteration bootstrap percentiles; small pools give wide, overlapping
 intervals, which is the honest output at this size. Those intervals are marginal, so read one at a
 time: two of them overlapping does not mean the two models are tied, because both are drawn from the
 same resamples and share the anchoring. Whether the top two separate is decided on the bootstrap of
-their difference, taken within each resample, and reported in Confidence stats. A &minus;&infin; lower bound means a model
-won so few rounds its rating is unidentifiable below. The length claim leads with a plain
+their difference, taken within each resample, and reported in Confidence stats. The length claim leads with a plain
 count (how often the longer answer, in characters, won a decisive round). The modelled
 coefficient behind the length-adjusted column is a joint logistic fit (Newton with a line
 search, stopped on the gradient norm) bootstrapped over the same rows; the column and the

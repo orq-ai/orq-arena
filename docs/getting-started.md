@@ -226,21 +226,21 @@ M28 🤝 draw
 match 28/28 done
 
 🏆 gemini-3.5-flash leads, but 76 rated rounds cannot separate it from
-claude-sonnet-4-6 (ahead in 83% of resamples; the report page has the
+claude-sonnet-4-6 (ahead in 81% of resamples; the report page has the
 tie-breakers)
 
                      Final Results
 ┏━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━┳━━━━━━━━━━━┳━━━━━━┓
 ┃ # ┃ Model                  ┃ ELO  ┃ 95% CI    ┃ win% ┃
 ┡━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━╇━━━━━━━━━━━╇━━━━━━┩
-│ 1 │ gemini-3.5-flash       │ 1374 │ 1184–2209 │ 86%  │
-│ 2 │ claude-sonnet-4-6      │ 1196 │ 1010–1886 │ 79%  │
-│ 3 │ gpt-5.4                │ 1174 │ 1018–1875 │ 76%  │
-│ 4 │ claude-opus-4-8        │ 1072 │ 902–1737  │ 61%  │
-│ 5 │ deepseek-chat          │ 1016 │ 820–1632  │ 52%  │
-│ 6 │ mistral-medium-2604    │ 901  │ 665–1529  │ 40%  │
-│ 7 │ gpt-5.4-mini           │ 805  │ 465–1412  │ 27%  │
-│ 8 │ gemini-3.1-pro-preview │ 463  │ -3000–632 │ 5%   │
+│ 1 │ gemini-3.5-flash       │ 1317 │ 1141–1614 │ 86%  │
+│ 2 │ claude-sonnet-4-6      │ 1178 │ 1017–1416 │ 79%  │
+│ 3 │ gpt-5.4                │ 1155 │ 1013–1379 │ 76%  │
+│ 4 │ claude-opus-4-8        │ 1064 │ 906–1259  │ 61%  │
+│ 5 │ deepseek-chat          │ 1014 │ 844–1175  │ 52%  │
+│ 6 │ mistral-medium-2604    │ 911  │ 710–1084  │ 40%  │
+│ 7 │ gpt-5.4-mini           │ 823  │ 582–959   │ 27%  │
+│ 8 │ gemini-3.1-pro-preview │ 537  │ 273–674   │ 5%   │
 └───┴────────────────────────┴──────┴───────────┴──────┘
 
 jury: 90% mean agreement · longer answer won 80% of decisive rounds (59/74) ·

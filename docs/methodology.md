@@ -75,6 +75,10 @@ rounds is in [LLM judges vs decision models](research/llm-judges-vs-decision-mod
 fit (Bradley & Terry, 1952) over every judged round, refit as the tournament progresses; ties
 count as half a win for each side. This is the same statistical core as Chatbot Arena's
 leaderboard (Chiang et al., 2024). Ratings are anchored so the field's average sits at 1000.
+Each model also plays one virtual tie against a fixed 1000-rated anchor. Without it, a model
+that loses (or wins) every round has no finite rating: on a small run it printed as exactly
+-3000. One tie pulls the extremes of a small run toward the middle; with many rounds per
+model it barely moves anything.
 
 **Confidence intervals.** A 1000-resample bootstrap gives each candidate a 95% CI. On a small
 run the intervals are wide and overlapping; that is the honest output. Those intervals are
