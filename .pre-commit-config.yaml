@@ -18,3 +18,8 @@ repos:
         language: system
         types: [python]
         require_serial: true
+  # Block staged secrets (API keys, tokens); the repo is public.
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks

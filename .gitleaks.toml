@@ -1,0 +1,10 @@
+# gitleaks config for the pre-commit hook. Keeps the default rules and adds
+# orq.ai keys, which the generic rule misses when no "key"/"token" word is near.
+[extend]
+useDefault = true
+
+[[rules]]
+id = "orq-api-key"
+description = "orq.ai API key"
+regex = '''sk-orq-[A-Za-z0-9_-]{20,}'''
+keywords = ["sk-orq-"]

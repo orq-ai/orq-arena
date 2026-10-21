@@ -33,3 +33,7 @@ examples/**/run.log
 # local run scratch at the repo root
 /newbattles*
 /*.report.html
+
+# Local agent/talk material, never committed
+.context/
+.superpowers/
