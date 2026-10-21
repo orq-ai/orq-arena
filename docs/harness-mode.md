@@ -121,7 +121,7 @@ candidates:
       skills: harness/skills
       system_prompt: "Prefer small diffs; run the tests before you stop."
 
-judges: [openai/gpt-6-luna, google/gemini-3.1-pro-preview, anthropic/claude-sonnet-5-5]
+judges: [google/gemini-3.1-pro-preview, xai/grok-4.5, mistral/mistral-medium-2604]
 ```
 
 Run it:
@@ -312,8 +312,9 @@ container; a replay from the trial cache costs only the jury calls.
 - **Harbor changes often.** A new release comes every few weeks. The version used is recorded in
   the run manifest and shown in the report footer.
 - **Self-preference is approximate.** A judge is excluded from a match when its model id equals a
-  contestant's, which only roughly applies to agents. The preflight still warns when a judge
-  shares a provider with a contestant.
+  contestant's, which only roughly applies to agents, and a judge can also favour a model of its
+  own maker. The preflight warns when a judge shares a provider with a contestant, and the shipped
+  harness configs use panels with no contestant's model family on them.
 
 ## Reference run results
 
@@ -321,22 +322,40 @@ The shipped `configs/harness-tb21.yaml` on eight terminal-bench 2.1 tasks, measu
 2026-10-19. claude-code, pi and pi + skills all run `anthropic/claude-opus-5-5`; codex runs
 `openai/gpt-6-luna`.
 
+How to read the tables in this section:
+
+- **Pass rate** is passed trials out of verified trials, one trial per task and agent. A trial
+  that could not run is voided and run again, so every agent below ends with one verified trial
+  per task; the voided attempts are named under each table.
+- **`~`** marks a cost that is tokens priced at the catalog rate (pi reports no cost of its own),
+  not a billed figure.
+- **ELO** comes from the jury and the tests together. All the runs below were re-judged on
+  2026-10-21 by panels with no contestant's model family on them (see each config), from the
+  stored write-ups, without running an agent again.
+- **The caps are not equal.** claude-code stops at its `max_budget_usd`, pi at `max_turns`, and
+  codex only at the task's time limit (see [Costs](#costs)). In these runs the dollar cap never
+  bound, but the pass rates compare agents under different limits.
+- **The samples are small.** One trial per task over 8 or 16 tasks, and the ELO intervals are
+  drawn over rounds, not tasks, so they understate how much a different task draw would move
+  things. Agents whose intervals overlap are not separated; read their order as a lead, not a
+  ranking. `--replicates` is the way to tighten this, at proportional cost.
+
 | Harness | Pass rate | ELO (95% CI) | $/task | min/task |
 |---|---|---|---|---|
-| pi + skills | 8/8 | 1121 (999 to 1334) | 0.21 (estimated) | 1.4 |
-| claude-code | 8/8 | 1060 (914 to 1253) | 0.27 | 1.2 |
-| pi | 7/8 | 982 (851 to 1140) | 0.21 (estimated) | 1.3 |
-| codex | 5/8 | 837 (561 to 968) | 0.01 | 2.1 |
+| claude-code | 8/8 | 1166 (1020 to 1594) | 0.27 | 1.2 |
+| pi + skills | 8/8 | 1053 (920 to 1290) | ~0.21 | 1.4 |
+| pi | 7/8 | 978 (810 to 1183) | ~0.21 | 1.3 |
+| codex | 5/8 | 804 (519 to 928) | 0.01 | 2.1 |
 
 How to read it:
 
-- **The top two are not separated.** pi + skills is ahead of claude-code in 69% of resamples.
-  The jury is not what makes the order wobble: re-judging the same 48 rounds three more times
-  with the same panel changed the verdict on 16 of the 38 jury-judged rounds at least once, but
-  never switched a winner (the changes are between a pick, a tie and no result), and the ranking
-  came out identical every time. What moves the order is which rounds are drawn: the first run,
-  with a different draw and `password-recovery` in the sample, put claude-code first. With 32
-  rated rounds, the order of two agents that pass the same tests follows the draw.
+- **The top two are not separated.** claude-code is ahead of pi + skills in 86% of resamples,
+  and its interval overlaps pi + skills and pi. The order of these two has moved before: the
+  live run's panel (gpt-6-luna, gemini-3.1-pro-preview and claude-sonnet-5-5, two of them from
+  a contestant's family) put pi + skills first, and an earlier run with a different round draw
+  put claude-code first. Re-judging with that old panel three more times never switched a winner,
+  so the draw and the panel move the order, not the noise of one panel. With 36 rated rounds,
+  the order of two agents that pass the same tests is not settled.
 - **The tests separate little at the top.** Five of the eight tasks are passed by every agent.
   The one task that separates pi from pi + skills is `headless-terminal`, a single trial each.
   `pi + skills` differs from `pi` in three ways (the skills folder, one line of system prompt and
@@ -349,8 +368,9 @@ Run conditions: Harbor 0.24.0; the first 8 tasks of `configs/tb21-sample16.txt` 
 2 hard: `tasks sample --n 8 --seed 7` with `password-recovery` replaced by `cancel-async-tasks`,
 because Opus 5.5 refuses it whatever the harness, which tells nothing about the harness); an Apple-silicon Mac with
 `max_parallel_trials: 2`; 32 trials, each run once and cached across runs; 48 rounds, of which
-the verifier gate decided 10 and the jury 38 (16 of those inconclusive); jury agreement 80%,
-jury cost $2.57 for the final run. A refusal counts as a loss, like any other failed task.
+the verifier gate decided 10 and the jury 38 (14 of those a tie or no result); jury agreement
+90%. The live run's jury cost $2.57 and the re-judge $2.50; 3 of the re-judge's 114 judge votes
+were lost to grok-4.5 timeouts. A refusal counts as a loss, like any other failed task.
 
 ### Budget pool: cheap models behind the agents
 
@@ -359,37 +379,37 @@ jury cost $2.57 for the final run. A refusal counts as a loss, like any other fa
 `configure-git-webserver`, `polyglot-rust-c`), with models that cost about $0.1 to $0.4 per million
 input tokens, 10 to 40 times less than Opus. Measured on 2026-10-19 with an Apple-silicon Mac and
 `max_parallel_trials: 3`: 96 trials, 3.2 hours, $7.60 of agent spend (pi's cost is estimated from
-tokens) and $1.13 of jury.
+tokens) and $1.13 of jury; the re-judge with the new panel cost $3.36.
 
 | Harness | Pass rate | ELO (95% CI) | $/task | min/task |
 |---|---|---|---|---|
-| claude-code (haiku-5-5) | 14/16 | 1204 (1121 to 1318) | 0.03 | 2.0 |
-| pi + skills (haiku-5-5) | 12/16 | 1112 (1042 to 1191) | 0.01 | 1.6 |
-| pi (haiku-5-5) | 13/16 | 1083 (1012 to 1165) | 0.01 | 1.6 |
-| codex (gpt-6-luna)&dagger; | 11/16 | 1046 (959 to 1136) | 0.01 | 1.9 |
-| pi (glm-5.3-flash) | 8/16 | 780 (668 to 864) | 0.01 | 6.3 |
-| pi (deepseek-v4-pro) | 12/16 | 775 (665 to 853) | 0.40 | 5.6 |
+| claude-code (haiku-5-5) | 14/16 | 1238 (1142 to 1362) | 0.03 | 2.0 |
+| pi + skills (haiku-5-5) | 12/16 | 1117 (1038 to 1206) | ~0.01 | 1.6 |
+| pi (haiku-5-5) | 13/16 | 1069 (990 to 1154) | ~0.01 | 1.6 |
+| codex (gpt-6-luna) | 11/16 | 1045 (959 to 1131) | 0.01 | 1.9 |
+| pi (deepseek-v4-pro) | 12/16 | 776 (674 to 857) | ~0.40 | 5.6 |
+| pi (glm-5.3-flash) | 8/16 | 754 (633 to 841) | ~0.01 | 6.3 |
 
-&dagger; `openai/gpt-6-luna` is also one of the three judges, so one judge shares codex's model.
-The preflight warns about it. codex's pass rate comes from the tests and does not depend on the
-jury; its ELO may. A later jury is picked with no contestant's model family on it.
+One codex attempt voided: on `headless-terminal` the verifier timed out after 22 minutes
+(`VerifierTimeoutError`). Nothing was cached, so the trial ran again in the same run: codex made
+17 attempts and has 16 verified trials, and 11/16 is out of those 16. Every other agent made 16
+attempts, all verified.
 
 How to read it:
 
 - **The tests separate more here than with Opus.** Of the 16 tasks, 5 are passed by every agent and
   `raman-fitting` is passed by none, so 10 carry signal, against 3 of 8 in the Opus run.
 - **ELO is not pass rate.** pi with deepseek-v4-pro passes 12 of 16, as many as pi + skills, yet rates
-  last. The criteria ask the jury to weigh efficiency, and on trials that passed, its median is 37
-  steps, 3.1 minutes and $0.13, against 10 to 13 steps, under a minute and under a cent for the
-  Haiku agents. It lost 50 of its 64 jury rounds. It also accounts for $6.44 of the $7.60 agent
+  below every Haiku agent and codex. The criteria ask the jury to weigh efficiency, and on trials
+  that passed, its median is 37 steps, 3.1 minutes and $0.13, against 10 to 13 steps, under a
+  minute and under a cent for the Haiku agents. It lost 52 of its 64 jury rounds. It also accounts for $6.44 of the $7.60 agent
   spend. If you want correctness alone, rank by pass rate.
 - **Same model, different harness again.** claude-code leads the three Haiku agents on both pass
-  rate (14 of 16 against 12 and 13) and ELO (1204 against 1083 and 1112), but its interval still
+  rate (14 of 16 against 12 and 13) and ELO (1238 against 1069 and 1117), but its interval still
   overlaps the two pi entries, so it is a lead, not a separation. The two pi agents overlap fully.
-- **The intervals are tighter than the Opus run**: 150 to 200 points wide for the top four, against
-  290 to 410 there, because this run drew 240 rounds, 59 of them decided by the tests.
-- **Jury:** 94% mean agreement, and 38 rounds ended in a tie or no result. One round voided: a
-  codex trial hit `VerifierTimeoutError` after 22 minutes and is retried on the next run.
+- **The intervals are tighter than the Opus run**: 165 to 220 points wide for the top four, against
+  370 to 570 there, because this run drew 240 rounds, 59 of them decided by the tests.
+- **Jury:** 92% mean agreement, and 36 rounds ended in a tie or no result.
 
 One trial per task and agent, as above: a pass rate over 16 tasks moves 6 points per task.
 
@@ -398,32 +418,30 @@ One trial per task and agent, as above: a pass rate over 16 tasks moves 6 points
 `pi + skills` differs from `pi` in three ways (the skills folder, a system prompt line and
 `thinking: medium`), so the budget config adds `pi + thinking (haiku)`: thinking medium and
 nothing else. Measured on 2026-10-20, 16 tasks, 7 agents, 16 new trials (the rest replayed from
-cache), 282 rated rounds, 0 voided:
+cache), 278 rated rounds, 0 voided, re-judged by the same panel as the table above:
 
 | Harness | Pass rate | ELO (95% CI) | $/task | min/task |
 |---|---|---|---|---|
-| pi + thinking (haiku-5-5) | 13/16 | 1240 (1161 to 1350) | ~0.01 | 1.4 |
-| claude-code (haiku-5-5) | 14/16 | 1188 (1107 to 1292) | 0.03 | 2.0 |
-| pi + skills (haiku-5-5) | 12/16 | 1073 (1003 to 1149) | ~0.01 | 1.6 |
-| pi (haiku-5-5) | 13/16 | 1035 (964 to 1111) | ~0.01 | 1.6 |
-| codex (gpt-6-luna)&dagger; | 11/16 | 1009 (921 to 1091) | 0.01 | 1.9 |
-| pi (deepseek-v4-pro) | 12/16 | 737 (617 to 817) | ~0.40 | 5.6 |
-| pi (glm-5.3-flash) | 8/16 | 717 (599 to 804) | ~0.01 | 6.3 |
-
-&dagger; See the note under the budget table: codex runs the model of one of its judges.
+| claude-code (haiku-5-5) | 14/16 | 1220 (1134 to 1331) | 0.03 | 2.0 |
+| pi + thinking (haiku-5-5) | 13/16 | 1208 (1133 to 1307) | ~0.01 | 1.4 |
+| pi + skills (haiku-5-5) | 12/16 | 1077 (1008 to 1153) | ~0.01 | 1.6 |
+| pi (haiku-5-5) | 13/16 | 1042 (963 to 1118) | ~0.01 | 1.6 |
+| codex (gpt-6-luna) | 11/16 | 1021 (938 to 1102) | 0.01 | 1.9 |
+| pi (deepseek-v4-pro) | 12/16 | 738 (630 to 819) | ~0.40 | 5.6 |
+| pi (glm-5.3-flash) | 8/16 | 695 (561 to 784) | ~0.01 | 6.3 |
 
 - **On correctness the three pi setups are one tier.** They pass 13, 12 and 13 of 16, and the only
   task that separates them is `headless-terminal`, which `pi + skills` fails. One task is too
   close to call.
-- **On quality they separate, in two steps.** Thinking medium alone adds 205 points over `pi`
-  (1240 against 1035). Adding the skills folder and the prompt line on top of it removes 167 of
-  them (`pi + skills`, 1073). On jury rounds `pi + thinking` beat `pi + skills` 10 times to 1 and
-  `pi` 7 times to 1 (the rest ties or no result). It takes fewer steps (median 10, against 13
+- **On quality they separate, in two steps.** Thinking medium alone adds 166 points over `pi`
+  (1208 against 1042). Adding the skills folder and the prompt line on top of it removes 131 of
+  them (`pi + skills`, 1077). On jury rounds `pi + thinking` beat `pi + skills` 7 times to 2 and
+  `pi` 8 times to 1 (the rest ties or no result). It takes fewer steps (median 10, against 13
   and 11) and less time (1.4 minutes, against 1.6 and 1.6).
-- **So the overlay looks harmful here, not inert.** `pi + skills` still rates 38 points above
+- **So the overlay looks harmful here, not inert.** `pi + skills` still rates 35 points above
   `pi`, but that is thinking's gain minus the overlay's cost.
-- **The sample is small.** 16 tasks, one trial each, and the top intervals overlap (`pi + thinking`
-  and claude-code). The example skill in `harness/skills` is two lines, so this says nothing about
+- **The sample is small.** 16 tasks, one trial each, and the top intervals overlap (claude-code
+  and `pi + thinking`; the live run's panel had them the other way round). The example skill in `harness/skills` is two lines, so this says nothing about
   skills that carry real task knowledge.
 - ELO is only comparable inside one pool: adding the control moved every rating.
 
@@ -432,19 +450,24 @@ cache), 282 rated rounds, 0 voided:
 `configs/harness-tb21-mid.yaml` puts five more models behind pi on the same 16 tasks, with the two
 Haiku 5.5 agents of the budget pool as a bridge. All five were smoke-tested through pi and the
 router on one easy task first. Measured on 2026-10-20: 7 agents, 336 rounds, 80 new trials
-(the Haiku ones replayed from the budget run's cache), 5.3 hours, and $1.53 of jury. The agent
+(the Haiku ones replayed from the budget run's cache), 5.3 hours, and $1.53 of jury ($4.51 for the
+re-judge with the new panel). The agent
 spend of the five new models was $27.26, and all of it is **estimated** (pi reports no cost, so
 it is tokens priced at the catalog rate), not a billed figure.
 
 | Harness | Pass rate | ELO (95% CI) | $/task | min/task | Agent timeouts |
 |---|---|---|---|---|---|
-| claude-code (haiku-5-5) | 14/16 | 1327 (1236 to 1459) | 0.03 | 2.0 | 0 |
-| pi (haiku-5-5) | 13/16 | 1180 (1111 to 1268) | ~0.01 | 1.6 | 0 |
-| pi (deepseek-v4.1-flash) | 9/16 | 980 (906 to 1050) | ~0.21 | 10.0 | 4 |
-| pi (grok-4.3) | 6/16 | 951 (880 to 1026) | ~0.12 | 4.0 | 2 |
-| pi (muse-spark-1.3) | 8/16 | 891 (817 to 961) | ~0.57 | 7.5 | 1 |
-| pi (glm-5.3) | 7/16 | 863 (773 to 938) | ~0.26 | 7.9 | 3 |
-| pi (qwen3.8-max) | 9/16 | 808 (710 to 879) | ~0.54 | 15.1 | 8 |
+| claude-code (haiku-5-5) | 14/16 | 1366 (1263 to 1530) | 0.03 | 2.0 | 0 |
+| pi (haiku-5-5) | 13/16 | 1193 (1120 to 1290) | ~0.01 | 1.6 | 0 |
+| pi (deepseek-v4.1-flash) | 9/16 | 975 (894 to 1062) | ~0.21 | 10.0 | 4 |
+| pi (grok-4.3) | 6/16 | 936 (843 to 1024) | ~0.12 | 4.0 | 2 |
+| pi (muse-spark-1.3) | 8/16 | 883 (796 to 951) | ~0.57 | 7.5 | 1 |
+| pi (qwen3.8-max) | 9/16 | 835 (746 to 911) | ~0.54 | 15.1 | 8 |
+| pi (glm-5.3) | 7/16 | 811 (713 to 879) | ~0.26 | 7.9 | 3 |
+
+One pi (muse-spark-1.3) attempt voided: the trial made no model call ("the router may have
+refused it"). It ran again in the same run, so muse-spark-1.3 made 17 attempts and has 16
+verified trials. Every other agent made 16 attempts, all verified.
 
 ELO is only comparable inside one pool: the two Haiku agents rate higher here than in the budget
 pool because they face weaker opponents.
@@ -465,8 +488,9 @@ How to read it:
 - **The tests still separate**: `fix-git` and `merge-diff-arc-agi-task` are passed by all seven,
   `raman-fitting` by none (as in the budget run), and 125 of the 336 rounds were decided by the
   tests alone.
-- **Jury:** 92% mean agreement. One round voided: a pi (muse-spark-1.3) trial made no model call
-  ("the router may have refused it"), so it is retried on the next run.
+- **Jury:** 91% mean agreement. The live run's panel had `alibaba/qwen3.7-plus` on it, from the
+  same family as qwen3.8-max; without it qwen3.8-max rates 27 points higher, so that judge did
+  not favour its family here.
 
 ## What comes next
 

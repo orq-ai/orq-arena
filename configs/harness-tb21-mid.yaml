@@ -71,7 +71,9 @@ candidates:
     model_id: xai/grok-4.3
     agent_kwargs: { max_turns: 60 }
 
+# A cheap prompted panel with no contestant's model family on it (google and mistral),
+# so no judge rates its own maker's model. The same panel judges harness-tb21-budget.yaml.
 judges:
-  - openai/gpt-6-luna
   - google/gemini-3.5-flash-lite
-  - alibaba/qwen3.7-plus
+  - mistral/mistral-medium-2604
+  - google/gemini-3.7-flash

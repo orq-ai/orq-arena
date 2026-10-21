@@ -74,9 +74,10 @@ candidates:
     model_id: openai/gpt-6-luna
 
 # A prompted panel: the dossier is long, so decision models (32k to 64k of
-# context) are not used here. google/gemini-3.1-pro-preview stands in for a
-# newer gemini pro; pick judges outside the agents' model families when you can.
+# context) are not used here. No judge shares a family with a contestant
+# (anthropic, openai): a judge can favour its own maker's model.
+# google/gemini-3.1-pro-preview stands in for a newer gemini pro.
 judges:
-  - openai/gpt-6-luna
   - google/gemini-3.1-pro-preview
-  - anthropic/claude-sonnet-5-5
+  - xai/grok-4.5
+  - mistral/mistral-medium-2604
