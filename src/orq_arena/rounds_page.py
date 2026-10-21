@@ -17,6 +17,7 @@ from typing import Any
 from evaluatorq.common.reports import esc as _e
 
 from .data.schemas import BattleRecord
+from .fmt import fmt_duration
 from .judging import floor_abstained, vote_probabilities
 from .redact import redact
 
@@ -92,7 +93,7 @@ def _trial(sol: dict[str, Any], dossier: str) -> dict[str, Any]:
         "steps": int(sol.get("steps") or 0),
         "cmds": int(sol.get("commands") or 0),
         "edits": int(sol.get("edits") or 0),
-        "ms": int(sol.get("duration_ms") or 0),
+        "dur": fmt_duration(int(sol.get("duration_ms") or 0)),
         "exit": sol.get("exit_reason") or "unknown",
         "stat": sol.get("diff_stat") or "",
         "note": sol.get("diff_note") or "",
@@ -103,6 +104,17 @@ def _trial(sol: dict[str, Any], dossier: str) -> dict[str, Any]:
         "tests": _read(sol, "verifier", "test-stdout.txt", cap=TESTS_CAP, tail=True),
         "dossier": dossier,
     }
+
+
+def how_decided(verdict: str, gate: bool) -> str:
+    """The row label for how a round ended; the same split as the outcome pills."""
+    if verdict == "void":
+        return "voided"
+    if gate:
+        return "decided by tests"
+    if verdict in ("A", "B"):
+        return "decided by jury"
+    return "tie" if verdict == "tie" else "no result"
 
 
 def rounds_data(
@@ -150,6 +162,7 @@ def rounds_data(
                 }
             )
         picks = {v["vote"] for v in votes if v["vote"]}
+        verdict = "void" if r.error else r.majority_verdict
         rounds.append(
             {
                 "i": i,
@@ -161,7 +174,8 @@ def rounds_data(
                 "level": meta.get("difficulty") or "",
                 "a": name_a,
                 "b": name_b,
-                "v": "void" if r.error else r.majority_verdict,
+                "v": verdict,
+                "how": how_decided(verdict, bool(r.decided_by_gate)),
                 "err": r.error or "",
                 "gate": bool(r.decided_by_gate),
                 "split": bool(
@@ -313,7 +327,6 @@ const R = D.rounds, T = D.trials;
 const $ = id => document.getElementById(id);
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const uniq = xs => [...new Set(xs.filter(x => x !== '' && x != null))];
-const fmtDur = ms => { const s = Math.floor(ms / 1000); return s >= 60 ? Math.floor(s / 60) + 'm ' + String(s % 60).padStart(2, '0') + 's' : s + 's'; };
 const fmtUsd = v => v == null ? 'cost unknown' : '$' + (v < 0.1 ? v.toFixed(3) : v.toFixed(2));
 const winnerOf = r => r.v === 'A' ? r.a : r.v === 'B' ? r.b : '';
 const harness = R.some(r => r.ta || r.tb);
@@ -332,6 +345,8 @@ fill('f-cat', 'any', uniq(R.map(r => r.cat)).sort());
 fill('f-match', 'any', uniq(R.map(r => r.match)));
 $('l-tests').hidden = !harness;
 $('l-cat').hidden = !harness || uniq(R.map(r => r.cat)).length < 2;
+// a hidden control must not filter: drop it from the state and the address
+if ($('l-cat').hidden) FIELDS.splice(FIELDS.indexOf('cat'), 1);
 if (D.capped) $('capnote').textContent = 'Showing the first ' + R.length + ' of ' + D.total + ' rounds.';
 let show = '';
 const pills = $('pills');
@@ -345,7 +360,11 @@ function state() { const s = {}; for (const f of FIELDS) { const v = field(f).va
 function writeHash() { const p = new URLSearchParams(state()).toString(); history.replaceState(null, '', p ? '#' + p : location.pathname + location.search); }
 function readHash() {
   const p = new URLSearchParams(location.hash.slice(1));
-  for (const f of FIELDS) { const f_ = field(f); const v = p.get(f) || ''; f_.value = v; if (f !== 'show' && f_.value !== v) f_.value = ''; }
+  for (const f of FIELDS) {
+    const f_ = field(f); const v = p.get(f) || '';
+    if (f === 'show') { show = PILLS.some(([k]) => k === v) ? v : ''; continue; }
+    f_.value = v; if (f_.value !== v) f_.value = '';
+  }
 }
 
 function matches(r, s) {
@@ -400,7 +419,7 @@ function trialPane(letter, name, key, gated) {
   const word = t.passed === true ? '✓ hidden tests PASSED' : t.passed === false ? '✗ hidden tests FAILED' : 'hidden tests not run';
   p.appendChild(badge(word + (typeof t.reward === 'number' ? ' (reward ' + t.reward + ')' : ''), t.passed === true ? 'pass' : t.passed === false ? 'fail' : 'neutral'));
   box.appendChild(p);
-  box.appendChild(el('p', 'hx-counts', t.steps + ' steps · ' + t.cmds + ' cmds · ' + t.edits + ' edits · ' + fmtDur(t.ms) + ' · ' +
+  box.appendChild(el('p', 'hx-counts', t.steps + ' steps · ' + t.cmds + ' cmds · ' + t.edits + ' edits · ' + t.dur + ' · ' +
     fmtUsd(t.cost) + (t.cost == null ? '' : t.est ? ' (estimated)' : ' (observed)')));
   box.appendChild(el('p', 'hx-exit', 'exit: ' + t.exit));
   const stat = t.stat + (t.tests_edited ? '  ⚠ tests/ edited' : '');
@@ -449,8 +468,7 @@ const rows = R.map(r => {
   const title = r.task ? r.task + (r.level ? ' · ' + r.level : '') : (r.q.length > 140 ? r.q.slice(0, 140) + '…' : r.q);
   const pair = el('div', 'rd-pair');
   pair.append(el('span', 'sideA', 'A'), ' ' + r.a + '  vs  ', el('span', 'sideB', 'B'), ' ' + r.b);
-  const how = r.v === 'void' ? 'voided' : r.gate ? 'decided by tests' : 'decided by jury';
-  main.append(el('div', 'rd-title', title), pair, el('div', 'rd-meta', [r.match ? r.match + ' · round ' + r.n : '', how].filter(Boolean).join(' · ')));
+  main.append(el('div', 'rd-title', title), pair, el('div', 'rd-meta', [r.match ? r.match + ' · round ' + r.n : '', r.how].filter(Boolean).join(' · ')));
   const end = el('div', 'rd-end');
   if (r.split) { const w = el('span', 'rd-warn', '⚠ split'); w.title = 'the panel split or could not decide'; end.appendChild(w); }
   end.appendChild(verdictBadge(r));
@@ -463,6 +481,8 @@ const rows = R.map(r => {
 const list = $('list'); rows.forEach(d => list.appendChild(d));
 
 function apply() {
+  // the opponent picker only exists beside an agent: clear it before reading the state
+  if (!$('f-who').value && $('f-vs').value) $('f-vs').value = '';
   const s = state();
   let order = R.map((r, k) => k);
   if (s.sort === 'split') order.sort((x, y) => (R[y].split - R[x].split) || (x - y));
@@ -472,7 +492,6 @@ function apply() {
   $('count').textContent = shown + ' of ' + R.length + ' rounds';
   $('empty').hidden = shown > 0;
   $('vs-wrap').hidden = !s.who;
-  if (!s.who && $('f-vs').value) { $('f-vs').value = ''; }
   pills.querySelectorAll('.rf-pill').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === show)));
   $('reset').hidden = Object.keys(s).length === 0;
   if (s.win || s.tests || s.match || s.cat || s.panel || s.sort) $('more').open = true;

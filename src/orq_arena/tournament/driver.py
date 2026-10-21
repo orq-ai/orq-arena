@@ -203,7 +203,9 @@ def harness_summary(records: list[BattleRecord], alias: dict[str, str]) -> dict[
             "pass_rate": (sum(1 for s in verified if s["passed"]) / len(verified))
             if verified
             else None,
+            # the mean is over priced trials only; ``priced`` < ``trials`` says how many it left out
             "mean_cost_usd": sum(costs) / len(costs) if costs else None,
+            "priced": len(costs),
             "mean_duration_s": sum(s.get("duration_ms", 0) for s in sols) / len(sols) / 1000,
             "tests_edited": sum(1 for s in sols if s.get("tests_edited")),
         }

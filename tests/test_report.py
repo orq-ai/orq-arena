@@ -644,7 +644,7 @@ def test_harness_rounds_page_carries_badges_diff_trajectory_and_gate(tmp_path):
     assert r["gate"] is True and r["v"] == "B" and (r["a"], r["b"]) == ("pi", "codex")
     ta, tb = data["trials"][r["ta"]], data["trials"][r["tb"]]
     assert (ta["passed"], tb["passed"]) == (False, True)
-    assert (ta["steps"], ta["cmds"], ta["edits"], ta["ms"]) == (23, 14, 6, 680_000)
+    assert (ta["steps"], ta["cmds"], ta["edits"], ta["dur"]) == (23, 14, 6, "11m 20s")
     assert ta["tests_edited"] is True and tb["exit"] == "max_turns" and tb["cost"] == 0.18
     assert "<script>alert(1)</script>" in ta["diff"] and "$ pytest <b>" in ta["traj"]
     assert ta["n_traj"] == 1 and "FAILED test_history_intact" in ta["tests"]
@@ -691,8 +691,33 @@ def test_the_ladder_and_the_spend_card_say_when_a_cost_is_estimated(tmp_path):
     )  # fmt: skip
     assert "~$0.42" in html and "1 of 1 trials priced from tokens" in html
     assert "(3 void)" in html  # a void is shown beside the pass rate
+    assert "win share &middot; ~$" in html  # the podium card marks pi's spend as estimated
     assert (
         "1 observed, 1 estimated from tokens" in html and "2 trials &middot; observed" not in html
     )
     assert _cost_provenance(4, 0) == "observed"
     assert _cost_provenance(4, 4) == "estimated from tokens"
+
+
+def test_a_round_says_how_it_ended_with_the_split_the_pills_use():
+    from orq_arena.data.schemas import GATE_JUDGE
+
+    gated = _record("A").model_copy(update={"judge_votes": [{"model": GATE_JUDGE, "vote": "A"}]})
+    void = _record("A").model_copy(update={"error": "harbor exited 1"})
+    recs = [_record("A"), _record("B"), _record("tie"), _record("inconclusive"), gated, void]
+    hows = [r["how"] for r in rounds_data(recs, {}, {}, None)["rounds"]]
+    assert hows == [
+        "decided by jury", "decided by jury", "tie", "no result", "decided by tests", "voided",
+    ]  # fmt: skip
+
+
+def test_a_trial_duration_is_formatted_once_in_python():
+    rec = _record("A").model_copy(
+        update={"solution_a": {"duration_ms": 125_000}, "solution_b": {"duration_ms": 45_000}}
+    )
+    trials = rounds_data([rec], {}, {}, None)["trials"]
+    assert sorted(t["dur"] for t in trials.values()) == ["2m 05s", "45s"]
+    html = build_rounds_html(
+        records=[rec], alias={}, labels={}, floor=None, title="t", report_href="r.html"
+    )
+    assert "fmtDur" not in html  # no second copy of the format in the page script

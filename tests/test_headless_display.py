@@ -211,3 +211,14 @@ def test_a_finished_trial_line_marks_an_estimated_cost():
     )
     assert "· $0.42" in _solution_line(SolutionReady(**base))
     assert "· ~$0.42" in _solution_line(SolutionReady(**base, cost_estimated=True))
+
+
+def test_the_tui_and_the_headless_table_show_voids_estimates_and_unpriced_trials_alike():
+    from orq_arena.headless import _harness_cells as headless_cells
+    from orq_arena.tui.screens.leaderboard import _harness_cells as tui_cells
+
+    h = {
+        "trials": 10, "passed": 2, "verified": 2, "unverified": 8, "priced": 2,
+        "mean_cost_usd": 0.21, "estimated": 2, "mean_duration_s": 90.0,
+    }  # fmt: skip
+    assert headless_cells(h) == tui_cells(h) == ["2/2 (8 void)", "~0.21 (8 unpriced)", "1.5"]

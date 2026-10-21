@@ -281,14 +281,23 @@ def _kpi(label: str, value: str, subtitle: str, status: str = "") -> str:
     )
 
 
-def _value_map_svg(points, champion: str, size_label: str = "average response length") -> str:
+def _value_map_svg(
+    points,
+    champion: str,
+    size_label: str = "average response length",
+    estimated: frozenset[str] = frozenset(),
+) -> str:
     """ELO vs cost (log x), dashed best-value frontier, size = avg out tokens.
 
     ELO on y (not win rate) so dot height agrees with the leaderboard rank in
     the dot: raw win rate ignores opponent strength and inverts rank order.
     points: (name, cost_usd, elo, win_rate, size) in leaderboard order.
+    estimated: names whose cost is partly tokens at the catalog rate, shown with ``~``.
     """
     import math
+
+    def _usd(name: str, v: float) -> str:
+        return ("~" if name in estimated else "") + _fmt_usd(v)
 
     if len(points) < 2:
         return ""
@@ -336,7 +345,7 @@ def _value_map_svg(points, champion: str, size_label: str = "average response le
         dots.append(
             f"<circle cx='{x:.0f}' cy='{y:.0f}' r='{rad:.0f}' fill='{fill}' opacity='.9' "
             f"stroke='var(--surface)' stroke-width='1.5'>"
-            f"<title>{_e(name)}: {_fmt_usd(c)}, ELO {e:.0f}, {r:.0%} win rate</title></circle>"
+            f"<title>{_e(name)}: {_usd(name, c)}, ELO {e:.0f}, {r:.0%} win rate</title></circle>"
             f"<text x='{x:.0f}' y='{y + 3.5:.0f}' font-size='10' font-weight='700' fill='#fff' "
             f"text-anchor='middle' pointer-events='none'>{rk}</text>"
         )
@@ -364,12 +373,12 @@ def _value_map_svg(points, champion: str, size_label: str = "average response le
             dots.append(
                 leader + f"<text x='{lx:.0f}' y='{ly:.0f}' font-size='11' font-weight='700' "
                 f"fill='var(--slate)' text-anchor='middle'>{_e(name)} "
-                f"<tspan fill='var(--gray-500)' font-weight='400'>{_fmt_usd(c)} &middot; ELO {e:.0f}</tspan></text>"
+                f"<tspan fill='var(--gray-500)' font-weight='400'>{_usd(name, c)} &middot; ELO {e:.0f}</tspan></text>"
             )
         star = " &#9733;" if on_frontier else ""
         key_rows.append(
             f"<span style='white-space:nowrap'><b>{rk}</b> {_e(name)} "
-            f"<span style='color:var(--gray-500)'>{_fmt_usd(c)} &middot; ELO {e:.0f} &middot; {r:.0%}{star}</span></span>"
+            f"<span style='color:var(--gray-500)'>{_usd(name, c)} &middot; ELO {e:.0f} &middot; {r:.0%}{star}</span></span>"
         )
     key = (
         "<p class='note' style='display:flex;flex-wrap:wrap;gap:4px 18px'>"
@@ -660,6 +669,10 @@ def build_report_html(
             cost_v, dur_v = hs.get("mean_cost_usd"), hs.get("mean_duration_s")
             est_n = hs.get("estimated") or 0
             cost_txt = "n/a" if cost_v is None else fmt_cost(cost_v, bool(est_n), 2)
+            unpriced = hs.get("trials", 0) - hs.get("priced", hs.get("trials", 0))
+            if cost_v is not None and unpriced > 0:
+                # the mean covers priced trials only; say how many it left out
+                cost_txt += f" <span class='sig warn'>({unpriced} unpriced)</span>"
             cost_title = (
                 f" title='{est_n} of {hs.get('trials', 0)} trials priced from tokens at the catalog rate'"
                 if est_n
@@ -932,6 +945,8 @@ def build_report_html(
         _harness_costs(records, alias) if is_harness else ({}, 0, 0)
     )
     trial_usd = sum(trial_usd_by.values())
+    # harnesses whose spend includes trials priced from tokens: their costs carry a "~"
+    est_names = frozenset(n for n, hs in harness_stats.items() if hs.get("estimated"))
     value_map = ""
     if prices or trial_usd_by:
         per_cost = {
@@ -955,6 +970,7 @@ def build_report_html(
             pts,
             champion,
             size_label=("average time to answer" if use_dur else "average response length"),
+            estimated=est_names,
         )
 
     rates_all = _win_rates(grid, order)
@@ -999,9 +1015,15 @@ def build_report_html(
             j_card = _kpi(
                 "Jury", _fmt_usd(j_usd), f"{j_in:,} in &middot; {j_out:,} out &middot; measured"
             )
-            t_card = _kpi("Total", f"${total:,.2f}", share_sub, "neutral")
+            # an agent that reports no cost is priced from tokens, so the total is approximate
+            t_card = (
+                _kpi("Estimated total", f"&asymp; ${total:,.2f}", share_sub, "neutral")
+                if est_names
+                else _kpi("Total", f"${total:,.2f}", share_sub, "neutral")
+            )
             spend = (
                 "Model and jury spend are exact: jury cost is what each judge call was priced at."
+                + (" Agent spend is partly estimated, so the total is too." if est_names else "")
             )
         else:
             j_big = f"&asymp; ${j_usd:,.2f}" if j_usd is not None else "n/a"
@@ -1111,7 +1133,7 @@ def build_report_html(
         # ELO is the value (the ranking axis); win share and spend ride below.
         sub = f"ELO &middot; {rates_all.get(nm, 0.0):.0%} win share"
         if nm in per_cost_all:
-            sub += f" &middot; {_fmt_usd(per_cost_all[nm])}"
+            sub += f" &middot; {'~' if nm in est_names else ''}{_fmt_usd(per_cost_all[nm])}"
         edge = ("pass" if separated else "warn") if i == 0 else ""
         top3.append(_kpi(_e(nm), f"{e0:.0f}<span class='medal'>{medals[i]}</span>", sub, edge))
     # Reconcile the common confusion when a lower-ranked card shows a higher

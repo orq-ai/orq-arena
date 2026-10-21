@@ -39,7 +39,7 @@ from .events import (
     TournamentEnded,
     TurnResolved,
 )
-from .fmt import fmt_cost
+from .fmt import fmt_cost, harness_cells
 from .tournament.driver import run_tournament
 
 
@@ -81,19 +81,7 @@ def _verdict_line(ended: TournamentEnded) -> str | None:
 
 
 def _harness_cells(h: dict[str, Any] | None) -> list[str]:
-    if not h:
-        return ["", "", ""]
-    rate = f"{h['passed']}/{h['verified']}" if h.get("verified") else "n/a"
-    if h.get("unverified"):
-        rate += (
-            f" ({h['unverified']} void)"  # a harness that voids 8 of 10 trials must not read 2/2
-        )
-    cost = (
-        f"{'~' if h.get('estimated') else ''}{h['mean_cost_usd']:.2f}"  # "~": tokens at catalog rate
-        if h.get("mean_cost_usd") is not None
-        else "n/a"
-    )
-    return [rate, cost, f"{h.get('mean_duration_s', 0) / 60:.1f}"]
+    return harness_cells(h) if h else ["", "", ""]
 
 
 def _solution_line(ev: SolutionReady) -> str:

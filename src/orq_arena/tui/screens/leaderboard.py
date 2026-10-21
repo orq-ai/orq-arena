@@ -11,26 +11,13 @@ from textual.containers import VerticalScroll
 from textual.screen import Screen
 from textual.widgets import DataTable, Static
 
+from ...fmt import harness_cells
 from ...judging import judge_labels
 
 
 def _harness_cells(h: dict[str, Any] | None) -> list[str]:
     """pass rate, $/task, min/task for one harness; dashes when it has no trials."""
-    if not h:
-        return ["–", "–", "–"]
-    if h.get("verified"):
-        passed = f"{h.get('passed', 0)}/{h['verified']}"
-    elif h.get("pass_rate") is not None:
-        passed = f"{h['pass_rate']:.0%}"
-    else:
-        passed = "–"
-    cost = h.get("mean_cost_usd")
-    secs = h.get("mean_duration_s")
-    return [
-        passed,
-        "–" if cost is None else f"{cost:.2f}",
-        "–" if secs is None else f"{secs / 60:.1f}",
-    ]
+    return harness_cells(h, missing="–") if h else ["–", "–", "–"]
 
 
 class LeaderboardScreen(Screen):

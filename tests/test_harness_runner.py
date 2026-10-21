@@ -418,6 +418,7 @@ def test_harness_summary_counts_voided_and_estimated_trials_beside_the_pass_rate
     )
     assert rep["pi"]["trials"] == 3 and rep["pi"]["verified"] == 1 and rep["pi"]["unverified"] == 2
     assert rep["pi"]["estimated"] == 1 and rep["cc"]["estimated"] == 3
+    assert rep["pi"]["priced"] == 1 and rep["pi"]["mean_cost_usd"] == 0.2  # mean of the priced one
 
 
 def test_one_duration_format_everywhere():
