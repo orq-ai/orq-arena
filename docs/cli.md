@@ -395,7 +395,7 @@ orq-arena rejudge --compare REPORT_JSON [--compare REPORT_JSON ...]
 | `--config PATH` | `orq_arena.yaml` | Supplies `gateway`, and (unless overridden) `criteria`, `judge_api`, `judge_swap`, `judge_abstain_below`, `replacement_judges`, and `min_successful_judges`. |
 | `--output PATH` | none, result only printed | Write the re-judged rounds to this JSONL path. |
 | `--report-json PATH` | none, result only printed | Write the run summary as JSON. |
-| `--concurrency N` | `4` | Max rounds judged at once. Each round makes one call per judge and seat order, and evaluatorq caps in-flight judge calls at 10 per process whatever this is set to. |
+| `--concurrency N` | `4` | Max rounds judged at once. Each round makes one call per judge, two when `judge_swap` is on, and evaluatorq caps in-flight judge calls at 10 per process whatever this is set to. |
 
 **Behavior notes:**
 
