@@ -1,0 +1,19 @@
+{
+    "task": {
+        "path": "/repo/.context/tb21/tasks/fix-git"
+    },
+    "trial_name": "fix-git__hmNjKgV",
+    "trials_dir": "/tmp/hb/spike-cc",
+    "agent": {
+        "name": "claude-code",
+        "model_name": "anthropic/claude-haiku-5-5",
+        "kwargs": {
+            "max_turns": 30,
+            "max_budget_usd": 0.5
+        }
+    },
+    "artifacts": [
+        "/app"
+    ],
+    "job_id": "079baede-de90-49b3-8f6f-bfecaf1e8fb4"
+}

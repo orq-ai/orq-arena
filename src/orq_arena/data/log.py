@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from ..redact import redact
 from .schemas import BattleRecord
 
 
@@ -24,4 +25,4 @@ class BattleLog:
         is complete after every line rather than after some later flush.
         """
         with self.path.open("a", encoding="utf-8") as fh:
-            fh.write(battle.model_dump_json() + "\n")
+            fh.write(redact(battle.model_dump_json()) + "\n")

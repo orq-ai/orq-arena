@@ -1,0 +1,17 @@
+"""Spike helper: Codex agent that keeps the provider prefix in --model.
+
+Harbor's Codex strips "openai/" from the model (model_name.split("/")[-1]), but the
+orq router (/v3/router/responses) requires "provider/model". This subclass rewrites
+the `--model` flag of the generated `codex exec` command back to the full id.
+"""
+from harbor.agents.installed.codex import Codex
+
+
+class OrqCodex(Codex):
+    async def exec_as_agent(self, environment, command, *args, **kwargs):
+        if self.model_name and "codex exec" in command:
+            bare = self.model_name.split("/")[-1]
+            command = command.replace(
+                f"--model {bare} ", f"--model {self.model_name} ", 1
+            )
+        return await super().exec_as_agent(environment, command, *args, **kwargs)

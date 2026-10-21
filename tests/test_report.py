@@ -2,7 +2,8 @@
 
 from orq_arena.config import ArenaConfig
 from orq_arena.data.schemas import BattleRecord
-from orq_arena.report import _ROUNDS_CAP, build_report_html, report_path_for
+from orq_arena.report import build_report_html, report_path_for, write_report
+from orq_arena.rounds_page import build_rounds_html, rounds_data, rounds_path_for
 
 CFG = ArenaConfig.model_validate(
     {
@@ -384,8 +385,10 @@ def test_decisions_report_measures_jury_cost_and_shows_confidence():
     assert "openai/judge-x" in html and "groq/judge-x" in html
     assert "panel: openai/judge-x, groq/judge-x (decision models)" in html
     assert "Every verdict via the orq.ai Decisions API" in html
-    # Rounds show probabilities, not the synthesized explanation.
-    assert "A 71% &middot; B 18% &middot; tie 11%" in html
+    # Rounds (on their own page) show probabilities, not the synthesized explanation.
+    data = rounds_data(records, {}, {"openai/judge-x": "openai/judge-x"}, 0.5)
+    assert data["rounds"][0]["votes"][0]["why"] == "A 71% · B 18% · tie 11%"
+    assert data["rounds"][0]["votes"][1]["floor"] is True
     assert "choice=" not in html
     assert not any(d in html for d in ("\u2014", "&mdash;", "&#8212;", "&#x2014;"))
 
@@ -403,20 +406,73 @@ def test_swap_off_says_position_bias_was_not_measured():
     assert "single seat order, so position bias (the flip rate) was not measured" in html
 
 
-def test_rounds_section_renders_chips_and_caps():
-    records = [_record("A") for _ in range(_ROUNDS_CAP + 5)]
-    html = build_report_html(
-        cfg=CFG,
-        records=records,
-        elo={"model-a": 1050.0, "model-b": 950.0},
-        report=REPORT,
-        manifest=MANIFEST,
+def test_the_report_links_to_the_rounds_page_and_never_embeds_a_round():
+    records = [_record("A") for _ in range(5)]
+    kw = dict(cfg=CFG, records=records, elo={"model-a": 1050.0, "model-b": 950.0}, report=REPORT, manifest=MANIFEST)  # fmt: skip
+    html = build_report_html(**kw, rounds_href="battles.rounds.html")
+    assert "<h2>Rounds</h2>" in html and "href='battles.rounds.html'" in html
+    assert "pw-cmp" not in html.replace(".pw-cmp", "")  # no round markup, only the stylesheet
+    assert "<details class='pw-cmp'" not in html and "pw-vote__why'>" not in html
+    assert "<h2>Rounds</h2>" not in build_report_html(**kw)  # no page to link to, no section
+
+
+def test_the_rounds_page_path_sits_next_to_the_report():
+    assert rounds_path_for("x/battles.report.html").name == "battles.rounds.html"
+    assert rounds_path_for("x/custom.html").name == "custom.rounds.html"
+
+
+def test_write_report_writes_both_pages_and_the_report_only_links(tmp_path):
+    records = [_record("A") for _ in range(3)]
+    out = write_report(
+        cfg=CFG, records=records, elo={"model-a": 1050.0, "model-b": 950.0}, report=REPORT,
+        manifest=MANIFEST, log_path=tmp_path / "battles.jsonl",
+    )  # fmt: skip
+    page = tmp_path / "battles.rounds.html"
+    assert out.name == "battles.report.html" and page.exists()
+    assert "battles.rounds.html" in out.read_text()
+    html = page.read_text()
+    for needle in (
+        "f-q",
+        "f-who",
+        "f-vs",
+        "f-task",
+        "f-win",
+        "f-tests",
+        "f-match",
+        "f-panel",
+        "f-sort",
+    ):
+        assert f'id="{needle}"' in html  # the filters
+    assert "battles.report.html" in html  # the way back
+    assert '<option value="">log order</option>' in html  # the default order is selectable
+    assert html.count("<select") <= 9 and 'id="pills"' in html  # a few controls, outcome as pills
+
+
+def test_the_rounds_page_holds_every_round_with_no_cap_at_200():
+    records = [_record("A") for _ in range(250)]
+    data = rounds_data(records, {}, {"prov/judge-1": "judge-1"}, None)
+    assert len(data["rounds"]) == 250 and data["capped"] is False
+    r = data["rounds"][0]
+    assert (r["a"], r["b"], r["v"], r["votes"][0]["judge"]) == (
+        "model-a",
+        "model-b",
+        "A",
+        "judge-1",
     )
-    assert "<h2>Rounds</h2>" in html
-    assert html.count("<details class='pw-cmp'>") == _ROUNDS_CAP
-    assert "pw-chip pw-chip--a" in html
-    assert f"Showing the first {_ROUNDS_CAP} of {_ROUNDS_CAP + 5} judged rounds" in html
-    assert "battle browser" in html
+    assert r["ra"] == "ra" and r["rb"] == "rb" and r["ta"] is None
+
+
+def test_the_rounds_page_cannot_be_broken_out_of_by_a_model_answer():
+    rec = _record("A")
+    rec.response_a = "</script><script>alert(1)</script> <!-- & \u2028"
+    html = build_rounds_html(
+        records=[rec], alias={}, labels={}, floor=None, title="t", report_href="r.html"
+    )
+    assert (
+        "</script><script>alert(1)" not in html
+        and "<!--" not in html.split('id="data"')[1].split("</script>")[0]
+    )
+    assert "\\u003c/script\\u003e" in html or "\u003c/script\u003e" in html
 
 
 def test_report_is_built_on_the_evaluatorq_skin():
@@ -446,3 +502,234 @@ def test_orq_dataset_meta_offline_fallback(monkeypatch):
     monkeypatch.setattr(orq_ai_sdk, "Orq", _boom)
     meta = orq_dataset_meta("ds_42")
     assert meta == {"id": "ds_42", "name": "ds_42", "url": "https://my.orq.ai/datasets/ds_42"}
+
+
+# ---------------------------------------------------------------- harness mode
+
+
+def _trial_dir(root, name, *, patch="", steps=None, tests=""):
+    d = root / name
+    (d / "verifier").mkdir(parents=True)
+    if patch:
+        (d / "diff.patch").write_text(patch, encoding="utf-8")
+    if steps is not None:
+        import json
+
+        (d / "steps.json").write_text(json.dumps(steps), encoding="utf-8")
+    if tests:
+        (d / "verifier" / "test-stdout.txt").write_text(tests, encoding="utf-8")
+    return str(d)
+
+
+def _solution(passed, trial_dir, **over):
+    return {
+        "passed": passed,
+        "reward": 1.0 if passed else 0.0,
+        "cost_usd": 0.42,
+        "tokens_in": 100,
+        "tokens_out": 50,
+        "duration_ms": 680_000,
+        "steps": 23,
+        "commands": 14,
+        "edits": 6,
+        "diff_stat": "+14 -3, 2 files",
+        "diff_note": "",
+        "tests_edited": False,
+        "exit_reason": "finished",
+        "trial_dir": trial_dir,
+    } | over
+
+
+def _harness_setup(tmp_path):
+    cfg = ArenaConfig.model_validate(
+        {
+            "candidates": [
+                {"kind": "harness", "agent": "pi", "model_id": "p/m", "name": "pi"},
+                {"kind": "harness", "agent": "codex", "model_id": "openai/m", "name": "codex"},
+            ],
+            "judges": ["prov/judge-1"],
+        }
+    )
+    a_dir = _trial_dir(
+        tmp_path,
+        "a",
+        patch="--- a/tests/t.py\n+++ b/tests/t.py\n@@\n-<script>alert(1)</script>\n+ok\n",
+        steps=[{"kind": "command", "title": "$ pytest <b>", "body": "3 passed", "meta": {}}],
+        tests="FAILED test_history_intact",
+    )
+    b_dir = _trial_dir(tmp_path, "b", patch="--- a/x\n+++ b/x\n@@\n-1\n+2\n")
+    rec = BattleRecord(
+        prompt_hash="h1",
+        prompt_text="fix the repo",
+        prompt_category="easy",
+        model_a="pi",
+        model_b="codex",
+        model_a_id="pi:p/m",
+        model_b_id="codex:p/m",
+        response_a="## Hidden tests: FAILED",
+        response_b="## Hidden tests: PASSED",
+        majority_verdict="B",
+        winner="codex",
+        judge_votes=[
+            {
+                "model": "verifier",
+                "vote": "B",
+                "completed": True,
+                "flipped": False,
+                "replacement": False,
+                "explanation": "hidden tests: A failed, B passed",
+                "observations": [],
+            }
+        ],
+        solution_a=_solution(False, a_dir, tests_edited=True),
+        solution_b=_solution(True, b_dir, exit_reason="max_turns", cost_usd=0.18),
+        judge_cost_usd=0.0,
+    )
+    report = REPORT | {
+        "by_model_names": {"pi:p/m": "pi", "codex:p/m": "codex"},
+        "elo_ci": {"pi": (900.0, 1100.0), "codex": (950.0, 1150.0)},
+        "win_grid": {"pi": {"codex": 0.0}, "codex": {"pi": 1.0}},
+        "harness": {
+            "pi": {
+                "trials": 1,
+                "passed": 0,
+                "verified": 1,
+                "pass_rate": 0.0,
+                "mean_cost_usd": 0.42,
+                "mean_duration_s": 680.0,
+                "tests_edited": 1,
+            },
+            "codex": {
+                "trials": 1,
+                "passed": 1,
+                "verified": 1,
+                "pass_rate": 1.0,
+                "mean_cost_usd": 0.18,
+                "mean_duration_s": 240.0,
+                "tests_edited": 0,
+            },
+        },
+        "gate_rounds": 1,
+    }
+    manifest = MANIFEST | {"harness": {"harbor_version": "0.24.0", "tasks": ["/t/fix-git"]}}
+    return cfg, [rec], report, manifest
+
+
+def test_harness_report_renders_the_ladder_and_leaves_the_rounds_to_their_page(tmp_path):
+    cfg, records, report, manifest = _harness_setup(tmp_path)
+    html = build_report_html(
+        cfg=cfg,
+        records=records,
+        elo={"pi": 950.0, "codex": 1050.0},
+        report=report,
+        manifest=manifest,
+        rounds_href="battles.rounds.html",
+    )
+    # the ladder swaps the length column for the three harness columns
+    assert "pass rate" in html and "$/task" in html and "min/task" in html
+    assert "avg length" not in html and "length-adj." not in html
+    assert "0/1" in html and "1/1" in html
+    assert "Agent trials" in html and "observed" in html
+    assert "harbor <code>0.24.0</code> &middot; 1 tasks" in html
+    assert "Harness</th>" in html
+    # no round, diff or trajectory is embedded: the rounds live on their page
+    assert "alert(1)" not in html and "$ pytest" not in html and "hidden tests PASSED" not in html
+    assert not any(d in html for d in ("\u2014", "&mdash;", "&#8212;", "&#x2014;"))
+
+
+def test_harness_rounds_page_carries_badges_diff_trajectory_and_gate(tmp_path):
+    cfg, records, report, manifest = _harness_setup(tmp_path)
+    data = rounds_data(records, {"pi:p/m": "pi", "codex:p/m": "codex"}, {}, None)
+    (r,) = data["rounds"]
+    assert r["gate"] is True and r["v"] == "B" and (r["a"], r["b"]) == ("pi", "codex")
+    ta, tb = data["trials"][r["ta"]], data["trials"][r["tb"]]
+    assert (ta["passed"], tb["passed"]) == (False, True)
+    assert (ta["steps"], ta["cmds"], ta["edits"], ta["dur"]) == (23, 14, 6, "11m 20s")
+    assert ta["tests_edited"] is True and tb["exit"] == "max_turns" and tb["cost"] == 0.18
+    assert "<script>alert(1)</script>" in ta["diff"] and "$ pytest <b>" in ta["traj"]
+    assert ta["n_traj"] == 1 and "FAILED test_history_intact" in ta["tests"]
+    html = build_rounds_html(
+        records=records, alias={"pi:p/m": "pi", "codex:p/m": "codex"}, labels={}, floor=None,
+        title="t", report_href="r.html",
+    )  # fmt: skip
+    # untrusted diff and trajectory text is data, never markup
+    assert "<script>alert(1)</script>" not in html
+    assert not any(d in html for d in ("&mdash;", "&#8212;", "&#x2014;"))
+
+
+def test_harness_rounds_survive_missing_trial_files(tmp_path):
+    cfg, records, report, manifest = _harness_setup(tmp_path)
+    for rec in records:
+        rec.solution_a["trial_dir"] = str(tmp_path / "gone")
+        rec.solution_b["trial_dir"] = ""
+    data = rounds_data(records, {}, {}, None)
+    (r,) = data["rounds"]
+    ta, tb = data["trials"][r["ta"]], data["trials"][r["tb"]]
+    assert ta["passed"] is False and ta["diff"] == "" and ta["traj"] == "" and tb["tests"] == ""
+
+
+def test_harness_cost_counts_a_replayed_trial_once(tmp_path):
+    from orq_arena.report import _harness_costs
+
+    cfg, records, _report, _manifest = _harness_setup(tmp_path)
+    again = records[0].model_copy(deep=True)  # same task, same two harnesses: a replay
+    usd, trials, unknown = _harness_costs([*records, again], {"pi:p/m": "pi", "codex:p/m": "codex"})
+    assert (trials, unknown) == (2, 0)
+    assert usd == {"pi": 0.42, "codex": 0.18}
+
+
+def test_the_ladder_and_the_spend_card_say_when_a_cost_is_estimated(tmp_path):
+    from orq_arena.report import _cost_provenance
+
+    cfg, records, report, manifest = _harness_setup(tmp_path)
+    for rec in records:
+        rec.solution_a["cost_estimated"] = True  # pi: tokens priced at the catalog rate
+    report["harness"]["pi"] |= {"estimated": 1, "unverified": 0}
+    report["harness"]["codex"] |= {"estimated": 0, "unverified": 3}
+    html = build_report_html(
+        cfg=cfg, records=records, elo={"pi": 950.0, "codex": 1050.0}, report=report, manifest=manifest
+    )  # fmt: skip
+    assert "~$0.42" in html and "1 of 1 trials priced from tokens" in html
+    assert "(3 void)" in html  # a void is shown beside the pass rate
+    assert "win share &middot; ~$" in html  # the podium card marks pi's spend as estimated
+    assert (
+        "1 observed, 1 estimated from tokens" in html and "2 trials &middot; observed" not in html
+    )
+    assert _cost_provenance(4, 0) == "observed"
+    assert _cost_provenance(4, 4) == "estimated from tokens"
+
+
+def test_the_total_card_says_estimated_when_a_trial_cost_is(tmp_path):
+    cfg, records, report, manifest = _harness_setup(tmp_path)
+    report["harness"]["pi"]["estimated"] = 0
+    kw = dict(cfg=cfg, records=records, elo={"pi": 950.0, "codex": 1050.0}, report=report,
+              manifest=manifest, prices={"prov/judge-1": (1.0, 2.0)})  # fmt: skip
+    measured = build_report_html(**kw)  # judge_cost_usd is set: the jury is measured
+    assert ">Total<" in measured and "partly estimated" not in measured
+    report["harness"]["pi"]["estimated"] = 1  # pi: tokens priced at the catalog rate
+    html = build_report_html(**kw)
+    assert ">Estimated total<" in html and "Agent spend is partly estimated" in html
+
+
+def test_a_round_says_how_it_ended_with_the_split_the_pills_use():
+    from orq_arena.data.schemas import GATE_JUDGE
+
+    gated = _record("A").model_copy(update={"judge_votes": [{"model": GATE_JUDGE, "vote": "A"}]})
+    void = _record("A").model_copy(update={"error": "harbor exited 1"})
+    recs = [_record("A"), _record("B"), _record("tie"), _record("inconclusive"), gated, void]
+    hows = [r["how"] for r in rounds_data(recs, {}, {}, None)["rounds"]]
+    assert hows == [
+        "decided by jury", "decided by jury", "tie", "no result", "decided by tests", "voided",
+    ]  # fmt: skip
+
+
+def test_a_trial_duration_is_formatted_once_in_python():
+    rec = _record("A").model_copy(
+        update={"solution_a": {"duration_ms": 125_000}, "solution_b": {"duration_ms": 45_000}}
+    )
+    trials = rounds_data([rec], {}, {}, None)["trials"]
+    assert sorted(t["dur"] for t in trials.values()) == ["2m 05s", "45s"]
+    html = build_rounds_html(
+        records=[rec], alias={}, labels={}, floor=None, title="t", report_href="r.html"
+    )
+    assert "fmtDur" not in html  # no second copy of the format in the page script

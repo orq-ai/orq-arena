@@ -15,11 +15,14 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from evaluatorq import PairwiseComparison, build_report
+from evaluatorq.pairwise import PairwiseVote
 
 from .config import ArenaConfig
 from .data.schemas import BattleRecord
+from .harness.routing import harness_model_id
 from .judging import judge_labels, judged_cost_usd, make_jury, pin_judge_endpoints
 from .providers.orq_gateway import OrqGateway
+from .redact import redact
 from .tournament.driver import manifest_path_for, record_names
 from .tournament.elo import bradley_terry_mle, build_wins_matrix
 
@@ -79,7 +82,7 @@ def panel_excluding_contestants(
     to neither falls back to a short-name match, so exclusion stays safe rather
     than silently letting a contestant judge itself.
     """
-    contestants_full = {short_to_full.get(m, m) for m in contestants}
+    contestants_full = {short_to_full.get(m, harness_model_id(m)) for m in contestants}
     unresolved_short = {m for m in contestants if m not in short_to_full}
 
     def is_contestant(j: str) -> bool:
@@ -167,6 +170,15 @@ async def rejudge_run(
         return comparators[key]
 
     async def score(rec: BattleRecord) -> tuple[PairwiseComparison, int]:
+        if rec.decided_by_gate:
+            # The hidden tests decided this round; no panel, old or new, reopens it.
+            return (
+                PairwiseComparison(
+                    winner=rec.majority_verdict,
+                    votes=[PairwiseVote.model_validate(v) for v in rec.judge_votes],
+                ),
+                0,
+            )
         async with sem:
             t0 = time.monotonic()
             comparison = await comparator_for(rec).compare(  # type: ignore[attr-defined]
@@ -198,10 +210,14 @@ async def rejudge_run(
     changed = sum(
         1 for rec, c in zip(records, comparisons, strict=True) if rec.majority_verdict != c.winner
     )
+    # The report describes the panel, so rounds the verifier decided stay out of it.
+    jury_comparisons = [
+        c for rec, c in zip(records, comparisons, strict=True) if not rec.decided_by_gate
+    ]
     return {
         "comparisons": comparisons,
         "judge_ms": [ms for _, ms in scored],
-        "report": build_report(comparisons),
+        "report": build_report(jury_comparisons),
         "old_ranking": old_rank,
         "new_ranking": new_rank,
         "spearman": spearman(old_rank, new_rank),
@@ -237,7 +253,7 @@ def write_rejudged(
                     ),
                 }
             )
-            fh.write(row.model_dump_json() + "\n")
+            fh.write(redact(row.model_dump_json()) + "\n")
 
 
 # The verdict word needs a field the statistic can express itself on. Spearman
@@ -360,7 +376,7 @@ def save_report_json(path: str | Path, result: dict) -> None:
         "new_ranking": result["new_ranking"] if decisive else None,
         "jury": result["report"].model_dump(),
     }
-    Path(path).write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
+    Path(path).write_text(redact(json.dumps(payload, indent=2, default=str)), encoding="utf-8")
 
 
 def compare_reports(paths: list[str | Path]) -> list[dict]:

@@ -63,6 +63,7 @@ def make_jury(
     comparator = llm_jury_pairwise(
         judges=panel,
         criteria=criteria or cfg.criteria,
+        prompt=cfg.judge_prompt,
         swap=cfg.judge_swap,
         replacement_judges=replacements or None,
         min_successful_judges=quorum,

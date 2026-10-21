@@ -31,7 +31,15 @@ from rich.table import Table
 
 from .config import ArenaConfig
 from .data.prompts import PromptItem
-from .events import MatchResolved, RoundVoided, StandingsUpdated, TournamentEnded, TurnResolved
+from .events import (
+    MatchResolved,
+    RoundVoided,
+    SolutionReady,
+    StandingsUpdated,
+    TournamentEnded,
+    TurnResolved,
+)
+from .fmt import fmt_cost, harness_cells
 from .tournament.driver import run_tournament
 
 
@@ -72,13 +80,37 @@ def _verdict_line(ended: TournamentEnded) -> str | None:
     )
 
 
+def _harness_cells(h: dict[str, Any] | None) -> list[str]:
+    return harness_cells(h) if h else ["", "", ""]
+
+
+def _solution_line(ev: SolutionReady) -> str:
+    """One line per finished trial: a trial is minutes of silence otherwise."""
+    side = ev.side.upper()
+    if ev.error:
+        return f"[yellow]{ev.match_id} {side} trial failed, {ev.error}[/yellow]"
+    verdict = {True: "PASSED", False: "FAILED", None: "tests not run"}[ev.passed]
+    cached = " (cached)" if ev.replay else ""
+    cost = f" · {fmt_cost(ev.cost_usd, ev.cost_estimated)}" if ev.cost_usd is not None else ""
+    return (
+        f"[dim]{ev.match_id} {side} hidden tests {verdict}{cached} · {ev.steps} steps · "
+        f"{ev.duration_ms / 60000:.1f} min{cost} · {ev.exit_reason}[/dim]"
+    )
+
+
 def _final_table(ended: TournamentEnded) -> Table:
     r: dict[str, Any] = ended.report or {}
     ci = r.get("elo_ci") or {}
     grid = r.get("win_grid") or {}
     thinking = r.get("thinking") or {}
+    harness = r.get("harness") or {}
     table = Table(title="Final Results")
-    cols = ["#", "Model", "ELO"] + (["95% CI"] if ci else []) + (["win%"] if grid else [])
+    cols = (
+        ["#", "Harness" if harness else "Model", "ELO"]
+        + (["95% CI"] if ci else [])
+        + (["win%"] if grid else [])
+        + (["pass rate", "$/task", "min/task"] if harness else [])
+    )
     for c in cols:
         table.add_column(c)
     for i, (name, elo) in enumerate(_ranked(ended), 1):
@@ -91,6 +123,8 @@ def _final_table(ended: TournamentEnded) -> Table:
             row.append(f"{fmt(lo)}–{fmt(hi)}")
         if grid:
             row.append(_win_pct(grid, name))
+        if harness:
+            row.extend(_harness_cells(harness.get(name)))
         table.add_row(*row)
     return table
 
@@ -139,6 +173,10 @@ def _print_summary(console: Console, ev: TournamentEnded) -> None:
     rp = report_path_for(ev.battle_log_path)
     if rp.exists():
         console.print(f"report page → {rp}")
+        from .rounds_page import rounds_path_for
+
+        if rounds_path_for(rp).exists():
+            console.print(f"rounds page → {rounds_path_for(rp)}")
 
 
 def _match_line(ev: MatchResolved) -> str:
@@ -180,6 +218,8 @@ async def consume_events(
                 )
             elif isinstance(ev, MatchResolved):
                 err_console.print(_match_line(ev))
+            elif isinstance(ev, SolutionReady):
+                err_console.print(_solution_line(ev))
             elif isinstance(ev, RoundVoided):
                 err_console.print(f"[yellow]{ev.match_id} round void, {ev.reason}[/yellow]")
             elif isinstance(ev, StandingsUpdated):
@@ -203,6 +243,8 @@ async def consume_events(
                 ev = await events.get()
                 if isinstance(ev, TurnResolved):
                     progress.advance(task, 1)
+                elif isinstance(ev, SolutionReady):
+                    progress.console.print(_solution_line(ev))
                 elif isinstance(ev, RoundVoided):
                     progress.advance(task, 1)
                     progress.console.print(

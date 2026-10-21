@@ -311,12 +311,13 @@ further model calls:
 |---|---|
 | `battles.jsonl` | One JSON line per judged round: both responses, reconciled per-judge votes, token/TTFT accounting. |
 | `battles.run.json` | The run manifest: the config it ran, config/prompt hashes, candidate pool, judge panel, seed, and (once finished) agreement stats. No credential ever lands in it. |
-| `battles.report.html` | A single-file HTML report, no server, no external assets. Verdict banner with the top 3 models up top, then the ELO ladder with error bars, a quality-vs-cost value map, speed, and the dollar spend (exact per model, `≈` for the jury, which is estimated at the panel's mean rate). Share it with anyone. |
+| `battles.report.html` | A single-file HTML report, no server, no external assets. Verdict banner with the top 3 models up top, then the ELO ladder with error bars, a quality-vs-cost value map, speed, and the dollar spend (exact per model, `≈` for the jury, which is estimated at the panel's mean rate). Share it with anyone. It never embeds rounds; it links to the rounds page. |
+| `battles.rounds.html` | Every round on a page of its own, with filters (contestant, versus, winner, result, decided by verifier gate or jury, task, hidden tests, judge splits, match, text search). Open a round for both answers (a harness run: both solutions with diff and trajectory) and every vote. The filters live in the address, so a filtered view can be shared. |
 
 ![HTML report page: verdict banner with the top three models, badges, ELO leaderboard with CI bars, and the ELO-vs-cost value map](assets/report-page.png)
 
-Pass `--output path/to/file.jsonl` to move all three; the manifest and report page always sit
-next to the log. `orq-arena report <log>` regenerates the report page on demand, and
+Pass `--output path/to/file.jsonl` to move all four; the manifest, report page and rounds page
+always sit next to the log. `orq-arena report <log>` regenerates the report page on demand, and
 `orq-arena rejudge` re-scores a recorded run with a different jury at judge-token cost only
 (see [cli.md](cli.md)).
 

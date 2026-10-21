@@ -11,8 +11,8 @@ file format. The tool is configured by two layers:
    model.
 
 The source of truth for every key below is `src/orq_arena/config.py` (models `MatchRules`,
-`OrqAIGatewayConfig`, `PreflightConfig`, `ArenaConfig`) and `src/orq_arena/candidates.py`
-(`CandidateSpec`). All file paths in this document are relative to the project root.
+`OrqAIGatewayConfig`, `PreflightConfig`, `HarnessConfig`, `ArenaConfig`) and
+`src/orq_arena/candidates.py` (`CandidateSpec`, `HarnessCandidate`). All file paths in this document are relative to the project root.
 
 ---
 
@@ -54,6 +54,7 @@ what the shell hasn't set. A missing `.env` is silently fine.
 |---|---|
 | `orq_arena.yaml` | The default model pool + rules, shipped at the project root. Loaded whenever `--config` is omitted or points here, `DEFAULT_CONFIG = "orq_arena.yaml"` in `src/orq_arena/cli.py`. Ships 8 candidates, uniform thinking-**OFF**, so the ELO compares models rather than vendor default reasoning settings. |
 | `configs/reasoning_arena.yaml` | Uniform thinking-**ON** counterpart of the default file, the "does thinking help?" benchmark. Not loaded automatically; run it explicitly with `--config configs/reasoning_arena.yaml`. |
+| `configs/harness-tb21.yaml` | Coding-agent pool for [harness mode](harness-mode.md): Claude Code, pi, pi with skills and codex on terminal-bench 2.1 tasks. Needs `harbor`, Docker and a prompts file from `orq-arena tasks sample`. |
 | `configs/frontier_8.yaml`, `configs/budget_8.yaml`, `configs/frontier_16.yaml` | Ready-made pools tiered by the Artificial Analysis intelligence index (frontier ~40-56, budget ~12-25, 16-model stress test). See [`configs/README.md`](https://github.com/orq-ai/orq-arena/blob/master/configs/README.md). |
 
 Any YAML path can be passed to `--config`; `load_config()` (`src/orq_arena/config.py`) reads it
@@ -170,11 +171,16 @@ is exposed as a config key. The preflight probe call (see below) also uses a har
 | Key | Type | Default | Effect |
 |---|---|---|---|
 | `headless_concurrency` | `int` | `4` | Matches run in parallel under an `asyncio.Semaphore(max(1, headless_concurrency))` on headless runs, the default (`run_headless` → `run_tournament(concurrency=...)`, `src/orq_arena/headless.py`). The TUI (`--tui`) always passes `concurrency=1` internally so the live show stays one fight at a time. |
+| `verifier_gate` | `bool` | `true` | Harness runs only. When exactly one of the two agents passes the task's hidden tests, the tests decide the round and the jury is not called. Pairs that both pass or both fail still go to the jury. Set `false` to send every pair to the jury. See [Harness mode](harness-mode.md#the-verifier-gate). |
+| `judge_prompt` | `str` or `null` | `null` | Optional template that replaces the jury's default pairwise prompt (evaluatorq's `prompt=` argument). It is recorded in the run manifest, so `rejudge` uses the same one. Leave it unset unless you are tuning the jury itself. |
 
 ### `candidates` (the model pool)
 
-`candidates: list[CandidateSpec]`: required at the top level, and the parsed list must contain at
-least 2 entries (`ArenaConfig._validate`: `"Need at least 2 candidates, got {n}"`).
+`candidates: list[CandidateSpec | HarnessCandidate]`: required at the top level, and the parsed
+list must contain at least 2 entries (`ArenaConfig._validate`: `"Need at least 2 candidates, got
+{n}"`). An entry with no `kind` key is a model candidate, which is everything below until the
+harness section. An entry with `kind: harness` is a coding agent, described in
+[Harness candidates](#harness-candidates-kind-harness).
 
 | Key | Type | Default | Effect |
 |---|---|---|---|
@@ -209,6 +215,55 @@ config where the thinking budget meets or exceeds the output cap fails to load w
 The shipped `orq_arena.yaml` also documents which models it deliberately excludes from the
 default pool because the router can't disable their thinking (see the comment below the `candidates` list
 in that file), those belong in `configs/reasoning_arena.yaml` instead.
+
+### Harness candidates (`kind: harness`)
+
+A harness candidate is a coding agent (Claude Code, pi, codex, ...) with a model and an optional
+setup around it, run through the `harbor` CLI on a task. The full guide, with the overlay table and
+a worked config, is [Harness mode](harness-mode.md). The keys:
+
+| Key | Type | Default | Effect |
+|---|---|---|---|
+| `kind` | `"model"` or `"harness"` | `"model"` | Which kind of candidate this entry is. Omit it for a model. |
+| `agent` | `str` | (required) | The Harbor agent name, for example `claude-code`, `pi` or `codex`. |
+| `model_id` | `str` | (required) | The model the agent drives, as `provider/model`. `claude-code` needs an `anthropic/` model and `codex` an `openai/` one. |
+| `name` | `str` | `agent/short_model`, plus `-<variant>` when the setup differs from vanilla | Display name on the leaderboard and cards. |
+| `emblem` | `str` | `""` | Optional glyph shown before the name. |
+| `agent_kwargs` | `dict` | `{}` | Passed to Harbor as repeated `--ak key=value`. Typical keys are `max_turns`, `max_budget_usd`, `reasoning_effort` and `thinking`, which cap the spend per trial. |
+| `agent_env` | `dict[str, str]` | `{}` | Extra environment for the Harbor process (a proxy, a native key). Values may use `${VAR}`. The router endpoint and key are set for you per agent. Only the keys (never the values) enter the candidate's identity. |
+| `overlay` | object or `null` | `null` | The setup around the agent: `skills`, `mcp_servers`, `memory`, `system_prompt`, `settings`. An agent that cannot honor a key fails config loading with its name in the message. The table of who honors what is in [Harness mode](harness-mode.md#overlay-what-each-agent-honors). |
+| `extra_instructions` | `str` | `""` | Text appended to the task instruction (Harbor's `--extra-instruction`). |
+| `timeout_multiplier` | `float` or `null` | `null` | Per-candidate override of `harness.timeout_multiplier`. |
+
+Two candidates with the same agent and model but a different setup are two contestants, told apart
+by a short **variant** hash of everything that changes behaviour (kwargs, env keys, instructions
+and the contents of overlay files). The identity every per-candidate view keys on is
+`agent:model_id#variant` (the `#variant` part is empty for a vanilla agent). Editing a skill file
+therefore creates a new contestant instead of silently reusing the old one's cached trials.
+
+Cross-field checks: an `agent_kwargs` key that duplicates a key the overlay produces is refused,
+and `judge_api: decisions` is refused when any candidate is a harness (decision models take 32k to
+64k of context and a trajectory dossier does not fit).
+
+### `harness` (`HarnessConfig`)
+
+Only read when at least one candidate has `kind: harness`.
+
+| Key | Type | Default | Effect |
+|---|---|---|---|
+| `harbor_bin` | `str` | `"harbor"` | The Harbor executable. Preflight stops the run if it is not on the `PATH`. |
+| `trials_dir` | `str` or `null` | `null` (→ `<battle log>.trials`) | Where trials and their cache live, one folder per task and candidate. |
+| `max_parallel_trials` | `int` | `2` | Harbor trials running at once across all matches. Each is a Docker container, so keep it low on a laptop. |
+| `router_host` | `str` or `null` | `null` (→ the gateway host) | Host agents are pointed at. Agents get `<host>/v3/anthropic` (claude-code) or `<host>/v3/router` (pi, codex). |
+| `api_key_name` | `str` | `"ORQ_API_KEY"` | Name of the environment variable Harbor hands to the agents as the router key. Preflight stops the run if it is unset. |
+| `timeout_multiplier` | `float` | `1.5` | Scales every task's agent time limit. The task images are linux/amd64, so an Apple-silicon Mac runs them under emulation and needs the slack. |
+| `artifacts` | `list[str]` | `["/app"]` | Container paths Harbor copies out after the trial. The final workspace diff is built from `/app`. |
+| `diff` | `bool` | `true` | Diff the final workspace against the pristine image so judges and the report can show what the agent changed. |
+| `diff_max_bytes` | `int` | `200000` | Longest diff kept; a larger one is cut and marked. |
+
+Prompt rows for a harness run carry task metadata next to the usual `prompt` and `category`. The
+`orq-arena tasks sample` command writes them; the keys the run reads are `harbor_task_path`
+(required, the task folder on disk), `task_name`, `difficulty`, `timeout_sec` and `image`.
 
 ### `judges`, `replacement_judges`, `criteria`, `min_successful_judges`, `judge_api`, `judge_swap`, `judge_abstain_below`
 
@@ -315,6 +370,17 @@ Everything else is a Pydantic default and safe to omit from the YAML entirely:
 | `judge_api` | `"llm"` |
 | `judge_swap` | `true` |
 | `judge_abstain_below` | `null` |
+| `verifier_gate` | `true` (harness runs only) |
+| `judge_prompt` | `null` |
+| `harness.harbor_bin` | `"harbor"` |
+| `harness.trials_dir` | `null` (→ `<battle log>.trials`) |
+| `harness.max_parallel_trials` | `2` |
+| `harness.router_host` | `null` (→ the gateway host) |
+| `harness.api_key_name` | `"ORQ_API_KEY"` |
+| `harness.timeout_multiplier` | `1.5` |
+| `harness.artifacts` | `["/app"]` |
+| `harness.diff` / `harness.diff_max_bytes` | `true` / `200000` |
+| `candidates[].kind` | `"model"` |
 | `candidates[].name` | short model id, or the full id when two candidates would share one |
 | `candidates[].emblem` | `""` |
 | `candidates[].reasoning` | `null` |

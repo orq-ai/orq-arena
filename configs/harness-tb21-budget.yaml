@@ -1,0 +1,104 @@
+# Budget harness arena: the same idea as harness-tb21.yaml with cheap models behind the agents
+# (about 0.1 USD per million input tokens against 4 for Opus). Models were smoke-tested through
+# pi and the router on one easy task; moonshotai/kimi-k2.7-code failed there (400 "text content
+# is empty" after its first tool call) and is left out.
+#
+# Each candidate is an agent run through Harbor in a fresh container per task. The
+# hidden tests of the task decide a round when exactly one side passes; the jury
+# only sees pairs that both pass or both fail. Everything is billed through the
+# orq router: each agent gets the router as its endpoint through the environment
+# (ORQ_API_KEY is read from your shell and never written to a file or a command line).
+#
+# Setup, once:
+#   uv tool install --python 3.13 harbor
+#   orq-arena tasks sample --dataset <terminal-bench-2-1 clone> --n 8 --seed 7 \
+#       -o prompts/tb21-sample.jsonl
+# Run:
+#   orq-arena run --config configs/harness-tb21.yaml --prompts prompts/tb21-sample.jsonl
+#
+# Cost: agent spend is not projected. Per-trial caps: max_turns (claude-code and pi) and
+# max_budget_usd (claude-code only). codex has neither, so a codex trial is bounded by the
+# task's time limit alone. Measured on the budget run: 96 trials for $7.60, and
+# deepseek-v4-pro alone was $6.44 of it. See docs/harness-mode.md.
+
+harness:
+  harbor_bin: harbor
+  # Trial cache, keyed (task, candidate). Delete a folder to re-run that trial.
+  # Left out, it defaults to "<battle log>.trials" next to the run's log.
+  trials_dir: outputs/harness-budget/trials
+  max_parallel_trials: 3        # containers at once, across all matches
+  api_key_name: ORQ_API_KEY     # the env var holding your orq key
+  timeout_multiplier: 1.5       # the task images are linux/amd64; Macs emulate them
+  artifacts: ["/app"]
+  diff: true
+  diff_max_bytes: 200000
+
+gateway:
+  judge_max_tokens: 8192        # a reasoning judge reading a long dossier needs room to think
+
+verifier_gate: true             # a hidden-test pass beats a fail without a jury call
+judge_api: llm                  # decision models cannot read a trajectory dossier
+
+criteria: >-
+  Which solution better completes the task? Weigh the hidden tests outcome shown,
+  correctness of the final workspace diff, minimal and clean changes, no reward
+  hacking (editing or skipping tests, hardcoding expected output), and efficiency
+  (fewer wasted steps). Ignore prose style.
+
+candidates:
+  - kind: harness
+    name: claude-code (haiku)
+    agent: claude-code
+    model_id: anthropic/claude-haiku-5-5
+    agent_kwargs: { max_turns: 60, max_budget_usd: 1.0 }
+
+  - kind: harness
+    name: pi (haiku)
+    agent: pi
+    model_id: anthropic/claude-haiku-5-5
+    agent_kwargs: { max_turns: 60 }
+
+  # Same agent and model as "pi (haiku)", but three things differ: a skills folder, a system
+  # prompt line and thinking: medium. "pi + thinking (haiku)" below is the control that
+  # separates thinking from the skills and the prompt line.
+  - kind: harness
+    name: pi + skills (haiku)
+    agent: pi
+    model_id: anthropic/claude-haiku-5-5
+    agent_kwargs: { max_turns: 60, thinking: medium }
+    overlay:
+      skills: harness/skills
+      system_prompt: "Prefer small diffs; run the tests before you stop."
+
+  # Control for "pi + skills (haiku)": thinking: medium and nothing else. Read the skills and
+  # prompt effect as "pi + skills" against this one, the thinking effect as this one against
+  # "pi (haiku)".
+  - kind: harness
+    name: pi + thinking (haiku)
+    agent: pi
+    model_id: anthropic/claude-haiku-5-5
+    agent_kwargs: { max_turns: 60, thinking: medium }
+
+  - kind: harness
+    name: codex (gpt-6-luna)
+    agent: codex
+    model_id: openai/gpt-6-luna
+
+  - kind: harness
+    name: pi (glm-5.3-flash)
+    agent: pi
+    model_id: zai/glm-5.3-flash
+    agent_kwargs: { max_turns: 60 }
+
+  - kind: harness
+    name: pi (deepseek-v4-pro)
+    agent: pi
+    model_id: deepseek/deepseek-v4-pro
+    agent_kwargs: { max_turns: 60 }
+
+# A cheap prompted panel with no contestant's model family on it (google and mistral),
+# so no judge rates its own maker's model. The same panel judges harness-tb21-mid.yaml.
+judges:
+  - google/gemini-3.5-flash-lite
+  - mistral/mistral-medium-2604
+  - google/gemini-3.7-flash

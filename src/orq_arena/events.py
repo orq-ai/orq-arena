@@ -38,6 +38,7 @@ class TurnPrompt(BaseModel):
     match_id: str
     round_number: int
     prompt: str
+    replicate: int = 0  # harness mode: which draw of the task this round plays
 
 
 class ResponseChunk(BaseModel):
@@ -65,6 +66,45 @@ class ResponseComplete(BaseModel):
     tokens_out: int = 0
     reasoning_tokens: int = 0
     finish_reason: str = ""
+    error: str | None = None
+
+
+StepKind = Literal[
+    "command", "edit", "read", "message", "thinking", "observation", "test", "log", "done"
+]
+
+
+class TrajectoryStep(BaseModel):
+    """One step of a coding agent's trajectory, harness candidates only."""
+
+    type: Literal["trajectory_step"] = "trajectory_step"
+    match_id: str
+    side: Literal["a", "b"]
+    kind: StepKind
+    title: str
+    body: str = ""
+    t_ms: int = 0  # since the trial started
+    replay: bool = False  # from a cached trial, not live
+
+
+class SolutionReady(BaseModel):
+    """A harness trial finished: what the verifier and the workspace say."""
+
+    type: Literal["solution_ready"] = "solution_ready"
+    match_id: str
+    side: Literal["a", "b"]
+    passed: bool | None = None  # None: the verifier did not run
+    reward: float | None = None
+    cost_usd: float | None = None
+    cost_estimated: bool = False  # priced from tokens at the catalog rate, not reported
+    duration_ms: int = 0
+    steps: int = 0
+    commands: int = 0
+    edits: int = 0
+    diff_stat: str = ""
+    tests_edited: bool = False
+    exit_reason: str = ""  # finished | max_turns | timeout | error
+    replay: bool = False
     error: str | None = None
 
 
@@ -120,6 +160,8 @@ ArenaEvent = (
     | ResponseChunk
     | ThinkingChunk
     | ResponseComplete
+    | TrajectoryStep
+    | SolutionReady
     | JudgeVerdictEvent
     | RoundVoided
     | TurnResolved

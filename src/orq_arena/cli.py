@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import sys
 from typing import Literal
 
 import click
 from loguru import logger
 from pydantic import ValidationError
 
-from .config import load_config
+from . import redact
+from .config import ORQ_API_KEY_ENV, load_config
 from .data.prompts import load_prompts
 
 DEFAULT_CONFIG = "orq_arena.yaml"
@@ -137,6 +139,11 @@ def _load_dotenv() -> None:
 def cli() -> None:
     """orq-arena, LLM arena benchmark: orq.ai router + evaluatorq jury."""
     _load_dotenv()
+    # Mask credentials in everything printed or written. The full-screen TUI draws on the
+    # terminal itself, and its text already passes through the same masks at the source.
+    redact.register_env(ORQ_API_KEY_ENV)
+    if "--tui" not in sys.argv:
+        redact.install_stream_redaction()
 
 
 @cli.command()
@@ -275,6 +282,10 @@ def run(
         if rounds < 1:
             raise click.ClickException("--rounds must be >= 1")
         cfg.match.max_rounds = rounds
+    elif cfg.has_harness:
+        # A trial is minutes and dollars: every match draws the whole task set, so
+        # a trial run for one match is replayed from the cache in the others.
+        cfg.match.max_rounds = len(prompts)
     if cfg.match.max_rounds < len(prompts):
         warn(
             f"  ⚠ each match samples {cfg.match.max_rounds} of your {len(prompts)} prompts "
@@ -310,6 +321,25 @@ def run(
     # Persist the caveat so the manifest and forwarded report carry it, not
     # just this console line (the report is the thing users hand to others).
     preflight_data: dict = {"counts": counts.__dict__, "family_overlaps": overlap}
+    if cfg.has_harness:
+        from .preflight import harness_checks, harness_plan
+
+        problems = harness_checks(cfg, prompts)
+        if problems:
+            raise click.ClickException(
+                "harness checks failed:\n" + "\n".join(f"  {p}" for p in problems)
+            )
+        harness_block = harness_plan(
+            cfg, prompts, trials_dir=cfg.harness.trials_dir or f"{output_path}.trials"
+        )
+        preflight_data["harness"] = harness_block
+        hp = harness_block["plan"]
+        status(
+            f"harness: {hp['trials']} trials ({hp['cached']} cached) on {len(hp['task_names'])} "
+            f"tasks; {hp['cost_note']}"
+        )
+        for line in harness_block["checks"]:
+            warn(f"  {line}")
     cost = cost_projection(cfg, prompts, counts, asyncio.run(fetch_price_map(cfg.gateway)))
     unpriced_suffix = " + unpriced" if cost.unpriced else ""
     if cost.projected_usd > 0:
@@ -396,6 +426,7 @@ def run(
             "prompts_label": prompts_label,
             "prompt_categories": dict(Counter(pr.category for pr in prompts)),
             "log_path": output_path,
+            "harness": preflight_data.get("harness"),
         }
         assert arena_app_cls is not None  # narrowed by the tui branch
         app = arena_app_cls(
@@ -440,6 +471,103 @@ def run(
             "abstained. Check the panel is reachable and the credential is valid, "
             "then re-run."
         )
+
+
+@cli.group()
+def tasks() -> None:
+    """Terminal-bench tasks for harness mode (no network, reads local task dirs)."""
+
+
+@tasks.command("sample")
+@click.option(
+    "--dataset",
+    default=None,
+    help="Directory of tasks (a terminal-bench-2-1 clone or Harbor's cache). "
+    "Default: Harbor's task cache.",
+)
+@click.option("--n", "n", type=int, default=8, show_default=True, help="Tasks to sample.")
+@click.option("--seed", type=int, default=7, show_default=True, help="Same seed, same sample.")
+@click.option(
+    "--max-timeout",
+    type=float,
+    default=900,
+    show_default=True,
+    help="Skip tasks whose agent timeout (seconds) is longer; 0 keeps every task.",
+)
+@click.option("--include-gpu", is_flag=True, default=False, help="Keep tasks that need a GPU.")
+@click.option(
+    "--names-file",
+    default=None,
+    help="Build the file from the tasks named in this text file (one per line, in this order) "
+    "instead of sampling, so a published sample can be rebuilt exactly. Ignores --n and --seed.",
+)
+@click.option(
+    "--replicates",
+    type=click.IntRange(min=1),
+    default=1,
+    show_default=True,
+    help="Trials per task and agent. Each task repeats this many times in the file, "
+    "and each repeat is run (and cached) separately.",
+)
+@click.option(
+    "--output",
+    "-o",
+    "output_path",
+    default="prompts/tb21-sample.jsonl",
+    show_default=True,
+    help="Prompt file to write.",
+)
+def tasks_sample(
+    dataset: str | None,
+    n: int,
+    seed: int,
+    max_timeout: float,
+    include_gpu: bool,
+    output_path: str,
+    names_file: str | None,
+    replicates: int,
+) -> None:
+    """Sample a difficulty-stratified task set and write it as a prompt file.
+
+    \b
+    Example:
+      orq-arena tasks sample --dataset .context/tb21 --n 8 --seed 7 -o prompts/tb21-sample.jsonl
+    """
+    from pathlib import Path
+
+    from .data.tasks import DEFAULT_DATASET, sample_tasks, scan_tasks, write_prompts
+
+    root = Path(dataset or DEFAULT_DATASET).expanduser()
+    if not root.is_dir():
+        raise click.ClickException(f"{root} is not a directory; pass --dataset <tasks dir>.")
+    found = scan_tasks(root)
+    if not found:
+        raise click.ClickException(
+            f"no tasks under {root} (a task is a directory with task.toml and instruction.md)."
+        )
+    if names_file:
+        from .data.tasks import read_names, select_named
+
+        try:
+            picked = select_named(found, read_names(names_file))
+        except (OSError, ValueError) as exc:
+            raise click.ClickException(str(exc)) from exc
+    else:
+        picked = sample_tasks(
+            found,
+            n=n,
+            seed=seed,
+            max_timeout_s=max_timeout or None,
+            exclude_gpu=not include_gpu,
+        )
+    if not picked:
+        raise click.ClickException("every task was filtered out; relax --max-timeout.")
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+    write_prompts(picked, output_path, replicates)
+    extra = f", {replicates} replicates each" if replicates > 1 else ""
+    click.echo(f"{len(picked)} of {len(found)} tasks{extra} → {output_path}")
+    for t in picked:
+        click.echo(f"  {t.name:<32} {t.difficulty:<8} {t.timeout_sec:.0f}s")
 
 
 def judges_header(cfg) -> str:
@@ -535,6 +663,10 @@ def _open_report(battle_log_path: str, open_browser: bool, announce: bool = Fals
         return
     if announce:
         click.echo(f"report page → {page}")
+        from .rounds_page import rounds_path_for
+
+        if rounds_path_for(page).exists():
+            click.echo(f"rounds page → {rounds_path_for(page)}")
     if open_browser and sys.stdout.isatty() and not os.environ.get("CI"):
         webbrowser.open(page.resolve().as_uri())
 
@@ -750,7 +882,8 @@ def report_cmd(log_path: str, config_path: str, output_path: str | None) -> None
     from click.core import ParameterSource
 
     from .data.schemas import BattleRecord
-    from .report import build_report_html, report_path_for
+    from .report import write_report
+    from .rounds_page import rounds_path_for
     from .tournament.driver import (
         IdentitySource,
         config_from_manifest,
@@ -823,20 +956,19 @@ def report_cmd(log_path: str, config_path: str, output_path: str | None) -> None
     except Exception:
         prices = {}
 
-    out = Path(output_path) if output_path else report_path_for(log)
-    out.write_text(
-        build_report_html(
-            cfg=cfg,
-            records=records,
-            elo=elo,
-            report=rep,
-            manifest=manifest,
-            prices=prices or None,
-            identity_source=identity,
-        ),
-        encoding="utf-8",
+    out = write_report(
+        cfg=cfg,
+        records=records,
+        elo=elo,
+        report=rep,
+        manifest=manifest,
+        log_path=log,
+        prices=prices or None,
+        out_path=output_path,
+        identity_source=identity,
     )
     click.echo(f"report page -> {out}")
+    click.echo(f"rounds page -> {rounds_path_for(out)}")
 
 
 @cli.command("refresh-catalog")

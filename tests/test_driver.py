@@ -31,6 +31,8 @@ def _cfg(n: int = 3) -> ArenaConfig:
 class FakeBattle:
     """candidate_a always wins its match; deterministic given the schedule."""
 
+    runners: list = []  # the runner each constructed battle was handed
+
     def __init__(
         self,
         *,
@@ -44,9 +46,11 @@ class FakeBattle:
         tournament_id,
         events,
         on_record=None,
+        runner=None,
     ):
         self.a, self.b = candidate_a, candidate_b
         self._on_record = on_record
+        FakeBattle.runners.append(runner)
 
     async def run(self):
         rec = BattleRecord(
@@ -54,6 +58,8 @@ class FakeBattle:
             prompt_text="p",
             model_a=self.a.short_model,
             model_b=self.b.short_model,
+            model_a_id=self.a.candidate_id,
+            model_b_id=self.b.candidate_id,
             majority_verdict="A",
             winner=self.a.short_model,
         )
@@ -135,3 +141,30 @@ async def test_rebuild_from_log_matches_live_elo(monkeypatch, tmp_path):
     rebuilt_elo, report = driver_mod.rebuild_from_log(cfg, records)
     assert rebuilt_elo == elo
     assert report["rated_rounds"] == 3
+
+
+async def test_a_harness_pool_gets_a_runner_and_a_per_log_trials_dir(monkeypatch, tmp_path):
+    _patch(monkeypatch)
+    FakeBattle.runners.clear()
+    cfg = ArenaConfig.model_validate(
+        {
+            "candidates": [
+                {"kind": "harness", "agent": "pi", "model_id": "x/m", "name": "pi"},
+                {"kind": "harness", "agent": "codex", "model_id": "openai/m", "name": "codex"},
+            ],
+            "judges": ["x/j1"],
+        }
+    )
+    _elo, _events, log = await _run(cfg, tmp_path)
+    (runner,) = FakeBattle.runners
+    assert str(runner.trials_dir) == f"{log}.trials"
+    manifest = json.loads(log.with_suffix(".run.json").read_text())
+    assert manifest["candidates"]["pi"]["candidate_id"] == "pi:x/m"
+    assert "harbor_version" in manifest["harness"]
+
+
+async def test_a_model_pool_gets_no_runner(monkeypatch, tmp_path):
+    _patch(monkeypatch)
+    FakeBattle.runners.clear()
+    await _run(_cfg(2), tmp_path)
+    assert FakeBattle.runners == [None]

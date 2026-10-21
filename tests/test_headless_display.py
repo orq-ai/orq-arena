@@ -137,3 +137,88 @@ def test_headless_verdict_never_calls_an_unresolved_gap_a_tie():
 
 def test_headless_verdict_claims_nothing_when_nothing_was_measured():
     assert _verdict(None) == "🏆 a has the best rating"
+
+
+def test_a_finished_trial_prints_one_line_and_the_table_gains_harness_columns():
+    from orq_arena.events import SolutionReady
+    from orq_arena.headless import _final_table
+
+    q: asyncio.Queue = asyncio.Queue()
+    q.put_nowait(
+        SolutionReady(
+            match_id="M1",
+            side="a",
+            passed=True,
+            cost_usd=0.42,
+            duration_ms=120000,
+            steps=14,
+            exit_reason="finished",
+        )  # fmt: skip
+    )
+    q.put_nowait(
+        TournamentEnded(
+            champion="pi",
+            elo={"pi": 1010.0, "cc": 990.0},
+            battle_log_path="x.jsonl",
+            report={
+                "harness": {
+                    "pi": {
+                        "passed": 6,
+                        "verified": 8,
+                        "mean_cost_usd": 0.21,
+                        "mean_duration_s": 246.0,
+                    }
+                }
+            },
+        )  # fmt: skip
+    )
+    out, err = io.StringIO(), io.StringIO()
+    asyncio.run(
+        consume_events(
+            q,
+            console=Console(file=out, width=120),
+            err_console=Console(file=err, width=120),
+            total_rounds=1,
+        )  # fmt: skip
+    )
+    assert "hidden tests PASSED" in err.getvalue() and "$0.42" in err.getvalue()
+    assert "6/8" in out.getvalue() and "0.21" in out.getvalue() and "4.1" in out.getvalue()
+    table = _final_table(
+        TournamentEnded(champion="pi", elo={"pi": 1.0}, battle_log_path="", report={})
+    )
+    assert [c.header for c in table.columns] == ["#", "Model", "ELO"]
+
+
+def test_the_table_shows_voids_and_estimated_costs_not_a_bare_rate():
+    from orq_arena.headless import _harness_cells
+
+    # 10 trials, 8 voided: the rate must not read 2/2
+    assert _harness_cells(
+        {"passed": 2, "verified": 2, "unverified": 8, "mean_cost_usd": 0.5, "mean_duration_s": 60.0}
+    )[0] == "2/2 (8 void)"  # fmt: skip
+    # a pi cost is tokens at the catalog rate: marked, not passed off as measured
+    estimated = _harness_cells({"passed": 1, "verified": 1, "mean_cost_usd": 0.21, "estimated": 3})
+    reported = _harness_cells({"passed": 1, "verified": 1, "mean_cost_usd": 0.21, "estimated": 0})
+    assert estimated[1] == "~0.21" and reported[1] == "0.21"
+
+
+def test_a_finished_trial_line_marks_an_estimated_cost():
+    from orq_arena.events import SolutionReady
+    from orq_arena.headless import _solution_line
+
+    base = dict(
+        match_id="M1", side="a", passed=True, cost_usd=0.42, steps=3, exit_reason="finished"
+    )
+    assert "· $0.42" in _solution_line(SolutionReady(**base))
+    assert "· ~$0.42" in _solution_line(SolutionReady(**base, cost_estimated=True))
+
+
+def test_the_tui_and_the_headless_table_show_voids_estimates_and_unpriced_trials_alike():
+    from orq_arena.headless import _harness_cells as headless_cells
+    from orq_arena.tui.screens.leaderboard import _harness_cells as tui_cells
+
+    h = {
+        "trials": 10, "passed": 2, "verified": 2, "unverified": 8, "priced": 2,
+        "mean_cost_usd": 0.21, "estimated": 2, "mean_duration_s": 90.0,
+    }  # fmt: skip
+    assert headless_cells(h) == tui_cells(h) == ["2/2 (8 void)", "~0.21 (8 unpriced)", "1.5"]

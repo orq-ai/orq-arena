@@ -44,11 +44,14 @@ class JudgeCard(Static):
         self._probabilities: dict[str, float] | None = None
         self._flipped = False
         self._replacement = False
+        self._skipped = False
         self.add_class("waiting")
         self.update(self._markup())
 
     def _markup(self) -> str:
         name = self.judge_name + (" [dim](stand-in)[/dim]" if self._replacement else "")
+        if self._skipped:
+            return f"[b]{name}[/b]\n[dim]skipped (gate)[/dim]"
         if not self._verdict:
             return f"[b]{name}[/b]\n[dim]deliberating…[/dim]"
         cue = _CUES.get(self._verdict.lower(), self._verdict)
@@ -90,6 +93,7 @@ class JudgeCard(Static):
         self._probabilities = probabilities
         self._flipped = flipped
         self._replacement = replacement
+        self._skipped = False
         self.remove_class("waiting")
         self.remove_class("stale")
         for c in _VERDICT_CLASSES:
@@ -97,6 +101,12 @@ class JudgeCard(Static):
         cls = f"verdict-{verdict.lower()}"
         if cls in _VERDICT_CLASSES:
             self.add_class(cls)
+        self.update(self._markup())
+
+    def skip(self) -> None:
+        """The verifier gate decided this round, so no jury vote is coming."""
+        self.reset()
+        self._skipped = True
         self.update(self._markup())
 
     def mark_stale(self) -> None:
@@ -113,7 +123,44 @@ class JudgeCard(Static):
         self._probabilities = None
         self._flipped = False
         self._replacement = False
+        self._skipped = False
         self.add_class("waiting")
         for c in _VERDICT_CLASSES:
             self.remove_class(c)
         self.update(self._markup())
+
+
+class VerifierCard(JudgeCard):
+    """The hidden-tests gate, shown next to the jury in harness mode.
+
+    Reads ``waiting for both`` until both trials report, then either the side the
+    tests picked or why the jury has to decide.
+    """
+
+    _note = "waiting for both"
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__("verifier", **kwargs)
+
+    def _markup(self) -> str:
+        if self._verdict in ("A", "B"):
+            cue = _CUES[self._verdict.lower()]
+            return f"[b]verifier[/b]  {cue}  tests decide\n[dim]{self._reasoning[:110]}[/dim]"
+        return f"[b]verifier[/b]\n[dim]{self._note}[/dim]"
+
+    def note(self, text: str) -> None:
+        """A non-verdict state: partial results, or a tie that goes to the jury."""
+        self.reset()
+        self._note = text
+        self.update(self._markup())
+        if text.startswith("waiting"):
+            self.add_class("waiting")
+        else:
+            self.remove_class("waiting")
+
+    def mark_stale(self) -> None:
+        self.reset()
+
+    def reset(self) -> None:
+        self._note = "waiting for both"
+        super().reset()

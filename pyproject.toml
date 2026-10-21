@@ -26,6 +26,8 @@ dependencies = [
     # imported directly (cli.py, headless.py); do not ride on transitive deps
     "loguru>=0.7",
     "rich>=13.7",
+    # task.toml reader for harness tasks; stdlib tomllib from 3.11
+    'tomli>=2.0; python_version < "3.11"',
 ]
 
 [project.optional-dependencies]

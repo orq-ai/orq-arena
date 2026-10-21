@@ -1606,6 +1606,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pyyaml" },
     { name = "rich" },
+    { name = "tomli", marker = "python_full_version < '3.11'" },
 ]
 
 [package.optional-dependencies]
@@ -1641,6 +1642,7 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "rich", specifier = ">=13.7" },
     { name = "textual", marker = "extra == 'tui'", specifier = ">=0.83" },
+    { name = "tomli", marker = "python_full_version < '3.11'", specifier = ">=2.0" },
 ]
 provides-extras = ["tui"]
 

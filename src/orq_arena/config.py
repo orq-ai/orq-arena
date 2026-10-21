@@ -8,7 +8,7 @@ from typing import Any, Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from .candidates import CandidateSpec
+from .candidates import AnyCandidate, CandidateSpec, HarnessCandidate
 
 
 class MatchRules(BaseModel):
@@ -74,6 +74,29 @@ class PreflightConfig(BaseModel):
     thinking_probe: bool = True
 
 
+class HarnessConfig(BaseModel):
+    """How harness candidates run: the Harbor CLI, its router endpoint, the cache."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    harbor_bin: str = "harbor"
+    # Trial cache and artifacts, keyed (prompt_hash, candidate_id). None means
+    # "<battle log>.trials" next to the run's log.
+    trials_dir: str | None = None
+    # Global cap on concurrent Harbor trials across all matches (headless).
+    max_parallel_trials: int = 2
+    # Agents reach the orq router at <router_host>/v3/anthropic (anthropic_messages)
+    # or <router_host>/v3/router (openai_*). None follows the arena's gateway host.
+    router_host: str | None = None
+    api_key_name: str = ORQ_API_KEY_ENV
+    # The TB-2.1 images are linux/amd64; on a Mac they run under emulation.
+    timeout_multiplier: float = Field(default=1.5, gt=0)
+    artifacts: list[str] = Field(default_factory=lambda: ["/app"])
+    # Diff the final workspace against the pristine image for the judges.
+    diff: bool = True
+    diff_max_bytes: int = 200_000
+
+
 class ArenaConfig(BaseModel):
     """Top-level orq-arena config."""
 
@@ -84,7 +107,14 @@ class ArenaConfig(BaseModel):
     # Parallel matches for headless runs only; the TUI is always sequential.
     headless_concurrency: int = 4
     gateway: OrqAIGatewayConfig = Field(default_factory=OrqAIGatewayConfig)
-    candidates: list[CandidateSpec]
+    candidates: list[AnyCandidate]
+    # Only read when a candidate has kind: harness.
+    harness: HarnessConfig = Field(default_factory=HarnessConfig)
+    # A hidden-test pass beats a fail without a jury call; the jury only sees
+    # pass/pass and fail/fail pairs. Harness runs only.
+    verifier_gate: bool = True
+    # Optional evaluatorq pairwise prompt template, shared by the run and rejudge.
+    judge_prompt: str | None = None
     # (was, model_id) for every candidate the validator had to rename off a
     # collision. Output, never input: excluded so it cannot ride into the
     # manifest's recorded config, and rebuilt from scratch on every validation
@@ -112,6 +142,10 @@ class ArenaConfig(BaseModel):
     # this counts as an abstention. None keeps every vote.
     judge_abstain_below: float | None = Field(default=None, gt=0.0, lt=1.0)
 
+    @property
+    def has_harness(self) -> bool:
+        return any(isinstance(c, HarnessCandidate) for c in self.candidates)
+
     @model_validator(mode="after")
     def _unique_candidate_names(self) -> ArenaConfig:
         """No two candidates may answer to the same name.
@@ -128,26 +162,39 @@ class ArenaConfig(BaseModel):
         model listed twice, which no rename can disambiguate, so that raises.
         """
         self.renamed = []  # this validation's findings, not a previous one's
-        by_name: dict[str, list[CandidateSpec]] = {}
+        by_name: dict[str, list[AnyCandidate]] = {}
         for c in self.candidates:
             by_name.setdefault(c.name, []).append(c)
         for name, group in by_name.items():
             if len(group) == 1:
                 continue
-            if len({c.model_id for c in group}) < len(group):
-                raise ValueError(f"Duplicate candidate {name!r}: the same model_id is listed twice")
+            if len({c.candidate_id for c in group}) < len(group):
+                raise ValueError(
+                    f"Duplicate candidate {name!r}: the same model_id (or agent setup) "
+                    "is listed twice"
+                )
             for c in group:
-                self.renamed.append((name, c.model_id))
-                c.name = c.model_id
+                self.renamed.append((name, c.candidate_id))
+                c.name = c.candidate_id
+
+        by_id: dict[str, str] = {}
+        for c in self.candidates:
+            if isinstance(c, HarnessCandidate):
+                if c.candidate_id in by_id:
+                    raise ValueError(
+                        f"Duplicate harness setup: {by_id[c.candidate_id]!r} and {c.name!r} "
+                        f"are the same agent, model and setup ({c.candidate_id})"
+                    )
+                by_id[c.candidate_id] = c.name
 
         seen: dict[str, str] = {}
         for c in self.candidates:
             if c.name in seen:
                 raise ValueError(
                     f"Duplicate candidate name {c.name!r} "
-                    f"({seen[c.name]} and {c.model_id}); names must be unique"
+                    f"({seen[c.name]} and {c.candidate_id}); names must be unique"
                 )
-            seen[c.name] = c.model_id
+            seen[c.name] = c.candidate_id
         return self
 
     @model_validator(mode="after")
@@ -161,7 +208,15 @@ class ArenaConfig(BaseModel):
                 "judge_abstain_below reads the probabilities a decision model returns; "
                 "set judge_api: decisions or drop it"
             )
+        if self.has_harness and self.judge_api == "decisions":
+            raise ValueError(
+                "judge_api: decisions cannot read a harness run: decision models "
+                "take 32k to 64k of context and a trajectory dossier does not fit. "
+                "Use judge_api: llm."
+            )
         for c in self.candidates:
+            if not isinstance(c, CandidateSpec):
+                continue
             budget = ((c.reasoning or {}).get("thinking") or {}).get("budget_tokens")
             cap = c.max_tokens or self.gateway.candidate_max_tokens
             if isinstance(budget, int) and budget >= cap:
@@ -177,7 +232,15 @@ def known_config_keys() -> list[str]:
     Lives beside the models so a new sub-model added here cannot silently
     drop out of the CLI's suggestion pool.
     """
-    models = (ArenaConfig, MatchRules, OrqAIGatewayConfig, PreflightConfig, CandidateSpec)
+    models = (
+        ArenaConfig,
+        MatchRules,
+        OrqAIGatewayConfig,
+        PreflightConfig,
+        HarnessConfig,
+        CandidateSpec,
+        HarnessCandidate,
+    )
     return sorted(
         {
             name

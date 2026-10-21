@@ -20,16 +20,18 @@ from evaluatorq import PairwiseComparison, build_report
 from pydantic import ValidationError
 
 from ..arena.battle import Battle
-from ..candidates import CandidateSpec
-from ..config import ArenaConfig
+from ..candidates import AnyCandidate, HarnessCandidate
+from ..config import ArenaConfig, HarnessConfig
 from ..data.log import BattleLog
 from ..data.prompts import PromptItem
 from ..data.schemas import BattleRecord
 from ..events import ArenaEvent, StandingsUpdated, TournamentEnded
+from ..harness.runner import HarborRunner
 from ..judging import pin_judge_endpoints
 from ..providers.credentials import active_workspace
 from ..providers.models_list import catalog_host
 from ..providers.orq_gateway import OrqGateway
+from ..redact import redact
 from .elo import (
     bootstrap_ci,
     bootstrap_draws,
@@ -45,8 +47,8 @@ Outcome = tuple[str, str, str, str]  # (name, name, 'winner' | 'tie', category)
 
 
 def round_robin_schedule(
-    candidates: list[CandidateSpec], seed: int = 42
-) -> list[tuple[CandidateSpec, CandidateSpec]]:
+    candidates: list[AnyCandidate], seed: int = 42
+) -> list[tuple[AnyCandidate, AnyCandidate]]:
     """Every pair once, in a seeded shuffled order."""
     schedule = list(combinations(candidates, 2))
     random.Random(seed).shuffle(schedule)
@@ -96,7 +98,9 @@ def elo_by_category(outcomes: list[Outcome]) -> dict[str, dict[str, float]]:
 def _rebuild_comparisons(records: list[BattleRecord]) -> list[PairwiseComparison]:
     comps: list[PairwiseComparison] = []
     for rec in records:
-        if rec.error is not None:
+        # A gate round has no jury votes to summarize; counting its lone synthetic
+        # vote would read as perfect agreement.
+        if rec.error is not None or rec.decided_by_gate:
             continue
         comps.append(
             PairwiseComparison.model_validate(
@@ -106,7 +110,7 @@ def _rebuild_comparisons(records: list[BattleRecord]) -> list[PairwiseComparison
     return comps
 
 
-def record_names(records: list[BattleRecord], candidates: list[CandidateSpec]) -> dict[str, str]:
+def record_names(records: list[BattleRecord], candidates: list[AnyCandidate]) -> dict[str, str]:
     """Map each record's stored model key to its display name.
 
     Keyed on the full router id where the record carries one, because short
@@ -114,7 +118,7 @@ def record_names(records: list[BattleRecord], candidates: list[CandidateSpec]) -
     and a short-name map would rate two different models as one. v3 logs have
     no ids, so those fall back to the short name they do have.
     """
-    by_id = {c.model_id: c.name for c in candidates}
+    by_id = {c.candidate_id: c.name for c in candidates}
     # Short names are only usable when they identify one candidate. A collision
     # resolves to nothing rather than to whichever candidate happened to be last.
     short_counts: dict[str, int] = {}
@@ -124,7 +128,7 @@ def record_names(records: list[BattleRecord], candidates: list[CandidateSpec]) -
 
     # Start from the pool so a candidate with no rounds still has a name; then
     # records add anything the pool no longer lists.
-    alias: dict[str, str] = {c.model_id: c.name for c in candidates}
+    alias: dict[str, str] = {c.candidate_id: c.name for c in candidates}
     record_keys: set[str] = set()
     for rec in records:
         for short, full in ((rec.model_a, rec.model_a_id), (rec.model_b, rec.model_b_id)):
@@ -167,6 +171,47 @@ def _top_difference(draws: list[dict[str, float]], ranked: list[tuple[str, float
     }
 
 
+def harness_summary(records: list[BattleRecord], alias: dict[str, str]) -> dict[str, dict]:
+    """Per-harness pass rate, mean cost and mean time, one entry per distinct trial.
+
+    A cached trial is replayed into every match that draws it; counting each
+    replay would weight a harness by how many matches it sat in. Keyed on
+    (prompt, candidate) so a trial counts once.
+    """
+    seen: dict[tuple[str, str], dict] = {}
+    for rec in records:
+        for side, sol in (("a", rec.solution_a), ("b", rec.solution_b)):
+            if sol:
+                seen.setdefault((rec.prompt_hash, rec.rating_key(side)), sol)  # type: ignore[arg-type]
+    per: dict[str, list[dict]] = {}
+    for (_ph, key), sol in seen.items():
+        per.setdefault(alias.get(key, key), []).append(sol)
+    out: dict[str, dict] = {}
+    for name, sols in per.items():
+        verified = [s for s in sols if s.get("passed") is not None]
+        costs = [s["cost_usd"] for s in sols if s.get("cost_usd") is not None]
+        out[name] = {
+            "trials": len(sols),
+            "passed": sum(1 for s in verified if s["passed"]),
+            "verified": len(verified),
+            # trials whose verifier never ran (voided): out of the pass rate, but never hidden
+            "unverified": len(sols) - len(verified),
+            # trials whose cost is tokens priced at the catalog rate, not a reported figure
+            "estimated": sum(
+                1 for s in sols if s.get("cost_usd") is not None and s.get("cost_estimated")
+            ),
+            "pass_rate": (sum(1 for s in verified if s["passed"]) / len(verified))
+            if verified
+            else None,
+            # the mean is over priced trials only; ``priced`` < ``trials`` says how many it left out
+            "mean_cost_usd": sum(costs) / len(costs) if costs else None,
+            "priced": len(costs),
+            "mean_duration_s": sum(s.get("duration_ms", 0) for s in sols) / len(sols) / 1000,
+            "tests_edited": sum(1 for s in sols if s.get("tests_edited")),
+        }
+    return out
+
+
 def _final_report(
     cfg: ArenaConfig,
     records: list[BattleRecord],
@@ -185,7 +230,7 @@ def _final_report(
 
     from ..analysis.kappa import cohen_kappa_pairs, fleiss_kappa
 
-    vote_rounds = [r.judge_votes for r in records if r.error is None]
+    vote_rounds = [r.judge_votes for r in records if r.error is None and not r.decided_by_gate]
     fleiss = fleiss_kappa(vote_rounds, list(cfg.judges))
     cohen = cohen_kappa_pairs(vote_rounds, list(cfg.judges))
 
@@ -207,8 +252,19 @@ def _final_report(
             grid[a][b] += 0.5
             grid[b][a] += 0.5
 
-    model_in = sum(r.tokens_a_in + r.tokens_b_in for r in records)
-    model_out = sum(r.tokens_a_out + r.tokens_b_out for r in records)
+    # A cached harness trial is replayed into every match that draws it, so its
+    # tokens count once per (prompt, candidate), not once per record.
+    model_in = model_out = 0
+    counted_trials: set[tuple[str, str]] = set()
+    for r in records:
+        for side in ("a", "b"):
+            if getattr(r, f"solution_{side}"):
+                trial_key = (r.prompt_hash, r.rating_key(side))  # type: ignore[arg-type]
+                if trial_key in counted_trials:
+                    continue
+                counted_trials.add(trial_key)
+            model_in += getattr(r, f"tokens_{side}_in")
+            model_out += getattr(r, f"tokens_{side}_out")
     judge_in = sum(r.judge_tokens_in for r in records)
     judge_out = sum(r.judge_tokens_out for r in records)
     # Measured only when every judged round carries its priced cost; a log with
@@ -239,7 +295,9 @@ def _final_report(
             len(rec.response_b or ""),
         )
         for rec in records
-        if rec.error is None
+        # A harness round's "answer" is a dossier; its length says nothing about style.
+        if not (rec.solution_a or rec.solution_b)
+        and rec.error is None
         and rec.majority_verdict in y_by_verdict
         and rec.rating_key("a") in alias
         and rec.rating_key("b") in alias
@@ -318,6 +376,8 @@ def _final_report(
         },
         "mixed_pool": len({w.thinking_enabled or probed.get(w.name, False) for w in cfg.candidates})
         > 1,
+        "harness": harness_summary(records, alias),
+        "gate_rounds": sum(1 for r in records if r.decided_by_gate),
         "error_rounds": sum(1 for r in records if r.error is not None),
         "rated_rounds": len(outcomes),
         "by_model_names": dict(alias),
@@ -362,6 +422,7 @@ def config_sha256(cfg: ArenaConfig) -> str:
     # Keys added after manifests existed are left out while they hold their legacy
     # value, so an old run's recorded hash still matches its unchanged YAML.
     legacy = {k for k, v in _LEGACY_IDENTITY.items() if getattr(cfg, k) == v}
+    legacy |= {k for k, v in _LEGACY_HASH_ONLY.items() if getattr(cfg, k) == v}
     return hashlib.sha256(cfg.model_dump_json(exclude=legacy).encode("utf-8")).hexdigest()[:16]
 
 
@@ -385,11 +446,20 @@ IDENTITY_FIELDS = (
     "judge_api",
     "judge_swap",
     "judge_abstain_below",
+    "judge_prompt",
 )
 # Identity keys added after manifests already existed. A manifest without them
 # predates them, and such a run judged over chat, in both seat orders, with no
 # floor. Filled in rather than left to the local YAML, which may say otherwise.
-_LEGACY_IDENTITY = {"judge_api": "llm", "judge_swap": True, "judge_abstain_below": None}
+_LEGACY_IDENTITY = {
+    "judge_api": "llm",
+    "judge_swap": True,
+    "judge_abstain_below": None,
+    "judge_prompt": None,
+}
+# Harness-era config keys that never reach the rating of a model-only run, so
+# they stay out of the hash while at their defaults and old hashes still match.
+_LEGACY_HASH_ONLY = {"harness": HarnessConfig(), "verifier_gate": True}
 
 IdentitySource = Literal["manifest", "manifest-partial", "config"]
 
@@ -477,6 +547,20 @@ def config_from_manifest(
     return fallback, "config"
 
 
+def _manifest_candidate(c: AnyCandidate) -> dict:
+    """One candidate's manifest entry; ``model`` stays for report and rejudge readers."""
+    if isinstance(c, HarnessCandidate):
+        return {
+            "model": c.model_id,
+            "reasoning": "vendor-default",
+            "kind": "harness",
+            "agent": c.agent,
+            "candidate_id": c.candidate_id,
+            "variant": c.variant,
+        }
+    return {"model": c.model_id, "reasoning": c.reasoning or "vendor-default"}
+
+
 def _write_manifest(
     path: Path,
     *,
@@ -527,10 +611,7 @@ def _write_manifest(
         # another workspace. Recording it as `orq_workspace` would read as a
         # statement about the run rather than about the machine that started it.
         "orq_cli_workspace": active_workspace(),
-        "candidates": {
-            c.name: {"model": c.model_id, "reasoning": c.reasoning or "vendor-default"}
-            for c in cfg.candidates
-        },
+        "candidates": {c.name: _manifest_candidate(c) for c in cfg.candidates},
         "judges": list(cfg.judges),
         "replacement_judges": list(cfg.replacement_judges),
         "min_successful_judges": cfg.min_successful_judges,
@@ -539,6 +620,13 @@ def _write_manifest(
         "judge_abstain_below": cfg.judge_abstain_below,
         "evaluatorq_version": evq_version,
     }
+    if cfg.has_harness:
+        from ..harness.runner import harbor_version
+
+        manifest["harness"] = {
+            "harbor_version": harbor_version(cfg.harness.harbor_bin),
+            "tasks": sorted({p.metadata.get("harbor_task_path", "") for p in prompts} - {""}),
+        }
     if finished_at is not None:
         manifest["finished_at"] = finished_at
     if dataset is not None:
@@ -553,7 +641,7 @@ def _write_manifest(
         manifest["fleiss"] = report.get("fleiss")
         manifest["tokens"] = report.get("tokens")
         manifest["length_coef"] = report.get("length_coef")
-    path.write_text(json.dumps(manifest, indent=2, default=str), encoding="utf-8")
+    path.write_text(redact(json.dumps(manifest, indent=2, default=str)), encoding="utf-8")
 
 
 async def run_tournament(
@@ -581,6 +669,20 @@ async def run_tournament(
     gateway = OrqGateway(cfg.gateway)
     await pin_judge_endpoints(cfg, gateway.client)
     log = BattleLog(battle_log_path)
+    runner = None
+    if cfg.has_harness:
+        from ..providers.models_list import fetch_price_map
+
+        try:
+            prices = await fetch_price_map(cfg.gateway)
+        except Exception:  # pricing is advisory; an agent that reports no cost shows n/a
+            prices = {}
+        runner = HarborRunner(
+            cfg.harness,
+            Path(cfg.harness.trials_dir or f"{battle_log_path}.trials"),
+            router_host=cfg.harness.router_host or catalog_host(cfg.gateway),
+            prices=prices,
+        )
     manifest_path = manifest_path_for(battle_log_path)
 
     names = [w.name for w in cfg.candidates]
@@ -629,6 +731,7 @@ async def run_tournament(
                 events=events,
                 # Per round, not per match: a killed run keeps what it paid for.
                 on_record=log.append,
+                runner=runner,
             )
             result = await battle.run()
             async with state_lock:

@@ -19,9 +19,13 @@ from evaluatorq.common.reports import html_table, load_css, load_logo_svg, statu
 from evaluatorq.common.reports import pct as _pct
 from evaluatorq.pairwise_reports.sections import POSITION_BIAS_WARN
 
+from .candidates import HarnessCandidate
 from .config import ArenaConfig
 from .data.schemas import BattleRecord
+from .fmt import fmt_cost
 from .judging import floor_abstained, judge_labels, vote_probabilities
+from .redact import redact
+from .rounds_page import rounds_path_for, write_rounds
 
 if TYPE_CHECKING:  # driver imports this module at render time; keep it type-only
     from .tournament.driver import IdentitySource
@@ -105,6 +109,10 @@ details.method p { font-size: 14px; color: var(--gray-700); max-width: 74ch; }
 .pw-vote { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; padding: 6px 0; border-top: 1px solid rgba(127,127,127,.15); }
 .pw-vote__model { width: 170px; font-weight: 600; flex: none; }
 .pw-vote__why { flex: 1; opacity: .85; font-size: 13.5px; }
+.hx-counts, .hx-exit { font-size: 13px; margin: 4px 0; color: var(--gray-700); }
+.hx details { margin: 4px 0; }
+.hx summary { cursor: pointer; font-size: 13px; }
+.hx pre { max-height: 22rem; }
 @media (max-width: 720px) { .pw-responses { grid-template-columns: 1fr; } .kpi-band { flex-wrap: wrap; } }
 """
 
@@ -145,6 +153,8 @@ def _cost_lines(records, manifest, prices, alias=None, jury_measured=None):
             ("a", r.tokens_a_in, r.tokens_a_out),
             ("b", r.tokens_b_in, r.tokens_b_out),
         ):
+            if (r.solution_a if side == "a" else r.solution_b) is not None:
+                continue  # an agent trial is priced by what it reported, see _harness_costs
             name, pr = _priced_side(r, side, alias, prices, id_by_name)
             if pr is None:
                 unpriced.add(name)
@@ -201,6 +211,8 @@ def _per_model_cost(records, manifest, prices, alias=None) -> dict[str, float]:
             ("a", r.tokens_a_in, r.tokens_a_out),
             ("b", r.tokens_b_in, r.tokens_b_out),
         ):
+            if (r.solution_a if side == "a" else r.solution_b) is not None:
+                continue
             name, pr = _priced_side(r, side, alias, prices, id_by_name)
             if pr is not None:
                 out[name] = out.get(name, 0.0) + tin * pr[0] / 1e6 + tout * pr[1] / 1e6
@@ -209,6 +221,51 @@ def _per_model_cost(records, manifest, prices, alias=None) -> dict[str, float]:
 
 def _fmt_usd(v: float) -> str:
     return f"${v:.2f}" if v >= 0.1 else f"${v:.3f}"
+
+
+def _harness_estimated(records) -> int:
+    """Distinct trials whose cost is tokens priced at the catalog rate, not a reported figure."""
+    seen: dict[tuple[str, str], dict] = {}
+    for r in records:
+        for side, sol in (("a", r.solution_a), ("b", r.solution_b)):
+            if sol:
+                seen.setdefault((r.prompt_hash, r.rating_key(side)), sol)
+    return sum(
+        1 for s in seen.values() if s.get("cost_usd") is not None and s.get("cost_estimated")
+    )
+
+
+def _harness_costs(records, alias) -> tuple[dict[str, float], int, int]:
+    """(observed usd per harness name, trials, trials that reported no cost).
+
+    Each (task, harness) trial counts once: a cached trial is replayed into every
+    match that draws it, and summing the replays would charge for it again. A
+    voided round still counts, since the money for its finished side was spent.
+    """
+    seen: dict[tuple[str, str], dict] = {}
+    for r in records:
+        for side, sol in (("a", r.solution_a), ("b", r.solution_b)):
+            if sol:
+                seen.setdefault((r.prompt_hash, r.rating_key(side)), sol)
+    usd: dict[str, float] = {}
+    unknown = 0
+    for (_ph, key), sol in seen.items():
+        cost = sol.get("cost_usd")
+        if cost is None:
+            unknown += 1
+            continue
+        name = alias.get(key, key)
+        usd[name] = usd.get(name, 0.0) + float(cost)
+    return usd, len(seen), unknown
+
+
+def _cost_provenance(priced: int, estimated: int) -> str:
+    """How an agent-spend figure was obtained: reported by the trials, or priced from tokens."""
+    if estimated == 0:
+        return "observed"
+    if estimated >= priced:
+        return "estimated from tokens"
+    return f"{priced - estimated} observed, {estimated} estimated from tokens"
 
 
 def _kpi(label: str, value: str, subtitle: str, status: str = "") -> str:
@@ -224,14 +281,23 @@ def _kpi(label: str, value: str, subtitle: str, status: str = "") -> str:
     )
 
 
-def _value_map_svg(points, champion: str, size_label: str = "average response length") -> str:
+def _value_map_svg(
+    points,
+    champion: str,
+    size_label: str = "average response length",
+    estimated: frozenset[str] = frozenset(),
+) -> str:
     """ELO vs cost (log x), dashed best-value frontier, size = avg out tokens.
 
     ELO on y (not win rate) so dot height agrees with the leaderboard rank in
     the dot: raw win rate ignores opponent strength and inverts rank order.
     points: (name, cost_usd, elo, win_rate, size) in leaderboard order.
+    estimated: names whose cost is partly tokens at the catalog rate, shown with ``~``.
     """
     import math
+
+    def _usd(name: str, v: float) -> str:
+        return ("~" if name in estimated else "") + _fmt_usd(v)
 
     if len(points) < 2:
         return ""
@@ -279,7 +345,7 @@ def _value_map_svg(points, champion: str, size_label: str = "average response le
         dots.append(
             f"<circle cx='{x:.0f}' cy='{y:.0f}' r='{rad:.0f}' fill='{fill}' opacity='.9' "
             f"stroke='var(--surface)' stroke-width='1.5'>"
-            f"<title>{_e(name)}: {_fmt_usd(c)}, ELO {e:.0f}, {r:.0%} win rate</title></circle>"
+            f"<title>{_e(name)}: {_usd(name, c)}, ELO {e:.0f}, {r:.0%} win rate</title></circle>"
             f"<text x='{x:.0f}' y='{y + 3.5:.0f}' font-size='10' font-weight='700' fill='#fff' "
             f"text-anchor='middle' pointer-events='none'>{rk}</text>"
         )
@@ -307,12 +373,12 @@ def _value_map_svg(points, champion: str, size_label: str = "average response le
             dots.append(
                 leader + f"<text x='{lx:.0f}' y='{ly:.0f}' font-size='11' font-weight='700' "
                 f"fill='var(--slate)' text-anchor='middle'>{_e(name)} "
-                f"<tspan fill='var(--gray-500)' font-weight='400'>{_fmt_usd(c)} &middot; ELO {e:.0f}</tspan></text>"
+                f"<tspan fill='var(--gray-500)' font-weight='400'>{_usd(name, c)} &middot; ELO {e:.0f}</tspan></text>"
             )
         star = " &#9733;" if on_frontier else ""
         key_rows.append(
             f"<span style='white-space:nowrap'><b>{rk}</b> {_e(name)} "
-            f"<span style='color:var(--gray-500)'>{_fmt_usd(c)} &middot; ELO {e:.0f} &middot; {r:.0%}{star}</span></span>"
+            f"<span style='color:var(--gray-500)'>{_usd(name, c)} &middot; ELO {e:.0f} &middot; {r:.0%}{star}</span></span>"
         )
     key = (
         "<p class='note' style='display:flex;flex-wrap:wrap;gap:4px 18px'>"
@@ -453,90 +519,6 @@ def _speed_svg(stats) -> str:
 """
 
 
-_ROUNDS_CAP = 200  # a 16-model run would otherwise be tens of MB
-
-
-def _clip(text: str, n: int) -> str:
-    return text if len(text) <= n else text[:n].rstrip() + "…"
-
-
-def _vote_chip(v: dict, label: str) -> str:
-    """The judge's pick as an evaluatorq vote chip; a dot when it abstained."""
-    flip = " pw-chip--flip" if v.get("flipped") else ""
-    choice = v.get("vote")
-    if choice is None:
-        return f"<span class='pw-chip pw-chip--abstain{flip}' title='{_e(label)} abstained'>&middot;</span>"
-    tone = {"A": "a", "B": "b"}.get(choice, "tie")
-    return f"<span class='pw-chip pw-chip--{tone}{flip}' title='{_e(label)}'>{_e(choice)}</span>"
-
-
-def _rounds_html(judged, alias, labels, floor) -> str:
-    """One expandable row per judged round: the panel's chips, then both answers and every vote."""
-    if not judged:
-        return ""
-    rows = []
-    for i, r in enumerate(judged[:_ROUNDS_CAP], 1):
-        name_a = alias.get(r.rating_key("a"), r.model_a)
-        name_b = alias.get(r.rating_key("b"), r.model_b)
-        verdict = r.majority_verdict
-        badge = {
-            "A": (f"{name_a} wins", "pass"),
-            "B": (f"{name_b} wins", "pass"),
-            "tie": ("tie", "neutral"),
-        }.get(verdict, ("inconclusive", "warn"))
-        picks = {v.get("vote") for v in r.judge_votes if v.get("vote")}
-        split = (
-            "<span class='pw-split' title='the panel split or could not decide'>⚠</span>"
-            if len(picks) > 1 or verdict == "inconclusive"
-            else ""
-        )
-        chips = "".join(
-            _vote_chip(v, labels.get(v.get("model"), v.get("model", ""))) for v in r.judge_votes
-        )
-        question = _clip(r.prompt_text, 300)
-        full_prompt = f"<pre>{_e(r.prompt_text)}</pre>" if question != r.prompt_text else ""
-        votes = []
-        for v in r.judge_votes:
-            label = labels.get(v.get("model"), v.get("model", ""))
-            tags = "<span class='pw-tag pw-tag--flip'>flipped</span>" if v.get("flipped") else ""
-            tags += "<span class='pw-tag'>under floor</span>" if floor_abstained(v, floor) else ""
-            tags += "<span class='pw-tag'>stand-in</span>" if v.get("replacement") else ""
-            probs = vote_probabilities(v)
-            why = (
-                " &middot; ".join(f"{k} {probs[k]:.0%}" for k in ("A", "B", "tie"))
-                if probs
-                else _e(_clip(v.get("explanation") or "", 400))
-            )
-            votes.append(
-                f"<li class='pw-vote'><span class='pw-vote__model'>{_e(label)}</span>"
-                f"{_vote_chip(v, label)}{tags}<span class='pw-vote__why'>{why}</span></li>"
-            )
-        rows.append(
-            f"<details class='pw-cmp'><summary><span class='pw-cmp__idx'>{i}</span>"
-            f"<span class='pw-cmp__q'>{_e(question)}<span class='pw-cmp__pair'>"
-            f"<span class='sideA'>A</span> {_e(name_a)} vs <span class='sideB'>B</span> "
-            f"{_e(name_b)}</span></span>{status_badge(*badge)}"
-            f"<span class='pw-cmp__chips'>{chips}</span>{split}</summary>{full_prompt}"
-            f"<div class='pw-responses'><div class='pw-response'><h4><span class='sideA'>A</span> "
-            f"{_e(name_a)}</h4><pre>{_e(r.response_a)}</pre></div><div class='pw-response'><h4>"
-            f"<span class='sideB'>B</span> {_e(name_b)}</h4><pre>{_e(r.response_b)}</pre></div></div>"
-            f"<ul class='pw-votes'>{''.join(votes)}</ul></details>"
-        )
-    cap = (
-        f"<p class='note'>Showing the first {_ROUNDS_CAP} of {len(judged)} judged rounds. To page "
-        f"through all of them, run with <code>orq-arena run --tui</code> and press <b>B</b> on the "
-        f"final leaderboard to open the battle browser.</p>"
-        if len(judged) > _ROUNDS_CAP
-        else ""
-    )
-    return (
-        "<h2>Rounds</h2><p class='note'>Every judged round with each judge&#39;s pick: A, B or tie; "
-        "a dot means the judge abstained, a dashed outline that it flipped when the sides were "
-        "swapped, and &#9888; that the panel split. Open a round to read both answers and every "
-        "vote.</p>" + "".join(rows) + cap
-    )
-
-
 def _empty_report_html(manifest: dict[str, Any], n_records: int) -> str:
     """Minimal valid page when no models were rated (empty pool / all voided)."""
     bench_id = _e(manifest.get("tournament_id", ""))
@@ -555,6 +537,24 @@ candidates were configured. Check the candidates in the YAML and the run log, th
 """
 
 
+def _alias_map(cfg: ArenaConfig, report: dict[str, Any]) -> dict[str, str]:
+    """Display name per rating key. Records store short names or ids; the rating is keyed by name."""
+    return report.get("by_model_names") or {
+        **{w.short_model: w.name for w in cfg.candidates},
+        # Two setups of one agent and model share a short name; the id tells them apart.
+        **{w.candidate_id: w.name for w in cfg.candidates if isinstance(w, HarnessCandidate)},
+    }
+
+
+def _judge_label_map(
+    cfg: ArenaConfig, report: dict[str, Any], manifest: dict[str, Any]
+) -> dict[str, str]:
+    """A label per judge from the whole panel, so two judges sharing a short name never share a row."""
+    per_judge = (report.get("jury") or {}).get("per_judge", [])
+    panel_ids = list(manifest.get("judges", cfg.judges))
+    return judge_labels([*panel_ids, *(str(j.get("model", "")) for j in per_judge)])
+
+
 def build_report_html(
     *,
     cfg: ArenaConfig,
@@ -564,8 +564,12 @@ def build_report_html(
     manifest: dict[str, Any],
     prices: dict[str, tuple[float, float]] | None = None,
     identity_source: IdentitySource = "manifest",
+    rounds_href: str | None = None,
 ) -> str:
     """Render the run report page as a self-contained HTML string.
+
+    Rounds are never embedded: ``rounds_href`` is the link to the rounds page
+    (``rounds_page.py``), left out when there is none.
 
     ``identity_source`` says where the model names, judge panel and reasoning
     flags came from: the run's manifest, or a YAML that may have drifted since
@@ -589,7 +593,13 @@ def build_report_html(
     thinking = report.get("thinking") or {}
     thinking_off = report.get("thinking_off") or {}
     verbosity = report.get("verbosity") or {}
-    elo_sc = report.get("elo_style_controlled") or {}
+    harness_stats: dict[str, dict] = report.get("harness") or {}
+    is_harness = bool(harness_stats) or any(
+        r.solution_a is not None or r.solution_b is not None for r in records
+    )
+    gate_rounds = report.get("gate_rounds") or sum(1 for r in judged if r.decided_by_gate)
+    # A harness answer is a dossier, so its length says nothing about style.
+    elo_sc = {} if is_harness else (report.get("elo_style_controlled") or {})
     length_coef = report.get("length_coef")
 
     # Verdict hero: does the top spot actually beat the runner-up? That is a
@@ -639,6 +649,42 @@ def build_report_html(
             think = ""
         tok = verbosity.get(name)
         sc_cell = f"<td class='n'>{elo_sc[name]:.0f}</td>" if name in elo_sc else ""
+        if is_harness:
+            hs = harness_stats.get(name) or {}
+            edited = hs.get("tests_edited") or 0
+            if edited:
+                think += (
+                    f" <span class='sig warn' title='trials where the agent edited files under "
+                    f"tests/'>⚠ tests edited &times;{edited}</span>"
+                )
+            verified = hs.get("verified") or 0
+            unverified = hs.get("unverified") or 0
+            void_txt = f" <span class='sig warn'>({unverified} void)</span>" if unverified else ""
+            pass_cell = (
+                f"<td class='n' title='{hs.get('pass_rate', 0):.0%} of verified trials'>"
+                f"{hs.get('passed', 0)}/{verified}{void_txt}</td>"
+                if verified
+                else f"<td class='n'>n/a{void_txt}</td>"
+            )
+            cost_v, dur_v = hs.get("mean_cost_usd"), hs.get("mean_duration_s")
+            est_n = hs.get("estimated") or 0
+            cost_txt = "n/a" if cost_v is None else fmt_cost(cost_v, bool(est_n), 2)
+            unpriced = hs.get("trials", 0) - hs.get("priced", hs.get("trials", 0))
+            if cost_v is not None and unpriced > 0:
+                # the mean covers priced trials only; say how many it left out
+                cost_txt += f" <span class='sig warn'>({unpriced} unpriced)</span>"
+            cost_title = (
+                f" title='{est_n} of {hs.get('trials', 0)} trials priced from tokens at the catalog rate'"
+                if est_n
+                else ""
+            )
+            tail_cells = (
+                pass_cell
+                + f"<td class='n'{cost_title}>{cost_txt}</td>"
+                + f"<td class='n'>{'n/a' if dur_v is None else f'{dur_v / 60:.1f}'}</td>"
+            )
+        else:
+            tail_cells = f"<td class='n'>{'' if tok is None else f'{tok:.0f}'}</td>"
         rank = medals[i - 1] if i <= 3 else str(i)
         # BT strength -> 0 floors the rating at 400*log10(1e-10)+1000 = -3000; that
         # bound is really -inf (model won ~nothing), so show it as such, not the artifact.
@@ -647,8 +693,7 @@ def build_report_html(
             f"<tr><td class='n'>{rank}</td><td class='name'>{_e(name)}{think}</td>"
             f"<td class='n'>{e0:.0f}</td><td class='n'>{lo_txt}&ndash;{hi:.0f}</td>"
             f"<td title='{lo:.0f} to {hi:.0f}'>{_ci_bar(dlo, dhi, e0, floor, span)}</td>"
-            f"{sc_cell}"
-            f"<td class='n'>{'' if tok is None else f'{tok:.0f}'}</td></tr>"
+            f"{sc_cell}{tail_cells}</tr>"
         )
 
     # Win grid: full names on rows, rank numbers on columns (no truncated-name collisions).
@@ -677,7 +722,7 @@ def build_report_html(
     jury = report.get("jury") or {}
     per_judge = jury.get("per_judge", [])
     panel_ids = list(manifest.get("judges", cfg.judges))
-    labels = judge_labels([*panel_ids, *(str(j.get("model", "")) for j in per_judge)])
+    labels = _judge_label_map(cfg, report, manifest)
     all_votes = [v for r in judged for v in r.judge_votes]
     stand_ins = {v.get("model") for v in all_votes if v.get("replacement")}
     # A flip rate means something only for a judge that saw both seat orders.
@@ -761,6 +806,7 @@ def build_report_html(
     j_in, j_out = tok.get("judges_in", 0), tok.get("judges_out", 0)
     total_tok = w_in + w_out + j_in + j_out
     jury_share = f"{(j_in + j_out) / total_tok:.0%}" if total_tok else "n/a"
+    share_sub = "agent trials plus jury" if is_harness else f"jury {jury_share} of tokens"
 
     # Flag a high inconclusive share: those rounds carried no signal, so a run
     # that's mostly inconclusive is weak evidence and shouldn't read as neutral.
@@ -833,7 +879,7 @@ def build_report_html(
     # The modelled coefficient joins it only when identified (fit converged,
     # bootstrap interval excluding 0), which is also when the length-adj.
     # column exists. Length means characters throughout.
-    length_pref = report.get("length_pref")
+    length_pref = None if is_harness else report.get("length_pref")
     if length_pref and length_pref["rounds"]:
         rounds_n = length_pref["rounds"]
         longer = length_pref["longer_wins"]
@@ -864,7 +910,8 @@ def build_report_html(
             )
         signal_rows.append(("Did length sway the jury", detail, ""))
     signal_rows.append(("Judges agreeing on decisive rounds", f"<b>{_pct(agreement)}</b>", ""))
-    signal_rows.append(("Jury share of tokens used", f"<b>{jury_share}</b>", ""))
+    if not is_harness:
+        signal_rows.append(("Jury share of tokens used", f"<b>{jury_share}</b>", ""))
     signals_table = html_table(
         ["Signal", "Reading"],
         [
@@ -877,7 +924,7 @@ def build_report_html(
 
     # Records store short model names; elo/manifest/report are keyed by display
     # name (name). Identical unless the config sets custom names.
-    alias = report.get("by_model_names") or {w.short_model: w.name for w in cfg.candidates}
+    alias = _alias_map(cfg, report)
     stats_all = _speed_stats(records, alias)
     speed = _speed_svg(stats_all)
     dur_by = {n: d for n, _t, _f, _o, d in stats_all}
@@ -894,9 +941,18 @@ def build_report_html(
         else ""
     )
 
+    trial_usd_by, n_trials, n_trials_unknown = (
+        _harness_costs(records, alias) if is_harness else ({}, 0, 0)
+    )
+    trial_usd = sum(trial_usd_by.values())
+    # harnesses whose spend includes trials priced from tokens: their costs carry a "~"
+    est_names = frozenset(n for n, hs in harness_stats.items() if hs.get("estimated"))
     value_map = ""
-    if prices:
-        per_cost = _per_model_cost(records, manifest, prices, alias)
+    if prices or trial_usd_by:
+        per_cost = {
+            **(_per_model_cost(records, manifest, prices, alias) if prices else {}),
+            **trial_usd_by,
+        }
         rates = _win_rates(grid, order)
         use_dur = any(dur_by.get(n, 0.0) > 0 for n in order)
         pts = [
@@ -914,10 +970,14 @@ def build_report_html(
             pts,
             champion,
             size_label=("average time to answer" if use_dur else "average response length"),
+            estimated=est_names,
         )
 
     rates_all = _win_rates(grid, order)
-    per_cost_all = _per_model_cost(records, manifest, prices, alias) if prices else {}
+    per_cost_all = {
+        **(_per_model_cost(records, manifest, prices, alias) if prices else {}),
+        **trial_usd_by,
+    }
 
     # Tokens & cost as three cards: models spend, jury spend, aggregated total.
     # Without catalog prices there's no cost story, so cards fall back to tokens.
@@ -930,16 +990,40 @@ def build_report_html(
             jury_measured = sum(r.judge_cost_usd or 0.0 for r in rounds_judged)
     cost = _cost_lines(records, manifest, prices, alias, jury_measured)
     cost_note = ""
+    pure_harness = all(isinstance(w, HarnessCandidate) for w in cfg.candidates)
+    trial_card = (
+        _kpi(
+            "Agent trials",
+            _fmt_usd(trial_usd),
+            f"{n_trials} trials &middot; "
+            + _cost_provenance(n_trials - n_trials_unknown, _harness_estimated(records))
+            + (f" &middot; {n_trials_unknown} reported no cost" if n_trials_unknown else ""),
+        )
+        if is_harness
+        else ""
+    )
+    trial_note = (
+        " Agent spend is what each trial reported (observed), or its tokens at the catalog rate for an agent that reports none (estimated), counted once even when a cached "
+        "trial is replayed into later matches."
+        if is_harness
+        else ""
+    )
     if cost:
         w_usd, j_usd, unpriced = cost
-        total = w_usd + (j_usd or 0.0)
+        total = w_usd + (j_usd or 0.0) + trial_usd
         if jury_measured is not None:
             j_card = _kpi(
                 "Jury", _fmt_usd(j_usd), f"{j_in:,} in &middot; {j_out:,} out &middot; measured"
             )
-            t_card = _kpi("Total", f"${total:,.2f}", f"jury {jury_share} of tokens", "neutral")
+            # an agent that reports no cost is priced from tokens, so the total is approximate
+            t_card = (
+                _kpi("Estimated total", f"&asymp; ${total:,.2f}", share_sub, "neutral")
+                if est_names
+                else _kpi("Total", f"${total:,.2f}", share_sub, "neutral")
+            )
             spend = (
                 "Model and jury spend are exact: jury cost is what each judge call was priced at."
+                + (" Agent spend is partly estimated, so the total is too." if est_names else "")
             )
         else:
             j_big = f"&asymp; ${j_usd:,.2f}" if j_usd is not None else "n/a"
@@ -947,28 +1031,39 @@ def build_report_html(
             t_card = _kpi(
                 "Estimated total",
                 f"&asymp; ${total:,.2f}",
-                f"jury {jury_share} of tokens",
+                share_sub,
                 "neutral",
             )
             spend = (
                 "Model spend is exact (per-model catalog rates); jury spend is estimated at the "
                 "panel's mean rate because the log stores the panel's token total, not per-judge splits."
             )
-        models_card = _kpi(
-            "Models", f"${w_usd:,.2f}", f"{w_in:,} in &middot; {w_out:,} out &middot; exact"
+        models_card = (
+            ""
+            if pure_harness
+            else _kpi(
+                "Models", f"${w_usd:,.2f}", f"{w_in:,} in &middot; {w_out:,} out &middot; exact"
+            )
         )
-        cost_cards = f"<div class='kpi-band'>{models_card}{j_card}{t_card}</div>"
+        cost_cards = f"<div class='kpi-band'>{models_card}{trial_card}{j_card}{t_card}</div>"
         excluded = (
             " Unpriced in the catalog and excluded: " + ", ".join(unpriced) + "."
             if unpriced
             else ""
         )
-        cost_note = f"<p class='note'>{spend}{excluded}</p>"
+        cost_note = f"<p class='note'>{spend}{trial_note}{excluded}</p>"
     else:
         cost_cards = (
             "<div class='kpi-band'>"
-            + _kpi(
-                "Models", f"{w_in + w_out:,}", f"{w_in:,} in &middot; {w_out:,} out &middot; tokens"
+            + trial_card
+            + (
+                ""
+                if pure_harness
+                else _kpi(
+                    "Models",
+                    f"{w_in + w_out:,}",
+                    f"{w_in:,} in &middot; {w_out:,} out &middot; tokens",
+                )
             )
             + _kpi(
                 "Jury", f"{j_in + j_out:,}", f"{j_in:,} in &middot; {j_out:,} out &middot; tokens"
@@ -1038,7 +1133,7 @@ def build_report_html(
         # ELO is the value (the ranking axis); win share and spend ride below.
         sub = f"ELO &middot; {rates_all.get(nm, 0.0):.0%} win share"
         if nm in per_cost_all:
-            sub += f" &middot; {_fmt_usd(per_cost_all[nm])}"
+            sub += f" &middot; {'~' if nm in est_names else ''}{_fmt_usd(per_cost_all[nm])}"
         edge = ("pass" if separated else "warn") if i == 0 else ""
         top3.append(_kpi(_e(nm), f"{e0:.0f}<span class='medal'>{medals[i]}</span>", sub, edge))
     # Reconcile the common confusion when a lower-ranked card shows a higher
@@ -1098,7 +1193,42 @@ def build_report_html(
         if decisions
         else "Every verdict via evaluatorq&#39;s pairwise jury"
     )
-    rounds = _rounds_html(judged, alias, labels, abstain_floor)
+    rounds = (
+        f"<h2>Rounds</h2><p class='note'>All {len(records)} rounds, each with the judges' picks "
+        f"and, for a harness run, both solutions with diff and trajectory, are on their own page "
+        f"with filters: <a href='{_e(rounds_href)}'>open the rounds browser</a>.</p>"
+        if rounds_href
+        else ""
+    )
+    harness_meth = (
+        "<h3>The verifier gate</h3><p>Each coding agent works in its own fresh container and the "
+        "task&#39;s hidden tests then run against what it left behind. When exactly one of the two "
+        "agents passes, the tests decide the round and the jury is not called (shown as "
+        "&ldquo;decided by verifier gate&rdquo;). When both pass or both fail, the jury reads a "
+        "short dossier for each side (the test verdict, the workspace diff, a trajectory summary "
+        "and the tail of the test output) and judges the quality of the work. Pass rate counts "
+        "each task once per harness. $/task and min/task are measured on the trial itself and "
+        "averaged over tasks. A &#9888; tests edited mark means the agent changed files under "
+        "<code>tests/</code>, which can inflate a pass.</p>"
+        if is_harness
+        else ""
+    )
+    hx = manifest.get("harness") or {}
+    harness_footer = ""
+    if hx:
+        n_tasks = len(hx.get("tasks") or [])
+        harness_footer = (
+            f"harbor <code>{_e(hx.get('harbor_version') or '?')}</code>"
+            + (f" &middot; {n_tasks} tasks" if n_tasks else "")
+            + " &middot; "
+        )
+    tail_head = (
+        "<th class='n' title='hidden tests passed / trials verified'>pass rate</th>"
+        "<th class='n' title='mean agent spend per task, as reported by the trial'>$/task</th>"
+        "<th class='n' title='mean wall-clock minutes per task'>min/task</th>"
+        if is_harness
+        else '<th class="n">avg length</th>'
+    )
 
     return f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
@@ -1108,7 +1238,7 @@ def build_report_html(
 
 <header class="hero">
 <div class="report-brand-logo">{_LOGO}</div>
-<p class="meta">{dataset_frag}{bench_id} &middot; {datestr} &middot; {len(ranked)} MODELS &middot; {len(records)} ROUNDS{" &middot; " + duration.upper() if duration else ""} &middot; {judges_meta} &middot; {swap_meta} &middot; ORQ-ARENA RUN</p>
+<p class="meta">{dataset_frag}{bench_id} &middot; {datestr} &middot; {len(ranked)} {"HARNESSES" if is_harness else "MODELS"} &middot; {len(records)} ROUNDS{" &middot; " + duration.upper() if duration else ""} &middot; {judges_meta} &middot; {swap_meta} &middot; ORQ-ARENA RUN</p>
 {status}
 <h1>{headline}</h1>
 <p class="lede">{expl}</p>
@@ -1118,8 +1248,8 @@ def build_report_html(
 
 <h2>Leaderboard</h2>
 <div class="tablewrap"><table>
-<thead><tr><th class="n">#</th><th>Model</th><th class="n">ELO</th><th class="n">95% CI</th>
-<th>CI range (shared scale)</th>{"<th class='n'>length-adj.</th>" if elo_sc else ""}<th class="n">avg length</th></tr></thead>
+<thead><tr><th class="n">#</th><th>{"Harness" if is_harness else "Model"}</th><th class="n">ELO</th><th class="n">95% CI</th>
+<th>CI range (shared scale)</th>{"<th class='n'>length-adj.</th>" if elo_sc else ""}{tail_head}</tr></thead>
 <tbody>{"".join(ladder_rows)}</tbody></table></div>
 <p class="note">ELO is a skill rating anchored at 1000: a model climbs by winning rounds, and more
 for beating a strong opponent, so a higher score means better on your prompts. The 95% CI is the
@@ -1146,6 +1276,7 @@ whose bars overlap are not thereby tied: read each bar on its own, and see Confi
   <span><span class="sideA">A</span> wins <b>{verdicts["A"]}</b></span>
   <span><span class="sideB">B</span> wins <b>{verdicts["B"]}</b></span>
   <span>ties <b>{verdicts["tie"]}</b></span>
+  {f"<span>decided by verifier gate <b>{gate_rounds}</b></span>" if is_harness else ""}
   <span class="sig{inc_cls}">inconclusive <b>{verdicts["inconclusive"]}</b></span>
   {f'<span class="sig warn">errored <b>{voids}</b></span>' if voids else ""}
 </div>
@@ -1184,8 +1315,8 @@ agreed on. The A-vs-B split is panel-level seat lean.</p>
 <p>A- and B-wins plus ties are decisive and feed the rating (rated = decisive + ties).
 Inconclusive rounds carry no signal and are dropped, never counted as ties. An errored round is
 a network or infrastructure failure, not a model failure; it is logged and excluded.</p>
-<h3>Cost</h3>
-<p>{cost_meth}</p>
+{harness_meth}<h3>Cost</h3>
+<p>{cost_meth}{trial_note}</p>
 </details>
 
 {rounds}
@@ -1194,7 +1325,7 @@ a network or infrastructure failure, not a model failure; it is logged and exclu
 config <code>{_e(manifest.get("config_sha256", "?"))}</code> &middot;
 prompts <code>{_e(manifest.get("prompts_sha256", "?"))}</code> ({manifest.get("prompt_count", "?")}) &middot;
 seed <code>{_e(manifest.get("seed", "?"))}</code> &middot;
-panel: {_e(panel)} &middot; evaluatorq <code>{_e(manifest.get("evaluatorq_version", "?"))}</code><br>
+{harness_footer}panel: {_e(panel)} &middot; evaluatorq <code>{_e(manifest.get("evaluatorq_version", "?"))}</code><br>
 generated by <a href="https://github.com/orq-ai/orq-arena">orq-arena</a>; regenerate any time
 with <code>orq-arena report &lt;battles.jsonl&gt;</code>. {via}; every token via the orq.ai
 router gateway.
@@ -1217,17 +1348,34 @@ def write_report(
     manifest: dict[str, Any],
     log_path: str | Path,
     prices: dict[str, tuple[float, float]] | None = None,
+    out_path: str | Path | None = None,
+    identity_source: IdentitySource = "manifest",
 ) -> Path:
-    out = report_path_for(log_path)
+    """Write the run report and, beside it, the rounds page it links to. Returns the report path."""
+    out = Path(out_path) if out_path else report_path_for(log_path)
+    rounds_out = rounds_path_for(out)
     out.write_text(
-        build_report_html(
-            cfg=cfg,
-            records=records,
-            elo=elo,
-            report=report,
-            manifest=manifest,
-            prices=prices,
+        redact(
+            build_report_html(
+                cfg=cfg,
+                records=records,
+                elo=elo,
+                report=report,
+                manifest=manifest,
+                prices=prices,
+                identity_source=identity_source,
+                rounds_href=rounds_out.name,
+            )
         ),
         encoding="utf-8",
+    )
+    write_rounds(
+        rounds_out,
+        records=records,
+        alias=_alias_map(cfg, report),
+        labels=_judge_label_map(cfg, report, manifest),
+        floor=cfg.judge_abstain_below,
+        title=str(manifest.get("tournament_id") or out.stem),
+        report_href=out.name,
     )
     return out

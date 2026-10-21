@@ -15,19 +15,36 @@ that produces reasoning despite its config.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Collection
+import os
+import platform
+import re
+import shutil
+import subprocess
+import tempfile
+from collections import Counter
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from itertools import combinations
+from pathlib import Path
 from typing import Any
 
-from .candidates import CandidateSpec
+from .candidates import AnyCandidate, CandidateSpec, HarnessCandidate
 from .config import ArenaConfig
-from .data.prompts import PromptItem
-from .providers.models_list import ModelEntry
+from .data.prompts import PromptItem, item_key
+from .harness.routing import WIRE
+from .providers.models_list import ModelEntry, catalog_host
 from .providers.orq_gateway import OrqGateway
 
 _PROBE_PROMPT = "Reply with the single word: ok"
+# A harness round's judge input is a dossier, not a capped model answer: 8 KB of
+# diff, 6 KB of key steps and a test tail, at four characters a token.
+_DOSSIER_TOKENS = 4_000
+
+
+def _models(cfg: ArenaConfig) -> list[CandidateSpec]:
+    """The candidates that are routed models; harness candidates call no model directly."""
+    return [c for c in cfg.candidates if isinstance(c, CandidateSpec)]
 
 
 @dataclass(frozen=True)
@@ -40,14 +57,17 @@ class CallCounts:
 
 
 def call_counts(cfg: ArenaConfig, prompts: list[PromptItem]) -> CallCounts:
-    matches = len(list(combinations(cfg.candidates, 2)))
+    pairs = list(combinations(cfg.candidates, 2))
+    matches = len(pairs)
     rounds = min(cfg.match.max_rounds, len(prompts))
+    # A harness side is a Harbor trial, not a model stream.
+    sides = sum(isinstance(c, CandidateSpec) for pair in pairs for c in pair)
     return CallCounts(
         matches=matches,
         rounds_per_match=rounds,
-        model_streams=matches * rounds * 2,
+        model_streams=sides * rounds,
         judge_calls=matches * rounds * len(cfg.judges) * seat_orders(cfg),
-        probe_calls=len(cfg.candidates) if cfg.preflight.thinking_probe else 0,
+        probe_calls=len(_models(cfg)) if cfg.preflight.thinking_probe else 0,
     )
 
 
@@ -121,6 +141,9 @@ def cost_projection(
     models_usd = 0.0
     max_cap = 0
     for w in cfg.candidates:
+        if isinstance(w, HarnessCandidate):
+            max_cap = max(max_cap, _DOSSIER_TOKENS)  # what the jury reads for this side
+            continue
         cap = w.max_tokens or cfg.gateway.candidate_max_tokens
         max_cap = max(max_cap, cap)
         streams = (n - 1) * rounds  # each candidate meets every other once
@@ -152,7 +175,7 @@ def cost_projection(
     probe_usd = 0.0
     if counts.probe_calls:
         probe_prompt_tok = _est_tokens(_PROBE_PROMPT)
-        for w in cfg.candidates:
+        for w in _models(cfg):
             if w.model_id not in prices:
                 continue  # already recorded above
             cin, cout = prices[w.model_id]
@@ -200,9 +223,13 @@ def cost_projection(
 
 
 def referenced_models(cfg: ArenaConfig) -> list[str]:
-    """Every model id the config names: candidates, judges, stand-in judges."""
+    """Every model id the config names: candidates, judges, stand-in judges.
+
+    A harness candidate's model is an agent setting, not a router call the catalog
+    can vouch for, so it is left out rather than reported as unknown.
+    """
     return [
-        *(w.model_id for w in cfg.candidates),
+        *(w.model_id for w in _models(cfg)),
         *cfg.judges,
         *cfg.replacement_judges,
     ]
@@ -359,7 +386,13 @@ def judge_context_warnings(
     """
     prompt_tok = max((_est_tokens(p.text) for p in prompts), default=1)
     max_cap = max(
-        (w.max_tokens or cfg.gateway.candidate_max_tokens for w in cfg.candidates), default=0
+        (
+            _DOSSIER_TOKENS
+            if isinstance(w, HarnessCandidate)
+            else (w.max_tokens or cfg.gateway.candidate_max_tokens)
+            for w in cfg.candidates
+        ),
+        default=0,
     )
     need = prompt_tok + 2 * max_cap + _JUDGE_WRAPPER_TOKENS
     tight = [
@@ -415,7 +448,7 @@ async def _probe_one(gateway: OrqGateway, w: CandidateSpec) -> tuple[str, dict[s
 async def thinking_probe(cfg: ArenaConfig) -> dict[str, dict[str, Any]]:
     """One tiny call per candidate; returns {name: probe result}."""
     gateway = OrqGateway(cfg.gateway)
-    results = await asyncio.gather(*(_probe_one(gateway, w) for w in cfg.candidates))
+    results = await asyncio.gather(*(_probe_one(gateway, w) for w in _models(cfg)))
     return dict(results)
 
 
@@ -428,7 +461,7 @@ def surprises(probe: dict[str, dict[str, Any]]) -> list[str]:
     ]
 
 
-def judge_family_overlaps(judges: list[str], candidates: list[CandidateSpec]) -> list[str]:
+def judge_family_overlaps(judges: list[str], candidates: Sequence[AnyCandidate]) -> list[str]:
     """Judges sharing a provider family with a contestant.
 
     Self-preference bias rides on stylistic self-recognition (Panickssery et
@@ -445,3 +478,280 @@ def judge_family_overlaps(judges: list[str], candidates: list[CandidateSpec]) ->
 
     candidate_fams = {fam(c.model_id) for c in candidates}
     return [j for j in judges if fam(j) in candidate_fams]
+
+
+# ----- harness mode ----------------------------------------------------------
+
+_COST_NOTE = (
+    "agent spend is not projected; per-trial caps are agent_kwargs max_turns (claude-code, pi) and "
+    "max_budget_usd (claude-code); codex has neither, and costs differ by model: check the first trials"
+)
+_DEFAULT_AGENT_TIMEOUT_S = 900
+_UNRESOLVED_VAR = re.compile(r"\$(\w+|\{[^}]*\})")
+_DRY_RUN_UNSUPPORTED = ("no such option", "unrecognized", "unknown option", "unexpected extra")
+
+
+def _run_cmd(argv: list[str], timeout: float = 30.0) -> tuple[int, str]:
+    """Run a command, return ``(exit code, stdout + stderr)``; 127 when it cannot start.
+
+    The single place preflight shells out, so tests replace it and never touch Docker.
+    """
+    try:
+        out = subprocess.run(argv, capture_output=True, text=True, timeout=timeout, check=False)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return 127, str(exc)
+    return out.returncode, (out.stdout or "") + (out.stderr or "")
+
+
+@dataclass(frozen=True)
+class _HarnessProbe:
+    problems: list[str]  # blocking
+    lines: list[str]  # for the run plan: "✓ ...", "⚠ ...", "✗ ..."
+
+
+_last_probe: tuple[Any, _HarnessProbe] | None = None
+
+
+def _harnesses(cfg: ArenaConfig) -> list[HarnessCandidate]:
+    return [c for c in cfg.candidates if isinstance(c, HarnessCandidate)]
+
+
+def _task_path(item: PromptItem) -> str:
+    return str(item.metadata.get("harbor_task_path") or "")
+
+
+def _dry_run(
+    cfg: ArenaConfig, exe: str, candidate: HarnessCandidate, item: PromptItem
+) -> tuple[bool, str]:
+    """``(ok, note)`` for one ``harbor run --dry-run``, built from the real argv."""
+    from .harness.runner import HarborRunner, HarnessError
+
+    with tempfile.TemporaryDirectory(prefix="orq-arena-dry-") as tmp:
+        runner = HarborRunner(
+            cfg.harness,
+            Path(tmp),
+            router_host=cfg.harness.router_host or catalog_host(cfg.gateway),
+            keep_awake=False,
+        )
+        try:
+            argv, env = runner._plan(item, candidate, "dry-run")
+        except HarnessError as exc:
+            return False, str(exc)
+        argv[0] = exe
+        # A custom agent (codex) is imported from PYTHONPATH; _run_cmd has no env of its own.
+        if env.get("PYTHONPATH") != os.environ.get("PYTHONPATH"):
+            argv = ["env", f"PYTHONPATH={env['PYTHONPATH']}", *argv]
+        code, out = _run_cmd([*argv, "--dry-run"], timeout=60.0)
+    tail = out.strip().splitlines()[-1] if out.strip() else ""
+    if code == 0:
+        return True, ""
+    if any(marker in out.lower() for marker in _DRY_RUN_UNSUPPORTED):
+        return False, "this harbor has no --dry-run"
+    return False, f"exit {code}: {tail[:160]}"
+
+
+def _existing_tasks(prompts: list[PromptItem]) -> set[str]:
+    return {t for p in prompts if (t := _task_path(p)) and Path(t).expanduser().exists()}
+
+
+def _probe_harness(cfg: ArenaConfig, prompts: list[PromptItem]) -> _HarnessProbe:
+    problems: list[str] = []
+    lines: list[str] = []
+    h = cfg.harness
+
+    def block(msg: str) -> None:
+        problems.append(msg)
+        lines.append(f"✗ {msg}")
+
+    exe = shutil.which(h.harbor_bin)
+    if exe is None:
+        block(
+            f"{h.harbor_bin!r} is not on PATH. Install Harbor with "
+            "`uv tool install --python 3.13 harbor`, or set harness.harbor_bin."
+        )
+    else:
+        code, out = _run_cmd([exe, "--version"])
+        version = out.strip().splitlines()[-1].strip() if out.strip() else ""
+        if code != 0:
+            block(f"`{h.harbor_bin} --version` failed (exit {code}): {version[:160]}")
+        elif version.lower().startswith("harbor"):
+            lines.append(f"✓ {version}")
+        else:
+            lines.append(f"✓ harbor {version}")
+
+    code, _out = _run_cmd(["docker", "info"])
+    if code != 0:
+        block("the Docker daemon is not reachable (`docker info` failed). Start Docker Desktop.")
+    else:
+        lines.append("✓ docker")
+
+    if os.environ.get(h.api_key_name):
+        lines.append(f"✓ {h.api_key_name}")
+    else:
+        block(
+            f"{h.api_key_name} is not set. Harbor passes it to every agent as the router key "
+            "(harness.api_key_name names the variable)."
+        )
+
+    harnesses = _harnesses(cfg)
+    for c in harnesses:
+        for path in c.overlay.paths() if c.overlay else []:
+            if not Path(path).expanduser().exists():
+                block(f"{c.name}: overlay path does not exist: {path}")
+        for key, value in c.agent_env.items():
+            if _UNRESOLVED_VAR.search(os.path.expandvars(value)):
+                block(
+                    f"{c.name}: agent_env {key} is {value!r}, which refers to an environment "
+                    "variable that is not set."
+                )
+
+    no_path = [p for p in prompts if not _task_path(p)]
+    if no_path:
+        block(
+            f"{len(no_path)} of {len(prompts)} prompt rows have no harbor_task_path metadata; "
+            "build the prompt file with `orq-arena tasks sample`."
+        )
+    gone = sorted({_task_path(p) for p in prompts if _task_path(p)} - _existing_tasks(prompts))
+    if gone:
+        shown = ", ".join(gone[:3]) + (f" and {len(gone) - 3} more" if len(gone) > 3 else "")
+        block(f"task directories not found: {shown}")
+    tasks_ok = bool(prompts) and not no_path and not gone
+    if tasks_ok:
+        lines.append(f"✓ {len(prompts)} task directories")
+
+    if exe is not None and tasks_ok:
+        first_of_agent: dict[str, HarnessCandidate] = {}
+        for c in harnesses:
+            first_of_agent.setdefault(c.agent, c)
+        for agent, c in first_of_agent.items():
+            ok, note = _dry_run(cfg, exe, c, prompts[0])
+            lines.append(
+                f"✓ harbor dry run: {agent}"
+                if ok
+                else f"⚠ harbor dry run for {agent} did not pass ({note}); not blocking"
+            )
+
+    if platform.machine().lower() in ("arm64", "aarch64"):
+        lines.append("⚠ images are linux/amd64, running under emulation")
+    return _HarnessProbe(problems, lines)
+
+
+def _probe_key(cfg: ArenaConfig, prompts: list[PromptItem]) -> Any:
+    # The helpers are in the key so a test that swaps them never reads a stale probe.
+    return (
+        cfg.model_dump_json(),
+        tuple(_task_path(p) for p in prompts),
+        _run_cmd,
+        shutil.which,
+        bool(os.environ.get(cfg.harness.api_key_name)),
+    )
+
+
+def harness_checks(cfg: ArenaConfig, prompts: list[PromptItem]) -> list[str]:
+    """Problems that stop a harness run before it spends anything; ``[]`` means go.
+
+    Harbor and Docker must be reachable, the router key set, every overlay path and
+    task directory present, and every ``agent_env`` value resolvable. A
+    ``harbor run --dry-run`` per distinct agent is advisory: a Harbor that lacks the
+    flag, or a dry run that fails for some other reason, is reported in the run
+    plan but does not block.
+    """
+    global _last_probe
+    probe = _probe_harness(cfg, prompts)
+    # `harness_plan` runs right after and shows the same lines; do not repeat the dry runs.
+    _last_probe = (_probe_key(cfg, prompts), probe)
+    return list(probe.problems)
+
+
+def _missing_images(prompts: list[PromptItem]) -> tuple[list[str], int, bool]:
+    """``(images not present locally, distinct images, whether Docker answered)``."""
+    images = list(dict.fromkeys(str(i) for p in prompts if (i := p.metadata.get("image"))))
+    if _run_cmd(["docker", "info"])[0] != 0:
+        return [], len(images), False
+    missing = [img for img in images if _run_cmd(["docker", "image", "inspect", img])[0] != 0]
+    return missing, len(images), True
+
+
+def harness_plan(
+    cfg: ArenaConfig,
+    prompts: list[PromptItem],
+    trials_dir: str | Path | None = None,
+) -> dict[str, Any]:
+    """The run plan for a harness pool: what will run, what is cached, what it may cost.
+
+    ``trials`` is an upper bound (``harnesses x tasks``): a tie never counts toward a
+    match's round cap, so a smaller ``--rounds`` can still draw extra tasks.
+    ``wall_estimate_s`` is the worst case, every uncached trial running to its
+    timeout (scaled by the timeout multiplier) on ``max_parallel_trials`` lanes.
+    Nothing here touches the network.
+    """
+    from .harness.runner import cached_trial_dir, job_name
+
+    harnesses = _harnesses(cfg)
+    where = trials_dir or cfg.harness.trials_dir
+    root = Path(where) if where else None
+
+    def timeout_s(item: PromptItem) -> int:
+        return int(item.metadata.get("timeout_sec") or _DEFAULT_AGENT_TIMEOUT_S)
+
+    cached = 0
+    uncached_s = 0.0
+    for c in harnesses:
+        mult = c.timeout_multiplier or cfg.harness.timeout_multiplier
+        for item in prompts:
+            if root is not None and cached_trial_dir(
+                root, job_name(item_key(item), c.candidate_id)
+            ):
+                cached += 1
+            else:
+                uncached_s += timeout_s(item) * mult
+
+    names: list[str] = []
+    for item in prompts:
+        name = str(item.metadata.get("task_name") or Path(_task_path(item)).name or "")
+        if name and name not in names:
+            names.append(name)
+
+    missing, n_images, docker_up = _missing_images(prompts)
+
+    probe = _last_probe[1] if _last_probe and _last_probe[0] == _probe_key(cfg, prompts) else None
+    checks = list((probe or _probe_harness(cfg, prompts)).lines)
+    if n_images and docker_up:
+        have = n_images - len(missing)
+        checks.append(
+            f"✓ {have}/{n_images} images"
+            if not missing
+            else f"⚠ {have}/{n_images} images present; harbor pulls the rest on first use"
+        )
+
+    def overlay_label(c: HarnessCandidate) -> str:
+        summary = c.overlay_summary()
+        return summary if summary == "vanilla" or not c.variant else f"{summary} #{c.variant}"
+
+    return {
+        "plan": {
+            "trials": len(harnesses) * len(prompts),
+            "cached": cached,
+            "matches": len(list(combinations(cfg.candidates, 2))),
+            "tasks_per_match": min(cfg.match.max_rounds, len(prompts)),
+            "task_names": names,
+            "difficulty_mix": dict(
+                Counter(str(p.metadata.get("difficulty") or "unknown") for p in prompts)
+            ),
+            "images_missing": missing,
+            "agent_timeouts_s": sum(timeout_s(p) for p in prompts) * len(harnesses),
+            "wall_estimate_s": int(uncached_s / max(1, cfg.harness.max_parallel_trials)),
+            "cost_note": _COST_NOTE,
+            "harnesses": [
+                {
+                    "name": c.name,
+                    "agent": c.agent,
+                    "model": c.model_id,
+                    "overlay": overlay_label(c),
+                    "api_format": WIRE[c.agent],
+                }
+                for c in harnesses
+            ],
+        },
+        "checks": checks,
+    }

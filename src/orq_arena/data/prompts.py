@@ -14,6 +14,7 @@ the datapoint's ``inputs``.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from dataclasses import dataclass, field, replace
@@ -29,6 +30,22 @@ class PromptItem:
     category: str = "general"
     # Opaque pass-through: never sliced or judged on, only carried to the log.
     metadata: dict = field(default_factory=dict)
+
+
+def prompt_hash(text: str) -> str:
+    """The id a prompt goes by in the log and in the harness trial cache."""
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+
+
+def replicate_key(text: str, replicate: int = 0) -> str:
+    """What a prompt's trial is keyed on: replicate 0 is the text itself, so trials cached
+    before replicates existed stay valid; later replicates are separate draws of one task."""
+    return text if not replicate else f"{text}\n\x00replicate={int(replicate)}"
+
+
+def item_key(item: PromptItem) -> str:
+    """``replicate_key`` for a prompt row; a row without a ``replicate`` is replicate 0."""
+    return replicate_key(item.text, int(item.metadata.get("replicate") or 0))
 
 
 def load_prompts(path: str | Path) -> list[PromptItem]:
