@@ -8,9 +8,9 @@ overview of the principles; the implementation itself is open source and is the 
 For every round, one prompt, two candidates, in a round-robin tournament:
 
 1. Both candidates answer the same prompt through the same orq.ai router gateway.
-2. An evaluatorq jury compares the two responses. Every judge sees the pair twice, once in
-   each seat order; a judge that contradicts itself between orders abstains rather than being
-   trusted on a coin flip.
+2. An evaluatorq jury compares the two responses. By default every judge sees the pair
+   twice, once in each seat order (`judge_swap: false` shows it once); a judge that
+   contradicts itself between orders abstains rather than being trusted on a coin flip.
 3. If fewer than two judges cast a decisive vote, the round is inconclusive and never reaches
    the rating.
 4. Every judged round (win, loss, or tie) feeds a Bradley-Terry fit over all rounds so far.
