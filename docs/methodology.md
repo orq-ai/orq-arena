@@ -71,14 +71,15 @@ rounds is in [LLM judges vs decision models](research/llm-judges-vs-decision-mod
 
 ## Ratings
 
-**Bradley-Terry, not incremental Elo.** Ratings come from a maximum-likelihood Bradley-Terry
-fit (Bradley & Terry, 1952) over every judged round, refit as the tournament progresses; ties
+**Bradley-Terry, not incremental Elo.** Ratings come from a Bradley-Terry fit (Bradley & Terry,
+1952) over every judged round, refit as the tournament progresses; ties
 count as half a win for each side. This is the same statistical core as Chatbot Arena's
 leaderboard (Chiang et al., 2024). Ratings are anchored so the field's average sits at 1000.
 Each model also plays one virtual tie against a fixed 1000-rated anchor. Without it, a model
 that loses (or wins) every round has no finite rating: on a small run it printed as exactly
 -3000. One tie pulls the extremes of a small run toward the middle; with many rounds per
-model it barely moves anything.
+model it barely moves anything. (In statistical terms the fit is a posterior mode with a weak
+prior, not a pure maximum-likelihood fit.)
 
 **Confidence intervals.** A 1000-resample bootstrap gives each candidate a 95% CI. On a small
 run the intervals are wide and overlapping; that is the honest output. Those intervals are
@@ -103,7 +104,10 @@ column reports each model with that preference priced out (`length-adj.` on the 
 `len-ctrl` in the live TUI). The coefficient and the column appear only when the preference
 is identified: the fit converged and a bootstrap interval over the same rows excludes 0.
 Resamples where one side always wins have no finite coefficient; they are counted as
-separated and widen the interval rather than being dropped. A big gap between a model's two
+separated and widen the interval rather than being dropped. The length fit has no virtual
+tie: when every round has the same length ratio, a tie would decide the coefficient on its
+own. So when a model wins or loses every round, that fit has no finite answer, and the column
+stays hidden even though the main rating is finite. A big gap between a model's two
 ratings means verbosity, not quality, is doing the separating. Length is the only style axis
 controlled today; markdown formatting is not.
 
