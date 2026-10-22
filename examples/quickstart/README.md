@@ -43,10 +43,10 @@ would rather keep the committed log untouched.
 
 ## What this run shows
 
-- **A real ranking with overlapping CIs.** `gemini-3.5-flash` leads at 1374,
-  but `claude-sonnet-4-6` (1196) and `gpt-5.4` (1174) overlap it; at the
-  bottom, `gemini-3.1-pro-preview`'s lower bound is unidentifiable (-3000) on
-  so few wins. Wide, overlapping intervals are the honest output at 76 rated
+- **A real ranking with overlapping CIs.** `gemini-3.5-flash` leads at 1317,
+  but `claude-sonnet-4-6` (1178) and `gpt-5.4` (1155) overlap it; at the
+  bottom, `gemini-3.1-pro-preview` won 1 of 22 rated rounds and sits at 537
+  (273–674). Wide, overlapping intervals are the honest output at 76 rated
   rounds, not a bug. Treat the shipped 30-prompt bank as a smoke test; use
   your own prompts and more rounds for a ranking you intend to defend.
 - **Draws are real.** 7 of the 28 matches ended a draw (equal judged round

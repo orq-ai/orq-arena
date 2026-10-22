@@ -86,9 +86,7 @@ def _final_table(ended: TournamentEnded) -> Table:
         row = [str(i), f"{name}{badge}", f"{elo:.0f}"]
         if ci:
             lo, hi = ci.get(name, (elo, elo))
-            # -inf lower bound: the model won too few rounds to identify a floor
-            fmt = lambda v: "-∞" if v == float("-inf") else f"{v:.0f}"  # noqa: E731
-            row.append(f"{fmt(lo)}–{fmt(hi)}")
+            row.append(f"{lo:.0f}–{hi:.0f}")
         if grid:
             row.append(_win_pct(grid, name))
         table.add_row(*row)
