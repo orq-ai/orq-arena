@@ -195,3 +195,47 @@ def test_a_cratered_model_does_not_masquerade_as_gamma_separation():
     # would call most of these draws "separated" and blow the count up.
     ci = bootstrap_gamma(rows, ["a", "b", "c"], draws=60)
     assert ci.separated < 10, f"{ci.separated}/60 draws misfiled as gamma separation"
+
+
+def test_a_sweep_hides_the_length_column_but_keeps_finite_ratings():
+    """A model that loses every round has no finite length-controlled fit (no
+    prior there, unlike the main rating: on a single length ratio a prior
+    would invent the coefficient). The fit refuses, so the length-adj. column
+    and coefficient stay hidden, while the main ELO, which has the prior,
+    stays finite for every model."""
+    cfg = ArenaConfig.model_validate(
+        {
+            "candidates": [{"model_id": f"prov/{m}"} for m in "abc"],
+            "judges": ["prov/j1", "prov/j2"],
+        }
+    )
+
+    def rec(n: int, a: str, b: str, verdict: str, len_a: int, len_b: int) -> BattleRecord:
+        return BattleRecord(
+            prompt_hash=f"h{n}",
+            prompt_text="p",
+            model_a=a,
+            model_b=b,
+            model_a_id=f"prov/{a}",
+            model_b_id=f"prov/{b}",
+            response_a="x" * len_a,
+            response_b="y" * len_b,
+            majority_verdict=verdict,
+            winner={"A": a, "B": b}[verdict],
+            judge_votes=[{"model": "prov/j1", "vote": verdict}],
+        )
+
+    # c loses all 12 of its rounds; a vs b carries a real length signal.
+    shape = (
+        [("a", "c", "A", 300, 200)] * 6
+        + [("c", "b", "B", 200, 300)] * 6
+        + [("a", "b", "A", 400, 100)] * 9
+        + [("a", "b", "B", 100, 400)] * 7
+        + [("a", "b", "B", 400, 100)] * 2
+        + [("a", "b", "A", 100, 400)] * 2
+    )
+    records = [rec(i, *row) for i, row in enumerate(shape)]
+    elo, report = rebuild_from_log(cfg, records)
+    assert report["elo_style_controlled"] is None
+    assert report["length_coef"] is None
+    assert all(0 < r < 2000 for r in elo.values()), elo
